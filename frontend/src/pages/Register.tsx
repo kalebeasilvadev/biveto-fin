@@ -1,0 +1,141 @@
+import { useState, useEffect } from 'react'
+import { useNavigate, Link } from 'react-router-dom'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
+import { authApi } from '../services/api'
+import { useAuthStore } from '../stores/authStore'
+
+const schema = z.object({
+  name: z.string().min(2, 'Mínimo 2 caracteres'),
+  email: z.string().email('Email inválido'),
+  password: z.string().min(6, 'Mínimo 6 caracteres'),
+})
+
+type FormData = z.infer<typeof schema>
+
+export default function Register() {
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+  const navigate = useNavigate()
+  const { setTokens, isAuthenticated } = useAuthStore()
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/', { replace: true })
+    }
+  }, [isAuthenticated, navigate])
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<FormData>({
+    resolver: zodResolver(schema),
+  })
+
+  const onSubmit = async (data: FormData) => {
+    setLoading(true)
+    setError('')
+
+    try {
+      await authApi.register(data.email, data.password, data.name)
+      // Fazer login automaticamente após registro
+      const loginResponse = await authApi.login(data.email, data.password)
+      setTokens(loginResponse.data.access_token, loginResponse.data.refresh_token)
+      // Navigation will happen via useEffect when isAuthenticated changes
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { detail?: string } } }
+      setError(error.response?.data?.detail || 'Erro ao cadastrar')
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+      <div className="max-w-md w-full">
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-primary-600">Financeiro</h1>
+          <p className="text-gray-600 mt-2">Crie sua conta</p>
+        </div>
+
+        <div className="card">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Nome
+              </label>
+              <input
+                type="text"
+                {...register('name')}
+                className="input"
+                placeholder="Seu nome"
+              />
+              {errors.name && (
+                <p className="text-red-500 text-sm mt-1">
+                  {errors.name.message}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Email
+              </label>
+              <input
+                type="email"
+                {...register('email')}
+                className="input"
+                placeholder="seu@email.com"
+              />
+              {errors.email && (
+                <p className="text-red-500 text-sm mt-1">
+                  {errors.email.message}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Senha
+              </label>
+              <input
+                type="password"
+                {...register('password')}
+                className="input"
+                placeholder="••••••••"
+              />
+              {errors.password && (
+                <p className="text-red-500 text-sm mt-1">
+                  {errors.password.message}
+                </p>
+              )}
+            </div>
+
+            {error && (
+              <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm">
+                {error}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="btn-primary w-full"
+            >
+              {loading ? 'Cadastrando...' : 'Cadastrar'}
+            </button>
+          </form>
+
+          <p className="text-center text-sm text-gray-600 mt-4">
+            Já tem conta?{' '}
+            <Link to="/login" className="text-primary-600 hover:underline">
+              Faça login
+            </Link>
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}

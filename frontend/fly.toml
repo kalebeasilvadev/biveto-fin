@@ -1,0 +1,31 @@
+# fly.toml - Frontend configuration for Fly.io
+# App name should be unique - change if needed
+
+app = "app-financeiro-web"
+primary_region = "gru"  # Sao Paulo, Brazil
+
+[build]
+  [build.args]
+    VITE_API_URL = "https://app-financeiro-api.fly.dev"
+
+[env]
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+[[http_service.checks]]
+  interval = "30s"
+  timeout = "5s"
+  grace_period = "5s"
+  method = "GET"
+  path = "/health"
+
+[[vm]]
+  memory = "256mb"
+  cpu_kind = "shared"
+  cpus = 1

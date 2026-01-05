@@ -1,0 +1,64 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+ENV/
+env/
+.eggs/
+*.egg-info/
+*.egg
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Database
+*.db
+*.sqlite3
+
+# Uploads
+uploads/
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# Node
+node_modules/
+dist/
+.npm
+*.log
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+docker-compose.override.yml
+
+# Fly.io
+fly.lock
+
+# Claude Code
+.claude/
+
+# JetBrains evaluation
+.jbeval/
+
+# Test files
+*.png
+!frontend/public/*.png
+
+# MCP config (may contain sensitive info)
+mcp-config.json
