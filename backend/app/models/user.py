@@ -22,8 +22,12 @@ class User(Base):
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
 
-    # License relationship
-    license: Mapped["License | None"] = relationship(back_populates="users", lazy="selectin")
+    # License relationship - specify foreign_keys to avoid ambiguity with License.owner_user_id
+    license: Mapped["License | None"] = relationship(
+        back_populates="users",
+        lazy="selectin",
+        foreign_keys="User.license_id"
+    )
 
     # Relationships - cascade delete when user is deleted
     accounts: Mapped[list["Account"]] = relationship(
