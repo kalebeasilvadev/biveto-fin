@@ -3,13 +3,13 @@ import { useNavigate, Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { authApi } from '../services/api'
+import { authApi, getApiErrorMessage } from '../services/api'
 import { useAuthStore } from '../stores/authStore'
 
 const schema = z.object({
   name: z.string().min(2, 'Mínimo 2 caracteres'),
   email: z.string().email('Email inválido'),
-  password: z.string().min(6, 'Mínimo 6 caracteres'),
+  password: z.string().min(8, 'Mínimo 8 caracteres'),
 })
 
 type FormData = z.infer<typeof schema>
@@ -46,8 +46,7 @@ export default function Register() {
       setTokens(loginResponse.data.access_token, loginResponse.data.refresh_token)
       // Navigation will happen via useEffect when isAuthenticated changes
     } catch (err: unknown) {
-      const error = err as { response?: { data?: { detail?: string } } }
-      setError(error.response?.data?.detail || 'Erro ao cadastrar')
+      setError(getApiErrorMessage(err, 'Erro ao cadastrar'))
       setLoading(false)
     }
   }

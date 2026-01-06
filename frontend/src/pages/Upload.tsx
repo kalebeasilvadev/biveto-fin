@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { documentsApi, transactionsApi, accountsApi, categoriesApi } from '../services/api'
+import { documentsApi, transactionsApi, accountsApi, categoriesApi, getApiErrorMessage } from '../services/api'
 import { Upload as UploadIcon, Camera, Check, X, PenLine, AlertCircle, Image, CreditCard, Repeat, FileSpreadsheet } from 'lucide-react'
 import { clsx } from 'clsx'
 
@@ -132,9 +132,7 @@ export default function Upload() {
       }
     },
     onError: (error: unknown) => {
-      const err = error as { response?: { data?: { detail?: string } } }
-      const message = err.response?.data?.detail || 'Erro ao processar documento'
-      setUploadError(message)
+      setUploadError(getApiErrorMessage(error, 'Erro ao processar documento'))
     },
   })
 

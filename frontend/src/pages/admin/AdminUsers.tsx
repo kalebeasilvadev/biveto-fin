@@ -14,9 +14,11 @@ import {
   Check,
   XCircle,
   KeyRound,
+  AlertTriangle,
+  CheckCircle,
 } from 'lucide-react'
 import { clsx } from 'clsx'
-import api from '../../services/api'
+import api, { getApiErrorMessage } from '../../services/api'
 
 interface User {
   id: number
@@ -53,10 +55,25 @@ interface License {
   type: string
 }
 
+interface ConfirmAction {
+  type: 'delete' | 'resetPassword' | 'cancelInvite'
+  title: string
+  message: string
+  confirmText: string
+  onConfirm: () => void
+}
+
+interface Feedback {
+  type: 'success' | 'error'
+  message: string
+}
+
 export default function AdminUsers() {
   const [showModal, setShowModal] = useState(false)
   const [showInviteModal, setShowInviteModal] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
+  const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null)
+  const [feedback, setFeedback] = useState<Feedback | null>(null)
   const [form, setForm] = useState<UserForm>({
     email: '',
     password: '',
@@ -148,10 +165,12 @@ export default function AdminUsers() {
       return response.data
     },
     onSuccess: () => {
-      alert('Email de redefinição de senha enviado!')
+      setFeedback({ type: 'success', message: 'Email de redefinição de senha enviado!' })
+      setTimeout(() => setFeedback(null), 4000)
     },
-    onError: (error: any) => {
-      alert(error?.response?.data?.detail || 'Erro ao enviar email de redefinição')
+    onError: (error: unknown) => {
+      setFeedback({ type: 'error', message: getApiErrorMessage(error, 'Erro ao enviar email de redefinição') })
+      setTimeout(() => setFeedback(null), 4000)
     },
   })
 
@@ -196,9 +215,42 @@ export default function AdminUsers() {
   }
 
   const handleDelete = (user: User) => {
-    if (confirm(`Tem certeza que deseja excluir ${user.name}?`)) {
-      deleteMutation.mutate(user.id)
-    }
+    setConfirmAction({
+      type: 'delete',
+      title: 'Excluir usuário',
+      message: `Tem certeza que deseja excluir ${user.name}? Esta ação não pode ser desfeita.`,
+      confirmText: 'Excluir',
+      onConfirm: () => {
+        deleteMutation.mutate(user.id)
+        setConfirmAction(null)
+      },
+    })
+  }
+
+  const handleResetPassword = (user: User) => {
+    setConfirmAction({
+      type: 'resetPassword',
+      title: 'Resetar senha',
+      message: `Enviar email de redefinição de senha para ${user.email}?`,
+      confirmText: 'Enviar',
+      onConfirm: () => {
+        resetPasswordMutation.mutate(user.id)
+        setConfirmAction(null)
+      },
+    })
+  }
+
+  const handleCancelInvite = (invite: Invitation) => {
+    setConfirmAction({
+      type: 'cancelInvite',
+      title: 'Cancelar convite',
+      message: `Cancelar o convite enviado para ${invite.email}?`,
+      confirmText: 'Cancelar convite',
+      onConfirm: () => {
+        cancelInviteMutation.mutate(invite.id)
+        setConfirmAction(null)
+      },
+    })
   }
 
   const toggleAdmin = (user: User) => {
@@ -369,11 +421,7 @@ export default function AdminUsers() {
                         {user.is_admin ? <Shield size={18} /> : <ShieldOff size={18} />}
                       </button>
                       <button
-                        onClick={() => {
-                          if (confirm(`Enviar email de redefinição de senha para ${user.email}?`)) {
-                            resetPasswordMutation.mutate(user.id)
-                          }
-                        }}
+                        onClick={() => handleResetPassword(user)}
                         disabled={resetPasswordMutation.isPending}
                         className="p-1.5 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg"
                         title="Resetar senha"
@@ -468,11 +516,7 @@ export default function AdminUsers() {
                             <Send size={18} />
                           </button>
                           <button
-                            onClick={() => {
-                              if (confirm('Cancelar este convite?')) {
-                                cancelInviteMutation.mutate(inv.id)
-                              }
-                            }}
+                            onClick={() => handleCancelInvite(inv)}
                             className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
                             title="Cancelar"
                           >
@@ -539,7 +583,7 @@ export default function AdminUsers() {
                   onChange={(e) => setForm({ ...form, password: e.target.value })}
                   className="input"
                   required={!editingUser}
-                  minLength={6}
+                  minLength={8}
                 />
               </div>
 
@@ -647,8 +691,7 @@ export default function AdminUsers() {
 
               {inviteMutation.isError && (
                 <div className="p-3 bg-red-50 text-red-700 rounded-lg text-sm">
-                  {(inviteMutation.error as any)?.response?.data?.detail ||
-                    'Erro ao enviar convite'}
+                  {getApiErrorMessage(inviteMutation.error, 'Erro ao enviar convite')}
                 </div>
               )}
 
@@ -666,6 +709,74 @@ export default function AdminUsers() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal */}
+      {confirmAction && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl w-full max-w-md p-6 mx-4">
+            <div className="flex items-start gap-4">
+              <div className={clsx(
+                'flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center',
+                confirmAction.type === 'delete' ? 'bg-red-100' : 'bg-orange-100'
+              )}>
+                {confirmAction.type === 'delete' ? (
+                  <AlertTriangle className="w-5 h-5 text-red-600" />
+                ) : confirmAction.type === 'resetPassword' ? (
+                  <KeyRound className="w-5 h-5 text-orange-600" />
+                ) : (
+                  <XCircle className="w-5 h-5 text-orange-600" />
+                )}
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-gray-900">{confirmAction.title}</h3>
+                <p className="mt-2 text-sm text-gray-600">{confirmAction.message}</p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => setConfirmAction(null)}
+                className="btn-secondary"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmAction.onConfirm}
+                className={clsx(
+                  'px-4 py-2 rounded-lg font-medium text-white transition-colors',
+                  confirmAction.type === 'delete'
+                    ? 'bg-red-600 hover:bg-red-700'
+                    : 'bg-biveto hover:bg-biveto-dark'
+                )}
+              >
+                {confirmAction.confirmText}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Feedback Toast */}
+      {feedback && (
+        <div className="fixed bottom-6 right-6 z-50 animate-in slide-in-from-bottom-5">
+          <div className={clsx(
+            'flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg',
+            feedback.type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
+          )}>
+            {feedback.type === 'success' ? (
+              <CheckCircle className="w-5 h-5 flex-shrink-0" />
+            ) : (
+              <XCircle className="w-5 h-5 flex-shrink-0" />
+            )}
+            <span className="text-sm font-medium">{feedback.message}</span>
+            <button
+              onClick={() => setFeedback(null)}
+              className="ml-2 p-1 hover:bg-white/20 rounded-full transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
         </div>
       )}

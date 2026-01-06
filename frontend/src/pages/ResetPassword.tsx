@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useAuthStore } from '../stores/authStore'
-import api from '../services/api'
+import api, { getApiErrorMessage } from '../services/api'
 import { Lock, AlertCircle, Loader2 } from 'lucide-react'
 
 export default function ResetPassword() {
@@ -38,8 +38,8 @@ export default function ResetPassword() {
       setTokens(data.access_token, data.refresh_token)
       navigate('/')
     },
-    onError: (err: any) => {
-      setError(err.response?.data?.detail || 'Erro ao redefinir senha')
+    onError: (err: unknown) => {
+      setError(getApiErrorMessage(err, 'Erro ao redefinir senha'))
     },
   })
 
@@ -52,8 +52,8 @@ export default function ResetPassword() {
       return
     }
 
-    if (password.length < 6) {
-      setError('A senha deve ter pelo menos 6 caracteres')
+    if (password.length < 8) {
+      setError('A senha deve ter pelo menos 8 caracteres')
       return
     }
 
@@ -74,8 +74,7 @@ export default function ResetPassword() {
 
   // Show error if invalid
   if (validationError || !resetData?.is_valid) {
-    const errorMessage =
-      (validationError as any)?.response?.data?.detail || 'Link inválido ou expirado'
+    const errorMessage = getApiErrorMessage(validationError, 'Link inválido ou expirado')
 
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -135,9 +134,9 @@ export default function ResetPassword() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="input pl-10"
-                  placeholder="Mínimo 6 caracteres"
+                  placeholder="Mínimo 8 caracteres"
                   required
-                  minLength={6}
+                  minLength={8}
                 />
               </div>
             </div>
@@ -157,7 +156,7 @@ export default function ResetPassword() {
                   className="input pl-10"
                   placeholder="Digite a senha novamente"
                   required
-                  minLength={6}
+                  minLength={8}
                 />
               </div>
             </div>

@@ -1,6 +1,6 @@
-const CACHE_NAME = 'biveto-v4';
-const STATIC_CACHE = 'biveto-static-v4';
-const DYNAMIC_CACHE = 'biveto-dynamic-v4';
+const CACHE_NAME = 'biveto-v9';
+const STATIC_CACHE = 'biveto-static-v9';
+const DYNAMIC_CACHE = 'biveto-dynamic-v9';
 
 // Assets to cache immediately
 const STATIC_ASSETS = [
@@ -46,6 +46,9 @@ self.addEventListener('fetch', event => {
 
   // Skip non-GET requests
   if (request.method !== 'GET') return;
+
+  // Skip chrome-extension and other non-http(s) schemes
+  if (!url.protocol.startsWith('http')) return;
 
   // API requests - network first
   if (url.pathname.startsWith('/api/')) {

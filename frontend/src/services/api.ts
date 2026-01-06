@@ -1,6 +1,36 @@
 import axios from 'axios'
 import { useAuthStore } from '../stores/authStore'
 
+// Mapeamento de mensagens de erro do FastAPI para português
+const errorMessages: Record<string, string> = {
+  'String should have at least 8 characters': 'A senha deve ter pelo menos 8 caracteres',
+  'String should have at least 2 characters': 'O nome deve ter pelo menos 2 caracteres',
+  'value is not a valid email address': 'Email inválido',
+  'Field required': 'Campo obrigatório',
+}
+
+// Extrai mensagem de erro amigável do FastAPI
+export function getApiErrorMessage(error: unknown, defaultMessage: string): string {
+  const err = error as { response?: { data?: { detail?: unknown } } }
+  const detail = err?.response?.data?.detail
+
+  // Se detail é uma string, retorna diretamente
+  if (typeof detail === 'string') {
+    return detail
+  }
+
+  // Se detail é um array (erro de validação 422), extrai a primeira mensagem
+  if (Array.isArray(detail) && detail.length > 0) {
+    const firstError = detail[0]
+    if (firstError?.msg) {
+      // Tenta traduzir a mensagem
+      return errorMessages[firstError.msg] || firstError.msg
+    }
+  }
+
+  return defaultMessage
+}
+
 // Em produção usa a URL completa, em dev usa proxy
 const baseURL = import.meta.env.VITE_API_URL
   ? `${import.meta.env.VITE_API_URL}/api/v1`

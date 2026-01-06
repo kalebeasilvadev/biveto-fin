@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { useAuthStore } from '../stores/authStore'
-import api from '../services/api'
+import api, { getApiErrorMessage } from '../services/api'
 import { Lock, User, Mail, Check, AlertCircle } from 'lucide-react'
 
 export default function Settings() {
@@ -25,8 +25,8 @@ export default function Settings() {
       setConfirmPassword('')
       setTimeout(() => setSuccess(false), 3000)
     },
-    onError: (err: any) => {
-      setError(err.response?.data?.detail || 'Erro ao alterar senha')
+    onError: (err: unknown) => {
+      setError(getApiErrorMessage(err, 'Erro ao alterar senha'))
       setSuccess(false)
     },
   })
@@ -132,8 +132,8 @@ export default function Settings() {
               onChange={(e) => setNewPassword(e.target.value)}
               className="input"
               required
-              minLength={6}
-              placeholder="Digite a nova senha (mín. 6 caracteres)"
+              minLength={8}
+              placeholder="Digite a nova senha (mín. 8 caracteres)"
             />
           </div>
 
@@ -147,7 +147,7 @@ export default function Settings() {
               onChange={(e) => setConfirmPassword(e.target.value)}
               className="input"
               required
-              minLength={6}
+              minLength={8}
               placeholder="Confirme a nova senha"
             />
           </div>

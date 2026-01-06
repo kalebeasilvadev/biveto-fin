@@ -3,12 +3,12 @@ import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { authApi } from '../services/api'
+import { authApi, getApiErrorMessage } from '../services/api'
 import { useAuthStore } from '../stores/authStore'
 
 const schema = z.object({
   email: z.string().email('Email inválido'),
-  password: z.string().min(6, 'Mínimo 6 caracteres'),
+  password: z.string().min(8, 'Mínimo 8 caracteres'),
 })
 
 type FormData = z.infer<typeof schema>
@@ -43,8 +43,7 @@ export default function Login() {
       setTokens(response.data.access_token, response.data.refresh_token)
       // Navigation will happen via useEffect when isAuthenticated changes
     } catch (err: unknown) {
-      const error = err as { response?: { data?: { detail?: string } } }
-      setError(error.response?.data?.detail || 'Erro ao fazer login')
+      setError(getApiErrorMessage(err, 'Erro ao fazer login'))
       setLoading(false)
     }
   }
