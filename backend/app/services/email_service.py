@@ -250,7 +250,7 @@ https://biveto.com
         <div class="container">
             <div class="card">
                 <div class="header">
-                    <img src="https://biveto.com/logo.svg" alt="Biveto" class="logo-img">
+                    <img src="https://biveto.com/logo.png" alt="Biveto" class="logo-img">
                     <p class="slogan">finanças claras. decisões firmes.</p>
                 </div>
 
@@ -282,7 +282,7 @@ https://biveto.com
                 </div>
 
                 <div class="footer">
-                    <img src="https://biveto.com/logo.svg" alt="Biveto" class="footer-logo-img">
+                    <img src="https://biveto.com/logo.png" alt="Biveto" class="footer-logo-img">
                     <p class="footer-slogan">finanças claras. decisões firmes.</p>
                     <p class="footer-links">
                         © 2025 Biveto · <a href="https://biveto.com">biveto.com</a>
@@ -335,7 +335,7 @@ https://biveto.com
         <div class="container">
             <div class="card">
                 <div class="header">
-                    <img src="https://biveto.com/logo.svg" alt="Biveto" class="logo-img">
+                    <img src="https://biveto.com/logo.png" alt="Biveto" class="logo-img">
                     <p class="slogan">finanças claras. decisões firmes.</p>
                 </div>
 
@@ -367,7 +367,7 @@ https://biveto.com
                 </div>
 
                 <div class="footer">
-                    <img src="https://biveto.com/logo.svg" alt="Biveto" class="footer-logo-img">
+                    <img src="https://biveto.com/logo.png" alt="Biveto" class="footer-logo-img">
                     <p class="footer-slogan">finanças claras. decisões firmes.</p>
                     <p class="footer-links">
                         © 2025 Biveto · <a href="https://biveto.com">biveto.com</a>
@@ -416,7 +416,7 @@ https://biveto.com
         <div class="container">
             <div class="card">
                 <div class="header">
-                    <img src="https://biveto.com/logo.svg" alt="Biveto" class="logo-img">
+                    <img src="https://biveto.com/logo.png" alt="Biveto" class="logo-img">
                     <p class="slogan">finanças claras. decisões firmes.</p>
                 </div>
 
@@ -441,7 +441,7 @@ https://biveto.com
                 </div>
 
                 <div class="footer">
-                    <img src="https://biveto.com/logo.svg" alt="Biveto" class="footer-logo-img">
+                    <img src="https://biveto.com/logo.png" alt="Biveto" class="footer-logo-img">
                     <p class="footer-slogan">finanças claras. decisões firmes.</p>
                     <p class="footer-links">
                         © 2025 Biveto · <a href="https://biveto.com">biveto.com</a>

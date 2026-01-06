@@ -13,6 +13,7 @@ import {
   Clock,
   Check,
   XCircle,
+  KeyRound,
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import api from '../../services/api'
@@ -138,6 +139,19 @@ export default function AdminUsers() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-invitations'] })
+    },
+  })
+
+  const resetPasswordMutation = useMutation({
+    mutationFn: async (userId: number) => {
+      const response = await api.post(`/admin/users/${userId}/reset-password`)
+      return response.data
+    },
+    onSuccess: () => {
+      alert('Email de redefinição de senha enviado!')
+    },
+    onError: (error: any) => {
+      alert(error?.response?.data?.detail || 'Erro ao enviar email de redefinição')
     },
   })
 
@@ -355,14 +369,28 @@ export default function AdminUsers() {
                         {user.is_admin ? <Shield size={18} /> : <ShieldOff size={18} />}
                       </button>
                       <button
+                        onClick={() => {
+                          if (confirm(`Enviar email de redefinição de senha para ${user.email}?`)) {
+                            resetPasswordMutation.mutate(user.id)
+                          }
+                        }}
+                        disabled={resetPasswordMutation.isPending}
+                        className="p-1.5 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg"
+                        title="Resetar senha"
+                      >
+                        <KeyRound size={18} />
+                      </button>
+                      <button
                         onClick={() => openEditModal(user)}
                         className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-gray-100 rounded-lg"
+                        title="Editar"
                       >
                         <Edit2 size={18} />
                       </button>
                       <button
                         onClick={() => handleDelete(user)}
                         className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-gray-100 rounded-lg"
+                        title="Excluir"
                       >
                         <Trash2 size={18} />
                       </button>
