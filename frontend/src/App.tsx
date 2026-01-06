@@ -16,6 +16,7 @@ import AdminDashboard from './pages/admin/AdminDashboard'
 import AdminUsers from './pages/admin/AdminUsers'
 import AdminLicenses from './pages/admin/AdminLicenses'
 import Settings from './pages/Settings'
+import Family from './pages/Family'
 import Invite from './pages/Invite'
 import ResetPassword from './pages/ResetPassword'
 
@@ -74,6 +75,7 @@ function App() {
         <Route path="chat" element={<Chat />} />
         <Route path="accounts" element={<Accounts />} />
         <Route path="settings" element={<Settings />} />
+        <Route path="family" element={<Family />} />
         {/* Admin routes - protegidas por AdminRoute */}
         <Route path="admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
         <Route path="admin/users" element={<AdminRoute><AdminUsers /></AdminRoute>} />

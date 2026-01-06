@@ -2,6 +2,7 @@ from datetime import date, datetime
 from pydantic import BaseModel, Field
 from typing import Optional
 from enum import Enum
+from ..models.household import OwnershipType
 
 
 class RecurrenceFrequency(str, Enum):
@@ -23,7 +24,7 @@ class TransactionType(str, Enum):
 
 
 class RecurringCreate(BaseModel):
-    """Schema para criar uma transação recorrente"""
+    """Schema para criar uma transacao recorrente"""
     name: str = Field(..., min_length=1, max_length=100)
     description: Optional[str] = Field(None, max_length=500)
     amount: float = Field(..., gt=0)
@@ -35,6 +36,7 @@ class RecurringCreate(BaseModel):
     day_of_week: Optional[int] = Field(None, ge=0, le=6)
     start_date: date
     end_date: Optional[date] = None
+    ownership_type: OwnershipType = OwnershipType.PERSONAL
 
 
 class RecurringUpdate(BaseModel):
@@ -53,7 +55,7 @@ class RecurringUpdate(BaseModel):
 
 
 class RecurringResponse(BaseModel):
-    """Schema de resposta de uma transação recorrente"""
+    """Schema de resposta de uma transacao recorrente"""
     id: int
     name: str
     description: Optional[str]
@@ -69,6 +71,7 @@ class RecurringResponse(BaseModel):
     start_date: date
     end_date: Optional[date]
     status: str
+    ownership_type: str = "personal"
     last_generated_date: Optional[date]
     next_due_date: Optional[date]
     created_at: datetime

@@ -13,6 +13,7 @@ from .debts import router as debts_router
 from .chat import router as chat_router
 from .admin import router as admin_router
 from .recurring import router as recurring_router
+from .family import router as family_router
 
 api_router = APIRouter()
 
@@ -28,5 +29,6 @@ api_router.include_router(budgets_router, prefix="/budgets", tags=["Orçamentos"
 api_router.include_router(goals_router, prefix="/goals", tags=["Metas"])
 api_router.include_router(debts_router, prefix="/debts", tags=["Dívidas"])
 api_router.include_router(recurring_router, prefix="/recurring", tags=["Recorrentes"])
+api_router.include_router(family_router, prefix="/family", tags=["Familia"])
 api_router.include_router(chat_router, prefix="/chat", tags=["Chat - Agente IA"])
-api_router.include_router(admin_router, prefix="/admin", tags=["Admin - Gestão"])
+api_router.include_router(admin_router, prefix="/admin", tags=["Admin - Gestao"])

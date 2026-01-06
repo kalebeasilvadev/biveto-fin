@@ -24,6 +24,7 @@ class Account(Base):
     color: Mapped[str | None] = mapped_column(String(7))  # hex color
     icon: Mapped[str | None] = mapped_column(String(50))
     is_active: Mapped[bool] = mapped_column(default=True)
+    ownership_type: Mapped[str] = mapped_column(String(20), default="personal")  # personal, household
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow

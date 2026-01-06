@@ -4,6 +4,15 @@ import { adminApi } from '../../services/api'
 import { Plus, Trash2, Edit2, Copy, X, Check, AlertCircle } from 'lucide-react'
 import { clsx } from 'clsx'
 
+interface HouseholdMember {
+  id: number
+  user_id: number
+  user_name: string | null
+  user_email: string | null
+  role: string
+  joined_at: string
+}
+
 interface License {
   id: number
   key: string
@@ -22,12 +31,18 @@ interface License {
   is_valid: boolean
   days_remaining: number | null
   user_count: number
+  owner_email: string | null
+  owner_user_id: number | null
+  owner_name: string | null
+  member_count: number
+  members: HouseholdMember[]
   created_at: string
 }
 
 interface LicenseForm {
   type: string
   max_users: number
+  owner_email: string
   has_ai_assistant: boolean
   has_insights: boolean
   has_debt_strategies: boolean
@@ -44,6 +59,7 @@ export default function AdminLicenses() {
   const [form, setForm] = useState<LicenseForm>({
     type: 'basic',
     max_users: 1,
+    owner_email: '',
     has_ai_assistant: true,
     has_insights: true,
     has_debt_strategies: true,
@@ -90,6 +106,7 @@ export default function AdminLicenses() {
     setForm({
       type: 'basic',
       max_users: 1,
+      owner_email: '',
       has_ai_assistant: true,
       has_insights: true,
       has_debt_strategies: true,
@@ -105,6 +122,7 @@ export default function AdminLicenses() {
     setForm({
       type: license.type,
       max_users: license.max_users,
+      owner_email: license.owner_email || '',
       has_ai_assistant: license.has_ai_assistant,
       has_insights: license.has_insights,
       has_debt_strategies: license.has_debt_strategies,
@@ -217,7 +235,7 @@ export default function AdminLicenses() {
                   <button
                     onClick={() => copyKey(license.code)}
                     className="p-1 text-gray-400 hover:text-primary-600"
-                    title="Copiar código"
+                    title="Copiar codigo"
                   >
                     {copiedKey === license.code ? (
                       <Check size={16} className="text-green-500" />
@@ -225,6 +243,23 @@ export default function AdminLicenses() {
                       <Copy size={16} />
                     )}
                   </button>
+                </div>
+
+                {/* Owner da licenca */}
+                <div className="mb-3 text-sm">
+                  <span className="text-gray-500">Proprietario:</span>{' '}
+                  {license.owner_name ? (
+                    <span className="font-medium">{license.owner_name}</span>
+                  ) : license.owner_email ? (
+                    <span className="text-orange-600">{license.owner_email} (pendente)</span>
+                  ) : (
+                    <span className="text-gray-400">Nao definido</span>
+                  )}
+                  {license.member_count > 0 && (
+                    <span className="ml-2 text-gray-400">
+                      ({license.member_count} membro{license.member_count > 1 ? 's' : ''})
+                    </span>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
@@ -336,6 +371,26 @@ export default function AdminLicenses() {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Campo owner_email - apenas na criacao */}
+              {!editingLicense && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Email do Proprietario *
+                  </label>
+                  <input
+                    type="email"
+                    value={form.owner_email}
+                    onChange={(e) => setForm({ ...form, owner_email: e.target.value })}
+                    className="input"
+                    required
+                    placeholder="email@exemplo.com"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Um convite sera enviado automaticamente para este email
+                  </p>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -355,7 +410,7 @@ export default function AdminLicenses() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Máx. Usuários
+                    Max. Usuarios
                   </label>
                   <input
                     type="number"
@@ -369,7 +424,7 @@ export default function AdminLicenses() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Data de Término (opcional)
+                  Data de Termino (opcional)
                 </label>
                 <input
                   type="date"

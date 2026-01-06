@@ -4,6 +4,7 @@ from decimal import Decimal
 from pydantic import BaseModel, Field
 
 from ..models.goal import GoalType, GoalStatus
+from ..models.household import OwnershipType
 
 
 class GoalContributionBase(BaseModel):
@@ -40,7 +41,7 @@ class GoalBase(BaseModel):
 
 
 class GoalCreate(GoalBase):
-    pass
+    ownership_type: OwnershipType = OwnershipType.PERSONAL
 
 
 class GoalUpdate(BaseModel):
@@ -65,6 +66,7 @@ class GoalResponse(GoalBase):
     monthly_contribution: Decimal | None
     auto_calculate_contribution: bool
     status: GoalStatus
+    ownership_type: str = "personal"
     created_at: datetime
     updated_at: datetime
 

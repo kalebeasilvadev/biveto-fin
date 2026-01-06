@@ -1,6 +1,7 @@
 from .license import License, LicenseType, LicenseStatus
 from .user import User
 from .account import Account
+from .household import HouseholdMember, HouseholdRole, OwnershipType
 from .category import Category
 from .merchant import Merchant
 from .document import Document, DocumentExtraction
@@ -19,6 +20,9 @@ __all__ = [
     "LicenseStatus",
     "User",
     "Account",
+    "HouseholdMember",
+    "HouseholdRole",
+    "OwnershipType",
     "Category",
     "Merchant",
     "Document",

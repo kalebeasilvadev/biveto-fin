@@ -1,8 +1,9 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
 import { useAuthStore } from '../stores/authStore'
 import api, { getApiErrorMessage } from '../services/api'
-import { Lock, User, Mail, Check, AlertCircle } from 'lucide-react'
+import { Lock, User, Mail, Check, AlertCircle, Users, ChevronRight } from 'lucide-react'
 
 export default function Settings() {
   const user = useAuthStore((state) => state.user)
@@ -58,9 +59,26 @@ export default function Settings() {
         <p className="text-gray-500">Gerencie sua conta e preferências</p>
       </div>
 
+      {/* Family Link Card */}
+      <Link
+        to="/family"
+        className="card flex items-center justify-between hover:shadow-md transition-shadow"
+      >
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-biveto-light rounded-lg">
+            <Users size={20} className="text-biveto" />
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">Familia</h2>
+            <p className="text-sm text-gray-500">Gerencie membros do plano familiar</p>
+          </div>
+        </div>
+        <ChevronRight size={20} className="text-gray-400" />
+      </Link>
+
       {/* User Info Card */}
       <div className="card">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Informações da Conta</h2>
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Informacoes da Conta</h2>
         <div className="space-y-4">
           <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
             <div className="p-2 bg-white rounded-lg shadow-sm">

@@ -1,6 +1,7 @@
 from datetime import datetime
 from pydantic import BaseModel, Field
 from ..models.account import AccountType
+from ..models.household import OwnershipType
 
 
 class AccountBase(BaseModel):
@@ -13,6 +14,7 @@ class AccountBase(BaseModel):
 
 class AccountCreate(AccountBase):
     balance: float = 0
+    ownership_type: OwnershipType = OwnershipType.PERSONAL
 
 
 class AccountUpdate(BaseModel):
@@ -26,6 +28,7 @@ class AccountResponse(AccountBase):
     id: int
     balance: float
     is_active: bool
+    ownership_type: str = "personal"
     created_at: datetime
 
     class Config:

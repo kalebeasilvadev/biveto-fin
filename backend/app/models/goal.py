@@ -63,6 +63,7 @@ class Goal(Base):
 
     # Status
     status: Mapped[str] = mapped_column(String(20), default=GoalStatus.ACTIVE.value)
+    ownership_type: Mapped[str] = mapped_column(String(20), default="personal")  # personal, household
 
     # Vinculação opcional a conta específica
     account_id: Mapped[int | None] = mapped_column(ForeignKey("accounts.id", ondelete="SET NULL"))

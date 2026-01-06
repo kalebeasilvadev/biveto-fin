@@ -56,6 +56,31 @@ class User(Base):
     recurring_transactions: Mapped[list["RecurringTransaction"]] = relationship(
         back_populates="user", lazy="selectin", cascade="all, delete-orphan"
     )
+    household_membership: Mapped["HouseholdMember | None"] = relationship(
+        back_populates="user",
+        foreign_keys="HouseholdMember.user_id",
+        uselist=False,
+        lazy="selectin"
+    )
+
+    @property
+    def household_role(self) -> str | None:
+        """Retorna o role do usuario na familia"""
+        if self.household_membership:
+            return self.household_membership.role
+        return None
+
+    @property
+    def is_license_owner(self) -> bool:
+        """Verifica se eh o owner da licenca"""
+        return self.household_membership is not None and self.household_membership.role == "owner"
+
+    @property
+    def can_invite_family_members(self) -> bool:
+        """Verifica se pode convidar membros para a familia"""
+        if not self.household_membership:
+            return False
+        return self.household_membership.can_invite_members
 
 
 from .account import Account
@@ -69,3 +94,4 @@ from .debt import Debt
 from .license import License
 from .invitation import Invitation
 from .recurring import RecurringTransaction
+from .household import HouseholdMember

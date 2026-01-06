@@ -221,3 +221,18 @@ export const adminApi = {
   updateLicense: (id: number, data: unknown) => api.patch(`/admin/licenses/${id}`, data),
   deleteLicense: (id: number) => api.delete(`/admin/licenses/${id}`),
 }
+
+export const familyApi = {
+  // Contexto da familia
+  getContext: () => api.get('/family/context'),
+
+  // Membros
+  listMembers: () => api.get('/family/members'),
+
+  // Convites
+  invite: (email: string, nickname?: string) =>
+    api.post('/family/invite', { email, nickname }),
+  listInvitations: () => api.get('/family/invitations'),
+  cancelInvitation: (id: number) => api.delete(`/family/invitations/${id}`),
+  resendInvitation: (id: number) => api.post(`/family/invitations/${id}/resend`),
+}

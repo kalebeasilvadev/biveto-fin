@@ -46,6 +46,7 @@ class RecurringTransaction(Base):
     status: Mapped[str] = mapped_column(String(20), default="active")  # RecurringStatus
     last_generated_date: Mapped[date | None] = mapped_column(Date)  # Última data gerada
     next_due_date: Mapped[date | None] = mapped_column(Date, index=True)  # Próxima data
+    ownership_type: Mapped[str] = mapped_column(String(20), default="personal")  # personal, household
 
     # Metadados
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

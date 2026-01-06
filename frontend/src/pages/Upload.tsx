@@ -1,8 +1,8 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { documentsApi, transactionsApi, accountsApi, categoriesApi, getApiErrorMessage } from '../services/api'
-import { Upload as UploadIcon, Camera, Check, X, PenLine, AlertCircle, Image, CreditCard, Repeat, FileSpreadsheet } from 'lucide-react'
+import { documentsApi, transactionsApi, accountsApi, categoriesApi, familyApi, getApiErrorMessage } from '../services/api'
+import { Upload as UploadIcon, Camera, Check, X, PenLine, AlertCircle, Image, CreditCard, Repeat, FileSpreadsheet, User, Users } from 'lucide-react'
 import { clsx } from 'clsx'
 
 interface ExtractedItem {
@@ -67,6 +67,7 @@ export default function Upload() {
     is_installment: false,
     installment_current: '',
     installment_total: '',
+    ownership_type: 'personal' as 'personal' | 'household',
   })
 
   // Prevent accidental page reload when document is processed
@@ -95,6 +96,20 @@ export default function Upload() {
 
   const accounts = accountsData?.data || []
   const categories = categoriesData?.data || []
+
+  const { data: familyData } = useQuery({
+    queryKey: ['family-context'],
+    queryFn: async () => {
+      try {
+        const response = await familyApi.getContext()
+        return response.data as { member_count: number }
+      } catch {
+        return null
+      }
+    },
+  })
+
+  const showOwnershipSelector = familyData && familyData.member_count >= 2
 
   // Função para encontrar categoria por nome sugerido pela LLM
   const findCategoryId = (suggestedCategory: string | null): string => {
@@ -260,6 +275,7 @@ export default function Upload() {
       category_id: formData.category_id ? parseInt(formData.category_id) : null,
       merchant_name: formData.merchant_name || null,
       description: formData.description || null,
+      ownership_type: formData.ownership_type,
     })
   }
 
@@ -280,6 +296,7 @@ export default function Upload() {
       is_installment: false,
       installment_current: '',
       installment_total: '',
+      ownership_type: 'personal',
     })
   }
 
@@ -873,6 +890,47 @@ export default function Upload() {
             placeholder={isManual ? 'Descrição da transação' : 'Nome do estabelecimento'}
           />
         </div>
+
+        {/* Ownership Type (only for family with 2+ members) */}
+        {showOwnershipSelector && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Visibilidade
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, ownership_type: 'personal' })}
+                className={clsx(
+                  'flex items-center gap-2 p-3 rounded-lg border-2 transition-all',
+                  formData.ownership_type === 'personal'
+                    ? 'border-primary-500 bg-primary-50'
+                    : 'border-gray-200 hover:border-gray-300'
+                )}
+              >
+                <User size={20} className={formData.ownership_type === 'personal' ? 'text-primary-600' : 'text-gray-400'} />
+                <span className={clsx('text-sm font-medium', formData.ownership_type === 'personal' ? 'text-primary-700' : 'text-gray-600')}>
+                  Pessoal
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, ownership_type: 'household' })}
+                className={clsx(
+                  'flex items-center gap-2 p-3 rounded-lg border-2 transition-all',
+                  formData.ownership_type === 'household'
+                    ? 'border-primary-500 bg-primary-50'
+                    : 'border-gray-200 hover:border-gray-300'
+                )}
+              >
+                <Users size={20} className={formData.ownership_type === 'household' ? 'text-primary-600' : 'text-gray-400'} />
+                <span className={clsx('text-sm font-medium', formData.ownership_type === 'household' ? 'text-primary-700' : 'text-gray-600')}>
+                  Familia
+                </span>
+              </button>
+            </div>
+          </div>
+        )}
 
         <button
           onClick={isManual ? handleManualSubmit : handleConfirm}

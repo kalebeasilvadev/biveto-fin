@@ -1,12 +1,13 @@
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, Body, HTTPException, status
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.deps import DbSession, CurrentUser
 from ..core.security import get_password_hash, verify_password
-from ..models import User, Invitation, InvitationStatus
+from ..models import User, Invitation, InvitationStatus, License
+from ..models.household import HouseholdMember, HouseholdRole
 from ..schemas.user import UserCreate, UserResponse
 from ..schemas.auth import Token, LoginRequest
 from ..schemas.invitation import InviteValidation, InviteRegister
@@ -88,12 +89,12 @@ async def validate_invitation(token: str, db: DbSession):
 
 @router.post("/invite/{token}", response_model=Token)
 async def register_via_invitation(token: str, data: InviteRegister, db: DbSession):
-    """Registra usuário via convite"""
+    """Registra usuario via convite e cria HouseholdMember"""
     result = await db.execute(select(Invitation).where(Invitation.token == token))
     invitation = result.scalar_one_or_none()
 
     if not invitation:
-        raise HTTPException(status_code=404, detail="Convite não encontrado")
+        raise HTTPException(status_code=404, detail="Convite nao encontrado")
 
     # Verificar validade
     if datetime.utcnow() > invitation.expires_at:
@@ -105,17 +106,17 @@ async def register_via_invitation(token: str, data: InviteRegister, db: DbSessio
     if invitation.status != InvitationStatus.PENDING:
         raise HTTPException(status_code=400, detail=f"Convite {invitation.status.value}")
 
-    # Verificar se email já existe
+    # Verificar se email ja existe
     existing = await db.scalar(select(User).where(User.email == invitation.email))
     if existing:
-        raise HTTPException(status_code=400, detail="Email já cadastrado")
+        raise HTTPException(status_code=400, detail="Email ja cadastrado")
 
-    # Criar usuário
+    # Criar usuario
     user = User(
         email=invitation.email,
         hashed_password=get_password_hash(data.password),
         name=data.name,
-        is_verified=True,  # Usuário via convite já é verificado
+        is_verified=True,  # Usuario via convite ja eh verificado
         license_id=invitation.license_id,
     )
 
@@ -125,6 +126,36 @@ async def register_via_invitation(token: str, data: InviteRegister, db: DbSessio
 
     # Setup inicial (contas, categorias)
     await setup_new_user(db, user.id)
+
+    # Criar HouseholdMember se tiver licenca
+    if invitation.license_id:
+        # Verificar se eh o primeiro membro da licenca
+        existing_members = await db.scalar(
+            select(func.count(HouseholdMember.id))
+            .where(HouseholdMember.license_id == invitation.license_id)
+        )
+
+        is_first_member = (existing_members or 0) == 0
+
+        # Criar HouseholdMember
+        household_member = HouseholdMember(
+            license_id=invitation.license_id,
+            user_id=user.id,
+            role=HouseholdRole.OWNER.value if is_first_member else HouseholdRole.MEMBER.value,
+            invited_by_id=invitation.invited_by_id,
+            can_invite_members=is_first_member,
+            can_see_all=is_first_member,
+        )
+        db.add(household_member)
+
+        # Se eh o primeiro membro, atualizar owner_user_id na licenca
+        if is_first_member:
+            license_result = await db.execute(
+                select(License).where(License.id == invitation.license_id)
+            )
+            license = license_result.scalar_one_or_none()
+            if license:
+                license.owner_user_id = user.id
 
     # Marcar convite como aceito
     invitation.status = InvitationStatus.ACCEPTED

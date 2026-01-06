@@ -70,6 +70,7 @@ class Debt(Base):
     # Status
     status: Mapped[str] = mapped_column(String(20), default=DebtStatus.ACTIVE.value)
     priority: Mapped[int] = mapped_column(Integer, default=0)  # Ordem de prioridade
+    ownership_type: Mapped[str] = mapped_column(String(20), default="personal")  # personal, household
 
     # Vinculação opcional
     account_id: Mapped[int | None] = mapped_column(ForeignKey("accounts.id", ondelete="SET NULL"))

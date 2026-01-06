@@ -1,9 +1,10 @@
-"""Schemas para Debt (Gestão de Dívidas)"""
+"""Schemas para Debt (Gestao de Dividas)"""
 from datetime import datetime, date
 from decimal import Decimal
 from pydantic import BaseModel, Field
 
 from ..models.debt import DebtType, DebtStatus, PayoffStrategy
+from ..models.household import OwnershipType
 
 
 class DebtPaymentBase(BaseModel):
@@ -46,7 +47,7 @@ class DebtBase(BaseModel):
 
 
 class DebtCreate(DebtBase):
-    pass
+    ownership_type: OwnershipType = OwnershipType.PERSONAL
 
 
 class DebtUpdate(BaseModel):
@@ -69,6 +70,7 @@ class DebtResponse(DebtBase):
     status: DebtStatus
     expected_payoff_date: date | None
     paid_off_date: date | None
+    ownership_type: str = "personal"
     created_at: datetime
     updated_at: datetime
 

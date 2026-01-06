@@ -21,7 +21,7 @@ class LicenseBase(BaseModel):
 
 
 class LicenseCreate(LicenseBase):
-    pass
+    owner_email: EmailStr  # Email do owner (obrigatorio) - recebera convite automatico
 
 
 class LicenseUpdate(BaseModel):
@@ -39,16 +39,36 @@ class LicenseUpdate(BaseModel):
     notes: str | None = None
 
 
+class HouseholdMemberSummary(BaseModel):
+    """Resumo de membro para listagem de licencas"""
+    id: int
+    user_id: int
+    user_name: str | None = None
+    user_email: str | None = None
+    role: str
+    joined_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
 class LicenseResponse(LicenseBase):
     id: int
     key: str
-    code: str  # Código amigável: BIV-XXXX-XXXX
+    code: str  # Codigo amigavel: BIV-XXXX-XXXX
     status: LicenseStatus
     created_at: datetime
     updated_at: datetime
     is_valid: bool
     days_remaining: int | None
     user_count: int = 0
+    # Campos do owner
+    owner_email: str | None = None
+    owner_user_id: int | None = None
+    owner_name: str | None = None  # Nome do owner se ja cadastrado
+    # Membros da familia
+    member_count: int = 0
+    members: list[HouseholdMemberSummary] | None = None
 
     class Config:
         from_attributes = True

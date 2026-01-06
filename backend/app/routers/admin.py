@@ -13,6 +13,7 @@ from ..schemas.admin import (
     LicenseCreate,
     LicenseUpdate,
     LicenseResponse,
+    HouseholdMemberSummary,
     UserAdminCreate,
     UserAdminUpdate,
     UserAdminResponse,
@@ -20,6 +21,7 @@ from ..schemas.admin import (
     AdminDashboard,
 )
 from ..schemas.invitation import InvitationCreate, InvitationListResponse
+from ..models.household import HouseholdMember
 
 router = APIRouter()
 
@@ -75,7 +77,7 @@ async def get_dashboard(current_user: CurrentUser, db: DbSession):
 
 @router.get("/licenses", response_model=list[LicenseResponse])
 async def list_licenses(current_user: CurrentUser, db: DbSession):
-    """Lista todas as licenças"""
+    """Lista todas as licencas"""
     require_admin(current_user)
 
     result = await db.execute(select(License).order_by(License.created_at.desc()))
@@ -86,6 +88,29 @@ async def list_licenses(current_user: CurrentUser, db: DbSession):
         user_count = await db.scalar(
             select(func.count(User.id)).where(User.license_id == lic.id)
         )
+
+        # Buscar membros da familia
+        members_result = await db.execute(
+            select(HouseholdMember).where(HouseholdMember.license_id == lic.id)
+        )
+        members = members_result.scalars().all()
+
+        members_summary = []
+        for m in members:
+            members_summary.append(HouseholdMemberSummary(
+                id=m.id,
+                user_id=m.user_id,
+                user_name=m.user.name if m.user else None,
+                user_email=m.user.email if m.user else None,
+                role=m.role,
+                joined_at=m.joined_at,
+            ))
+
+        # Nome do owner se ja cadastrado
+        owner_name = None
+        if lic.owner_user_id and lic.owner:
+            owner_name = lic.owner.name
+
         resp = LicenseResponse(
             id=lic.id,
             key=lic.key,
@@ -108,6 +133,11 @@ async def list_licenses(current_user: CurrentUser, db: DbSession):
             is_valid=lic.is_valid,
             days_remaining=lic.days_remaining,
             user_count=user_count or 0,
+            owner_email=lic.owner_email,
+            owner_user_id=lic.owner_user_id,
+            owner_name=owner_name,
+            member_count=len(members),
+            members=members_summary,
         )
         response.append(resp)
 
@@ -120,8 +150,29 @@ async def create_license(
     current_user: CurrentUser,
     db: DbSession,
 ):
-    """Cria uma nova licença"""
+    """Cria uma nova licenca e envia convite automatico para o owner"""
     require_admin(current_user)
+
+    # Verificar se o email do owner ja esta cadastrado
+    existing_user = await db.scalar(select(User).where(User.email == data.owner_email))
+    if existing_user:
+        raise HTTPException(
+            status_code=400,
+            detail="Email do proprietario ja esta cadastrado no sistema"
+        )
+
+    # Verificar se ja existe convite pendente para este email
+    existing_invite = await db.scalar(
+        select(Invitation).where(
+            Invitation.email == data.owner_email,
+            Invitation.status == InvitationStatus.PENDING
+        )
+    )
+    if existing_invite:
+        raise HTTPException(
+            status_code=400,
+            detail="Ja existe um convite pendente para este email"
+        )
 
     # Generate unique key
     key = secrets.token_urlsafe(32)
@@ -140,11 +191,33 @@ async def create_license(
         start_date=data.start_date,
         end_date=data.end_date,
         notes=data.notes,
+        owner_email=data.owner_email,  # Novo campo
     )
 
     db.add(license)
-    await db.commit()
+    await db.flush()
     await db.refresh(license)
+
+    # Criar convite automatico para o owner
+    invitation = Invitation(
+        email=data.owner_email,
+        license_id=license.id,
+        invited_by_id=current_user.id,
+    )
+    db.add(invitation)
+    await db.commit()
+    await db.refresh(invitation)
+
+    # Enviar email de convite
+    invite_url = f"{settings.frontend_url}/invite/{invitation.token}"
+    email_sent = email_service.send_invitation(
+        to_email=data.owner_email,
+        invite_url=invite_url,
+        inviter_name=current_user.name,
+    )
+
+    if not email_sent:
+        print(f"Aviso: Email nao enviado para {data.owner_email}")
 
     return LicenseResponse(
         id=license.id,
@@ -168,6 +241,11 @@ async def create_license(
         is_valid=license.is_valid,
         days_remaining=license.days_remaining,
         user_count=0,
+        owner_email=license.owner_email,
+        owner_user_id=None,
+        owner_name=None,
+        member_count=0,
+        members=[],
     )
 
 
@@ -178,14 +256,14 @@ async def update_license(
     current_user: CurrentUser,
     db: DbSession,
 ):
-    """Atualiza uma licença"""
+    """Atualiza uma licenca"""
     require_admin(current_user)
 
     result = await db.execute(select(License).where(License.id == license_id))
     license = result.scalar_one_or_none()
 
     if not license:
-        raise HTTPException(status_code=404, detail="Licença não encontrada")
+        raise HTTPException(status_code=404, detail="Licenca nao encontrada")
 
     update_data = data.model_dump(exclude_unset=True)
     for key, value in update_data.items():
@@ -197,6 +275,27 @@ async def update_license(
     user_count = await db.scalar(
         select(func.count(User.id)).where(User.license_id == license.id)
     )
+
+    # Buscar membros
+    members_result = await db.execute(
+        select(HouseholdMember).where(HouseholdMember.license_id == license.id)
+    )
+    members = members_result.scalars().all()
+
+    members_summary = []
+    for m in members:
+        members_summary.append(HouseholdMemberSummary(
+            id=m.id,
+            user_id=m.user_id,
+            user_name=m.user.name if m.user else None,
+            user_email=m.user.email if m.user else None,
+            role=m.role,
+            joined_at=m.joined_at,
+        ))
+
+    owner_name = None
+    if license.owner_user_id and license.owner:
+        owner_name = license.owner.name
 
     return LicenseResponse(
         id=license.id,
@@ -220,6 +319,11 @@ async def update_license(
         is_valid=license.is_valid,
         days_remaining=license.days_remaining,
         user_count=user_count or 0,
+        owner_email=license.owner_email,
+        owner_user_id=license.owner_user_id,
+        owner_name=owner_name,
+        member_count=len(members),
+        members=members_summary,
     )
 
 

@@ -1,7 +1,8 @@
-"""Schemas para Budget (Orçamento)"""
+"""Schemas para Budget (Orcamento)"""
 from datetime import datetime
 from decimal import Decimal
 from pydantic import BaseModel, Field
+from ..models.household import OwnershipType
 
 
 class BudgetItemBase(BaseModel):
@@ -50,6 +51,7 @@ class BudgetBase(BaseModel):
 
 class BudgetCreate(BudgetBase):
     items: list[BudgetItemCreate] = []
+    ownership_type: OwnershipType = OwnershipType.PERSONAL
 
 
 class BudgetUpdate(BaseModel):
@@ -62,6 +64,7 @@ class BudgetResponse(BudgetBase):
     id: int
     user_id: int
     total_expense_planned: Decimal
+    ownership_type: str = "personal"
     created_at: datetime
     updated_at: datetime
     items: list[BudgetItemResponse] = []
@@ -71,7 +74,7 @@ class BudgetResponse(BudgetBase):
     total_available: Decimal = Decimal(0)
     total_income_actual: Decimal = Decimal(0)
     balance: Decimal = Decimal(0)
-    health_score: float = 0.0  # 0-100, saúde do orçamento
+    health_score: float = 0.0  # 0-100, saude do orcamento
 
     class Config:
         from_attributes = True

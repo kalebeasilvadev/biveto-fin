@@ -36,6 +36,7 @@ class Budget(Base):
     # Configurações
     allow_rollover: Mapped[bool] = mapped_column(Boolean, default=True)  # Permite rolar saldo não usado
     notes: Mapped[str | None] = mapped_column(Text)
+    ownership_type: Mapped[str] = mapped_column(String(20), default="personal")  # personal, household
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { accountsApi } from '../services/api'
+import { accountsApi, familyApi } from '../services/api'
 import {
   Wallet,
   Building,
@@ -10,6 +10,8 @@ import {
   Pencil,
   Trash2,
   X,
+  Users,
+  User,
 } from 'lucide-react'
 import { clsx } from 'clsx'
 
@@ -22,6 +24,13 @@ interface Account {
   color: string | null
   icon: string | null
   is_active: boolean
+  ownership_type: 'personal' | 'household'
+}
+
+interface FamilyContext {
+  license_id: number
+  member_count: number
+  max_members: number
 }
 
 const accountTypes = [
@@ -55,12 +64,27 @@ export default function Accounts() {
     type: 'bank',
     balance: '',
     color: '#3b82f6',
+    ownership_type: 'personal' as 'personal' | 'household',
   })
 
   const { data, isLoading } = useQuery({
     queryKey: ['accounts'],
     queryFn: accountsApi.list,
   })
+
+  const { data: familyData } = useQuery({
+    queryKey: ['family-context'],
+    queryFn: async () => {
+      try {
+        const response = await familyApi.getContext()
+        return response.data as FamilyContext
+      } catch {
+        return null
+      }
+    },
+  })
+
+  const showOwnershipSelector = familyData && familyData.member_count >= 2
 
   const accounts: Account[] = data?.data || []
 
@@ -95,6 +119,7 @@ export default function Accounts() {
       type: 'bank',
       balance: '',
       color: '#3b82f6',
+      ownership_type: 'personal',
     })
     setShowModal(true)
   }
@@ -106,6 +131,7 @@ export default function Accounts() {
       type: account.type,
       balance: account.balance.toString(),
       color: account.color || '#3b82f6',
+      ownership_type: account.ownership_type || 'personal',
     })
     setShowModal(true)
   }
@@ -121,6 +147,7 @@ export default function Accounts() {
       type: formData.type,
       balance: parseFloat(formData.balance) || 0,
       color: formData.color,
+      ownership_type: formData.ownership_type,
     }
 
     if (editingAccount) {
@@ -219,7 +246,7 @@ export default function Accounts() {
                     </button>
                   </div>
                 </div>
-                <div className="mt-4">
+                <div className="mt-4 flex items-center justify-between">
                   <p
                     className={clsx(
                       'text-2xl font-bold',
@@ -231,6 +258,12 @@ export default function Accounts() {
                       currency: account.currency || 'BRL',
                     })}
                   </p>
+                  {account.ownership_type === 'household' && (
+                    <span className="flex items-center gap-1 text-xs text-purple-600 bg-purple-50 px-2 py-1 rounded-full">
+                      <Users size={12} />
+                      Familia
+                    </span>
+                  )}
                 </div>
               </div>
             )
@@ -315,6 +348,46 @@ export default function Accounts() {
                   ))}
                 </div>
               </div>
+
+              {showOwnershipSelector && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Visibilidade
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, ownership_type: 'personal' })}
+                      className={clsx(
+                        'flex items-center gap-2 p-3 rounded-lg border-2 transition-all',
+                        formData.ownership_type === 'personal'
+                          ? 'border-biveto bg-biveto-light'
+                          : 'border-gray-200 hover:border-gray-300'
+                      )}
+                    >
+                      <User size={20} className={formData.ownership_type === 'personal' ? 'text-biveto' : 'text-gray-400'} />
+                      <span className={clsx('text-sm font-medium', formData.ownership_type === 'personal' ? 'text-biveto' : 'text-gray-600')}>
+                        Pessoal
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, ownership_type: 'household' })}
+                      className={clsx(
+                        'flex items-center gap-2 p-3 rounded-lg border-2 transition-all',
+                        formData.ownership_type === 'household'
+                          ? 'border-biveto bg-biveto-light'
+                          : 'border-gray-200 hover:border-gray-300'
+                      )}
+                    >
+                      <Users size={20} className={formData.ownership_type === 'household' ? 'text-biveto' : 'text-gray-400'} />
+                      <span className={clsx('text-sm font-medium', formData.ownership_type === 'household' ? 'text-biveto' : 'text-gray-600')}>
+                        Familia
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              )}
 
               <div className="flex gap-2 pt-4">
                 <button onClick={closeModal} className="btn-secondary flex-1">

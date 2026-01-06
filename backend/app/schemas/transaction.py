@@ -1,6 +1,7 @@
 from datetime import datetime, date as date_type
 from pydantic import BaseModel, Field
 from ..models.transaction import TransactionType
+from ..models.household import OwnershipType
 
 
 class TransactionBase(BaseModel):
@@ -18,6 +19,7 @@ class TransactionCreate(TransactionBase):
     account_id: int
     category_id: int | None = None
     merchant_name: str | None = None
+    ownership_type: OwnershipType = OwnershipType.PERSONAL
 
 
 class TransactionConfirm(BaseModel):
@@ -62,6 +64,7 @@ class TransactionResponse(TransactionBase):
     installment_series_id: int | None = None
     installment_number: int | None
     installment_total: int | None
+    ownership_type: str = "personal"
     created_at: datetime
     updated_at: datetime
 
