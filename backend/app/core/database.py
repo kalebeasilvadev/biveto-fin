@@ -15,18 +15,22 @@ if is_sqlite:
         connect_args={"check_same_thread": False},
     )
 else:
-    # PostgreSQL com pool
+    # PostgreSQL com pool otimizado
     engine = create_async_engine(
         settings.database_url,
         echo=settings.debug,
-        pool_size=5,
-        max_overflow=10,
+        pool_size=5,           # Conexões mantidas no pool
+        max_overflow=10,       # Conexões extras sob demanda
+        pool_pre_ping=True,    # Verifica conexão antes de usar
+        pool_recycle=300,      # Recicla conexões a cada 5 min
+        pool_timeout=30,       # Timeout para obter conexão do pool
     )
 
 async_session_maker = async_sessionmaker(
     engine,
     class_=AsyncSession,
     expire_on_commit=False,
+    autoflush=False,           # Controle manual de flush
 )
 
 
@@ -35,12 +39,16 @@ class Base(DeclarativeBase):
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
+    """
+    Dependency que fornece sessão do banco.
+    Auto-commit ao final da request se não houver exceção.
+    Rollback automático em caso de exceção.
+    """
     async with async_session_maker() as session:
         try:
             yield session
+            # Auto-commit se não houver exceção
             await session.commit()
         except Exception:
             await session.rollback()
             raise
-        finally:
-            await session.close()

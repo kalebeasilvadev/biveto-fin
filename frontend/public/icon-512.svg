@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="iconGradient512" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1E3A5F"/>
+      <stop offset="100%" style="stop-color:#102a43"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Icon container -->
+  <rect x="0" y="0" width="512" height="512" rx="102" fill="url(#iconGradient512)"/>
+
+  <!-- B with bars -->
+  <g fill="white">
+    <!-- Left bar -->
+    <rect x="102" y="102" width="68" height="308" rx="16"/>
+    <!-- Top bar -->
+    <rect x="187" y="102" width="136" height="68" rx="16"/>
+    <!-- Middle bar -->
+    <rect x="187" y="222" width="170" height="68" rx="16"/>
+    <!-- Bottom bar -->
+    <rect x="187" y="342" width="204" height="68" rx="16"/>
+    <!-- Connectors -->
+    <rect x="298" y="155" width="51" height="85" rx="8"/>
+    <rect x="332" y="275" width="51" height="85" rx="8"/>
+  </g>
+
+  <!-- Green dot -->
+  <circle cx="426" cy="119" r="51" fill="#4ade80"/>
+</svg>

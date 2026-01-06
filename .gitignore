@@ -56,9 +56,13 @@ fly.lock
 # JetBrains evaluation
 .jbeval/
 
-# Test files
+# Playwright MCP
+.playwright-mcp/
+
+# Screenshots/prints (temp files)
 *.png
 !frontend/public/*.png
+prints/
 
 # MCP config (may contain sensitive info)
 mcp-config.json

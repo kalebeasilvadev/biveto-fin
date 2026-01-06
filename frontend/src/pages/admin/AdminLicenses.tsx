@@ -7,6 +7,7 @@ import { clsx } from 'clsx'
 interface License {
   id: number
   key: string
+  code: string
   type: string
   status: string
   max_users: number
@@ -32,7 +33,7 @@ interface LicenseForm {
   has_debt_strategies: boolean
   has_goals: boolean
   has_budget: boolean
-  end_date: string
+  end_date: string | null
   notes: string
 }
 
@@ -210,15 +211,15 @@ export default function AdminLicenses() {
                 </div>
 
                 <div className="flex items-center gap-2 mb-3">
-                  <code className="text-sm bg-gray-100 px-2 py-1 rounded font-mono">
-                    {license.key.substring(0, 20)}...
+                  <code className="text-sm bg-gray-100 px-3 py-1.5 rounded font-mono font-semibold tracking-wider">
+                    {license.code}
                   </code>
                   <button
-                    onClick={() => copyKey(license.key)}
+                    onClick={() => copyKey(license.code)}
                     className="p-1 text-gray-400 hover:text-primary-600"
-                    title="Copiar chave"
+                    title="Copiar código"
                   >
-                    {copiedKey === license.key ? (
+                    {copiedKey === license.code ? (
                       <Check size={16} className="text-green-500" />
                     ) : (
                       <Copy size={16} />
@@ -372,8 +373,8 @@ export default function AdminLicenses() {
                 </label>
                 <input
                   type="date"
-                  value={form.end_date}
-                  onChange={(e) => setForm({ ...form, end_date: e.target.value })}
+                  value={form.end_date || ''}
+                  onChange={(e) => setForm({ ...form, end_date: e.target.value || null })}
                   className="input"
                 />
               </div>

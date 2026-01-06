@@ -10,6 +10,8 @@ from .installment import InstallmentSeries, InstallmentSeriesStatus
 from .budget import Budget, BudgetItem, BudgetPeriodType
 from .goal import Goal, GoalContribution, GoalType, GoalStatus
 from .debt import Debt, DebtPayment, DebtType, DebtStatus, PayoffStrategy
+from .invitation import Invitation, InvitationStatus
+from .recurring import RecurringTransaction, RecurrenceFrequency, RecurringStatus
 
 __all__ = [
     "License",
@@ -38,4 +40,9 @@ __all__ = [
     "DebtType",
     "DebtStatus",
     "PayoffStrategy",
+    "Invitation",
+    "InvitationStatus",
+    "RecurringTransaction",
+    "RecurrenceFrequency",
+    "RecurringStatus",
 ]

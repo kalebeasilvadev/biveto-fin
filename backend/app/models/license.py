@@ -1,8 +1,18 @@
 from datetime import datetime, date
 from enum import Enum
+import secrets
 from sqlalchemy import String, Boolean, DateTime, Date, Integer, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from ..core.database import Base
+
+
+def generate_license_code() -> str:
+    """Gera código amigável: BIV-XXXX-XXXX"""
+    # Caracteres sem I,O,0,1 para evitar confusão
+    chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+    part1 = ''.join(secrets.choice(chars) for _ in range(4))
+    part2 = ''.join(secrets.choice(chars) for _ in range(4))
+    return f"BIV-{part1}-{part2}"
 
 
 class LicenseType(str, Enum):
@@ -24,6 +34,7 @@ class License(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     key: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    code: Mapped[str] = mapped_column(String(13), unique=True, index=True, default=generate_license_code)
     type: Mapped[LicenseType] = mapped_column(String(20), default=LicenseType.BASIC)
     status: Mapped[LicenseStatus] = mapped_column(String(20), default=LicenseStatus.ACTIVE)
 

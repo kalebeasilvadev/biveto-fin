@@ -90,11 +90,11 @@ export default function Chat() {
     <div className="flex flex-col h-[calc(100vh-8rem)]">
       {/* Header */}
       <div className="flex items-center gap-3 mb-4">
-        <div className="p-3 bg-primary-100 rounded-full">
-          <Bot className="text-primary-600" size={24} />
+        <div className="p-3 bg-biveto-light rounded-full">
+          <Bot className="text-biveto" size={24} />
         </div>
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Fin - Assistente Financeiro</h1>
+          <h1 className="text-xl font-bold text-gray-900">Biveto Assistente</h1>
           <p className="text-sm text-gray-500">
             Powered by IA - Análise personalizada das suas finanças
           </p>
@@ -106,7 +106,7 @@ export default function Chat() {
         {/* Welcome Message */}
         {messages.length === 0 && (
           <div className="text-center py-8">
-            <Sparkles className="mx-auto text-primary-500 mb-4" size={48} />
+            <Sparkles className="mx-auto text-biveto mb-4" size={48} />
             <p className="text-gray-600 mb-6">{welcomeMessage}</p>
 
             {/* Suggestions */}
@@ -118,7 +118,7 @@ export default function Chat() {
                     <button
                       key={index}
                       onClick={() => handleSuggestionClick(suggestion)}
-                      className="px-4 py-2 bg-white border border-gray-200 rounded-full text-sm text-gray-700 hover:bg-primary-50 hover:border-primary-300 transition-colors"
+                      className="px-4 py-2 bg-white border border-gray-200 rounded-full text-sm text-gray-700 hover:bg-biveto-light hover:border-primary-300 transition-colors"
                     >
                       {suggestion}
                     </button>
@@ -136,8 +136,8 @@ export default function Chat() {
             className={clsx('flex gap-3', message.role === 'user' ? 'justify-end' : 'justify-start')}
           >
             {message.role === 'assistant' && (
-              <div className="p-2 bg-primary-100 rounded-full h-fit">
-                <Bot className="text-primary-600" size={20} />
+              <div className="p-2 bg-biveto-light rounded-full h-fit">
+                <Bot className="text-biveto" size={20} />
               </div>
             )}
 
@@ -145,7 +145,7 @@ export default function Chat() {
               className={clsx(
                 'max-w-[80%] rounded-2xl px-4 py-3',
                 message.role === 'user'
-                  ? 'bg-primary-600 text-white'
+                  ? 'gradient-biveto text-white'
                   : 'bg-white border border-gray-200'
               )}
             >
@@ -169,8 +169,8 @@ export default function Chat() {
         {/* Loading indicator */}
         {sendMutation.isPending && (
           <div className="flex gap-3 justify-start">
-            <div className="p-2 bg-primary-100 rounded-full h-fit">
-              <Bot className="text-primary-600" size={20} />
+            <div className="p-2 bg-biveto-light rounded-full h-fit">
+              <Bot className="text-biveto" size={20} />
             </div>
             <div className="bg-white border border-gray-200 rounded-2xl px-4 py-3">
               <div className="flex items-center gap-2 text-gray-500">
@@ -205,7 +205,7 @@ export default function Chat() {
           </button>
         </div>
         <p className="text-xs text-gray-400 mt-2 text-center">
-          O Fin analisa suas transações, dívidas, metas e orçamentos para dar recomendações personalizadas.
+          O Biveto Assistente analisa suas transações, dívidas, metas e orçamentos para dar recomendações personalizadas.
         </p>
       </div>
     </div>

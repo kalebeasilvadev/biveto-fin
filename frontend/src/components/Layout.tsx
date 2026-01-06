@@ -1,4 +1,4 @@
-import { Outlet, NavLink, useNavigate } from 'react-router-dom'
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
 import {
   LayoutDashboard,
@@ -11,24 +11,38 @@ import {
   Wallet,
   Target,
   CreditCard,
+  Repeat,
   Bot,
   Settings,
   Building,
+  Plus,
+  ChevronRight,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { clsx } from 'clsx'
 import api from '../services/api'
 
-const navItems = [
+// Main navigation items
+const mainNavItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/transactions', icon: Receipt, label: 'Transações' },
   { to: '/accounts', icon: Building, label: 'Contas' },
   { to: '/budget', icon: Wallet, label: 'Orçamento' },
   { to: '/goals', icon: Target, label: 'Metas' },
   { to: '/debts', icon: CreditCard, label: 'Dívidas' },
+  { to: '/recurring', icon: Repeat, label: 'Recorrentes' },
   { to: '/upload', icon: Upload, label: 'Adicionar' },
   { to: '/insights', icon: Lightbulb, label: 'Insights' },
-  { to: '/chat', icon: Bot, label: 'Assistente IA' },
+  { to: '/chat', icon: Bot, label: 'Assistente' },
+]
+
+// Bottom navigation items (mobile) - most important screens
+const bottomNavItems = [
+  { to: '/', icon: LayoutDashboard, label: 'Home' },
+  { to: '/transactions', icon: Receipt, label: 'Transações' },
+  { to: '/upload', icon: Plus, label: 'Adicionar', primary: true },
+  { to: '/insights', icon: Lightbulb, label: 'Insights' },
+  { to: '/chat', icon: Bot, label: 'Chat' },
 ]
 
 export default function Layout() {
@@ -37,6 +51,7 @@ export default function Layout() {
   const user = useAuthStore((state) => state.user)
   const setUser = useAuthStore((state) => state.setUser)
   const navigate = useNavigate()
+  const location = useLocation()
 
   // Fetch user info on mount to get is_admin
   useEffect(() => {
@@ -53,6 +68,11 @@ export default function Layout() {
     }
   }, [])
 
+  // Close mobile menu on route change
+  useEffect(() => {
+    setMobileMenuOpen(false)
+  }, [location.pathname])
+
   const handleLogout = () => {
     logout()
     navigate('/login')
@@ -61,99 +81,254 @@ export default function Layout() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Mobile header */}
-      <div className="lg:hidden bg-white border-b px-4 py-3 flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-primary-600">Financeiro</h1>
-        <button
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="p-2"
-        >
-          {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-        </button>
-      </div>
+      <header className="lg:hidden fixed top-0 left-0 right-0 z-40 glass border-b border-gray-200/50">
+        <div className="flex items-center justify-between px-4 h-14">
+          <img src="/logo.svg" alt="Biveto" className="h-8" />
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="btn-icon"
+            aria-label="Menu"
+          >
+            {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
+          </button>
+        </div>
+      </header>
 
       <div className="flex">
-        {/* Sidebar */}
-        <aside
-          className={clsx(
-            'fixed lg:static inset-y-0 left-0 z-50 w-64 bg-white border-r transform transition-transform lg:transform-none',
-            mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
-          )}
-        >
-          <div className="p-6 hidden lg:block">
-            <h1 className="text-xl font-bold text-primary-600">Financeiro</h1>
+        {/* Desktop Sidebar */}
+        <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:fixed lg:inset-y-0 bg-white border-r border-gray-100">
+          {/* Logo */}
+          <div className="flex items-center h-16 px-6 border-b border-gray-100">
+            <img src="/logo.svg" alt="Biveto" className="h-9" />
           </div>
 
-          <nav className="px-4 py-6 lg:py-0 space-y-1">
-            {navItems.map((item) => (
+          {/* Navigation */}
+          <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+            {mainNavItems.map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}
-                onClick={() => setMobileMenuOpen(false)}
                 className={({ isActive }) =>
                   clsx(
-                    'flex items-center gap-3 px-4 py-3 rounded-lg transition-colors',
+                    'flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium transition-all duration-200',
                     isActive
-                      ? 'bg-primary-50 text-primary-700'
-                      : 'text-gray-600 hover:bg-gray-100'
+                      ? 'bg-biveto-light text-biveto shadow-sm'
+                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                   )
                 }
               >
                 <item.icon size={20} />
-                {item.label}
+                <span>{item.label}</span>
               </NavLink>
             ))}
 
             {/* Admin Menu */}
             {user?.is_admin && (
               <>
-                <div className="border-t my-2" />
+                <div className="border-t border-gray-100 my-3" />
                 <NavLink
                   to="/admin"
-                  onClick={() => setMobileMenuOpen(false)}
                   className={({ isActive }) =>
                     clsx(
-                      'flex items-center gap-3 px-4 py-3 rounded-lg transition-colors',
+                      'flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium transition-all duration-200',
                       isActive
-                        ? 'bg-blue-50 text-blue-700'
-                        : 'text-gray-600 hover:bg-gray-100'
+                        ? 'bg-blue-50 text-blue-700 shadow-sm'
+                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                     )
                   }
                 >
                   <Settings size={20} />
-                  Admin
+                  <span>Admin</span>
                 </NavLink>
               </>
             )}
           </nav>
 
-          <div className="absolute bottom-0 left-0 right-0 p-4 border-t">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600 truncate">
-                {user?.name || 'Usuário'}
-              </span>
+          {/* User section */}
+          <div className="p-4 border-t border-gray-100">
+            <div className="flex items-center gap-3 p-2 rounded-xl hover:bg-gray-50 transition-colors">
+              <div className="avatar avatar-sm">
+                {user?.name?.charAt(0).toUpperCase() || 'U'}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-900 truncate">
+                  {user?.name || 'Usuário'}
+                </p>
+                <p className="text-xs text-gray-500 truncate">
+                  {user?.email || ''}
+                </p>
+              </div>
+              <NavLink
+                to="/settings"
+                className="p-2 text-gray-400 hover:text-biveto hover:bg-biveto-light rounded-lg transition-colors"
+                title="Configurações"
+              >
+                <Settings size={18} />
+              </NavLink>
               <button
                 onClick={handleLogout}
-                className="p-2 text-gray-500 hover:text-red-600"
+                className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                title="Sair"
               >
-                <LogOut size={20} />
+                <LogOut size={18} />
               </button>
             </div>
           </div>
         </aside>
 
-        {/* Overlay */}
+        {/* Mobile Sidebar Overlay */}
         {mobileMenuOpen && (
           <div
-            className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 lg:hidden"
             onClick={() => setMobileMenuOpen(false)}
           />
         )}
 
+        {/* Mobile Sidebar */}
+        <aside
+          className={clsx(
+            'fixed inset-y-0 left-0 z-50 w-72 bg-white shadow-xl transform transition-transform duration-300 ease-out lg:hidden',
+            mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+          )}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between h-14 px-4 border-b border-gray-100">
+            <img src="/logo.svg" alt="Biveto" className="h-8" />
+            <button
+              onClick={() => setMobileMenuOpen(false)}
+              className="btn-icon"
+            >
+              <X size={22} />
+            </button>
+          </div>
+
+          {/* User info */}
+          <div className="p-4 border-b border-gray-100">
+            <div className="flex items-center gap-3">
+              <div className="avatar">
+                {user?.name?.charAt(0).toUpperCase() || 'U'}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-gray-900 truncate">
+                  {user?.name || 'Usuário'}
+                </p>
+                <p className="text-sm text-gray-500 truncate">
+                  {user?.email || ''}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Navigation */}
+          <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+            {mainNavItems.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                className={({ isActive }) =>
+                  clsx(
+                    'flex items-center justify-between px-4 py-3 rounded-xl font-medium transition-all duration-200',
+                    isActive
+                      ? 'bg-biveto-light text-biveto'
+                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                  )
+                }
+              >
+                <div className="flex items-center gap-3">
+                  <item.icon size={20} />
+                  <span>{item.label}</span>
+                </div>
+                <ChevronRight size={16} className="text-gray-400" />
+              </NavLink>
+            ))}
+
+            {/* Admin Menu */}
+            {user?.is_admin && (
+              <>
+                <div className="border-t border-gray-100 my-3" />
+                <NavLink
+                  to="/admin"
+                  className={({ isActive }) =>
+                    clsx(
+                      'flex items-center justify-between px-4 py-3 rounded-xl font-medium transition-all duration-200',
+                      isActive
+                        ? 'bg-blue-50 text-blue-700'
+                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    )
+                  }
+                >
+                  <div className="flex items-center gap-3">
+                    <Settings size={20} />
+                    <span>Admin</span>
+                  </div>
+                  <ChevronRight size={16} className="text-gray-400" />
+                </NavLink>
+              </>
+            )}
+          </nav>
+
+          {/* Settings & Logout */}
+          <div className="p-4 border-t border-gray-100 space-y-2">
+            <NavLink
+              to="/settings"
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-xl font-medium transition-colors"
+            >
+              <Settings size={20} />
+              <span>Configurações</span>
+            </NavLink>
+            <button
+              onClick={handleLogout}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 text-red-600 bg-red-50 hover:bg-red-100 rounded-xl font-medium transition-colors"
+            >
+              <LogOut size={20} />
+              <span>Sair da conta</span>
+            </button>
+          </div>
+        </aside>
+
         {/* Main content */}
-        <main className="flex-1 p-6 lg:p-8">
-          <Outlet />
+        <main className="flex-1 lg:ml-64">
+          {/* Spacer for mobile header */}
+          <div className="h-14 lg:hidden" />
+
+          {/* Content */}
+          <div className="p-4 lg:p-8 pb-24 lg:pb-8">
+            <Outlet />
+          </div>
+
+          {/* Spacer for mobile bottom nav */}
+          <div className="h-20 lg:hidden" />
         </main>
       </div>
+
+      {/* Mobile Bottom Navigation */}
+      <nav className="bottom-nav">
+        {bottomNavItems.map((item) => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            className={({ isActive }) =>
+              item.primary
+                ? 'relative -mt-5'
+                : clsx(
+                    'bottom-nav-item',
+                    isActive && 'bottom-nav-item-active'
+                  )
+            }
+          >
+            {item.primary ? (
+              <div className="w-14 h-14 rounded-2xl gradient-biveto shadow-lg shadow-biveto flex items-center justify-center text-white active:scale-95 transition-transform">
+                <item.icon size={26} strokeWidth={2.5} />
+              </div>
+            ) : (
+              <>
+                <item.icon size={22} />
+                <span className="text-[10px] font-medium">{item.label}</span>
+              </>
+            )}
+          </NavLink>
+        ))}
+      </nav>
     </div>
   )
 }

@@ -42,6 +42,7 @@ class LicenseUpdate(BaseModel):
 class LicenseResponse(LicenseBase):
     id: int
     key: str
+    code: str  # Código amigável: BIV-XXXX-XXXX
     status: LicenseStatus
     created_at: datetime
     updated_at: datetime
@@ -57,8 +58,8 @@ class LicenseResponse(LicenseBase):
 
 class UserAdminCreate(BaseModel):
     email: EmailStr
-    password: str = Field(..., min_length=6)
     name: str = Field(..., min_length=2)
+    password: str | None = Field(None, min_length=6)  # Opcional - se não informado, envia convite
     is_admin: bool = False
     license_id: int | None = None
 

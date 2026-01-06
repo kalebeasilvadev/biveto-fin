@@ -149,7 +149,7 @@ export default function Dashboard() {
                       innerRadius={40}
                       outerRadius={70}
                     >
-                      {summary.categories.map((_, index) => (
+                      {summary.categories.map((_: unknown, index: number) => (
                         <Cell
                           key={index}
                           fill={COLORS[index % COLORS.length]}
@@ -163,7 +163,7 @@ export default function Dashboard() {
                 </ResponsiveContainer>
               </div>
               <div className="flex-1 space-y-2">
-                {summary.categories.slice(0, 5).map((cat, index) => (
+                {summary.categories.slice(0, 5).map((cat: { category_id: number; category_name: string; percentage: number }, index: number) => (
                   <div key={cat.category_id} className="flex items-center gap-2">
                     <div
                       className="w-3 h-3 rounded-full"
@@ -190,7 +190,7 @@ export default function Dashboard() {
           <h2 className="text-lg font-semibold mb-4">Top Estabelecimentos</h2>
           {summary?.top_merchants && summary.top_merchants.length > 0 ? (
             <div className="space-y-3">
-              {summary.top_merchants.slice(0, 5).map((merchant) => (
+              {summary.top_merchants.slice(0, 5).map((merchant: { merchant_id: number | null; merchant_name: string; total: number; count: number }) => (
                 <div
                   key={merchant.merchant_id || 'other'}
                   className="flex items-center justify-between"

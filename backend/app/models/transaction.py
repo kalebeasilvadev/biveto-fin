@@ -40,6 +40,9 @@ class Transaction(Base):
     is_recurring: Mapped[bool] = mapped_column(default=False)
     recurrence_type: Mapped[str | None] = mapped_column(String(10))
     recurrence_parent_id: Mapped[int | None] = mapped_column(ForeignKey("transactions.id"))
+    recurring_id: Mapped[int | None] = mapped_column(
+        ForeignKey("recurring_transactions.id", ondelete="SET NULL"), index=True
+    )
 
     # Parcelas
     installment_series_id: Mapped[int | None] = mapped_column(
@@ -67,6 +70,10 @@ class Transaction(Base):
     document: Mapped["Document | None"] = relationship(back_populates="transaction")
     installment_series: Mapped["InstallmentSeries | None"] = relationship(
         back_populates="transactions"
+    )
+    recurring_source: Mapped["RecurringTransaction | None"] = relationship(
+        back_populates="generated_transactions",
+        foreign_keys=[recurring_id]
     )
     audit_logs: Mapped[list["TransactionAudit"]] = relationship(
         back_populates="transaction", lazy="selectin"
@@ -97,3 +104,4 @@ from .category import Category
 from .merchant import Merchant
 from .document import Document
 from .installment import InstallmentSeries
+from .recurring import RecurringTransaction

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { debtsApi } from '../services/api'
-import { Plus, CreditCard, TrendingDown, AlertCircle, CheckCircle, Calculator } from 'lucide-react'
+import { Plus, CreditCard, AlertCircle, CheckCircle, Calculator } from 'lucide-react'
 import { clsx } from 'clsx'
 
 interface DebtPayment {
@@ -48,13 +48,6 @@ interface DebtSummary {
   debt_count: number
   highest_rate_debt: { name: string; rate: number } | null
   smallest_balance_debt: { name: string; balance: number } | null
-}
-
-interface PayoffStep {
-  debt_name: string
-  payment_amount: number
-  balance_after: number
-  months_to_payoff: number
 }
 
 interface DebtOrderItem {

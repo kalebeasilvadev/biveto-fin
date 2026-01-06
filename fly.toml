@@ -1,10 +1,11 @@
 # fly.toml - Backend configuration for Fly.io
 # App name should be unique - change if needed
 
-app = "app-financeiro-api"
+app = "app-financeiro"
 primary_region = "gru"  # Sao Paulo, Brazil
 
 [build]
+  dockerfile = "backend/Dockerfile"
 
 [env]
   ENVIRONMENT = "production"
@@ -15,15 +16,19 @@ primary_region = "gru"  # Sao Paulo, Brazil
   force_https = true
   auto_stop_machines = "stop"
   auto_start_machines = true
-  min_machines_running = 0
+  min_machines_running = 1
   processes = ["app"]
 
 [[http_service.checks]]
   interval = "30s"
-  timeout = "5s"
-  grace_period = "10s"
+  timeout = "10s"
+  grace_period = "30s"
   method = "GET"
   path = "/health"
+
+[mounts]
+  source = "app_data"
+  destination = "/app/data"
 
 [[vm]]
   memory = "512mb"

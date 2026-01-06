@@ -34,7 +34,7 @@ async def create_account(
         icon=data.icon,
     )
     db.add(account)
-    await db.flush()
+    await db.commit()
     await db.refresh(account)
     return account
 
@@ -79,7 +79,7 @@ async def update_account(
     for field, value in data.model_dump(exclude_unset=True).items():
         setattr(account, field, value)
 
-    await db.flush()
+    await db.commit()
     await db.refresh(account)
     return account
 
@@ -102,3 +102,4 @@ async def delete_account(
         raise HTTPException(status_code=404, detail="Conta não encontrada")
 
     await db.delete(account)
+    await db.commit()

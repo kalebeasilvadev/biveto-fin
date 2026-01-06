@@ -56,7 +56,7 @@ export default function Register() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <div className="max-w-md w-full">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-primary-600">Financeiro</h1>
+          <img src="/logo.svg" alt="Biveto" className="h-12 mx-auto mb-2" />
           <p className="text-gray-600 mt-2">Crie sua conta</p>
         </div>
 
@@ -130,7 +130,7 @@ export default function Register() {
 
           <p className="text-center text-sm text-gray-600 mt-4">
             Já tem conta?{' '}
-            <Link to="/login" className="text-primary-600 hover:underline">
+            <Link to="/login" className="text-biveto hover:underline">
               Faça login
             </Link>
           </p>

@@ -161,6 +161,19 @@ export const chatApi = {
   getSuggestions: () => api.get('/chat/suggestions'),
 }
 
+export const recurringApi = {
+  list: (includeInactive?: boolean) =>
+    api.get('/recurring', { params: includeInactive ? { include_inactive: true } : {} }),
+  get: (id: number) => api.get(`/recurring/${id}`),
+  create: (data: unknown) => api.post('/recurring', data),
+  update: (id: number, data: unknown) => api.patch(`/recurring/${id}`, data),
+  delete: (id: number) => api.delete(`/recurring/${id}`),
+  pause: (id: number) => api.post(`/recurring/${id}/pause`),
+  resume: (id: number) => api.post(`/recurring/${id}/resume`),
+  summary: () => api.get('/recurring/summary'),
+  generate: () => api.post('/recurring/generate'),
+}
+
 export const adminApi = {
   // Dashboard
   dashboard: () => api.get('/admin/dashboard'),

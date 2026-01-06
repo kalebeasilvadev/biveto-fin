@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { budgetsApi, categoriesApi } from '../services/api'
 import { ChevronLeft, ChevronRight, Plus, Trash2, Copy } from 'lucide-react'

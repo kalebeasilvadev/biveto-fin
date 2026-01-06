@@ -1,8 +1,21 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { adminApi } from '../../services/api'
-import { Plus, Trash2, Edit2, Shield, ShieldOff, X } from 'lucide-react'
+import {
+  Plus,
+  Trash2,
+  Edit2,
+  Shield,
+  ShieldOff,
+  X,
+  Mail,
+  Send,
+  Clock,
+  Check,
+  XCircle,
+} from 'lucide-react'
 import { clsx } from 'clsx'
+import api from '../../services/api'
 
 interface User {
   id: number
@@ -14,6 +27,17 @@ interface User {
   created_at: string
 }
 
+interface Invitation {
+  id: number
+  email: string
+  status: 'pending' | 'accepted' | 'expired' | 'cancelled'
+  license_id: number | null
+  license_code: string | null
+  invited_by_name: string
+  expires_at: string
+  created_at: string
+}
+
 interface UserForm {
   email: string
   password: string
@@ -22,8 +46,15 @@ interface UserForm {
   license_id: number | null
 }
 
+interface License {
+  id: number
+  code: string
+  type: string
+}
+
 export default function AdminUsers() {
   const [showModal, setShowModal] = useState(false)
+  const [showInviteModal, setShowInviteModal] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [form, setForm] = useState<UserForm>({
     email: '',
@@ -32,6 +63,9 @@ export default function AdminUsers() {
     is_admin: false,
     license_id: null,
   })
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteLicenseId, setInviteLicenseId] = useState<number | null>(null)
+  const [activeTab, setActiveTab] = useState<'users' | 'invitations'>('users')
 
   const queryClient = useQueryClient()
 
@@ -43,6 +77,14 @@ export default function AdminUsers() {
   const { data: licenses } = useQuery({
     queryKey: ['admin-licenses'],
     queryFn: () => adminApi.listLicenses(),
+  })
+
+  const { data: invitations, isLoading: isLoadingInvitations } = useQuery({
+    queryKey: ['admin-invitations'],
+    queryFn: async () => {
+      const response = await api.get('/admin/invitations')
+      return response.data
+    },
   })
 
   const createMutation = useMutation({
@@ -69,10 +111,46 @@ export default function AdminUsers() {
     },
   })
 
+  const inviteMutation = useMutation({
+    mutationFn: async (data: { email: string; license_id: number | null }) => {
+      const response = await api.post('/admin/invitations', data)
+      return response.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-invitations'] })
+      closeInviteModal()
+    },
+  })
+
+  const resendMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const response = await api.post(`/admin/invitations/${id}/resend`)
+      return response.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-invitations'] })
+    },
+  })
+
+  const cancelInviteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await api.delete(`/admin/invitations/${id}`)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-invitations'] })
+    },
+  })
+
   const closeModal = () => {
     setShowModal(false)
     setEditingUser(null)
     setForm({ email: '', password: '', name: '', is_admin: false, license_id: null })
+  }
+
+  const closeInviteModal = () => {
+    setShowInviteModal(false)
+    setInviteEmail('')
+    setInviteLicenseId(null)
   }
 
   const openEditModal = (user: User) => {
@@ -98,6 +176,11 @@ export default function AdminUsers() {
     }
   }
 
+  const handleInvite = (e: React.FormEvent) => {
+    e.preventDefault()
+    inviteMutation.mutate({ email: inviteEmail, license_id: inviteLicenseId })
+  }
+
   const handleDelete = (user: User) => {
     if (confirm(`Tem certeza que deseja excluir ${user.name}?`)) {
       deleteMutation.mutate(user.id)
@@ -106,6 +189,37 @@ export default function AdminUsers() {
 
   const toggleAdmin = (user: User) => {
     updateMutation.mutate({ id: user.id, data: { is_admin: !user.is_admin } })
+  }
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return (
+          <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded-full flex items-center gap-1">
+            <Clock size={12} /> Pendente
+          </span>
+        )
+      case 'accepted':
+        return (
+          <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full flex items-center gap-1">
+            <Check size={12} /> Aceito
+          </span>
+        )
+      case 'expired':
+        return (
+          <span className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded-full flex items-center gap-1">
+            <XCircle size={12} /> Expirado
+          </span>
+        )
+      case 'cancelled':
+        return (
+          <span className="px-2 py-1 text-xs bg-red-100 text-red-800 rounded-full flex items-center gap-1">
+            <XCircle size={12} /> Cancelado
+          </span>
+        )
+      default:
+        return null
+    }
   }
 
   if (isLoading) {
@@ -121,107 +235,233 @@ export default function AdminUsers() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Usuários</h1>
-          <p className="text-gray-500">Gerencie os usuários do sistema</p>
+          <p className="text-gray-500">Gerencie os usuários e convites</p>
         </div>
-        <button
-          onClick={() => setShowModal(true)}
-          className="btn-primary flex items-center gap-2"
-        >
-          <Plus size={20} />
-          Novo Usuário
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowInviteModal(true)}
+            className="btn-secondary flex items-center gap-2"
+          >
+            <Mail size={20} />
+            Convidar
+          </button>
+          <button
+            onClick={() => setShowModal(true)}
+            className="btn-primary flex items-center gap-2"
+          >
+            <Plus size={20} />
+            Novo Usuário
+          </button>
+        </div>
       </div>
 
-      <div className="card overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Usuário
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Status
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Licença
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Criado em
-              </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Ações
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {users?.data?.map((user: User) => (
-              <tr key={user.id}>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div>
-                    <div className="text-sm font-medium text-gray-900 flex items-center gap-2">
-                      {user.name}
-                      {user.is_admin && (
-                        <span className="px-2 py-0.5 text-xs bg-blue-100 text-blue-800 rounded-full">
-                          Admin
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-sm text-gray-500">{user.email}</div>
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span
-                    className={clsx(
-                      'px-2 py-1 text-xs rounded-full',
-                      user.is_active
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-red-100 text-red-800'
-                    )}
-                  >
-                    {user.is_active ? 'Ativo' : 'Inativo'}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {user.license_id ? `#${user.license_id}` : '-'}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {new Date(user.created_at).toLocaleDateString('pt-BR')}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  <div className="flex items-center justify-end gap-2">
-                    <button
-                      onClick={() => toggleAdmin(user)}
-                      className={clsx(
-                        'p-1.5 rounded-lg transition-colors',
-                        user.is_admin
-                          ? 'text-blue-600 hover:bg-blue-50'
-                          : 'text-gray-400 hover:bg-gray-100'
-                      )}
-                      title={user.is_admin ? 'Remover admin' : 'Tornar admin'}
-                    >
-                      {user.is_admin ? <Shield size={18} /> : <ShieldOff size={18} />}
-                    </button>
-                    <button
-                      onClick={() => openEditModal(user)}
-                      className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-gray-100 rounded-lg"
-                    >
-                      <Edit2 size={18} />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(user)}
-                      className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-gray-100 rounded-lg"
-                    >
-                      <Trash2 size={18} />
-                    </button>
-                  </div>
-                </td>
+      {/* Tabs */}
+      <div className="border-b border-gray-200">
+        <nav className="flex gap-4">
+          <button
+            onClick={() => setActiveTab('users')}
+            className={clsx(
+              'pb-3 text-sm font-medium border-b-2 transition-colors',
+              activeTab === 'users'
+                ? 'border-biveto text-biveto'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            )}
+          >
+            Usuários ({users?.data?.length || 0})
+          </button>
+          <button
+            onClick={() => setActiveTab('invitations')}
+            className={clsx(
+              'pb-3 text-sm font-medium border-b-2 transition-colors',
+              activeTab === 'invitations'
+                ? 'border-biveto text-biveto'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            )}
+          >
+            Convites ({invitations?.length || 0})
+          </button>
+        </nav>
+      </div>
+
+      {/* Users Tab */}
+      {activeTab === 'users' && (
+        <div className="card overflow-hidden">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Usuário
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Status
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Licença
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Criado em
+                </th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Ações
+                </th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {users?.data?.map((user: User) => (
+                <tr key={user.id}>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div>
+                      <div className="text-sm font-medium text-gray-900 flex items-center gap-2">
+                        {user.name}
+                        {user.is_admin && (
+                          <span className="px-2 py-0.5 text-xs bg-blue-100 text-blue-800 rounded-full">
+                            Admin
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-sm text-gray-500">{user.email}</div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span
+                      className={clsx(
+                        'px-2 py-1 text-xs rounded-full',
+                        user.is_active
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-red-100 text-red-800'
+                      )}
+                    >
+                      {user.is_active ? 'Ativo' : 'Inativo'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {user.license_id ? `#${user.license_id}` : '-'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {new Date(user.created_at).toLocaleDateString('pt-BR')}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={() => toggleAdmin(user)}
+                        className={clsx(
+                          'p-1.5 rounded-lg transition-colors',
+                          user.is_admin
+                            ? 'text-blue-600 hover:bg-blue-50'
+                            : 'text-gray-400 hover:bg-gray-100'
+                        )}
+                        title={user.is_admin ? 'Remover admin' : 'Tornar admin'}
+                      >
+                        {user.is_admin ? <Shield size={18} /> : <ShieldOff size={18} />}
+                      </button>
+                      <button
+                        onClick={() => openEditModal(user)}
+                        className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-gray-100 rounded-lg"
+                      >
+                        <Edit2 size={18} />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(user)}
+                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-gray-100 rounded-lg"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
-      {/* Modal */}
+      {/* Invitations Tab */}
+      {activeTab === 'invitations' && (
+        <div className="card overflow-hidden">
+          {isLoadingInvitations ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+            </div>
+          ) : invitations?.length === 0 ? (
+            <div className="text-center py-12 text-gray-500">
+              Nenhum convite enviado ainda
+            </div>
+          ) : (
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Email
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Licença
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Enviado por
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Expira em
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Ações
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {invitations?.map((inv: Invitation) => (
+                  <tr key={inv.id}>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {inv.email}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {getStatusBadge(inv.status)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {inv.license_code || '-'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {inv.invited_by_name}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {new Date(inv.expires_at).toLocaleString('pt-BR')}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      {inv.status === 'pending' && (
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => resendMutation.mutate(inv.id)}
+                            disabled={resendMutation.isPending}
+                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"
+                            title="Reenviar"
+                          >
+                            <Send size={18} />
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (confirm('Cancelar este convite?')) {
+                                cancelInviteMutation.mutate(inv.id)
+                              }
+                            }}
+                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
+                            title="Cancelar"
+                          >
+                            <XCircle size={18} />
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+
+      {/* User Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg w-full max-w-md p-6">
@@ -287,9 +527,9 @@ export default function AdminUsers() {
                   className="input"
                 >
                   <option value="">Sem licença</option>
-                  {licenses?.data?.map((lic: { id: number; key: string; type: string }) => (
+                  {licenses?.data?.map((lic: License) => (
                     <option key={lic.id} value={lic.id}>
-                      #{lic.id} - {lic.type}
+                      {lic.code} - {lic.type}
                     </option>
                   ))}
                 </select>
@@ -320,6 +560,81 @@ export default function AdminUsers() {
                   {createMutation.isPending || updateMutation.isPending
                     ? 'Salvando...'
                     : 'Salvar'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Invite Modal */}
+      {showInviteModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold">Convidar Usuário</h2>
+              <button onClick={closeInviteModal} className="text-gray-400 hover:text-gray-600">
+                <X size={20} />
+              </button>
+            </div>
+
+            <p className="text-sm text-gray-600 mb-4">
+              Um email será enviado com um link para criar a conta.
+            </p>
+
+            <form onSubmit={handleInvite} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  className="input"
+                  placeholder="email@exemplo.com"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Licença (opcional)
+                </label>
+                <select
+                  value={inviteLicenseId || ''}
+                  onChange={(e) =>
+                    setInviteLicenseId(e.target.value ? Number(e.target.value) : null)
+                  }
+                  className="input"
+                >
+                  <option value="">Sem licença</option>
+                  {licenses?.data?.map((lic: License) => (
+                    <option key={lic.id} value={lic.id}>
+                      {lic.code} - {lic.type}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {inviteMutation.isError && (
+                <div className="p-3 bg-red-50 text-red-700 rounded-lg text-sm">
+                  {(inviteMutation.error as any)?.response?.data?.detail ||
+                    'Erro ao enviar convite'}
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3 pt-4">
+                <button type="button" onClick={closeInviteModal} className="btn-secondary">
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="btn-primary flex items-center gap-2"
+                  disabled={inviteMutation.isPending}
+                >
+                  <Send size={18} />
+                  {inviteMutation.isPending ? 'Enviando...' : 'Enviar Convite'}
                 </button>
               </div>
             </form>

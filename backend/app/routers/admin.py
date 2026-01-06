@@ -1,12 +1,14 @@
 import secrets
-from datetime import date
+from datetime import date, datetime, timedelta
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select, func
-from passlib.context import CryptContext
 
 from ..core.deps import CurrentUser, DbSession
-from ..models import User, License, LicenseStatus
+from ..core.config import settings
+from ..core.security import get_password_hash
+from ..models import User, License, LicenseStatus, Invitation, InvitationStatus
 from ..services.user_setup import setup_new_user
+from ..services.email_service import email_service
 from ..schemas.admin import (
     LicenseCreate,
     LicenseUpdate,
@@ -17,9 +19,12 @@ from ..schemas.admin import (
     UserListResponse,
     AdminDashboard,
 )
+from ..schemas.invitation import InvitationCreate, InvitationListResponse
 
 router = APIRouter()
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# Constantes de segurança
+RESET_TOKEN_EXPIRE_HOURS = 1
 
 
 def require_admin(user: User):
@@ -84,6 +89,7 @@ async def list_licenses(current_user: CurrentUser, db: DbSession):
         resp = LicenseResponse(
             id=lic.id,
             key=lic.key,
+            code=lic.code,
             type=lic.type,
             status=lic.status,
             max_users=lic.max_users,
@@ -143,6 +149,7 @@ async def create_license(
     return LicenseResponse(
         id=license.id,
         key=license.key,
+        code=license.code,
         type=license.type,
         status=license.status,
         max_users=license.max_users,
@@ -194,6 +201,7 @@ async def update_license(
     return LicenseResponse(
         id=license.id,
         key=license.key,
+        code=license.code,
         type=license.type,
         status=license.status,
         max_users=license.max_users,
@@ -263,7 +271,7 @@ async def create_user(
     current_user: CurrentUser,
     db: DbSession,
 ):
-    """Cria um novo usuário (via admin)"""
+    """Cria um novo usuário. Se senha não for informada, envia convite por email."""
     require_admin(current_user)
 
     # Check if email exists
@@ -272,6 +280,7 @@ async def create_user(
         raise HTTPException(status_code=400, detail="Email já cadastrado")
 
     # Validate license if provided
+    license = None
     if data.license_id:
         license = await db.scalar(
             select(License).where(License.id == data.license_id)
@@ -279,25 +288,71 @@ async def create_user(
         if not license:
             raise HTTPException(status_code=400, detail="Licença não encontrada")
 
-    user = User(
+    # If password provided, create user directly
+    if data.password:
+        user = User(
+            email=data.email,
+            hashed_password=get_password_hash(data.password),
+            name=data.name,
+            is_admin=data.is_admin,
+            license_id=data.license_id,
+            is_verified=True,
+        )
+
+        db.add(user)
+        await db.flush()
+        await db.refresh(user)
+
+        # Create default accounts and categories
+        await setup_new_user(db, user.id)
+
+        await db.commit()
+
+        return UserAdminResponse.model_validate(user)
+
+    # No password - create invitation and send email
+    existing_invite = await db.scalar(
+        select(Invitation).where(
+            Invitation.email == data.email,
+            Invitation.status == InvitationStatus.PENDING
+        )
+    )
+    if existing_invite:
+        raise HTTPException(status_code=400, detail="Já existe um convite pendente para este email")
+
+    invitation = Invitation(
         email=data.email,
-        hashed_password=pwd_context.hash(data.password),
-        name=data.name,
-        is_admin=data.is_admin,
         license_id=data.license_id,
-        is_verified=True,  # Admin created users are verified
+        invited_by_id=current_user.id,
     )
 
-    db.add(user)
-    await db.flush()  # Flush to get user ID
-    await db.refresh(user)
-
-    # Create default accounts and categories for the new user
-    await setup_new_user(db, user.id)
-
+    db.add(invitation)
     await db.commit()
+    await db.refresh(invitation)
 
-    return UserAdminResponse.model_validate(user)
+    # Send invitation email
+    invite_url = f"{settings.frontend_url}/invite/{invitation.token}"
+    email_sent = email_service.send_invitation(
+        to_email=data.email,
+        invite_url=invite_url,
+        inviter_name=current_user.name,
+    )
+
+    if not email_sent:
+        print(f"Aviso: Email não enviado para {data.email}")
+
+    # Return placeholder response (user will be created when invitation is accepted)
+    return UserAdminResponse(
+        id=0,
+        email=data.email,
+        name=data.name,
+        is_active=False,
+        is_verified=False,
+        is_admin=data.is_admin,
+        license_id=data.license_id,
+        created_at=invitation.created_at,
+        updated_at=invitation.created_at,
+    )
 
 
 @router.get("/users/{user_id}", response_model=UserAdminResponse)
@@ -338,7 +393,7 @@ async def update_user(
 
     # Hash password if being updated
     if "password" in update_data and update_data["password"]:
-        update_data["hashed_password"] = pwd_context.hash(update_data.pop("password"))
+        update_data["hashed_password"] = get_password_hash(update_data.pop("password"))
     elif "password" in update_data:
         del update_data["password"]
 
@@ -378,4 +433,188 @@ async def delete_user(
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
 
     await db.delete(user)
+    await db.commit()
+
+
+@router.post("/users/{user_id}/reset-password", status_code=status.HTTP_200_OK)
+async def send_password_reset(
+    user_id: int,
+    current_user: CurrentUser,
+    db: DbSession,
+):
+    """Envia email de redefinição de senha para o usuário"""
+    require_admin(current_user)
+
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+
+    # Gerar token de reset com expiração
+    reset_token = secrets.token_urlsafe(32)
+    user.reset_token = reset_token
+    user.reset_token_expires = datetime.utcnow() + timedelta(hours=RESET_TOKEN_EXPIRE_HOURS)
+
+    await db.commit()
+
+    # Enviar email
+    reset_url = f"{settings.frontend_url}/reset-password/{reset_token}"
+    email_sent = email_service.send_password_reset(
+        to_email=user.email,
+        reset_url=reset_url,
+        user_name=user.name,
+    )
+
+    if not email_sent:
+        raise HTTPException(status_code=500, detail="Falha ao enviar email")
+
+    return {"message": "Email de redefinição de senha enviado com sucesso"}
+
+
+# ========== Invitations ==========
+
+@router.get("/invitations", response_model=list[InvitationListResponse])
+async def list_invitations(current_user: CurrentUser, db: DbSession):
+    """Lista todos os convites"""
+    require_admin(current_user)
+
+    result = await db.execute(
+        select(Invitation).order_by(Invitation.created_at.desc())
+    )
+    invitations = result.scalars().all()
+
+    response = []
+    for inv in invitations:
+        response.append(InvitationListResponse(
+            id=inv.id,
+            email=inv.email,
+            status=inv.status,
+            license_id=inv.license_id,
+            license_code=inv.license.code if inv.license else None,
+            invited_by_name=inv.invited_by.name if inv.invited_by else "Desconhecido",
+            expires_at=inv.expires_at,
+            created_at=inv.created_at,
+        ))
+
+    return response
+
+
+@router.post("/invitations", response_model=InvitationListResponse, status_code=status.HTTP_201_CREATED)
+async def create_invitation(
+    data: InvitationCreate,
+    current_user: CurrentUser,
+    db: DbSession,
+):
+    """Cria e envia um convite por email"""
+    require_admin(current_user)
+
+    # Verificar se email já está cadastrado
+    existing_user = await db.scalar(select(User).where(User.email == data.email))
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email já cadastrado no sistema")
+
+    # Verificar se já existe convite pendente
+    existing_invite = await db.scalar(
+        select(Invitation).where(
+            Invitation.email == data.email,
+            Invitation.status == InvitationStatus.PENDING
+        )
+    )
+    if existing_invite:
+        raise HTTPException(status_code=400, detail="Já existe um convite pendente para este email")
+
+    # Validar licença se fornecida
+    license = None
+    if data.license_id:
+        license = await db.scalar(select(License).where(License.id == data.license_id))
+        if not license:
+            raise HTTPException(status_code=400, detail="Licença não encontrada")
+
+    # Criar convite
+    invitation = Invitation(
+        email=data.email,
+        license_id=data.license_id,
+        invited_by_id=current_user.id,
+    )
+
+    db.add(invitation)
+    await db.commit()
+    await db.refresh(invitation)
+
+    # Enviar email
+    invite_url = f"{settings.frontend_url}/invite/{invitation.token}"
+    email_sent = email_service.send_invitation(
+        to_email=data.email,
+        invite_url=invite_url,
+        inviter_name=current_user.name,
+    )
+
+    if not email_sent:
+        # Log mas não falha - convite foi criado
+        print(f"Aviso: Email não enviado para {data.email}")
+
+    return InvitationListResponse(
+        id=invitation.id,
+        email=invitation.email,
+        status=invitation.status,
+        license_id=invitation.license_id,
+        license_code=license.code if license else None,
+        invited_by_name=current_user.name,
+        expires_at=invitation.expires_at,
+        created_at=invitation.created_at,
+    )
+
+
+@router.post("/invitations/{invitation_id}/resend", status_code=status.HTTP_200_OK)
+async def resend_invitation(
+    invitation_id: int,
+    current_user: CurrentUser,
+    db: DbSession,
+):
+    """Reenvia email de convite"""
+    require_admin(current_user)
+
+    result = await db.execute(select(Invitation).where(Invitation.id == invitation_id))
+    invitation = result.scalar_one_or_none()
+
+    if not invitation:
+        raise HTTPException(status_code=404, detail="Convite não encontrado")
+
+    if invitation.status != InvitationStatus.PENDING:
+        raise HTTPException(status_code=400, detail="Convite não está pendente")
+
+    # Enviar email novamente
+    invite_url = f"{settings.frontend_url}/invite/{invitation.token}"
+    email_sent = email_service.send_invitation(
+        to_email=invitation.email,
+        invite_url=invite_url,
+        inviter_name=invitation.invited_by.name if invitation.invited_by else "Administrador",
+    )
+
+    if not email_sent:
+        raise HTTPException(status_code=500, detail="Falha ao enviar email")
+
+    return {"message": "Email reenviado com sucesso"}
+
+
+@router.delete("/invitations/{invitation_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def cancel_invitation(
+    invitation_id: int,
+    current_user: CurrentUser,
+    db: DbSession,
+):
+    """Cancela um convite"""
+    require_admin(current_user)
+
+    result = await db.execute(select(Invitation).where(Invitation.id == invitation_id))
+    invitation = result.scalar_one_or_none()
+
+    if not invitation:
+        raise HTTPException(status_code=404, detail="Convite não encontrado")
+
+    if invitation.status == InvitationStatus.ACCEPTED:
+        raise HTTPException(status_code=400, detail="Convite já foi aceito")
+
+    invitation.status = InvitationStatus.CANCELLED
     await db.commit()

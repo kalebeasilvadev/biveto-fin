@@ -86,9 +86,12 @@ class DocumentService:
                     date=item.get('date'),
                     category=item.get('category'),
                     confidence=item.get('confidence', 0.9),
+                    is_installment=item.get('is_installment', False),
+                    installment_current=item.get('installment_current'),
+                    installment_total=item.get('installment_total'),
                 )
                 for item in extraction_data['items']
-                if item.get('amount', 0) > 0
+                if item.get('amount', 0) != 0  # Aceita positivos e negativos
             ]
 
         return response
@@ -174,25 +177,42 @@ class DocumentService:
     async def _extract_data(
         self, document: Document, content: bytes
     ) -> dict | None:
-        """Extrai dados do documento usando LLM com visão (retorna lista de itens)"""
-        from .llm_ocr_service import LLMOCRService
+        """Extrai dados do documento usando LLM com visão ou parser de planilha"""
 
-        # Executar extração com LLM
-        llm_service = LLMOCRService()
-        llm_result = await llm_service.extract_from_image(content, document.mime_type)
+        # Verificar se é CSV ou Excel
+        mime_type = document.mime_type or ''
+        filename = document.original_filename or ''
+
+        is_spreadsheet = (
+            mime_type in ['text/csv', 'application/csv',
+                          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                          'application/vnd.ms-excel'] or
+            filename.lower().endswith(('.csv', '.xlsx', '.xls'))
+        )
+
+        if is_spreadsheet:
+            # Usar parser de planilha
+            from .spreadsheet_parser_service import SpreadsheetParserService
+            parser = SpreadsheetParserService()
+            result = await parser.parse_file(content, filename, mime_type)
+        else:
+            # Usar LLM com visão para imagens/PDFs
+            from .llm_ocr_service import LLMOCRService
+            llm_service = LLMOCRService()
+            result = await llm_service.extract_from_image(content, mime_type)
 
         # Se houve erro na extração
-        if llm_result.get('error'):
-            document.error_message = llm_result['error']
+        if result.get('error'):
+            document.error_message = result['error']
             return None
 
         # Determinar tipo de documento
-        doc_type = llm_result.get('document_type')
+        doc_type = result.get('document_type')
         if doc_type:
             document.document_type = doc_type
 
         # Retornar itens individuais com categoria
-        items = llm_result.get('items', [])
+        items = result.get('items', [])
 
         return {
             'items': items,

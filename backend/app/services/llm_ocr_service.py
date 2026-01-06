@@ -2,6 +2,7 @@
 import base64
 import json
 import httpx
+import io
 from ..core.config import settings
 
 
@@ -27,40 +28,92 @@ Extraia TODOS os itens/transações visíveis INDIVIDUALMENTE e retorne um JSON 
 REGRAS CRÍTICAS:
 
 1. PARCELAS (MUITO IMPORTANTE!):
-   - Identifique compras parceladas: "Parcela 3/12", "3 de 12", "Parc 03/12", "3x de 12"
-   - Se encontrar parcela, extraia:
-     * installment_current: número da parcela atual (ex: 3)
-     * installment_total: total de parcelas (ex: 12)
-     * is_installment: true
-   - Se NÃO for parcelado: is_installment: false, omita os campos de parcela
-   - O valor (amount) deve ser o valor DA PARCELA, não o total da compra
+   PADRÕES DE PARCELAMENTO POR BANCO:
 
-2. DATAS: Extraia a data EXATA de cada transação visível (formato YYYY-MM-DD)
-   - Se mostra "25 JAN", converta para "2024-01-25"
-   - Use o ano da fatura quando não especificado
-   - NUNCA deixe date como null se houver data visível
+   NUBANK:
+   - "Parcela X de Y" ou "Parcela X/Y" (ex: "Parcela 1 de 6")
+   - Números "XX/YY" no nome (ex: "Pag*steam 03/12" = parcela 3 de 12)
+   - "*nome XX/YY" (ex: "*nuuve01/06" = parcela 1 de 6)
 
-3. VALORES: Converta R$ para número (R$ 1.234,56 → 1234.56)
+   INTER:
+   - "(Parcela XX de YY)" no final (ex: "DM *helphbomaxcom (Parcela 05 de 12)")
+   - "NOME (Parcela XX de YY)" (ex: "LOJAS NOSSO LAR (Parcela 04 de 12)")
+
+   BRADESCO/AMEX:
+   - "NOME XX/YY" com espaço (ex: "Steam 02/12" = parcela 2 de 12)
+   - "NOME*código XX/YY" (ex: "HOTMART asimovacadem02/12" = parcela 2 de 12)
+   - "NOME LT02/10" (ex: "CIATOY BRINQUEDOS LT02/10" = parcela 2 de 10)
+   - "NOME 01/06" (ex: "INSIDE GAMES 01/06" = parcela 1 de 6)
+
+   PADRÕES GENÉRICOS:
+   - "Parc X/Y" ou "Parc X de Y"
+   - "Xª parcela de Y" ou "Xa de Y"
+   - "XX/YY" no final da descrição
+
+   COMO EXTRAIR:
+   - installment_current: número da parcela atual (ex: 3)
+   - installment_total: total de parcelas (ex: 12)
+   - is_installment: true
+   - O valor (amount) deve ser o valor DA PARCELA exibido, não o total da compra
+
+   Se NÃO for parcelado: is_installment: false, omita os campos de parcela
+
+2. DATAS:
+   - Extraia a data EXATA de cada transação
+   - Formato de saída: YYYY-MM-DD
+   - Formatos de entrada comuns:
+     * "23 de ago. 2025" → "2025-08-23"
+     * "04 de set. 2025" → "2025-09-04"
+     * "08/12" (dia/mês) → use ano do contexto da fatura
+     * "25 de dezembro" → use ano do contexto
+   - Use o ano do vencimento da fatura quando o ano não estiver explícito
+
+3. VALORES:
+   - Converta R$ para número decimal (R$ 1.234,56 → 1234.56)
+   - Valores negativos/créditos:
+     * "-R$ 210,90" → amount: -210.90
+     * "+ R$ 1.556,82" ou "1.513,17 -" → amount: -1513.17 (pagamento/crédito)
+     * "PAGAMENTO DE FATURA" → amount negativo
+   - Valores em dólar "US$ 10,00" devem ter o valor em reais extraído se disponível
 
 4. CATEGORIAS - baseado no nome do estabelecimento:
-   - alimentacao: restaurantes, pizzarias, lanches, delivery, ifood
-   - transporte: posto, uber, 99, estacionamento, shellbox
-   - moradia: luz, água, gás, aluguel, condomínio
-   - saude: farmácia, hospital, médico, drogaria
-   - lazer: cinema, streaming, jogos, bar, spotify, netflix
-   - eletronicos: magazine luiza, americanas, casas bahia, kabum
-   - roupas: renner, c&a, riachuelo, zara, shein
-   - servicos: elétrica, hidráulica, manutenção
-   - mercado: supermercado, mercado, atacado
-   - assinaturas: spotify, netflix, amazon prime, disney+
+   - alimentacao: restaurantes, pizzarias, lanches, delivery, ifood, mc donalds, burger, gruta
+   - transporte: posto, uber, 99, estacionamento, shellbox, pedagio
+   - moradia: luz, água, gás, aluguel, condomínio, energia, enel, sabesp
+   - saude: farmácia, hospital, médico, drogaria, droga raia, ultrafarma
+   - lazer: cinema, streaming, jogos, bar, spotify, netflix, steam, nuuvem, pag*steam, inside games, shopee, daiso
+   - eletronicos: magazine luiza, americanas, casas bahia, kabum, pichau, amazon, ciatoy
+   - roupas: renner, c&a, riachuelo, zara, shein, o boticario, oboticario
+   - servicos: elétrica, hidráulica, manutenção, solare instalacao
+   - mercado: supermercado, mercado, atacado, pao de acucar, carrefour, extra, distribuidora
+   - assinaturas: spotify, netflix, amazon prime, disney+, gympass, wellhub, hotmart, apple.com/bill, hbomax
+   - cartao: anuidade, taxa, iof, seguro cartao
+   - educacao: hotmart, cursos, academy
    - outros: quando não se encaixar nas anteriores
 
 5. DOCUMENT_TYPE: fatura_cartao | cupom_fiscal | comprovante | extrato
 
-EXEMPLOS DE EXTRAÇÃO DE PARCELAS:
-- "MAGAZINE LUIZA PARC 03/12 R$ 150,00" → installment_current: 3, installment_total: 12, amount: 150.00
-- "AMAZON 2 DE 5 R$ 89,90" → installment_current: 2, installment_total: 5, amount: 89.90
-- "IFOOD R$ 45,00" → is_installment: false (não tem parcela)
+EXEMPLOS DE EXTRAÇÃO:
+
+NUBANK:
+- "Nuuvem *nuuve01/06 R$ 44,65 Parcela 1 de 6" → description: "Nuuvem", installment_current: 1, installment_total: 6, amount: 44.65
+- "Pag*steam 03/12 R$ 106,09 Parcela 3 de 12" → description: "Steam", installment_current: 3, installment_total: 12, amount: 106.09
+
+INTER:
+- "DM *helphbomaxcom (Parcela 05 de 12) R$ 39,90" → description: "HBO Max", installment_current: 5, installment_total: 12, amount: 39.90
+- "LOJAS NOSSO LAR (Parcela 04 de 12) R$ 99,99" → description: "Lojas Nosso Lar", installment_current: 4, installment_total: 12, amount: 99.99
+- "PAGAMENTO DE FATURA + R$ 1.556,82" → description: "Pagamento de Fatura", amount: -1556.82, is_installment: false
+
+BRADESCO/AMEX:
+- "Steam 02/12 SAO PAULO R$ 105,66" → description: "Steam", installment_current: 2, installment_total: 12, amount: 105.66
+- "INSIDE GAMES 01/06 BRASILIA R$ 135,00" → description: "Inside Games", installment_current: 1, installment_total: 6, amount: 135.00
+- "DAISO JAPAN BRASILIA R$ 371,80" → description: "Daiso Japan", is_installment: false, amount: 371.80
+- "PAG BOLETO BANCARIO 1.513,17 -" → description: "Pagamento Boleto", amount: -1513.17, is_installment: false
+
+IMPORTANTE:
+- Limpe a descrição removendo códigos como "*nuuve01/06", "03/12", "LT02/10", "(Parcela X de Y)" etc.
+- Deixe apenas o nome legível do estabelecimento.
+- NÃO ignore pagamentos/créditos (valores com sinal negativo ou "+").
 
 Retorne APENAS o JSON válido, sem explicações."""
 
@@ -72,8 +125,60 @@ class LLMOCRService:
         self.provider = settings.vision_provider
         self.model = settings.vision_model
 
+    def _convert_pdf_to_images(self, pdf_content: bytes) -> list[tuple[bytes, str]]:
+        """Converte PDF para lista de imagens (uma por página)"""
+        try:
+            import fitz  # pymupdf
+
+            images = []
+            pdf_doc = fitz.open(stream=pdf_content, filetype="pdf")
+
+            for page_num in range(len(pdf_doc)):
+                page = pdf_doc[page_num]
+                # Renderizar página como imagem com boa resolução
+                mat = fitz.Matrix(2.0, 2.0)  # 2x zoom para melhor qualidade
+                pix = page.get_pixmap(matrix=mat)
+                img_bytes = pix.tobytes("png")
+                images.append((img_bytes, 'image/png'))
+
+            pdf_doc.close()
+            return images
+        except Exception as e:
+            print(f"Erro ao converter PDF: {e}")
+            return []
+
     async def extract_from_image(self, image_content: bytes, mime_type: str = 'image/png') -> dict:
         """Extrai dados da imagem usando o provider configurado"""
+        try:
+            # Se for PDF, converter para imagens e processar todas as páginas
+            if mime_type == 'application/pdf' or mime_type.endswith('/pdf'):
+                images = self._convert_pdf_to_images(image_content)
+                if not images:
+                    return {'items': [], 'error': 'Não foi possível processar o PDF'}
+
+                # Processar todas as páginas e combinar resultados
+                all_items = []
+                document_type = None
+
+                for img_content, img_mime in images:
+                    result = await self._process_single_image(img_content, img_mime)
+                    if result.get('items'):
+                        all_items.extend(result['items'])
+                    if result.get('document_type') and not document_type:
+                        document_type = result['document_type']
+
+                return {
+                    'items': all_items,
+                    'document_type': document_type,
+                }
+            else:
+                return await self._process_single_image(image_content, mime_type)
+
+        except Exception as e:
+            return {'items': [], 'error': str(e)}
+
+    async def _process_single_image(self, image_content: bytes, mime_type: str) -> dict:
+        """Processa uma única imagem"""
         try:
             if self.provider == 'google':
                 return await self._call_google(image_content, mime_type)
@@ -97,7 +202,11 @@ class LLMOCRService:
 
         async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.post(
-                f'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}',
+                f'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent',
+                headers={
+                    'x-goog-api-key': api_key,  # API key no header (mais seguro que query param)
+                    'Content-Type': 'application/json',
+                },
                 json={
                     'contents': [{
                         'parts': [
@@ -112,7 +221,7 @@ class LLMOCRService:
                     }],
                     'generationConfig': {
                         'temperature': 0.1,
-                        'maxOutputTokens': 2000,
+                        'maxOutputTokens': 4000,
                     }
                 },
             )
@@ -154,7 +263,7 @@ class LLMOCRService:
                             ]
                         }
                     ],
-                    'max_tokens': 2000,
+                    'max_tokens': 4000,
                     'temperature': 0.1,
                 },
             )
@@ -189,7 +298,7 @@ class LLMOCRService:
                 },
                 json={
                     'model': 'claude-3-haiku-20240307',
-                    'max_tokens': 2000,
+                    'max_tokens': 4000,
                     'messages': [
                         {
                             'role': 'user',
@@ -275,7 +384,8 @@ class LLMOCRService:
                     'installment_total': installment_total,
                 }
 
-                if normalized['amount'] > 0:
+                # Aceitar tanto despesas (positivo) quanto pagamentos/créditos (negativo)
+                if normalized['amount'] != 0:
                     items.append(normalized)
 
             return {

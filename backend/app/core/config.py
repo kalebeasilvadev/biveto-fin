@@ -26,7 +26,7 @@ class Settings(BaseSettings):
 
     # Document Processing
     max_upload_size_mb: int = 10
-    allowed_extensions: list[str] = ["jpg", "jpeg", "png", "pdf"]
+    allowed_extensions: list[str] = ["jpg", "jpeg", "png", "pdf", "csv", "xlsx", "xls"]
 
     # Storage
     upload_dir: str = "./uploads"
@@ -38,6 +38,18 @@ class Settings(BaseSettings):
     google_api_key: str | None = None  # Gemini - GRÁTIS
     anthropic_api_key: str | None = None
     vision_model: str = "gemini-2.0-flash"  # Modelo gratuito com visão (atualizado 2025)
+
+    # SMTP Configuration (Hostinger)
+    smtp_host: str = "smtp.hostinger.com"
+    smtp_port: int = 465
+    smtp_use_ssl: bool = True
+    smtp_user: str | None = None
+    smtp_password: str | None = None
+    smtp_from_name: str = "Biveto"
+    smtp_from_email: str | None = None
+
+    # Frontend URL (para links nos emails)
+    frontend_url: str = "https://biveto.com"
 
     class Config:
         env_file = ".env"

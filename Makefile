@@ -1,4 +1,4 @@
-.PHONY: help install dev backend frontend docker-up docker-down docker-clean
+.PHONY: help install dev backend frontend docker-up docker-down docker-clean deploy ssh create-admin admin
 
 # Cores
 GREEN  := $(shell tput -Txterm setaf 2)
@@ -88,3 +88,24 @@ clean: ## Remove arquivos temporários
 	find . -type d -name node_modules -exec rm -rf {} + 2>/dev/null || true
 	find . -type d -name dist -exec rm -rf {} + 2>/dev/null || true
 	rm -rf backend/venv 2>/dev/null || true
+
+# ==================== Deploy ====================
+
+deploy: ## Deploy para Fly.io
+	flyctl deploy
+
+deploy-logs: ## Mostra logs do Fly.io
+	flyctl logs
+
+ssh: ## SSH no container Fly.io
+	flyctl ssh console
+
+# ==================== Admin ====================
+
+create-admin: ## Cria usuário admin (uso: make create-admin email=x senha=y nome=z)
+	cd backend && . venv/bin/activate && python scripts/create_admin.py "$(email)" "$(senha)" "$(nome)"
+
+# ==================== Admin Panel ====================
+
+admin: ## Inicia o painel admin (porta 5174)
+	cd admin/frontend && npm run dev -- --port 5174

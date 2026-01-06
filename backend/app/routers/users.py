@@ -1,8 +1,10 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException, status
 
 from ..core.deps import CurrentUser, DbSession
-from ..schemas.user import UserResponse, UserUpdate
+from ..core.security import get_password_hash, verify_password
+from ..schemas.user import UserResponse, UserUpdate, ChangePassword
 from ..services.user_service import UserService
+from ..services.email_service import email_service
 
 router = APIRouter()
 
@@ -22,3 +24,27 @@ async def update_current_user(
     """Atualiza dados do usuário autenticado"""
     user_service = UserService(db)
     return await user_service.update(current_user, data)
+
+
+@router.post("/me/change-password")
+async def change_password(
+    data: ChangePassword,
+    current_user: CurrentUser,
+    db: DbSession,
+):
+    """Altera a senha do usuário autenticado"""
+    # Verificar senha atual
+    if not verify_password(data.current_password, current_user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Senha atual incorreta"
+        )
+
+    # Atualizar senha
+    current_user.hashed_password = get_password_hash(data.new_password)
+    await db.commit()
+
+    # Enviar notificação de alteração de senha
+    email_service.send_password_changed_notification(current_user.email, current_user.name)
+
+    return {"message": "Senha alterada com sucesso"}

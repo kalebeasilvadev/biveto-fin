@@ -39,7 +39,7 @@ async def create_category(
         is_system=False,
     )
     db.add(category)
-    await db.flush()
+    await db.commit()
     await db.refresh(category)
     return category
 
@@ -66,3 +66,4 @@ async def delete_category(
         )
 
     await db.delete(category)
+    await db.commit()

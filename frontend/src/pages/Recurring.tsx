@@ -1,0 +1,656 @@
+import { useState } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { recurringApi, accountsApi, categoriesApi } from '../services/api'
+import { Plus, Repeat, Pause, Play, Trash2, Edit2, Calendar, DollarSign } from 'lucide-react'
+import { clsx } from 'clsx'
+
+interface RecurringTransaction {
+  id: number
+  name: string
+  description: string | null
+  amount: number
+  type: string
+  account_id: number
+  account_name: string | null
+  category_id: number | null
+  category_name: string | null
+  frequency: string
+  day_of_month: number | null
+  day_of_week: number | null
+  start_date: string
+  end_date: string | null
+  status: string
+  last_generated_date: string | null
+  next_due_date: string | null
+}
+
+interface RecurringSummary {
+  total_monthly_expenses: number
+  total_monthly_income: number
+  active_count: number
+  paused_count: number
+}
+
+interface Account {
+  id: number
+  name: string
+}
+
+interface Category {
+  id: number
+  name: string
+}
+
+const frequencyLabels: Record<string, string> = {
+  daily: 'Diário',
+  weekly: 'Semanal',
+  monthly: 'Mensal',
+  yearly: 'Anual',
+}
+
+const dayOfWeekLabels: Record<number, string> = {
+  0: 'Segunda',
+  1: 'Terça',
+  2: 'Quarta',
+  3: 'Quinta',
+  4: 'Sexta',
+  5: 'Sábado',
+  6: 'Domingo',
+}
+
+const statusLabels: Record<string, string> = {
+  active: 'Ativo',
+  paused: 'Pausado',
+  cancelled: 'Cancelado',
+}
+
+export default function Recurring() {
+  const queryClient = useQueryClient()
+  const [showForm, setShowForm] = useState(false)
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const [formData, setFormData] = useState({
+    name: '',
+    description: '',
+    amount: '',
+    type: 'expense',
+    account_id: '',
+    category_id: '',
+    frequency: 'monthly',
+    day_of_month: '1',
+    day_of_week: '',
+    start_date: new Date().toISOString().split('T')[0],
+    end_date: '',
+  })
+
+  const { data: recurring = [], isLoading } = useQuery<RecurringTransaction[]>({
+    queryKey: ['recurring'],
+    queryFn: async () => {
+      const response = await recurringApi.list()
+      return response.data
+    },
+  })
+
+  const { data: summary } = useQuery<RecurringSummary>({
+    queryKey: ['recurring-summary'],
+    queryFn: async () => {
+      const response = await recurringApi.summary()
+      return response.data
+    },
+  })
+
+  const { data: accounts = [] } = useQuery<Account[]>({
+    queryKey: ['accounts'],
+    queryFn: async () => {
+      const response = await accountsApi.list()
+      return response.data
+    },
+  })
+
+  const { data: categories = [] } = useQuery<Category[]>({
+    queryKey: ['categories'],
+    queryFn: async () => {
+      const response = await categoriesApi.list()
+      return response.data
+    },
+  })
+
+  const createMutation = useMutation({
+    mutationFn: (data: unknown) => recurringApi.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['recurring'] })
+      queryClient.invalidateQueries({ queryKey: ['recurring-summary'] })
+      resetForm()
+    },
+  })
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: unknown }) =>
+      recurringApi.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['recurring'] })
+      queryClient.invalidateQueries({ queryKey: ['recurring-summary'] })
+      resetForm()
+    },
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => recurringApi.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['recurring'] })
+      queryClient.invalidateQueries({ queryKey: ['recurring-summary'] })
+    },
+  })
+
+  const pauseMutation = useMutation({
+    mutationFn: (id: number) => recurringApi.pause(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['recurring'] })
+      queryClient.invalidateQueries({ queryKey: ['recurring-summary'] })
+    },
+  })
+
+  const resumeMutation = useMutation({
+    mutationFn: (id: number) => recurringApi.resume(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['recurring'] })
+      queryClient.invalidateQueries({ queryKey: ['recurring-summary'] })
+    },
+  })
+
+  const generateMutation = useMutation({
+    mutationFn: () => recurringApi.generate(),
+    onSuccess: (response) => {
+      queryClient.invalidateQueries({ queryKey: ['recurring'] })
+      queryClient.invalidateQueries({ queryKey: ['transactions'] })
+      alert(`${response.data.generated_count} transações geradas!`)
+    },
+  })
+
+  const resetForm = () => {
+    setShowForm(false)
+    setEditingId(null)
+    setFormData({
+      name: '',
+      description: '',
+      amount: '',
+      type: 'expense',
+      account_id: '',
+      category_id: '',
+      frequency: 'monthly',
+      day_of_month: '1',
+      day_of_week: '',
+      start_date: new Date().toISOString().split('T')[0],
+      end_date: '',
+    })
+  }
+
+  const handleEdit = (item: RecurringTransaction) => {
+    setEditingId(item.id)
+    setFormData({
+      name: item.name,
+      description: item.description || '',
+      amount: item.amount.toString(),
+      type: item.type,
+      account_id: item.account_id.toString(),
+      category_id: item.category_id?.toString() || '',
+      frequency: item.frequency,
+      day_of_month: item.day_of_month?.toString() || '1',
+      day_of_week: item.day_of_week?.toString() || '',
+      start_date: item.start_date,
+      end_date: item.end_date || '',
+    })
+    setShowForm(true)
+  }
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    const data = {
+      name: formData.name,
+      description: formData.description || null,
+      amount: parseFloat(formData.amount),
+      type: formData.type,
+      account_id: parseInt(formData.account_id),
+      category_id: formData.category_id ? parseInt(formData.category_id) : null,
+      frequency: formData.frequency,
+      day_of_month: formData.frequency === 'monthly' ? parseInt(formData.day_of_month) : null,
+      day_of_week: formData.frequency === 'weekly' ? parseInt(formData.day_of_week) : null,
+      start_date: formData.start_date,
+      end_date: formData.end_date || null,
+    }
+
+    if (editingId) {
+      updateMutation.mutate({ id: editingId, data })
+    } else {
+      createMutation.mutate(data)
+    }
+  }
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }).format(value)
+  }
+
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return '-'
+    return new Date(dateStr).toLocaleDateString('pt-BR')
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Despesas Recorrentes</h1>
+          <p className="text-gray-500 mt-1">
+            Gerencie seus gastos fixos como aluguel, assinaturas e contas
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => generateMutation.mutate()}
+            disabled={generateMutation.isPending}
+            className="btn-secondary flex items-center gap-2"
+          >
+            <Calendar className="w-4 h-4" />
+            Gerar Pendentes
+          </button>
+          <button
+            onClick={() => setShowForm(true)}
+            className="btn-primary flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            Nova Recorrência
+          </button>
+        </div>
+      </div>
+
+      {/* Summary Cards */}
+      {summary && (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="bg-white rounded-xl p-4 border border-gray-200">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-red-100 rounded-lg">
+                <DollarSign className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Despesas Mensais</p>
+                <p className="text-lg font-semibold text-red-600">
+                  {formatCurrency(summary.total_monthly_expenses)}
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl p-4 border border-gray-200">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-green-100 rounded-lg">
+                <DollarSign className="w-5 h-5 text-green-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Receitas Mensais</p>
+                <p className="text-lg font-semibold text-green-600">
+                  {formatCurrency(summary.total_monthly_income)}
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl p-4 border border-gray-200">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-primary-100 rounded-lg">
+                <Repeat className="w-5 h-5 text-primary-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Ativos</p>
+                <p className="text-lg font-semibold">{summary.active_count}</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl p-4 border border-gray-200">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-yellow-100 rounded-lg">
+                <Pause className="w-5 h-5 text-yellow-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Pausados</p>
+                <p className="text-lg font-semibold">{summary.paused_count}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Form Modal */}
+      {showForm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <h2 className="text-xl font-semibold mb-4">
+              {editingId ? 'Editar Recorrência' : 'Nova Recorrência'}
+            </h2>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Nome *
+                </label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="input w-full"
+                  placeholder="Ex: Aluguel, Netflix, Energia"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Valor *
+                  </label>
+                  <input
+                    type="number"
+                    value={formData.amount}
+                    onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                    className="input w-full"
+                    placeholder="0,00"
+                    step="0.01"
+                    min="0"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Tipo *
+                  </label>
+                  <select
+                    value={formData.type}
+                    onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                    className="input w-full"
+                  >
+                    <option value="expense">Despesa</option>
+                    <option value="income">Receita</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Conta *
+                  </label>
+                  <select
+                    value={formData.account_id}
+                    onChange={(e) => setFormData({ ...formData, account_id: e.target.value })}
+                    className="input w-full"
+                    required
+                  >
+                    <option value="">Selecione...</option>
+                    {accounts.map((account) => (
+                      <option key={account.id} value={account.id}>
+                        {account.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Categoria
+                  </label>
+                  <select
+                    value={formData.category_id}
+                    onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
+                    className="input w-full"
+                  >
+                    <option value="">Selecione...</option>
+                    {categories.map((category) => (
+                      <option key={category.id} value={category.id}>
+                        {category.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Frequência *
+                  </label>
+                  <select
+                    value={formData.frequency}
+                    onChange={(e) => setFormData({ ...formData, frequency: e.target.value })}
+                    className="input w-full"
+                  >
+                    <option value="daily">Diário</option>
+                    <option value="weekly">Semanal</option>
+                    <option value="monthly">Mensal</option>
+                    <option value="yearly">Anual</option>
+                  </select>
+                </div>
+                {formData.frequency === 'monthly' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Dia do Mês
+                    </label>
+                    <input
+                      type="number"
+                      value={formData.day_of_month}
+                      onChange={(e) => setFormData({ ...formData, day_of_month: e.target.value })}
+                      className="input w-full"
+                      min="1"
+                      max="31"
+                    />
+                  </div>
+                )}
+                {formData.frequency === 'weekly' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Dia da Semana
+                    </label>
+                    <select
+                      value={formData.day_of_week}
+                      onChange={(e) => setFormData({ ...formData, day_of_week: e.target.value })}
+                      className="input w-full"
+                    >
+                      {Object.entries(dayOfWeekLabels).map(([value, label]) => (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Data Início *
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.start_date}
+                    onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                    className="input w-full"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Data Fim (opcional)
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.end_date}
+                    onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
+                    className="input w-full"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Descrição
+                </label>
+                <textarea
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  className="input w-full"
+                  rows={2}
+                  placeholder="Observações..."
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4">
+                <button type="button" onClick={resetForm} className="btn-secondary">
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="btn-primary"
+                  disabled={createMutation.isPending || updateMutation.isPending}
+                >
+                  {editingId ? 'Salvar' : 'Criar'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* List */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        {recurring.length === 0 ? (
+          <div className="p-8 text-center text-gray-500">
+            <Repeat className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+            <p>Nenhuma recorrência cadastrada</p>
+            <p className="text-sm mt-1">
+              Adicione suas despesas fixas como aluguel, assinaturas e contas
+            </p>
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-200">
+            {recurring.map((item) => (
+              <div
+                key={item.id}
+                className={clsx(
+                  'p-4 flex items-center justify-between',
+                  item.status === 'paused' && 'bg-gray-50'
+                )}
+              >
+                <div className="flex items-center gap-4">
+                  <div
+                    className={clsx(
+                      'p-2 rounded-lg',
+                      item.type === 'expense' ? 'bg-red-100' : 'bg-green-100'
+                    )}
+                  >
+                    <Repeat
+                      className={clsx(
+                        'w-5 h-5',
+                        item.type === 'expense' ? 'text-red-600' : 'text-green-600'
+                      )}
+                    />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium">{item.name}</p>
+                      <span
+                        className={clsx(
+                          'text-xs px-2 py-0.5 rounded-full',
+                          item.status === 'active' && 'bg-green-100 text-green-700',
+                          item.status === 'paused' && 'bg-yellow-100 text-yellow-700',
+                          item.status === 'cancelled' && 'bg-gray-100 text-gray-700'
+                        )}
+                      >
+                        {statusLabels[item.status]}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3 text-sm text-gray-500">
+                      <span>{frequencyLabels[item.frequency]}</span>
+                      {item.frequency === 'monthly' && item.day_of_month && (
+                        <span>Dia {item.day_of_month}</span>
+                      )}
+                      {item.frequency === 'weekly' && item.day_of_week !== null && (
+                        <span>{dayOfWeekLabels[item.day_of_week]}</span>
+                      )}
+                      <span className="text-gray-300">|</span>
+                      <span>{item.account_name}</span>
+                      {item.category_name && (
+                        <>
+                          <span className="text-gray-300">|</span>
+                          <span>{item.category_name}</span>
+                        </>
+                      )}
+                    </div>
+                    {item.next_due_date && (
+                      <p className="text-xs text-gray-400 mt-1">
+                        Próximo: {formatDate(item.next_due_date)}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-4">
+                  <span
+                    className={clsx(
+                      'font-semibold',
+                      item.type === 'expense' ? 'text-red-600' : 'text-green-600'
+                    )}
+                  >
+                    {item.type === 'expense' ? '-' : '+'}
+                    {formatCurrency(item.amount)}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    {item.status === 'active' ? (
+                      <button
+                        onClick={() => pauseMutation.mutate(item.id)}
+                        className="p-2 text-gray-400 hover:text-yellow-600 hover:bg-yellow-50 rounded-lg"
+                        title="Pausar"
+                      >
+                        <Pause className="w-4 h-4" />
+                      </button>
+                    ) : item.status === 'paused' ? (
+                      <button
+                        onClick={() => resumeMutation.mutate(item.id)}
+                        className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg"
+                        title="Retomar"
+                      >
+                        <Play className="w-4 h-4" />
+                      </button>
+                    ) : null}
+                    <button
+                      onClick={() => handleEdit(item)}
+                      className="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg"
+                      title="Editar"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (confirm('Tem certeza que deseja excluir esta recorrência?')) {
+                          deleteMutation.mutate(item.id)
+                        }
+                      }}
+                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
+                      title="Excluir"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
