@@ -1,6 +1,6 @@
-const CACHE_NAME = 'biveto-v3';
-const STATIC_CACHE = 'biveto-static-v3';
-const DYNAMIC_CACHE = 'biveto-dynamic-v3';
+const CACHE_NAME = 'biveto-v4';
+const STATIC_CACHE = 'biveto-static-v4';
+const DYNAMIC_CACHE = 'biveto-dynamic-v4';
 
 // Assets to cache immediately
 const STATIC_ASSETS = [
