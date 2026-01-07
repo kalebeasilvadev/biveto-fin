@@ -162,7 +162,7 @@ export default function AdminLicenses() {
     setShowModal(true)
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     const data = {
       ...form,
@@ -171,7 +171,21 @@ export default function AdminLicenses() {
     if (editingLicense) {
       updateMutation.mutate({ id: editingLicense.id, data })
     } else {
-      createMutation.mutate(data as LicenseForm)
+      try {
+        await createMutation.mutateAsync(data as LicenseForm)
+      } catch (err: unknown) {
+        const error = err as { response?: { data?: { detail?: { message?: string; existing_user?: ExistingUserInfo } | string } } }
+        console.log('Erro capturado:', error)
+        alert('Erro capturado: ' + JSON.stringify(error.response?.data))
+
+        const detail = error.response?.data?.detail
+        if (typeof detail === 'object' && detail !== null && 'existing_user' in detail) {
+          setExistingUserInfo((detail as { existing_user: ExistingUserInfo }).existing_user)
+          setPendingFormData(form)
+          setShowExistingUserModal(true)
+          setShowModal(false)
+        }
+      }
     }
   }
 
