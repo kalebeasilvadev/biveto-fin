@@ -112,6 +112,19 @@ export default function Family() {
     },
   })
 
+  const removeMemberMutation = useMutation({
+    mutationFn: (memberId: number) => familyApi.removeMember(memberId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['family-context'] })
+      setSuccess('Membro removido com sucesso')
+      setTimeout(() => setSuccess(''), 3000)
+    },
+    onError: (err: unknown) => {
+      const error = err as { response?: { data?: { detail?: string } } }
+      setError(error.response?.data?.detail || 'Erro ao remover membro')
+    },
+  })
+
   const handleInvite = (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
@@ -256,7 +269,7 @@ export default function Family() {
           {familyContext.members.map((member) => (
             <div
               key={member.id}
-              className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+              className="flex items-center justify-between p-3 bg-gray-50 dark:bg-slate-700/50 rounded-lg"
             >
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-biveto-light flex items-center justify-center text-biveto font-semibold">
@@ -264,21 +277,38 @@ export default function Family() {
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="font-medium text-gray-900">
+                    <span className="font-medium text-gray-900 dark:text-white">
                       {member.nickname || member.user_name || member.user_email}
                     </span>
                     {getRoleIcon(member.role)}
                   </div>
-                  <p className="text-sm text-gray-500">{member.user_email}</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">{member.user_email}</p>
                 </div>
               </div>
-              <div className="text-right">
-                <span className="text-xs px-2 py-1 bg-gray-200 text-gray-600 rounded-full">
-                  {getRoleLabel(member.role)}
-                </span>
-                <p className="text-xs text-gray-400 mt-1">
-                  Desde {new Date(member.joined_at).toLocaleDateString('pt-BR')}
-                </p>
+              <div className="flex items-center gap-3">
+                <div className="text-right">
+                  <span className="text-xs px-2 py-1 bg-gray-200 dark:bg-slate-600 text-gray-600 dark:text-gray-300 rounded-full">
+                    {getRoleLabel(member.role)}
+                  </span>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Desde {new Date(member.joined_at).toLocaleDateString('pt-BR')}
+                  </p>
+                </div>
+                {/* Remove button - only show for owner and not for self or other owners */}
+                {familyContext.is_owner && member.role !== 'owner' && (
+                  <button
+                    onClick={() => {
+                      if (confirm(`Remover ${member.user_name || member.user_email} da família?`)) {
+                        removeMemberMutation.mutate(member.id)
+                      }
+                    }}
+                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg"
+                    disabled={removeMemberMutation.isPending}
+                    title="Remover membro"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                )}
               </div>
             </div>
           ))}

@@ -21,7 +21,7 @@ from ..schemas.admin import (
     AdminDashboard,
 )
 from ..schemas.invitation import InvitationCreate, InvitationListResponse
-from ..models.household import HouseholdMember
+from ..models.household import HouseholdMember, HouseholdRole
 
 router = APIRouter()
 
@@ -156,10 +156,48 @@ async def create_license(
     # Verificar se o email do owner ja esta cadastrado
     existing_user = await db.scalar(select(User).where(User.email == data.owner_email))
     if existing_user:
-        raise HTTPException(
-            status_code=400,
-            detail="Email do proprietario ja esta cadastrado no sistema"
-        )
+        # Get current license info
+        current_license = await db.scalar(
+            select(License).where(License.id == existing_user.license_id)
+        ) if existing_user.license_id else None
+
+        # If force_transfer flag is set, proceed with transfer
+        if data.force_transfer:
+            # Remove user from current license/household
+            if existing_user.license_id:
+                # Remove household membership
+                await db.execute(
+                    select(HouseholdMember).where(
+                        HouseholdMember.user_id == existing_user.id
+                    )
+                )
+                existing_membership = await db.scalar(
+                    select(HouseholdMember).where(
+                        HouseholdMember.user_id == existing_user.id
+                    )
+                )
+                if existing_membership:
+                    await db.delete(existing_membership)
+
+                # Clear license_id from user (will be set to new license below)
+                existing_user.license_id = None
+                await db.flush()
+        else:
+            # Return info about existing user for frontend modal
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "message": "Email do proprietario ja esta cadastrado no sistema",
+                    "existing_user": {
+                        "email": existing_user.email,
+                        "user_id": existing_user.id,
+                        "user_name": existing_user.name,
+                        "current_license_id": current_license.id if current_license else None,
+                        "current_license_code": current_license.code if current_license else None,
+                        "current_license_owner_email": current_license.owner_email if current_license else None,
+                    }
+                }
+            )
 
     # Verificar se ja existe convite pendente para este email
     existing_invite = await db.scalar(
@@ -168,11 +206,15 @@ async def create_license(
             Invitation.status == InvitationStatus.PENDING
         )
     )
-    if existing_invite:
+    if existing_invite and not data.force_transfer:
         raise HTTPException(
             status_code=400,
             detail="Ja existe um convite pendente para este email"
         )
+
+    # Cancel any existing pending invites for this email if force_transfer
+    if data.force_transfer and existing_invite:
+        existing_invite.status = InvitationStatus.CANCELLED
 
     # Generate unique key
     key = secrets.token_urlsafe(32)
@@ -198,7 +240,65 @@ async def create_license(
     await db.flush()
     await db.refresh(license)
 
-    # Criar convite automatico para o owner
+    # If this is a transfer of an existing user, link them directly
+    if data.force_transfer and existing_user:
+        # Update user's license_id
+        existing_user.license_id = license.id
+
+        # Set owner_user_id on license
+        license.owner_user_id = existing_user.id
+
+        # Create household membership as owner
+        membership = HouseholdMember(
+            license_id=license.id,
+            user_id=existing_user.id,
+            role=HouseholdRole.OWNER.value,
+            can_create_transactions=True,
+            can_edit_shared=True,
+            can_invite_members=True,
+            can_see_all=True,
+        )
+        db.add(membership)
+        await db.commit()
+        await db.refresh(license)
+
+        return LicenseResponse(
+            id=license.id,
+            key=license.key,
+            code=license.code,
+            type=license.type,
+            status=license.status,
+            max_users=license.max_users,
+            max_transactions_per_month=license.max_transactions_per_month,
+            max_documents_per_month=license.max_documents_per_month,
+            has_ai_assistant=license.has_ai_assistant,
+            has_insights=license.has_insights,
+            has_debt_strategies=license.has_debt_strategies,
+            has_goals=license.has_goals,
+            has_budget=license.has_budget,
+            start_date=license.start_date,
+            end_date=license.end_date,
+            notes=license.notes,
+            created_at=license.created_at,
+            updated_at=license.updated_at,
+            is_valid=license.is_valid,
+            days_remaining=license.days_remaining,
+            user_count=1,
+            owner_email=license.owner_email,
+            owner_user_id=existing_user.id,
+            owner_name=existing_user.name,
+            member_count=1,
+            members=[HouseholdMemberSummary(
+                id=membership.id,
+                user_id=existing_user.id,
+                user_name=existing_user.name,
+                user_email=existing_user.email,
+                role=membership.role,
+                joined_at=membership.joined_at,
+            )],
+        )
+
+    # Criar convite automatico para o owner (new user case)
     invitation = Invitation(
         email=data.owner_email,
         license_id=license.id,

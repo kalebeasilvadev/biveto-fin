@@ -305,3 +305,60 @@ async def resend_family_invitation(
         raise HTTPException(status_code=500, detail="Falha ao enviar email")
 
     return {"message": "Email reenviado com sucesso"}
+
+
+@router.delete("/members/{member_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_family_member(
+    member_id: int,
+    current_user: CurrentUser,
+    db: DbSession,
+):
+    """Remove membro da familia (apenas owner pode remover)"""
+    require_license(current_user)
+
+    # Verificar se o usuario eh owner da familia
+    if not current_user.household_membership:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Usuario nao pertence a nenhuma familia"
+        )
+
+    if current_user.household_membership.role != HouseholdRole.OWNER.value:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Apenas o proprietario pode remover membros"
+        )
+
+    # Buscar membro a ser removido
+    member_result = await db.execute(
+        select(HouseholdMember).where(HouseholdMember.id == member_id)
+    )
+    member = member_result.scalar_one_or_none()
+
+    if not member:
+        raise HTTPException(status_code=404, detail="Membro nao encontrado")
+
+    # Verificar se pertence a mesma licenca
+    if member.license_id != current_user.license_id:
+        raise HTTPException(status_code=403, detail="Membro nao pertence a sua familia")
+
+    # Nao pode remover a si mesmo
+    if member.user_id == current_user.id:
+        raise HTTPException(status_code=400, detail="Voce nao pode remover a si mesmo")
+
+    # Nao pode remover outro owner
+    if member.role == HouseholdRole.OWNER.value:
+        raise HTTPException(status_code=400, detail="Nao e possivel remover o proprietario")
+
+    # Buscar usuario para limpar a licenca dele
+    user_result = await db.execute(
+        select(User).where(User.id == member.user_id)
+    )
+    user = user_result.scalar_one_or_none()
+
+    if user:
+        user.license_id = None
+
+    # Remover membership
+    await db.delete(member)
+    await db.commit()

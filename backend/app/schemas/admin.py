@@ -22,6 +22,7 @@ class LicenseBase(BaseModel):
 
 class LicenseCreate(LicenseBase):
     owner_email: EmailStr  # Email do owner (obrigatorio) - recebera convite automatico
+    force_transfer: bool = False  # Se True, transfere usuario existente para nova licenca
 
 
 class LicenseUpdate(BaseModel):

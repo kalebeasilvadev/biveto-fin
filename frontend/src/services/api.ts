@@ -243,6 +243,7 @@ export const familyApi = {
 
   // Membros
   listMembers: () => api.get('/family/members'),
+  removeMember: (memberId: number) => api.delete(`/family/members/${memberId}`),
 
   // Convites
   invite: (email: string, nickname?: string) =>

@@ -1,8 +1,17 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { adminApi } from '../../services/api'
-import { Plus, Trash2, Edit2, Copy, X, Check, AlertCircle } from 'lucide-react'
+import { Plus, Trash2, Edit2, Copy, X, Check, AlertCircle, Mail, UserMinus } from 'lucide-react'
 import { clsx } from 'clsx'
+
+interface ExistingUserInfo {
+  email: string
+  current_license_id: number
+  current_license_code: string
+  current_license_owner_email: string
+  user_id: number
+  user_name: string | null
+}
 
 interface HouseholdMember {
   id: number
@@ -56,6 +65,9 @@ export default function AdminLicenses() {
   const [showModal, setShowModal] = useState(false)
   const [editingLicense, setEditingLicense] = useState<License | null>(null)
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
+  const [existingUserInfo, setExistingUserInfo] = useState<ExistingUserInfo | null>(null)
+  const [showExistingUserModal, setShowExistingUserModal] = useState(false)
+  const [pendingFormData, setPendingFormData] = useState<LicenseForm | null>(null)
   const [form, setForm] = useState<LicenseForm>({
     type: 'basic',
     max_users: 1,
@@ -77,10 +89,23 @@ export default function AdminLicenses() {
   })
 
   const createMutation = useMutation({
-    mutationFn: (data: LicenseForm) => adminApi.createLicense(data),
+    mutationFn: (data: LicenseForm & { force_transfer?: boolean }) => adminApi.createLicense(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-licenses'] })
       closeModal()
+      setShowExistingUserModal(false)
+      setExistingUserInfo(null)
+      setPendingFormData(null)
+    },
+    onError: (err: unknown) => {
+      const error = err as { response?: { data?: { detail?: string; existing_user?: ExistingUserInfo } } }
+      // Check if it's an existing user error with transfer option
+      if (error.response?.data?.existing_user) {
+        setExistingUserInfo(error.response.data.existing_user)
+        setPendingFormData(form)
+        setShowExistingUserModal(true)
+        setShowModal(false)
+      }
     },
   })
 
@@ -228,36 +253,41 @@ export default function AdminLicenses() {
                   )}
                 </div>
 
+                {/* Owner email as primary identifier */}
+                <div className="flex items-center gap-2 mb-2">
+                  <Mail size={16} className="text-gray-400" />
+                  <span className="font-semibold text-gray-900 dark:text-white">
+                    {license.owner_email || 'Sem proprietário'}
+                  </span>
+                  {license.owner_name && (
+                    <span className="text-sm text-gray-500">({license.owner_name})</span>
+                  )}
+                  {!license.owner_name && license.owner_email && (
+                    <span className="text-xs px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full">
+                      pendente
+                    </span>
+                  )}
+                </div>
+
+                {/* License code - secondary info */}
                 <div className="flex items-center gap-2 mb-3">
-                  <code className="text-sm bg-gray-100 px-3 py-1.5 rounded font-mono font-semibold tracking-wider">
+                  <code className="text-xs bg-gray-100 dark:bg-slate-700 px-2 py-1 rounded font-mono text-gray-600 dark:text-gray-300">
                     {license.code}
                   </code>
                   <button
                     onClick={() => copyKey(license.code)}
                     className="p-1 text-gray-400 hover:text-primary-600"
-                    title="Copiar codigo"
+                    title="Copiar código"
                   >
                     {copiedKey === license.code ? (
-                      <Check size={16} className="text-green-500" />
+                      <Check size={14} className="text-green-500" />
                     ) : (
-                      <Copy size={16} />
+                      <Copy size={14} />
                     )}
                   </button>
-                </div>
-
-                {/* Owner da licenca */}
-                <div className="mb-3 text-sm">
-                  <span className="text-gray-500">Proprietario:</span>{' '}
-                  {license.owner_name ? (
-                    <span className="font-medium">{license.owner_name}</span>
-                  ) : license.owner_email ? (
-                    <span className="text-orange-600">{license.owner_email} (pendente)</span>
-                  ) : (
-                    <span className="text-gray-400">Nao definido</span>
-                  )}
                   {license.member_count > 0 && (
-                    <span className="ml-2 text-gray-400">
-                      ({license.member_count} membro{license.member_count > 1 ? 's' : ''})
+                    <span className="text-xs text-gray-500">
+                      • {license.member_count} membro{license.member_count > 1 ? 's' : ''}
                     </span>
                   )}
                 </div>
@@ -357,15 +387,86 @@ export default function AdminLicenses() {
         )}
       </div>
 
+      {/* Existing User Transfer Modal */}
+      {showExistingUserModal && existingUserInfo && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-slate-800 rounded-lg w-full max-w-md p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-3 bg-orange-100 dark:bg-orange-900/50 rounded-full">
+                <AlertCircle size={24} className="text-orange-600" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Usuário já cadastrado
+                </h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  O email informado já está vinculado a uma licença
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-gray-50 dark:bg-slate-700 rounded-lg p-4 mb-4 space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500 dark:text-gray-400">Email:</span>
+                <span className="font-medium text-gray-900 dark:text-white">{existingUserInfo.email}</span>
+              </div>
+              {existingUserInfo.user_name && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500 dark:text-gray-400">Nome:</span>
+                  <span className="font-medium text-gray-900 dark:text-white">{existingUserInfo.user_name}</span>
+                </div>
+              )}
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500 dark:text-gray-400">Licença atual:</span>
+                <span className="font-mono text-gray-900 dark:text-white">{existingUserInfo.current_license_code}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500 dark:text-gray-400">Proprietário atual:</span>
+                <span className="text-gray-900 dark:text-white">{existingUserInfo.current_license_owner_email}</span>
+              </div>
+            </div>
+
+            <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
+              Deseja remover este usuário da licença atual e criar uma nova licença onde ele será o proprietário?
+            </p>
+
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowExistingUserModal(false)
+                  setExistingUserInfo(null)
+                  setPendingFormData(null)
+                }}
+                className="btn-secondary"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  if (pendingFormData) {
+                    createMutation.mutate({ ...pendingFormData, force_transfer: true })
+                  }
+                }}
+                className="btn-primary flex items-center gap-2"
+                disabled={createMutation.isPending}
+              >
+                <UserMinus size={18} />
+                {createMutation.isPending ? 'Transferindo...' : 'Confirmar Transferência'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white dark:bg-slate-800 rounded-lg w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                 {editingLicense ? 'Editar Licença' : 'Nova Licença'}
               </h2>
-              <button onClick={closeModal} className="text-gray-400 hover:text-gray-600">
+              <button onClick={closeModal} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
                 <X size={20} />
               </button>
             </div>
