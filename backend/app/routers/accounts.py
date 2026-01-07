@@ -1,19 +1,55 @@
+from __future__ import annotations
 from fastapi import APIRouter, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import select, or_, and_
 
 from ..core.deps import CurrentUser, DbSession
 from ..models.account import Account
+from ..models.household import HouseholdMember
 from ..schemas.account import AccountCreate, AccountResponse, AccountUpdate
 
 router = APIRouter()
 
 
+async def get_household_user_ids(db, user) -> list[int]:
+    """Get all user IDs in the same household/license as the user"""
+    if not user.license_id:
+        return []
+
+    result = await db.execute(
+        select(HouseholdMember.user_id).where(
+            HouseholdMember.license_id == user.license_id
+        )
+    )
+    return list(result.scalars().all())
+
+
 @router.get("", response_model=list[AccountResponse])
 async def list_accounts(current_user: CurrentUser, db: DbSession):
-    """Lista todas as contas do usuário"""
-    result = await db.execute(
-        select(Account).where(Account.user_id == current_user.id)
-    )
+    """Lista todas as contas do usuário (pessoais + household)"""
+    household_user_ids = await get_household_user_ids(db, current_user)
+
+    if household_user_ids:
+        # User is in a household - get personal + household accounts
+        result = await db.execute(
+            select(Account).where(
+                or_(
+                    # Personal accounts from user
+                    and_(
+                        Account.user_id == current_user.id,
+                        Account.ownership_type == "personal"
+                    ),
+                    # Household accounts from any family member
+                    and_(
+                        Account.user_id.in_(household_user_ids),
+                        Account.ownership_type == "household"
+                    )
+                )
+            )
+        )
+    else:
+        result = await db.execute(
+            select(Account).where(Account.user_id == current_user.id)
+        )
     return result.scalars().all()
 
 
@@ -32,6 +68,7 @@ async def create_account(
         currency=data.currency,
         color=data.color,
         icon=data.icon,
+        ownership_type=data.ownership_type.value,
     )
     db.add(account)
     await db.commit()

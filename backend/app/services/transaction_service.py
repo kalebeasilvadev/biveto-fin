@@ -1,11 +1,13 @@
+from __future__ import annotations
 from datetime import date
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, or_, func
 from fastapi import HTTPException, status
 
 from ..models.transaction import Transaction, TransactionAudit, TransactionType
 from ..models.merchant import Merchant
 from ..models.user import User
+from ..models.household import HouseholdMember
 from ..schemas.transaction import TransactionCreate, TransactionUpdate, TransactionConfirm
 from .installment_service import InstallmentService
 
@@ -32,6 +34,7 @@ class TransactionService:
             notes=data.notes,
             tags=data.tags,
             is_fixed=data.is_fixed,
+            ownership_type=data.ownership_type.value if hasattr(data.ownership_type, 'value') else data.ownership_type,
         )
         self.db.add(transaction)
         await self.db.flush()
@@ -67,15 +70,21 @@ class TransactionService:
                     detail="Documento não encontrado",
                 )
 
-            # Verificar idempotência
-            existing = await self.db.execute(
-                select(Transaction).where(Transaction.document_id == data.document_id)
-            )
-            if existing.scalar_one_or_none():
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Já existe transação para este documento",
+            # Verificar idempotência por item específico (document_id + merchant_name + amount)
+            # Permite múltiplos itens do mesmo documento, mas não duplicatas exatas
+            if data.merchant_name:
+                existing = await self.db.execute(
+                    select(Transaction).where(
+                        Transaction.document_id == data.document_id,
+                        Transaction.description == data.merchant_name,
+                        Transaction.amount == data.amount,
+                    )
                 )
+                if existing.scalar_one_or_none():
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail=f"Item já adicionado: {data.merchant_name}",
+                    )
 
         merchant_id = None
         if data.merchant_name:
@@ -171,6 +180,7 @@ class TransactionService:
                 description=data.description,
                 tags=data.tags,
                 is_fixed=data.is_fixed,
+                ownership_type=data.ownership_type.value if hasattr(data.ownership_type, 'value') else data.ownership_type,
             )
             self.db.add(transaction)
             await self.db.flush()
@@ -195,10 +205,33 @@ class TransactionService:
         end_date: date | None = None,
         category_id: int | None = None,
         account_id: int | None = None,
+        search: str | None = None,
         limit: int = 50,
         offset: int = 0,
     ) -> list[Transaction]:
-        query = select(Transaction).where(Transaction.user_id == user.id)
+        from ..models.category import Category
+
+        # Get household member IDs if user is part of a household
+        household_user_ids = await self._get_household_user_ids(user)
+
+        if household_user_ids:
+            # User is in a household - get personal + household transactions
+            query = select(Transaction).where(
+                or_(
+                    # Personal transactions from user
+                    and_(
+                        Transaction.user_id == user.id,
+                        Transaction.ownership_type == "personal"
+                    ),
+                    # Household transactions from any family member
+                    and_(
+                        Transaction.user_id.in_(household_user_ids),
+                        Transaction.ownership_type == "household"
+                    )
+                )
+            )
+        else:
+            query = select(Transaction).where(Transaction.user_id == user.id)
 
         if start_date:
             query = query.where(Transaction.date >= start_date)
@@ -209,8 +242,88 @@ class TransactionService:
         if account_id:
             query = query.where(Transaction.account_id == account_id)
 
+        # Search across description, merchant name, and category name
+        if search:
+            search_term = f"%{search.lower()}%"
+            query = query.outerjoin(Merchant, Transaction.merchant_id == Merchant.id)
+            query = query.outerjoin(Category, Transaction.category_id == Category.id)
+            query = query.where(
+                or_(
+                    func.lower(Transaction.description).like(search_term),
+                    func.lower(Merchant.name).like(search_term),
+                    func.lower(Category.name).like(search_term),
+                )
+            )
+
         query = query.order_by(Transaction.date.desc()).limit(limit).offset(offset)
         result = await self.db.execute(query)
+        return list(result.scalars().all())
+
+    async def count(
+        self,
+        user: User,
+        start_date: date | None = None,
+        end_date: date | None = None,
+        category_id: int | None = None,
+        account_id: int | None = None,
+        search: str | None = None,
+    ) -> int:
+        """Returns the total count of transactions matching the filters"""
+        from ..models.category import Category
+
+        household_user_ids = await self._get_household_user_ids(user)
+
+        if household_user_ids:
+            query = select(func.count(Transaction.id)).where(
+                or_(
+                    and_(
+                        Transaction.user_id == user.id,
+                        Transaction.ownership_type == "personal"
+                    ),
+                    and_(
+                        Transaction.user_id.in_(household_user_ids),
+                        Transaction.ownership_type == "household"
+                    )
+                )
+            )
+        else:
+            query = select(func.count(Transaction.id)).where(Transaction.user_id == user.id)
+
+        if start_date:
+            query = query.where(Transaction.date >= start_date)
+        if end_date:
+            query = query.where(Transaction.date <= end_date)
+        if category_id:
+            query = query.where(Transaction.category_id == category_id)
+        if account_id:
+            query = query.where(Transaction.account_id == account_id)
+
+        # Search across description, merchant name, and category name
+        if search:
+            search_term = f"%{search.lower()}%"
+            query = query.outerjoin(Merchant, Transaction.merchant_id == Merchant.id)
+            query = query.outerjoin(Category, Transaction.category_id == Category.id)
+            query = query.where(
+                or_(
+                    func.lower(Transaction.description).like(search_term),
+                    func.lower(Merchant.name).like(search_term),
+                    func.lower(Category.name).like(search_term),
+                )
+            )
+
+        result = await self.db.execute(query)
+        return result.scalar() or 0
+
+    async def _get_household_user_ids(self, user: User) -> list[int]:
+        """Get all user IDs in the same household/license as the user"""
+        if not user.license_id:
+            return []
+
+        result = await self.db.execute(
+            select(HouseholdMember.user_id).where(
+                HouseholdMember.license_id == user.license_id
+            )
+        )
         return list(result.scalars().all())
 
     async def update(

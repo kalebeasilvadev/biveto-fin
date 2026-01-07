@@ -14,6 +14,7 @@ import {
   User,
 } from 'lucide-react'
 import { clsx } from 'clsx'
+import EmptyState from '../components/EmptyState'
 
 interface Account {
   id: number
@@ -177,8 +178,8 @@ export default function Accounts() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Minhas Contas</h1>
-          <p className="text-gray-500">Gerencie suas contas bancárias e carteiras</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Minhas Contas</h1>
+          <p className="text-gray-500 dark:text-gray-400">Gerencie suas contas bancárias e carteiras</p>
         </div>
         <button onClick={openCreateModal} className="btn-primary flex items-center gap-2">
           <Plus size={18} />
@@ -200,13 +201,13 @@ export default function Accounts() {
 
       {/* Accounts Grid */}
       {accounts.length === 0 ? (
-        <div className="card text-center py-12">
-          <Wallet className="mx-auto text-gray-400 mb-4" size={48} />
-          <p className="text-gray-600 mb-4">Nenhuma conta cadastrada</p>
-          <button onClick={openCreateModal} className="btn-primary">
-            Criar primeira conta
-          </button>
-        </div>
+        <EmptyState
+          icon={Wallet}
+          title="Nenhuma conta cadastrada"
+          description="Cadastre suas contas bancárias e carteiras para acompanhar seus saldos."
+          actionLabel="Criar primeira conta"
+          actionOnClick={openCreateModal}
+        />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {accounts.map((account) => {
@@ -225,8 +226,8 @@ export default function Accounts() {
                       <Icon size={24} style={{ color: account.color || '#3b82f6' }} />
                     </div>
                     <div>
-                      <h3 className="font-medium text-gray-900">{account.name}</h3>
-                      <p className="text-sm text-gray-500">
+                      <h3 className="font-medium text-gray-900 dark:text-white">{account.name}</h3>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
                         {getAccountTypeLabel(account.type)}
                       </p>
                     </div>
@@ -250,7 +251,7 @@ export default function Accounts() {
                   <p
                     className={clsx(
                       'text-2xl font-bold',
-                      account.balance >= 0 ? 'text-gray-900' : 'text-red-500'
+                      account.balance >= 0 ? 'text-gray-900 dark:text-white' : 'text-red-500'
                     )}
                   >
                     {account.balance.toLocaleString('pt-BR', {

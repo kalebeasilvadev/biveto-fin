@@ -1,5 +1,9 @@
 from datetime import date
+import csv
+import io
 from fastapi import APIRouter, Query
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 
 from ..core.deps import CurrentUser, DbSession
 from ..schemas.transaction import (
@@ -13,7 +17,15 @@ from ..services.transaction_service import TransactionService
 router = APIRouter()
 
 
-@router.get("", response_model=list[TransactionResponse])
+class PaginatedTransactions(BaseModel):
+    items: list[TransactionResponse]
+    total: int
+    limit: int
+    offset: int
+    has_more: bool
+
+
+@router.get("", response_model=PaginatedTransactions)
 async def list_transactions(
     current_user: CurrentUser,
     db: DbSession,
@@ -21,19 +33,104 @@ async def list_transactions(
     end_date: date | None = Query(None),
     category_id: int | None = Query(None),
     account_id: int | None = Query(None),
-    limit: int = Query(50, le=100),
+    search: str | None = Query(None, min_length=2, max_length=100),
+    limit: int = Query(20, le=100),
     offset: int = Query(0, ge=0),
 ):
-    """Lista transações com filtros"""
+    """Lista transações com filtros, busca e paginação"""
     service = TransactionService(db)
-    return await service.list(
+
+    items = await service.list(
         current_user,
         start_date=start_date,
         end_date=end_date,
         category_id=category_id,
         account_id=account_id,
+        search=search,
         limit=limit,
         offset=offset,
+    )
+
+    total = await service.count(
+        current_user,
+        start_date=start_date,
+        end_date=end_date,
+        category_id=category_id,
+        account_id=account_id,
+        search=search,
+    )
+
+    return PaginatedTransactions(
+        items=items,
+        total=total,
+        limit=limit,
+        offset=offset,
+        has_more=offset + len(items) < total,
+    )
+
+
+@router.get("/export/csv")
+async def export_transactions_csv(
+    current_user: CurrentUser,
+    db: DbSession,
+    start_date: date | None = Query(None),
+    end_date: date | None = Query(None),
+    category_id: int | None = Query(None),
+    account_id: int | None = Query(None),
+):
+    """Exporta transações em formato CSV"""
+    service = TransactionService(db)
+    transactions = await service.list(
+        current_user,
+        start_date=start_date,
+        end_date=end_date,
+        category_id=category_id,
+        account_id=account_id,
+        limit=10000,  # Higher limit for exports
+        offset=0,
+    )
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    # Header
+    writer.writerow([
+        "Data",
+        "Tipo",
+        "Descrição",
+        "Categoria",
+        "Conta",
+        "Valor",
+        "Estabelecimento",
+        "Parcela",
+    ])
+
+    # Data rows
+    for t in transactions:
+        tipo = "Receita" if t.type == "income" else "Despesa"
+        valor = f"{t.amount:.2f}"
+        parcela = f"{t.installment_number}/{t.installment_total}" if t.installment_total else ""
+        writer.writerow([
+            t.date.strftime("%d/%m/%Y"),
+            tipo,
+            t.description or "",
+            t.category_name or "Sem categoria",
+            t.account_name or "",
+            valor,
+            t.merchant_name or "",
+            parcela,
+        ])
+
+    output.seek(0)
+    filename = f"transacoes_{date.today().strftime('%Y%m%d')}.csv"
+
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}",
+            "Content-Type": "text/csv; charset=utf-8",
+        },
     )
 
 

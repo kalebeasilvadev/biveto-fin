@@ -2,6 +2,7 @@
 Agente IA Financeiro - Assistente Inteligente de Finanças Pessoais
 Suporta múltiplos providers: Google Gemini (gratuito), OpenAI, Anthropic
 """
+from __future__ import annotations
 import json
 import httpx
 import uuid
@@ -17,6 +18,7 @@ from ..models.debt import Debt, DebtStatus
 from ..models.goal import Goal
 from ..models.budget import Budget, BudgetItem
 from ..models.account import Account
+from ..models.household import HouseholdMember
 from ..schemas.chat import ChatResponse
 
 
@@ -86,10 +88,30 @@ class FinancialAgentService:
         today = date.today()
         month_start = date(today.year, today.month, 1)
 
-        # 1. Resumo de contas
-        accounts = await self.db.execute(
-            select(Account).where(Account.user_id == user.id)
-        )
+        # Get household member IDs if user is part of a household
+        household_user_ids = await self._get_household_user_ids(user)
+
+        # 1. Resumo de contas (pessoais + household)
+        if household_user_ids:
+            from sqlalchemy import or_, and_
+            accounts = await self.db.execute(
+                select(Account).where(
+                    or_(
+                        and_(
+                            Account.user_id == user.id,
+                            Account.ownership_type == "personal"
+                        ),
+                        and_(
+                            Account.user_id.in_(household_user_ids),
+                            Account.ownership_type == "household"
+                        )
+                    )
+                )
+            )
+        else:
+            accounts = await self.db.execute(
+                select(Account).where(Account.user_id == user.id)
+            )
         accounts_list = accounts.scalars().all()
         context["contas"] = [
             {"nome": a.name, "tipo": a.type, "saldo": float(a.balance)}
@@ -97,13 +119,31 @@ class FinancialAgentService:
         ]
         context["saldo_total"] = sum(float(a.balance) for a in accounts_list)
 
-        # 2. Transações do mês atual
-        transactions = await self.db.execute(
-            select(Transaction).where(
-                Transaction.user_id == user.id,
-                Transaction.date >= month_start
+        # 2. Transações do mês atual (pessoais + household)
+        if household_user_ids:
+            from sqlalchemy import or_, and_
+            transactions = await self.db.execute(
+                select(Transaction).where(
+                    Transaction.date >= month_start,
+                    or_(
+                        and_(
+                            Transaction.user_id == user.id,
+                            Transaction.ownership_type == "personal"
+                        ),
+                        and_(
+                            Transaction.user_id.in_(household_user_ids),
+                            Transaction.ownership_type == "household"
+                        )
+                    )
+                )
             )
-        )
+        else:
+            transactions = await self.db.execute(
+                select(Transaction).where(
+                    Transaction.user_id == user.id,
+                    Transaction.date >= month_start
+                )
+            )
         txs = transactions.scalars().all()
 
         receitas = sum(float(t.amount) for t in txs if t.type == TransactionType.INCOME)
@@ -370,3 +410,15 @@ FORMATO DE RESPOSTA:
         # Combinar e limitar a 3 sugestões
         all_suggestions = suggestions + general_suggestions
         return all_suggestions[:3]
+
+    async def _get_household_user_ids(self, user: User) -> list[int]:
+        """Get all user IDs in the same household/license as the user"""
+        if not user.license_id:
+            return []
+
+        result = await self.db.execute(
+            select(HouseholdMember.user_id).where(
+                HouseholdMember.license_id == user.license_id
+            )
+        )
+        return list(result.scalars().all())

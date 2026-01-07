@@ -1,11 +1,12 @@
 from datetime import datetime, timedelta
-from fastapi import APIRouter, Depends, Body, HTTPException, status
+from fastapi import APIRouter, Depends, Body, HTTPException, status, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.deps import DbSession, CurrentUser
-from ..core.security import get_password_hash, verify_password
+from ..core.security import get_password_hash, verify_password, validate_password_or_raise
+from ..core.rate_limit import limiter
 from ..models import User, Invitation, InvitationStatus, License
 from ..models.household import HouseholdMember, HouseholdRole
 from ..schemas.user import UserCreate, UserResponse
@@ -40,7 +41,8 @@ async def get_current_user_info(current_user: CurrentUser):
 
 
 @router.post("/login", response_model=Token)
-async def login(credentials: LoginRequest, db: DbSession):
+@limiter.limit("5/minute")
+async def login(request: Request, credentials: LoginRequest, db: DbSession):
     """Autentica usuário e retorna tokens"""
     auth_service = AuthService(db)
     return await auth_service.login(credentials.email, credentials.password)
@@ -88,7 +90,8 @@ async def validate_invitation(token: str, db: DbSession):
 
 
 @router.post("/invite/{token}", response_model=Token)
-async def register_via_invitation(token: str, data: InviteRegister, db: DbSession):
+@limiter.limit("3/minute")
+async def register_via_invitation(request: Request, token: str, data: InviteRegister, db: DbSession):
     """Registra usuario via convite e cria HouseholdMember"""
     result = await db.execute(select(Invitation).where(Invitation.token == token))
     invitation = result.scalar_one_or_none()
@@ -110,6 +113,9 @@ async def register_via_invitation(token: str, data: InviteRegister, db: DbSessio
     existing = await db.scalar(select(User).where(User.email == invitation.email))
     if existing:
         raise HTTPException(status_code=400, detail="Email ja cadastrado")
+
+    # Validar força da senha
+    validate_password_or_raise(data.password)
 
     # Criar usuario
     user = User(
@@ -201,7 +207,8 @@ async def validate_reset_token(token: str, db: DbSession):
 
 
 @router.post("/reset-password/{token}", response_model=Token)
-async def reset_password(token: str, data: ResetPasswordRequest, db: DbSession):
+@limiter.limit("3/minute")
+async def reset_password(request: Request, token: str, data: ResetPasswordRequest, db: DbSession):
     """Redefine a senha usando o token"""
     result = await db.execute(select(User).where(User.reset_token == token))
     user = result.scalar_one_or_none()
@@ -217,6 +224,9 @@ async def reset_password(token: str, data: ResetPasswordRequest, db: DbSession):
             user.reset_token_expires = None
             await db.commit()
             raise HTTPException(status_code=400, detail="Token expirado")
+
+    # Validar força da nova senha
+    validate_password_or_raise(data.password)
 
     # Guardar dados para notificação antes de alterar
     user_email = user.email

@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { goalsApi } from '../services/api'
 import { Plus, Target, Wallet, TrendingUp, PiggyBank, Calculator } from 'lucide-react'
 import { clsx } from 'clsx'
+import EmptyState from '../components/EmptyState'
 
 interface GoalContribution {
   id: number
@@ -126,7 +127,7 @@ export default function Goals() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Metas Financeiras</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Metas Financeiras</h1>
         <button
           onClick={() => setShowCreateModal(true)}
           className="btn-primary flex items-center gap-2"
@@ -143,12 +144,12 @@ export default function Goals() {
           className="card text-left hover:shadow-md transition-shadow"
         >
           <div className="flex items-center gap-3">
-            <div className="p-3 bg-blue-100 rounded-lg">
+            <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
               <Wallet className="text-blue-600" size={24} />
             </div>
             <div>
-              <h3 className="font-semibold">Calcular Reserva de Emergência</h3>
-              <p className="text-sm text-gray-500">Descubra quanto você precisa poupar</p>
+              <h3 className="font-semibold dark:text-white">Calcular Reserva de Emergência</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Descubra quanto você precisa poupar</p>
             </div>
           </div>
         </button>
@@ -158,12 +159,12 @@ export default function Goals() {
           className="card text-left hover:shadow-md transition-shadow"
         >
           <div className="flex items-center gap-3">
-            <div className="p-3 bg-purple-100 rounded-lg">
+            <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
               <Calculator className="text-purple-600" size={24} />
             </div>
             <div>
-              <h3 className="font-semibold">Calcular PNIF (Cerbasi)</h3>
-              <p className="text-sm text-gray-500">Patrimônio para independência financeira</p>
+              <h3 className="font-semibold dark:text-white">Calcular PNIF (Cerbasi)</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Patrimônio para independência financeira</p>
             </div>
           </div>
         </button>
@@ -175,17 +176,13 @@ export default function Goals() {
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
         </div>
       ) : activeGoals.length === 0 ? (
-        <div className="card text-center py-12">
-          <Target className="mx-auto text-gray-400 mb-4" size={48} />
-          <p className="text-gray-500 mb-4">Nenhuma meta ativa</p>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="btn-primary inline-flex items-center gap-2"
-          >
-            <Plus size={18} />
-            Criar primeira meta
-          </button>
-        </div>
+        <EmptyState
+          icon={Target}
+          title="Nenhuma meta ativa"
+          description="Defina metas financeiras para organizar suas economias e alcançar seus objetivos."
+          actionLabel="Criar primeira meta"
+          actionOnClick={() => setShowCreateModal(true)}
+        />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {activeGoals.map((goal) => {
@@ -205,8 +202,8 @@ export default function Goals() {
                       )}
                     </div>
                     <div>
-                      <h3 className="font-semibold">{goal.name}</h3>
-                      <p className="text-sm text-gray-500">{goalTypeLabels[goal.type]}</p>
+                      <h3 className="font-semibold dark:text-white">{goal.name}</h3>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">{goalTypeLabels[goal.type]}</p>
                     </div>
                   </div>
                   <button
@@ -219,28 +216,28 @@ export default function Goals() {
 
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">Progresso</span>
-                    <span className="font-medium">{goal.progress_percentage.toFixed(1)}%</span>
+                    <span className="text-gray-500 dark:text-gray-400">Progresso</span>
+                    <span className="font-medium dark:text-white">{goal.progress_percentage.toFixed(1)}%</span>
                   </div>
-                  <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
+                  <div className="h-3 bg-gray-100 dark:bg-slate-700 rounded-full overflow-hidden">
                     <div
                       className="h-full rounded-full bg-primary-500 transition-all"
                       style={{ width: `${Math.min(goal.progress_percentage, 100)}%` }}
                     />
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">{formatCurrency(goal.current_amount)}</span>
-                    <span className="text-gray-500">{formatCurrency(goal.target_amount)}</span>
+                    <span className="text-gray-600 dark:text-gray-300">{formatCurrency(goal.current_amount)}</span>
+                    <span className="text-gray-500 dark:text-gray-400">{formatCurrency(goal.target_amount)}</span>
                   </div>
                 </div>
 
                 {goal.monthly_contribution && (
-                  <p className="text-sm text-gray-500 mt-3">
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-3">
                     Contribuição mensal: {formatCurrency(goal.monthly_contribution)}
                   </p>
                 )}
                 {goal.target_date && (
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
                     Prazo: {new Date(goal.target_date).toLocaleDateString('pt-BR')}
                   </p>
                 )}

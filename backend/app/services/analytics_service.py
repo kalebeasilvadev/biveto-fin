@@ -1,12 +1,14 @@
+from __future__ import annotations
 from datetime import date, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_
+from sqlalchemy import select, func, and_, or_
 from calendar import monthrange
 
 from ..models.transaction import Transaction, TransactionType
 from ..models.category import Category
 from ..models.merchant import Merchant
 from ..models.user import User
+from ..models.household import HouseholdMember
 from ..schemas.analytics import (
     AnalyticsSummary,
     CategorySummary,
@@ -111,11 +113,48 @@ class AnalyticsService:
     async def _get_transactions(
         self, user: User, start_date: date, end_date: date
     ) -> list[Transaction]:
+        # Get household member IDs if user is part of a household
+        household_user_ids = await self._get_household_user_ids(user)
+
+        if household_user_ids:
+            # User is in a household - get personal + household transactions
+            result = await self.db.execute(
+                select(Transaction).where(
+                    Transaction.date >= start_date,
+                    Transaction.date <= end_date,
+                    or_(
+                        # Personal transactions from user
+                        and_(
+                            Transaction.user_id == user.id,
+                            Transaction.ownership_type == "personal"
+                        ),
+                        # Household transactions from any family member
+                        and_(
+                            Transaction.user_id.in_(household_user_ids),
+                            Transaction.ownership_type == "household"
+                        )
+                    )
+                )
+            )
+        else:
+            # User is not in a household - get only their transactions
+            result = await self.db.execute(
+                select(Transaction).where(
+                    Transaction.user_id == user.id,
+                    Transaction.date >= start_date,
+                    Transaction.date <= end_date,
+                )
+            )
+        return list(result.scalars().all())
+
+    async def _get_household_user_ids(self, user: User) -> list[int]:
+        """Get all user IDs in the same household/license as the user"""
+        if not user.license_id:
+            return []
+
         result = await self.db.execute(
-            select(Transaction).where(
-                Transaction.user_id == user.id,
-                Transaction.date >= start_date,
-                Transaction.date <= end_date,
+            select(HouseholdMember.user_id).where(
+                HouseholdMember.license_id == user.license_id
             )
         )
         return list(result.scalars().all())

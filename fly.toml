@@ -21,8 +21,8 @@ primary_region = "gru"  # Sao Paulo, Brazil
 
 [[http_service.checks]]
   interval = "30s"
-  timeout = "10s"
-  grace_period = "30s"
+  timeout = "20s"
+  grace_period = "60s"
   method = "GET"
   path = "/health"
 

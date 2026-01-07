@@ -33,6 +33,7 @@ class TransactionConfirm(BaseModel):
     description: str | None = None
     tags: list[str] | None = None
     is_fixed: bool = False
+    ownership_type: OwnershipType = OwnershipType.PERSONAL
 
     # Campos de parcelamento
     is_installment: bool = False

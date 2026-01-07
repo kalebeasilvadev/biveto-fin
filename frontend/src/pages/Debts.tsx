@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { debtsApi } from '../services/api'
 import { Plus, CreditCard, AlertCircle, CheckCircle, Calculator } from 'lucide-react'
 import { clsx } from 'clsx'
+import EmptyState from '../components/EmptyState'
 
 interface DebtPayment {
   id: number
@@ -209,7 +210,7 @@ export default function Debts() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Gestão de Dívidas</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Gestão de Dívidas</h1>
         <button
           onClick={() => setShowCreateModal(true)}
           className="btn-primary flex items-center gap-2"
@@ -222,41 +223,41 @@ export default function Debts() {
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="card">
-            <p className="text-sm text-gray-500">Dívida Total</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Dívida Total</p>
             <p className="text-2xl font-bold text-expense">{formatCurrency(summary.total_debt)}</p>
           </div>
           <div className="card">
-            <p className="text-sm text-gray-500">Pagamento Mínimo</p>
-            <p className="text-xl font-bold text-gray-900">
+            <p className="text-sm text-gray-500 dark:text-gray-400">Pagamento Mínimo</p>
+            <p className="text-xl font-bold text-gray-900 dark:text-white">
               {formatCurrency(summary.total_minimum_payment)}
             </p>
           </div>
           <div className="card">
-            <p className="text-sm text-gray-500">Juros Mensais</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Juros Mensais</p>
             <p className="text-xl font-bold text-yellow-600">
               {formatCurrency(summary.total_monthly_interest)}
             </p>
           </div>
           <div className="card">
-            <p className="text-sm text-gray-500">Qtd. Dívidas</p>
-            <p className="text-xl font-bold text-gray-900">{summary.debt_count}</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Qtd. Dívidas</p>
+            <p className="text-xl font-bold text-gray-900 dark:text-white">{summary.debt_count}</p>
           </div>
         </div>
 
       {/* Strategy Calculator */}
       <div className="card">
         <div className="flex items-center gap-3 mb-4">
-          <div className="p-3 bg-primary-100 rounded-lg">
+          <div className="p-3 bg-primary-100 dark:bg-primary-900/30 rounded-lg">
             <Calculator className="text-primary-600" size={24} />
           </div>
           <div>
-            <h3 className="font-semibold">Comparar Estratégias de Quitação</h3>
-            <p className="text-sm text-gray-500">Snowball (Dave Ramsey) vs Avalanche</p>
+            <h3 className="font-semibold dark:text-white">Comparar Estratégias de Quitação</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Snowball (Dave Ramsey) vs Avalanche</p>
           </div>
         </div>
         <div className="flex gap-4">
           <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Quanto você pode pagar por mês?
             </label>
             <input
@@ -286,29 +287,25 @@ export default function Debts() {
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
         </div>
       ) : activeDebts.length === 0 ? (
-        <div className="card text-center py-12">
-          <CheckCircle className="mx-auto text-green-500 mb-4" size={48} />
-          <p className="text-gray-500 mb-4">Parabéns! Você não tem dívidas ativas.</p>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="btn-secondary inline-flex items-center gap-2"
-          >
-            <Plus size={18} />
-            Registrar dívida
-          </button>
-        </div>
+        <EmptyState
+          icon={CheckCircle}
+          title="Parabéns! Você não tem dívidas ativas."
+          description="Continue assim! Se precisar, você pode registrar novas dívidas para acompanhá-las."
+          actionLabel="Registrar dívida"
+          actionOnClick={() => setShowCreateModal(true)}
+        />
       ) : (
         <div className="space-y-4">
           {activeDebts.map((debt) => (
             <div key={debt.id} className="card">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <div className="p-3 bg-red-100 rounded-lg">
+                  <div className="p-3 bg-red-100 dark:bg-red-900/30 rounded-lg">
                     <CreditCard className="text-red-600" size={24} />
                   </div>
                   <div>
-                    <h3 className="font-semibold">{debt.name}</h3>
-                    <p className="text-sm text-gray-500">
+                    <h3 className="font-semibold dark:text-white">{debt.name}</h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
                       {debtTypeLabels[debt.type]} {debt.creditor && `• ${debt.creditor}`}
                     </p>
                   </div>
@@ -323,19 +320,19 @@ export default function Debts() {
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                 <div>
-                  <p className="text-gray-500">Saldo Atual</p>
+                  <p className="text-gray-500 dark:text-gray-400">Saldo Atual</p>
                   <p className="font-bold text-expense">{formatCurrency(debt.current_balance)}</p>
                 </div>
                 <div>
-                  <p className="text-gray-500">Valor Original</p>
-                  <p className="font-medium">{formatCurrency(debt.original_amount)}</p>
+                  <p className="text-gray-500 dark:text-gray-400">Valor Original</p>
+                  <p className="font-medium dark:text-white">{formatCurrency(debt.original_amount)}</p>
                 </div>
                 <div>
-                  <p className="text-gray-500">Pagamento Mínimo</p>
-                  <p className="font-medium">{formatCurrency(debt.minimum_payment)}</p>
+                  <p className="text-gray-500 dark:text-gray-400">Pagamento Mínimo</p>
+                  <p className="font-medium dark:text-white">{formatCurrency(debt.minimum_payment)}</p>
                 </div>
                 <div>
-                  <p className="text-gray-500">Taxa de Juros</p>
+                  <p className="text-gray-500 dark:text-gray-400">Taxa de Juros</p>
                   <p className="font-medium text-yellow-600">
                     {formatPercent(debt.interest_rate)} {debt.interest_type === 'monthly' ? 'a.m.' : 'a.a.'}
                   </p>
@@ -344,13 +341,13 @@ export default function Debts() {
 
               {/* Progress bar */}
               <div className="mt-4">
-                <div className="flex justify-between text-xs text-gray-500 mb-1">
+                <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mb-1">
                   <span>Pago</span>
                   <span>
                     {((1 - debt.current_balance / debt.original_amount) * 100).toFixed(0)}%
                   </span>
                 </div>
-                <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                <div className="h-2 bg-gray-100 dark:bg-slate-700 rounded-full overflow-hidden">
                   <div
                     className="h-full rounded-full bg-green-500"
                     style={{
@@ -361,7 +358,7 @@ export default function Debts() {
               </div>
 
               {debt.due_day && (
-                <p className="text-sm text-gray-500 mt-2">
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
                   Vencimento: dia {debt.due_day} de cada mês
                 </p>
               )}

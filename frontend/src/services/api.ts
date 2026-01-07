@@ -100,6 +100,21 @@ export const transactionsApi = {
   confirm: (data: unknown) => api.post('/transactions/confirm', data),
   update: (id: number, data: unknown) => api.patch(`/transactions/${id}`, data),
   delete: (id: number) => api.delete(`/transactions/${id}`),
+  exportCSV: async (params?: Record<string, unknown>) => {
+    const response = await api.get('/transactions/export/csv', {
+      params,
+      responseType: 'blob',
+    })
+    const url = window.URL.createObjectURL(new Blob([response.data]))
+    const link = document.createElement('a')
+    link.href = url
+    const date = new Date().toISOString().split('T')[0].replace(/-/g, '')
+    link.setAttribute('download', `transacoes_${date}.csv`)
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    window.URL.revokeObjectURL(url)
+  },
 }
 
 export const documentsApi = {

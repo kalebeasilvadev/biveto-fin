@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { recurringApi, accountsApi, categoriesApi } from '../services/api'
 import { Plus, Repeat, Pause, Play, Trash2, Edit2, Calendar, DollarSign } from 'lucide-react'
 import { clsx } from 'clsx'
+import EmptyState from '../components/EmptyState'
 
 interface RecurringTransaction {
   id: number
@@ -250,8 +251,8 @@ export default function Recurring() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Despesas Recorrentes</h1>
-          <p className="text-gray-500 mt-1">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Despesas Recorrentes</h1>
+          <p className="text-gray-500 dark:text-gray-400 mt-1">
             Gerencie seus gastos fixos como aluguel, assinaturas e contas
           </p>
         </div>
@@ -277,51 +278,51 @@ export default function Recurring() {
       {/* Summary Cards */}
       {summary && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="bg-white rounded-xl p-4 border border-gray-200">
+          <div className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-gray-200 dark:border-slate-700">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-red-100 rounded-lg">
+              <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-lg">
                 <DollarSign className="w-5 h-5 text-red-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-500">Despesas Mensais</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Despesas Mensais</p>
                 <p className="text-lg font-semibold text-red-600">
                   {formatCurrency(summary.total_monthly_expenses)}
                 </p>
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-xl p-4 border border-gray-200">
+          <div className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-gray-200 dark:border-slate-700">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-100 rounded-lg">
+              <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
                 <DollarSign className="w-5 h-5 text-green-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-500">Receitas Mensais</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Receitas Mensais</p>
                 <p className="text-lg font-semibold text-green-600">
                   {formatCurrency(summary.total_monthly_income)}
                 </p>
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-xl p-4 border border-gray-200">
+          <div className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-gray-200 dark:border-slate-700">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary-100 rounded-lg">
+              <div className="p-2 bg-primary-100 dark:bg-primary-900/30 rounded-lg">
                 <Repeat className="w-5 h-5 text-primary-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-500">Ativos</p>
-                <p className="text-lg font-semibold">{summary.active_count}</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Ativos</p>
+                <p className="text-lg font-semibold dark:text-white">{summary.active_count}</p>
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-xl p-4 border border-gray-200">
+          <div className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-gray-200 dark:border-slate-700">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-yellow-100 rounded-lg">
+              <div className="p-2 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg">
                 <Pause className="w-5 h-5 text-yellow-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-500">Pausados</p>
-                <p className="text-lg font-semibold">{summary.paused_count}</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Pausados</p>
+                <p className="text-lg font-semibold dark:text-white">{summary.paused_count}</p>
               </div>
             </div>
           </div>
@@ -527,30 +528,30 @@ export default function Recurring() {
       )}
 
       {/* List */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 overflow-hidden">
         {recurring.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">
-            <Repeat className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-            <p>Nenhuma recorrência cadastrada</p>
-            <p className="text-sm mt-1">
-              Adicione suas despesas fixas como aluguel, assinaturas e contas
-            </p>
-          </div>
+          <EmptyState
+            icon={Repeat}
+            title="Nenhuma recorrência cadastrada"
+            description="Adicione suas despesas fixas como aluguel, assinaturas e contas para ter controle automático."
+            actionLabel="Nova Recorrência"
+            actionOnClick={() => setShowForm(true)}
+          />
         ) : (
-          <div className="divide-y divide-gray-200">
+          <div className="divide-y divide-gray-200 dark:divide-slate-700">
             {recurring.map((item) => (
               <div
                 key={item.id}
                 className={clsx(
                   'p-4 flex items-center justify-between',
-                  item.status === 'paused' && 'bg-gray-50'
+                  item.status === 'paused' && 'bg-gray-50 dark:bg-slate-700/50'
                 )}
               >
                 <div className="flex items-center gap-4">
                   <div
                     className={clsx(
                       'p-2 rounded-lg',
-                      item.type === 'expense' ? 'bg-red-100' : 'bg-green-100'
+                      item.type === 'expense' ? 'bg-red-100 dark:bg-red-900/30' : 'bg-green-100 dark:bg-green-900/30'
                     )}
                   >
                     <Repeat
@@ -562,7 +563,7 @@ export default function Recurring() {
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <p className="font-medium">{item.name}</p>
+                      <p className="font-medium dark:text-white">{item.name}</p>
                       <span
                         className={clsx(
                           'text-xs px-2 py-0.5 rounded-full',
@@ -574,7 +575,7 @@ export default function Recurring() {
                         {statusLabels[item.status]}
                       </span>
                     </div>
-                    <div className="flex items-center gap-3 text-sm text-gray-500">
+                    <div className="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
                       <span>{frequencyLabels[item.frequency]}</span>
                       {item.frequency === 'monthly' && item.day_of_month && (
                         <span>Dia {item.day_of_month}</span>
@@ -582,11 +583,11 @@ export default function Recurring() {
                       {item.frequency === 'weekly' && item.day_of_week !== null && (
                         <span>{dayOfWeekLabels[item.day_of_week]}</span>
                       )}
-                      <span className="text-gray-300">|</span>
+                      <span className="text-gray-300 dark:text-gray-600">|</span>
                       <span>{item.account_name}</span>
                       {item.category_name && (
                         <>
-                          <span className="text-gray-300">|</span>
+                          <span className="text-gray-300 dark:text-gray-600">|</span>
                           <span>{item.category_name}</span>
                         </>
                       )}

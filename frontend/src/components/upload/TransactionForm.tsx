@@ -1,0 +1,284 @@
+import { Link } from 'react-router-dom'
+import { Check, AlertCircle, User, Users } from 'lucide-react'
+import { clsx } from 'clsx'
+import { TransactionFormData } from '../../types/upload'
+
+interface Account {
+  id: number
+  name: string
+}
+
+interface Category {
+  id: number
+  name: string
+  type: string
+}
+
+interface TransactionFormProps {
+  formData: TransactionFormData
+  onChange: (data: Partial<TransactionFormData>) => void
+  accounts: Account[]
+  categories: Category[]
+  onSubmit: () => void
+  isPending: boolean
+  isManual: boolean
+  showOwnershipSelector: boolean
+  showInstallmentSection?: boolean
+  editingItemDescription?: string
+  onCloseEdit?: () => void
+}
+
+export default function TransactionForm({
+  formData,
+  onChange,
+  accounts,
+  categories,
+  onSubmit,
+  isPending,
+  isManual,
+  showOwnershipSelector,
+  showInstallmentSection = true,
+  editingItemDescription,
+  onCloseEdit,
+}: TransactionFormProps) {
+  const filteredCategories = categories.filter(
+    (cat) => isManual ? cat.type === formData.type : cat.type === 'expense'
+  )
+
+  return (
+    <div className="space-y-4">
+      {/* Type selector (manual only) */}
+      {isManual && (
+        <div className="flex gap-2">
+          <button
+            onClick={() => onChange({ type: 'expense' })}
+            className={clsx(
+              'flex-1 py-3 rounded-lg font-medium transition-colors',
+              formData.type === 'expense'
+                ? 'bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 border-2 border-red-500'
+                : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-300'
+            )}
+          >
+            Despesa
+          </button>
+          <button
+            onClick={() => onChange({ type: 'income' })}
+            className={clsx(
+              'flex-1 py-3 rounded-lg font-medium transition-colors',
+              formData.type === 'income'
+                ? 'bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300 border-2 border-green-500'
+                : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-300'
+            )}
+          >
+            Receita
+          </button>
+        </div>
+      )}
+
+      {/* Editing item header */}
+      {editingItemDescription && onCloseEdit && (
+        <div className="bg-blue-50 dark:bg-blue-900/30 rounded-xl p-3 flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-blue-800 dark:text-blue-300">Editando item</p>
+            <p className="text-xs text-blue-600 dark:text-blue-400">{editingItemDescription}</p>
+          </div>
+          <button onClick={onCloseEdit} className="text-blue-600 hover:text-blue-800">
+            <AlertCircle size={20} />
+          </button>
+        </div>
+      )}
+
+      {/* Account selector */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Conta *</label>
+        {accounts.length === 0 ? (
+          <div className="bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3 flex items-start gap-2">
+            <AlertCircle className="text-yellow-600 flex-shrink-0 mt-0.5" size={18} />
+            <div className="text-sm">
+              <p className="text-yellow-800 dark:text-yellow-300 font-medium">Nenhuma conta cadastrada</p>
+              <Link to="/accounts" className="text-yellow-600 dark:text-yellow-400 hover:underline">
+                Clique aqui para criar uma conta
+              </Link>
+            </div>
+          </div>
+        ) : (
+          <select
+            value={formData.account_id}
+            onChange={(e) => onChange({ account_id: e.target.value })}
+            className="input"
+          >
+            <option value="">Selecione</option>
+            {accounts.map((acc) => (
+              <option key={acc.id} value={acc.id}>{acc.name}</option>
+            ))}
+          </select>
+        )}
+      </div>
+
+      {/* Amount */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Valor *</label>
+        <input
+          type="number"
+          step="0.01"
+          inputMode="decimal"
+          value={formData.amount}
+          onChange={(e) => onChange({ amount: e.target.value })}
+          className="input text-2xl font-bold"
+          placeholder="0,00"
+        />
+      </div>
+
+      {/* Category */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Categoria</label>
+        <select
+          value={formData.category_id}
+          onChange={(e) => onChange({ category_id: e.target.value })}
+          className="input"
+        >
+          <option value="">Selecione</option>
+          {filteredCategories.map((cat) => (
+            <option key={cat.id} value={cat.id}>{cat.name}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Date */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Data</label>
+        <input
+          type="date"
+          value={formData.date}
+          onChange={(e) => onChange({ date: e.target.value })}
+          className="input"
+        />
+      </div>
+
+      {/* Installment section */}
+      {!isManual && showInstallmentSection && (
+        <div className="bg-blue-50 dark:bg-blue-900/30 rounded-xl p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={formData.is_installment}
+                onChange={(e) => onChange({
+                  is_installment: e.target.checked,
+                  installment_current: e.target.checked ? (formData.installment_current || '1') : '',
+                  installment_total: e.target.checked ? formData.installment_total : '',
+                })}
+                className="w-4 h-4 text-blue-600 rounded"
+              />
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Compra parcelada</span>
+            </label>
+            {formData.is_installment && formData.installment_current && formData.installment_total && (
+              <span className="px-2 py-1 text-xs font-medium bg-blue-100 dark:bg-blue-800 text-blue-700 dark:text-blue-300 rounded-full">
+                {formData.installment_current}/{formData.installment_total}
+              </span>
+            )}
+          </div>
+
+          {formData.is_installment && (
+            <div className="flex gap-3">
+              <div className="flex-1">
+                <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Parcela atual</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={formData.installment_current}
+                  onChange={(e) => onChange({ installment_current: e.target.value })}
+                  className="input text-center"
+                  placeholder="1"
+                />
+              </div>
+              <div className="flex items-end pb-2 text-gray-400">de</div>
+              <div className="flex-1">
+                <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Total de parcelas</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={formData.installment_total}
+                  onChange={(e) => onChange({ installment_total: e.target.value })}
+                  className="input text-center"
+                  placeholder="12"
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Description / Merchant */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          {isManual ? 'Descrição' : 'Estabelecimento'}
+        </label>
+        <input
+          type="text"
+          value={isManual ? formData.description : formData.merchant_name}
+          onChange={(e) => onChange({
+            [isManual ? 'description' : 'merchant_name']: e.target.value,
+          })}
+          className="input"
+          placeholder={isManual ? 'Descrição da transação' : 'Nome do estabelecimento'}
+        />
+      </div>
+
+      {/* Ownership Type */}
+      {showOwnershipSelector && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Visibilidade
+          </label>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => onChange({ ownership_type: 'personal' })}
+              className={clsx(
+                'flex items-center gap-2 p-3 rounded-lg border-2 transition-all',
+                formData.ownership_type === 'personal'
+                  ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/30'
+                  : 'border-gray-200 dark:border-slate-600 hover:border-gray-300'
+              )}
+            >
+              <User size={20} className={formData.ownership_type === 'personal' ? 'text-primary-600' : 'text-gray-400'} />
+              <span className={clsx('text-sm font-medium', formData.ownership_type === 'personal' ? 'text-primary-700 dark:text-primary-300' : 'text-gray-600 dark:text-gray-300')}>
+                Pessoal
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onChange({ ownership_type: 'household' })}
+              className={clsx(
+                'flex items-center gap-2 p-3 rounded-lg border-2 transition-all',
+                formData.ownership_type === 'household'
+                  ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/30'
+                  : 'border-gray-200 dark:border-slate-600 hover:border-gray-300'
+              )}
+            >
+              <Users size={20} className={formData.ownership_type === 'household' ? 'text-primary-600' : 'text-gray-400'} />
+              <span className={clsx('text-sm font-medium', formData.ownership_type === 'household' ? 'text-primary-700 dark:text-primary-300' : 'text-gray-600 dark:text-gray-300')}>
+                Familia
+              </span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Submit button */}
+      <button
+        onClick={onSubmit}
+        disabled={!formData.amount || !formData.account_id || isPending}
+        className="btn-primary w-full py-4 text-lg flex items-center justify-center gap-2"
+      >
+        {isPending ? 'Salvando...' : (
+          <>
+            <Check size={20} />
+            {isManual ? 'Salvar' : 'Confirmar Item'}
+          </>
+        )}
+      </button>
+    </div>
+  )
+}

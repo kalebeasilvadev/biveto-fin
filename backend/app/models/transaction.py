@@ -65,9 +65,9 @@ class Transaction(Base):
 
     # Relationships
     user: Mapped["User"] = relationship(back_populates="transactions")
-    account: Mapped["Account"] = relationship(back_populates="transactions")
-    category: Mapped["Category | None"] = relationship(back_populates="transactions")
-    merchant: Mapped["Merchant | None"] = relationship(back_populates="transactions")
+    account: Mapped["Account"] = relationship(back_populates="transactions", lazy="selectin")
+    category: Mapped["Category | None"] = relationship(back_populates="transactions", lazy="selectin")
+    merchant: Mapped["Merchant | None"] = relationship(back_populates="transactions", lazy="selectin")
     document: Mapped["Document | None"] = relationship(back_populates="transaction")
     installment_series: Mapped["InstallmentSeries | None"] = relationship(
         back_populates="transactions"
@@ -79,6 +79,19 @@ class Transaction(Base):
     audit_logs: Mapped[list["TransactionAudit"]] = relationship(
         back_populates="transaction", lazy="selectin"
     )
+
+    # Computed properties for API responses
+    @property
+    def category_name(self) -> str | None:
+        return self.category.name if self.category else None
+
+    @property
+    def account_name(self) -> str | None:
+        return self.account.name if self.account else None
+
+    @property
+    def merchant_name(self) -> str | None:
+        return self.merchant.name if self.merchant else None
 
 
 class TransactionAudit(Base):

@@ -187,29 +187,40 @@ export default function Dashboard() {
         </div>
 
         <div className="card">
-          <h2 className="text-lg font-semibold mb-4">Top Estabelecimentos</h2>
-          {summary?.top_merchants && summary.top_merchants.length > 0 ? (
+          <h2 className="text-lg font-semibold mb-4">Maiores Gastos</h2>
+          {summary?.categories && summary.categories.length > 0 ? (
             <div className="space-y-3">
-              {summary.top_merchants.slice(0, 5).map((merchant: { merchant_id: number | null; merchant_name: string; total: number; count: number }) => (
+              {summary.categories.slice(0, 5).map((cat: { category_id: number; category_name: string; total: number; count: number; percentage: number }, index: number) => (
                 <div
-                  key={merchant.merchant_id || 'other'}
+                  key={cat.category_id}
                   className="flex items-center justify-between"
                 >
-                  <div>
-                    <p className="font-medium">{merchant.merchant_name}</p>
-                    <p className="text-sm text-gray-500">
-                      {merchant.count} transações
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="w-3 h-3 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                    />
+                    <div>
+                      <p className="font-medium">{cat.category_name}</p>
+                      <p className="text-sm text-gray-500">
+                        {cat.count} transações
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="font-semibold text-expense">
+                      {formatCurrency(cat.total)}
+                    </span>
+                    <p className="text-xs text-gray-500">
+                      {cat.percentage.toFixed(0)}%
                     </p>
                   </div>
-                  <span className="font-semibold">
-                    {formatCurrency(merchant.total)}
-                  </span>
                 </div>
               ))}
             </div>
           ) : (
             <p className="text-gray-500 text-center py-8">
-              Nenhum estabelecimento registrado
+              Nenhuma despesa registrada
             </p>
           )}
         </div>

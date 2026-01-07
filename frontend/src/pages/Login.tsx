@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { authApi, getApiErrorMessage } from '../services/api'
 import { useAuthStore } from '../stores/authStore'
+import LoadingButton from '../components/LoadingButton'
 
 const schema = z.object({
   email: z.string().email('Email inválido'),
@@ -49,17 +50,17 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-slate-900 px-4">
       <div className="max-w-md w-full">
         <div className="text-center mb-8">
           <img src="/logo.svg" alt="Biveto" className="h-12 mx-auto mb-2" />
-          <p className="text-gray-500 text-sm">finanças claras. decisões firmes.</p>
+          <p className="text-gray-500 dark:text-gray-400 text-sm">finanças claras. decisões firmes.</p>
         </div>
 
         <div className="card">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Email
               </label>
               <input
@@ -76,7 +77,7 @@ export default function Login() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Senha
               </label>
               <input
@@ -93,21 +94,21 @@ export default function Login() {
             </div>
 
             {error && (
-              <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm">
+              <div className="bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 p-3 rounded-lg text-sm">
                 {error}
               </div>
             )}
 
-            <button
+            <LoadingButton
               type="submit"
-              disabled={loading}
-              className="btn-primary w-full"
+              isLoading={loading}
+              className="w-full"
             >
-              {loading ? 'Entrando...' : 'Entrar'}
-            </button>
+              Entrar
+            </LoadingButton>
           </form>
 
-          <p className="text-center text-sm text-gray-500 mt-4">
+          <p className="text-center text-sm text-gray-500 dark:text-gray-400 mt-4">
             Acesso restrito por convite
           </p>
         </div>

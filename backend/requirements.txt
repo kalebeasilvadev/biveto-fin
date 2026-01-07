@@ -36,5 +36,8 @@ httpx>=0.27.0
 # Utilities
 python-dateutil==2.8.2
 
+# Rate limiting
+slowapi==0.1.9
+
 # MCP Server (opcional - só para dev local)
 # mcp>=1.0.0

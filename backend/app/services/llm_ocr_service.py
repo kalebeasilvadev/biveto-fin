@@ -8,112 +8,137 @@ from ..core.config import settings
 
 EXTRACTION_PROMPT = """Analise esta imagem de documento financeiro brasileiro (cupom fiscal, fatura de cartão, comprovante, extrato).
 
-Extraia TODOS os itens/transações visíveis INDIVIDUALMENTE e retorne um JSON válido com este formato:
+Extraia os itens/transações e retorne um JSON válido com este formato:
 
 {
   "items": [
     {
-      "description": "Nome do estabelecimento ou produto",
+      "description": "Nome do produto ou estabelecimento",
       "amount": 123.45,
       "date": "2024-12-25",
-      "category": "alimentacao",
+      "category": "mercado",
       "installment_current": 3,
       "installment_total": 12,
       "is_installment": true
     }
   ],
-  "document_type": "fatura_cartao"
+  "document_type": "cupom_fiscal"
 }
 
-REGRAS CRÍTICAS:
+==== REGRA MAIS IMPORTANTE ====
 
-1. PARCELAS (MUITO IMPORTANTE!):
-   PADRÕES DE PARCELAMENTO POR BANCO:
+PARA CUPOM FISCAL / NOTA FISCAL DE SUPERMERCADO:
+- Extraia APENAS os PRODUTOS comprados
+- NÃO EXTRAIA (IGNORE COMPLETAMENTE):
+  * Descontos (ex: "DESCONTO", "DESC", "DESCONTO POR QUANTIDADE", "DESC QTD", valores negativos no cupom)
+  * Totais (ex: "TOTAL", "SUBTOTAL", "TOTAL A PAGAR", "VALOR TOTAL")
+  * Forma de pagamento (ex: "DINHEIRO", "CARTÃO", "PIX", "TROCO", "CREDITO", "DEBITO")
+  * Impostos (ex: "ICMS", "TRIBUTOS", "VALOR APROX TRIBUTOS")
+  * Informações do estabelecimento (CNPJ, endereço, etc.)
+- TODOS os valores de produtos devem ser POSITIVOS (são despesas)
+- Se um item aparece com valor negativo no cupom (desconto), IGNORE esse item completamente
 
-   NUBANK:
-   - "Parcela X de Y" ou "Parcela X/Y" (ex: "Parcela 1 de 6")
-   - Números "XX/YY" no nome (ex: "Pag*steam 03/12" = parcela 3 de 12)
-   - "*nome XX/YY" (ex: "*nuuve01/06" = parcela 1 de 6)
+PARA FATURA DE CARTÃO DE CRÉDITO:
+- Extraia compras (valores positivos = despesa)
+- Extraia pagamentos/créditos como valores NEGATIVOS (ex: "PAGAMENTO DE FATURA" = amount negativo)
 
-   INTER:
-   - "(Parcela XX de YY)" no final (ex: "DM *helphbomaxcom (Parcela 05 de 12)")
-   - "NOME (Parcela XX de YY)" (ex: "LOJAS NOSSO LAR (Parcela 04 de 12)")
+==== LEITURA DE NOMES DE PRODUTOS (OCR) ====
 
-   BRADESCO/AMEX:
-   - "NOME XX/YY" com espaço (ex: "Steam 02/12" = parcela 2 de 12)
-   - "NOME*código XX/YY" (ex: "HOTMART asimovacadem02/12" = parcela 2 de 12)
-   - "NOME LT02/10" (ex: "CIATOY BRINQUEDOS LT02/10" = parcela 2 de 10)
-   - "NOME 01/06" (ex: "INSIDE GAMES 01/06" = parcela 1 de 6)
+MUITO IMPORTANTE: Cupons fiscais têm abreviações e OCR pode ler errado. INTERPRETE e CORRIJA:
 
-   PADRÕES GENÉRICOS:
-   - "Parc X/Y" ou "Parc X de Y"
-   - "Xª parcela de Y" ou "Xa de Y"
-   - "XX/YY" no final da descrição
+Exemplos de correção obrigatória:
+- "LIMAD KG" ou "LIMAO KG" → "Limão Kg"
+- "ACU REFIN" ou "ACUCAR REF" → "Açúcar Refinado"
+- "ARR BRANCO" → "Arroz Branco"
+- "FGO FRANGO" ou "FRGO" → "Frango"
+- "CONTRA FILE" ou "CTRA FILE" → "Contra Filé"
+- "PAO FRANCES" → "Pão Francês"
+- "DETERG" → "Detergente"
+- "MARG" → "Margarina"
+- "LEITE INTEG" → "Leite Integral"
+- "CERV" → "Cerveja"
+- "REFRIG" → "Refrigerante"
+- "SABAO PO" → "Sabão em Pó"
+- "PAP HIGIEN" → "Papel Higiênico"
+- "OVO VERM" → "Ovo Vermelho"
+- "BATATA ING" → "Batata Inglesa"
+- "CARVAD" ou "CARVAO" → "Carvão"
+- "TRIANGULO EKC EUCALIPTO" → "Carvão Triângulo Eucalipto"
+- "BON FESF" ou "BIFE" → "Bife"
+- "ALCATRA" → "Alcatra"
+- "ARANHA" → "Carne Aranha" (corte de carne)
+- "PRATO DESCART" → "Prato Descartável"
+- "COPOBRAS" → "Copobras" (marca)
 
-   COMO EXTRAIR:
-   - installment_current: número da parcela atual (ex: 3)
-   - installment_total: total de parcelas (ex: 12)
-   - is_installment: true
-   - O valor (amount) deve ser o valor DA PARCELA exibido, não o total da compra
+Use o contexto para interpretar abreviações de forma legível e natural em português.
 
-   Se NÃO for parcelado: is_installment: false, omita os campos de parcela
+==== PARCELAS (para faturas de cartão) ====
 
-2. DATAS:
-   - Extraia a data EXATA de cada transação
-   - Formato de saída: YYYY-MM-DD
-   - Formatos de entrada comuns:
-     * "23 de ago. 2025" → "2025-08-23"
-     * "04 de set. 2025" → "2025-09-04"
-     * "08/12" (dia/mês) → use ano do contexto da fatura
-     * "25 de dezembro" → use ano do contexto
-   - Use o ano do vencimento da fatura quando o ano não estiver explícito
+PADRÕES DE PARCELAMENTO:
+- "Parcela X de Y" ou "Parcela X/Y"
+- "XX/YY" no final (ex: "Steam 03/12" = parcela 3 de 12)
+- "(Parcela XX de YY)" no final
+- "*nome01/06" = parcela 1 de 6
 
-3. VALORES:
-   - Converta R$ para número decimal (R$ 1.234,56 → 1234.56)
-   - Valores negativos/créditos:
-     * "-R$ 210,90" → amount: -210.90
-     * "+ R$ 1.556,82" ou "1.513,17 -" → amount: -1513.17 (pagamento/crédito)
-     * "PAGAMENTO DE FATURA" → amount negativo
-   - Valores em dólar "US$ 10,00" devem ter o valor em reais extraído se disponível
+COMO EXTRAIR:
+- installment_current: número da parcela atual
+- installment_total: total de parcelas
+- is_installment: true
+- O valor deve ser o valor DA PARCELA, não o total
 
-4. CATEGORIAS - baseado no nome do estabelecimento:
-   - alimentacao: restaurantes, pizzarias, lanches, delivery, ifood, mc donalds, burger, gruta
-   - transporte: posto, uber, 99, estacionamento, shellbox, pedagio
-   - moradia: luz, água, gás, aluguel, condomínio, energia, enel, sabesp
-   - saude: farmácia, hospital, médico, drogaria, droga raia, ultrafarma
-   - lazer: cinema, streaming, jogos, bar, spotify, netflix, steam, nuuvem, pag*steam, inside games, shopee, daiso
-   - eletronicos: magazine luiza, americanas, casas bahia, kabum, pichau, amazon, ciatoy
-   - roupas: renner, c&a, riachuelo, zara, shein, o boticario, oboticario
-   - servicos: elétrica, hidráulica, manutenção, solare instalacao
-   - mercado: supermercado, mercado, atacado, pao de acucar, carrefour, extra, distribuidora
-   - assinaturas: spotify, netflix, amazon prime, disney+, gympass, wellhub, hotmart, apple.com/bill, hbomax
-   - cartao: anuidade, taxa, iof, seguro cartao
-   - educacao: hotmart, cursos, academy
-   - outros: quando não se encaixar nas anteriores
+==== DATAS ====
 
-5. DOCUMENT_TYPE: fatura_cartao | cupom_fiscal | comprovante | extrato
+- Formato de saída: YYYY-MM-DD
+- Formatos de entrada: "23/08/2024", "23 de ago. 2024", "08/12" (use ano do contexto)
 
-EXEMPLOS DE EXTRAÇÃO:
+==== VALORES ====
 
-NUBANK:
-- "Nuuvem *nuuve01/06 R$ 44,65 Parcela 1 de 6" → description: "Nuuvem", installment_current: 1, installment_total: 6, amount: 44.65
-- "Pag*steam 03/12 R$ 106,09 Parcela 3 de 12" → description: "Steam", installment_current: 3, installment_total: 12, amount: 106.09
+- Converta R$ para número decimal (R$ 1.234,56 → 1234.56)
+- Para cupom fiscal: TODOS os produtos são valores POSITIVOS
+- Para fatura: pagamentos/créditos são NEGATIVOS
 
-INTER:
-- "DM *helphbomaxcom (Parcela 05 de 12) R$ 39,90" → description: "HBO Max", installment_current: 5, installment_total: 12, amount: 39.90
-- "LOJAS NOSSO LAR (Parcela 04 de 12) R$ 99,99" → description: "Lojas Nosso Lar", installment_current: 4, installment_total: 12, amount: 99.99
-- "PAGAMENTO DE FATURA + R$ 1.556,82" → description: "Pagamento de Fatura", amount: -1556.82, is_installment: false
+==== CATEGORIAS ====
 
-BRADESCO/AMEX:
-- "Steam 02/12 SAO PAULO R$ 105,66" → description: "Steam", installment_current: 2, installment_total: 12, amount: 105.66
-- "INSIDE GAMES 01/06 BRASILIA R$ 135,00" → description: "Inside Games", installment_current: 1, installment_total: 6, amount: 135.00
-- "DAISO JAPAN BRASILIA R$ 371,80" → description: "Daiso Japan", is_installment: false, amount: 371.80
-- "PAG BOLETO BANCARIO 1.513,17 -" → description: "Pagamento Boleto", amount: -1513.17, is_installment: false
+- alimentacao: restaurantes, pizzarias, delivery, ifood, mc donalds
+- transporte: posto, uber, 99, estacionamento
+- moradia: luz, água, gás, aluguel, condomínio
+- saude: farmácia, hospital, drogaria
+- lazer: cinema, jogos, bar, spotify, netflix, steam, shopee
+- eletronicos: magazine luiza, americanas, kabum, amazon
+- roupas: renner, c&a, riachuelo, zara, shein
+- mercado: supermercado, mercado, atacado, produtos de cupom fiscal
+- assinaturas: spotify, netflix, amazon prime, disney+, gympass
+- outros: quando não se encaixar
 
-IMPORTANTE:
-- Limpe a descrição removendo códigos como "*nuuve01/06", "03/12", "LT02/10", "(Parcela X de Y)" etc.
-- Deixe apenas o nome legível do estabelecimento.
-- NÃO ignore pagamentos/créditos (valores com sinal negativo ou "+").
+==== DOCUMENT_TYPE ====
+
+- cupom_fiscal: nota de supermercado/loja com lista de produtos
+- fatura_cartao: fatura de cartão de crédito
+- comprovante: comprovante de pagamento único
+- extrato: extrato bancário
+
+==== EXEMPLOS ====
+
+CUPOM FISCAL (supermercado):
+Entrada: "LIMAD KG 2,43 | CONTRA FILE KG 185,89 | DESC QTD -1,80 | TOTAL 350,00"
+Saída correta:
+{
+  "items": [
+    {"description": "Limão Kg", "amount": 2.43, "category": "mercado"},
+    {"description": "Contra Filé Kg", "amount": 185.89, "category": "mercado"}
+  ],
+  "document_type": "cupom_fiscal"
+}
+IMPORTANTE: "DESC QTD" e "TOTAL" foram IGNORADOS pois não são produtos!
+
+FATURA CARTÃO:
+{
+  "items": [
+    {"description": "Steam", "amount": 105.66, "installment_current": 2, "installment_total": 12, "is_installment": true},
+    {"description": "Pagamento Fatura", "amount": -1556.82, "is_installment": false}
+  ],
+  "document_type": "fatura_cartao"
+}
 
 Retorne APENAS o JSON válido, sem explicações."""
 

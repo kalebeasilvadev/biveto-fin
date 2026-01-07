@@ -11,6 +11,29 @@
     --biveto-navy-light: #334e68;
     --biveto-green: #4ade80;
     --biveto-green-dark: #22c55e;
+
+    /* Light mode colors */
+    --bg-primary: #f9fafb;
+    --bg-secondary: #ffffff;
+    --bg-tertiary: #f3f4f6;
+    --text-primary: #111827;
+    --text-secondary: #6b7280;
+    --text-tertiary: #9ca3af;
+    --border-color: #e5e7eb;
+    --border-color-light: #f3f4f6;
+  }
+
+  .dark {
+    --bg-primary: #0f172a;
+    --bg-secondary: #1e293b;
+    --bg-tertiary: #334155;
+    --text-primary: #f1f5f9;
+    --text-secondary: #94a3b8;
+    --text-tertiary: #64748b;
+    --border-color: #334155;
+    --border-color-light: #1e293b;
+    --biveto-navy: #3b82f6;
+    --biveto-navy-light: #60a5fa;
   }
 
   html {
@@ -18,8 +41,14 @@
   }
 
   body {
-    @apply bg-gray-50 text-gray-900 antialiased;
+    @apply antialiased transition-colors duration-200;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
     -webkit-tap-highlight-color: transparent;
+  }
+
+  .dark body {
+    @apply bg-slate-900 text-slate-100;
   }
 
   /* Scrollbar styling */
@@ -105,7 +134,9 @@
     @apply w-full px-4 py-3 bg-white border border-gray-200 rounded-xl
            text-gray-900 placeholder-gray-400
            transition-all duration-200 ease-out
-           hover:border-gray-300;
+           hover:border-gray-300
+           dark:bg-slate-800 dark:border-slate-600 dark:text-slate-100
+           dark:placeholder-slate-400 dark:hover:border-slate-500;
     @apply focus:outline-none focus:ring-2 focus:border-primary-800;
     --tw-ring-color: rgba(30, 58, 95, 0.2);
   }
@@ -117,7 +148,8 @@
   /* Cards */
   .card {
     @apply bg-white rounded-2xl shadow-sm border border-gray-100 p-5
-           transition-all duration-200;
+           transition-all duration-200
+           dark:bg-slate-800 dark:border-slate-700;
   }
 
   .card-hover {
@@ -205,8 +237,10 @@
   .bottom-nav {
     @apply fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100
            flex items-center justify-around px-2 py-2
-           lg:hidden z-50;
-    padding-bottom: max(0.5rem, var(--safe-area-inset-bottom));
+           lg:hidden z-50
+           dark:bg-slate-900 dark:border-slate-700;
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+    padding-bottom: max(0.75rem, constant(safe-area-inset-bottom)); /* iOS < 11.2 */
   }
 
   .bottom-nav-item {

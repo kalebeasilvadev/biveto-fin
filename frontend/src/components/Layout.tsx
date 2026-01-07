@@ -1,5 +1,6 @@
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
+import { useThemeStore } from '../stores/themeStore'
 import {
   LayoutDashboard,
   Receipt,
@@ -17,6 +18,8 @@ import {
   Building,
   Plus,
   ChevronRight,
+  Moon,
+  Sun,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { clsx } from 'clsx'
@@ -50,8 +53,11 @@ export default function Layout() {
   const logout = useAuthStore((state) => state.logout)
   const user = useAuthStore((state) => state.user)
   const setUser = useAuthStore((state) => state.setUser)
+  const { theme, toggleTheme } = useThemeStore()
   const navigate = useNavigate()
   const location = useLocation()
+
+  const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
 
   // Fetch user info on mount to get is_admin
   useEffect(() => {
@@ -79,9 +85,9 @@ export default function Layout() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-slate-900 transition-colors">
       {/* Mobile header */}
-      <header className="lg:hidden fixed top-0 left-0 right-0 z-40 glass border-b border-gray-200/50">
+      <header className="lg:hidden fixed top-0 left-0 right-0 z-40 glass border-b border-gray-200/50 dark:bg-slate-900/80 dark:border-slate-700">
         <div className="flex items-center justify-between px-4 h-14">
           <img src="/logo.svg" alt="Biveto" className="h-8" />
           <button
@@ -96,7 +102,7 @@ export default function Layout() {
 
       <div className="flex">
         {/* Desktop Sidebar */}
-        <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:fixed lg:inset-y-0 bg-white border-r border-gray-100">
+        <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:fixed lg:inset-y-0 bg-white border-r border-gray-100 dark:bg-slate-800 dark:border-slate-700">
           {/* Logo */}
           <div className="flex items-center h-16 px-6 border-b border-gray-100">
             <img src="/logo.svg" alt="Biveto" className="h-9" />
@@ -158,16 +164,23 @@ export default function Layout() {
                   {user?.email || ''}
                 </p>
               </div>
+              <button
+                onClick={toggleTheme}
+                className="p-2 text-gray-400 hover:text-biveto hover:bg-biveto-light rounded-lg transition-colors dark:hover:bg-slate-700"
+                title={isDark ? 'Modo claro' : 'Modo escuro'}
+              >
+                {isDark ? <Sun size={18} /> : <Moon size={18} />}
+              </button>
               <NavLink
                 to="/settings"
-                className="p-2 text-gray-400 hover:text-biveto hover:bg-biveto-light rounded-lg transition-colors"
+                className="p-2 text-gray-400 hover:text-biveto hover:bg-biveto-light rounded-lg transition-colors dark:hover:bg-slate-700"
                 title="Configurações"
               >
                 <Settings size={18} />
               </NavLink>
               <button
                 onClick={handleLogout}
-                className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors dark:hover:bg-red-900/30"
                 title="Sair"
               >
                 <LogOut size={18} />
@@ -187,7 +200,7 @@ export default function Layout() {
         {/* Mobile Sidebar */}
         <aside
           className={clsx(
-            'fixed inset-y-0 left-0 z-50 w-72 bg-white shadow-xl transform transition-transform duration-300 ease-out lg:hidden',
+            'fixed inset-y-0 left-0 z-50 w-72 bg-white shadow-xl transform transition-transform duration-300 ease-out lg:hidden flex flex-col',
             mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
           )}
         >
@@ -219,8 +232,8 @@ export default function Layout() {
             </div>
           </div>
 
-          {/* Navigation */}
-          <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+          {/* Navigation - scrollable area */}
+          <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto min-h-0">
             {mainNavItems.map((item) => (
               <NavLink
                 key={item.to}
@@ -267,8 +280,8 @@ export default function Layout() {
             )}
           </nav>
 
-          {/* Settings & Logout */}
-          <div className="p-4 border-t border-gray-100 space-y-2">
+          {/* Settings & Logout - with extra padding for bottom nav + safe area */}
+          <div className="p-4 border-t border-gray-100 space-y-2 pb-safe" style={{ paddingBottom: 'max(1rem, calc(env(safe-area-inset-bottom) + 5rem))' }}>
             <NavLink
               to="/settings"
               className="w-full flex items-center justify-center gap-2 px-4 py-3 text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-xl font-medium transition-colors"
@@ -296,8 +309,8 @@ export default function Layout() {
             <Outlet />
           </div>
 
-          {/* Spacer for mobile bottom nav */}
-          <div className="h-20 lg:hidden" />
+          {/* Spacer for mobile bottom nav - extra padding for iOS safe area */}
+          <div className="h-24 lg:hidden" />
         </main>
       </div>
 
