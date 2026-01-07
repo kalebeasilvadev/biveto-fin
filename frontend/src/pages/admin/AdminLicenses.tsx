@@ -97,18 +97,8 @@ export default function AdminLicenses() {
       setExistingUserInfo(null)
       setPendingFormData(null)
     },
-    onError: (err: unknown) => {
-      const error = err as { response?: { data?: { detail?: { message?: string; existing_user?: ExistingUserInfo } | string } } }
-      // Debug: show what we received
-      alert('Erro recebido: ' + JSON.stringify(error.response?.data))
-      const detail = error.response?.data?.detail
-      if (typeof detail === 'object' && detail !== null && 'existing_user' in detail) {
-        alert('Mostrando modal de transferência!')
-        setExistingUserInfo((detail as { existing_user: ExistingUserInfo }).existing_user)
-        setPendingFormData(form)
-        setShowExistingUserModal(true)
-        setShowModal(false)
-      }
+    onError: () => {
+      // Errors are handled in handleSubmit via try/catch
     },
   })
 
@@ -175,9 +165,6 @@ export default function AdminLicenses() {
         await createMutation.mutateAsync(data as LicenseForm)
       } catch (err: unknown) {
         const error = err as { response?: { data?: { detail?: { message?: string; existing_user?: ExistingUserInfo } | string } } }
-        console.log('Erro capturado:', error)
-        alert('Erro capturado: ' + JSON.stringify(error.response?.data))
-
         const detail = error.response?.data?.detail
         if (typeof detail === 'object' && detail !== null && 'existing_user' in detail) {
           setExistingUserInfo((detail as { existing_user: ExistingUserInfo }).existing_user)
