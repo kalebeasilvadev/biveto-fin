@@ -336,10 +336,10 @@ export default function Upload() {
       </div>
 
       <div className="card space-y-4">
-        {/* Duplicate alert */}
+        {/* Duplicate alert - informational only */}
         {!isManual && document?.is_duplicate && (
-          <div className="bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-800 text-yellow-800 dark:text-yellow-300 p-3 rounded-lg text-sm">
-            Este documento já foi enviado anteriormente.
+          <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-300 p-3 rounded-lg text-sm">
+            <strong>Documento reconhecido:</strong> Este arquivo foi enviado anteriormente. Os dados foram processados novamente e você pode confirmar os itens abaixo.
           </div>
         )}
 
