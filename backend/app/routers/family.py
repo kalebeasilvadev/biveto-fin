@@ -206,10 +206,13 @@ async def invite_member(
     if not email_sent:
         print(f"Aviso: Email nao enviado para {data.email}")
 
+    # Status pode ser Enum ou string dependendo de como foi carregado
+    status_value = invitation.status.value if hasattr(invitation.status, 'value') else str(invitation.status)
+
     return FamilyInviteResponse(
         invitation_id=invitation.id,
         email=invitation.email,
-        status=invitation.status.value,
+        status=status_value,
         expires_at=invitation.expires_at,
     )
 
@@ -229,10 +232,11 @@ async def list_family_invitations(current_user: CurrentUser, db: DbSession):
 
     response = []
     for inv in invitations:
+        status_value = inv.status.value if hasattr(inv.status, 'value') else str(inv.status)
         response.append(FamilyInvitationResponse(
             id=inv.id,
             email=inv.email,
-            status=inv.status.value,
+            status=status_value,
             created_at=inv.created_at,
             expires_at=inv.expires_at,
         ))

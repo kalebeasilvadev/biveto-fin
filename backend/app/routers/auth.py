@@ -74,7 +74,8 @@ async def validate_invitation(token: str, db: DbSession):
         raise HTTPException(status_code=400, detail="Convite expirado")
 
     if invitation.status != InvitationStatus.PENDING:
-        raise HTTPException(status_code=400, detail=f"Convite {invitation.status.value}")
+        status_str = invitation.status.value if hasattr(invitation.status, 'value') else str(invitation.status)
+        raise HTTPException(status_code=400, detail=f"Convite {status_str}")
 
     # license.type pode ser string ou Enum dependendo de como foi salvo
     license_type = None
@@ -107,7 +108,8 @@ async def register_via_invitation(request: Request, token: str, data: InviteRegi
         raise HTTPException(status_code=400, detail="Convite expirado")
 
     if invitation.status != InvitationStatus.PENDING:
-        raise HTTPException(status_code=400, detail=f"Convite {invitation.status.value}")
+        status_str = invitation.status.value if hasattr(invitation.status, 'value') else str(invitation.status)
+        raise HTTPException(status_code=400, detail=f"Convite {status_str}")
 
     # Verificar se email ja existe
     existing = await db.scalar(select(User).where(User.email == invitation.email))
