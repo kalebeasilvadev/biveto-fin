@@ -110,14 +110,22 @@ if STATIC_DIR.exists():
     async def serve_manifest():
         manifest_path = STATIC_DIR / "manifest.json"
         if manifest_path.exists():
-            return FileResponse(manifest_path, media_type="application/json")
+            return FileResponse(
+                manifest_path,
+                media_type="application/json",
+                headers={"Cache-Control": "no-cache, must-revalidate"}
+            )
         return {"error": "Manifest not found"}
 
     @app.get("/sw.js")
     async def serve_service_worker():
         sw_path = STATIC_DIR / "sw.js"
         if sw_path.exists():
-            return FileResponse(sw_path, media_type="application/javascript")
+            return FileResponse(
+                sw_path,
+                media_type="application/javascript",
+                headers={"Cache-Control": "no-cache, must-revalidate"}
+            )
         return {"error": "Service worker not found"}
 
     # Catch-all para SPA - qualquer rota não-API serve o index.html
@@ -126,6 +134,9 @@ if STATIC_DIR.exists():
         # Se for rota de API, não interceptar
         if full_path.startswith("api/") or full_path == "health":
             return None
+
+        # Headers para index.html - não cachear para sempre ter versão mais recente
+        no_cache_headers = {"Cache-Control": "no-cache, no-store, must-revalidate"}
 
         # Proteção contra path traversal
         # Resolve o caminho e verifica se está dentro de STATIC_DIR
@@ -138,7 +149,7 @@ if STATIC_DIR.exists():
                 # Tentativa de path traversal detectada
                 index_path = STATIC_DIR / "index.html"
                 if index_path.exists():
-                    return FileResponse(index_path)
+                    return FileResponse(index_path, headers=no_cache_headers)
                 return {"error": "Not found"}
 
             # Verificar se é um arquivo estático existente
@@ -151,5 +162,5 @@ if STATIC_DIR.exists():
         # Caso contrário, servir index.html para SPA routing
         index_path = STATIC_DIR / "index.html"
         if index_path.exists():
-            return FileResponse(index_path)
+            return FileResponse(index_path, headers=no_cache_headers)
         return {"error": "Frontend not found"}
