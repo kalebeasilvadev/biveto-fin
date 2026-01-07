@@ -98,10 +98,12 @@ export default function AdminLicenses() {
       setPendingFormData(null)
     },
     onError: (err: unknown) => {
-      const error = err as { response?: { data?: { detail?: string; existing_user?: ExistingUserInfo } } }
+      const error = err as { response?: { data?: { detail?: { message?: string; existing_user?: ExistingUserInfo } | string } } }
       // Check if it's an existing user error with transfer option
-      if (error.response?.data?.existing_user) {
-        setExistingUserInfo(error.response.data.existing_user)
+      // Backend returns: { detail: { message: "...", existing_user: {...} } }
+      const detail = error.response?.data?.detail
+      if (typeof detail === 'object' && detail?.existing_user) {
+        setExistingUserInfo(detail.existing_user)
         setPendingFormData(form)
         setShowExistingUserModal(true)
         setShowModal(false)
