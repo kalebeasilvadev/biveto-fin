@@ -1,9 +1,11 @@
 from __future__ import annotations
 from fastapi import APIRouter, HTTPException, status
-from sqlalchemy import select, or_, and_
+from sqlalchemy import select, or_, and_, func, case
+from decimal import Decimal
 
 from ..core.deps import CurrentUser, DbSession
 from ..models.account import Account
+from ..models.transaction import Transaction, TransactionType
 from ..models.household import HouseholdMember
 from ..schemas.account import AccountCreate, AccountResponse, AccountUpdate
 
@@ -23,9 +25,31 @@ async def get_household_user_ids(db, user) -> list[int]:
     return list(result.scalars().all())
 
 
+async def calculate_account_balance(db, account_id: int) -> Decimal:
+    """
+    Calcula o saldo real da conta baseado nas transações.
+    Saldo = saldo_inicial + receitas - despesas
+    """
+    result = await db.execute(
+        select(
+            func.coalesce(
+                func.sum(
+                    case(
+                        (Transaction.type == TransactionType.INCOME.value, Transaction.amount),
+                        (Transaction.type == TransactionType.EXPENSE.value, -Transaction.amount),
+                        else_=0
+                    )
+                ),
+                0
+            )
+        ).where(Transaction.account_id == account_id)
+    )
+    return result.scalar() or Decimal(0)
+
+
 @router.get("", response_model=list[AccountResponse])
 async def list_accounts(current_user: CurrentUser, db: DbSession):
-    """Lista todas as contas do usuário (pessoais + household)"""
+    """Lista todas as contas do usuário (pessoais + household) com saldos atualizados"""
     household_user_ids = await get_household_user_ids(db, current_user)
 
     if household_user_ids:
@@ -50,7 +74,31 @@ async def list_accounts(current_user: CurrentUser, db: DbSession):
         result = await db.execute(
             select(Account).where(Account.user_id == current_user.id)
         )
-    return result.scalars().all()
+
+    accounts = result.scalars().all()
+
+    # Calcular saldo real de cada conta baseado nas transações
+    accounts_with_balance = []
+    for account in accounts:
+        transaction_balance = await calculate_account_balance(db, account.id)
+        # O saldo inicial da conta + movimentações das transações
+        computed_balance = float(account.balance) + float(transaction_balance)
+
+        # Criar resposta com saldo atualizado
+        account_dict = {
+            "id": account.id,
+            "name": account.name,
+            "type": account.type,
+            "balance": computed_balance,
+            "currency": account.currency,
+            "color": account.color,
+            "icon": account.icon,
+            "is_active": account.is_active,
+            "ownership_type": account.ownership_type,
+        }
+        accounts_with_balance.append(account_dict)
+
+    return accounts_with_balance
 
 
 @router.post("", response_model=AccountResponse, status_code=201)
@@ -82,7 +130,7 @@ async def get_account(
     current_user: CurrentUser,
     db: DbSession,
 ):
-    """Retorna uma conta específica"""
+    """Retorna uma conta específica com saldo atualizado"""
     result = await db.execute(
         select(Account).where(
             Account.id == account_id,
@@ -92,7 +140,22 @@ async def get_account(
     account = result.scalar_one_or_none()
     if not account:
         raise HTTPException(status_code=404, detail="Conta não encontrada")
-    return account
+
+    # Calcular saldo real baseado nas transações
+    transaction_balance = await calculate_account_balance(db, account.id)
+    computed_balance = float(account.balance) + float(transaction_balance)
+
+    return {
+        "id": account.id,
+        "name": account.name,
+        "type": account.type,
+        "balance": computed_balance,
+        "currency": account.currency,
+        "color": account.color,
+        "icon": account.icon,
+        "is_active": account.is_active,
+        "ownership_type": account.ownership_type,
+    }
 
 
 @router.patch("/{account_id}", response_model=AccountResponse)

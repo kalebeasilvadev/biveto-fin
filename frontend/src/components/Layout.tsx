@@ -24,6 +24,7 @@ import {
 import { useState, useEffect } from 'react'
 import { clsx } from 'clsx'
 import api from '../services/api'
+import FloatingAssistant from './FloatingAssistant'
 
 // Main navigation items
 const mainNavItems = [
@@ -313,6 +314,9 @@ export default function Layout() {
           <div className="h-24 lg:hidden" />
         </main>
       </div>
+
+      {/* Floating Assistant Button */}
+      <FloatingAssistant />
 
       {/* Mobile Bottom Navigation */}
       <nav className="bottom-nav">
