@@ -99,13 +99,11 @@ export default function AdminLicenses() {
     },
     onError: (err: unknown) => {
       const error = err as { response?: { data?: { detail?: { message?: string; existing_user?: ExistingUserInfo } | string } } }
-      // Check if it's an existing user error with transfer option
-      // Backend returns: { detail: { message: "...", existing_user: {...} } }
-      console.log('Create license error:', error.response?.data)
+      // Debug: show what we received
+      alert('Erro recebido: ' + JSON.stringify(error.response?.data))
       const detail = error.response?.data?.detail
-      console.log('Detail:', detail, 'Type:', typeof detail)
       if (typeof detail === 'object' && detail !== null && 'existing_user' in detail) {
-        console.log('Showing existing user modal')
+        alert('Mostrando modal de transferência!')
         setExistingUserInfo((detail as { existing_user: ExistingUserInfo }).existing_user)
         setPendingFormData(form)
         setShowExistingUserModal(true)
