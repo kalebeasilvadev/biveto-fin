@@ -1,11 +1,10 @@
-const CACHE_NAME = 'biveto-v11';
-const STATIC_CACHE = 'biveto-static-v11';
-const DYNAMIC_CACHE = 'biveto-dynamic-v11';
+const CACHE_VERSION = 'v12';
+const CACHE_NAME = `biveto-${CACHE_VERSION}`;
+const STATIC_CACHE = `biveto-static-${CACHE_VERSION}`;
+const DYNAMIC_CACHE = `biveto-dynamic-${CACHE_VERSION}`;
 
-// Assets to cache immediately
+// Assets to cache immediately (NOT index.html - always fetch fresh)
 const STATIC_ASSETS = [
-  '/',
-  '/index.html',
   '/manifest.json',
   '/logo.svg',
   '/favicon.svg',
@@ -39,7 +38,7 @@ self.addEventListener('activate', event => {
   );
 });
 
-// Fetch event - network first for API, cache first for assets
+// Fetch event - network first for API and HTML, cache first for assets
 self.addEventListener('fetch', event => {
   const { request } = event;
   const url = new URL(request.url);
@@ -55,7 +54,23 @@ self.addEventListener('fetch', event => {
     event.respondWith(
       fetch(request)
         .then(response => {
-          // Clone response for cache
+          const responseClone = response.clone();
+          caches.open(DYNAMIC_CACHE).then(cache => {
+            cache.put(request, responseClone);
+          });
+          return response;
+        })
+        .catch(() => caches.match(request))
+    );
+    return;
+  }
+
+  // HTML/Navigation requests - ALWAYS network first to get fresh content
+  if (request.mode === 'navigate' || request.destination === 'document' || url.pathname.endsWith('.html') || url.pathname === '/') {
+    event.respondWith(
+      fetch(request)
+        .then(response => {
+          // Cache the fresh response for offline use
           const responseClone = response.clone();
           caches.open(DYNAMIC_CACHE).then(cache => {
             cache.put(request, responseClone);
@@ -63,40 +78,43 @@ self.addEventListener('fetch', event => {
           return response;
         })
         .catch(() => {
-          return caches.match(request);
+          // Only use cache as fallback when offline
+          return caches.match(request) || caches.match('/');
         })
     );
     return;
   }
 
-  // Static assets - cache first
-  event.respondWith(
-    caches.match(request)
-      .then(cachedResponse => {
-        if (cachedResponse) {
-          return cachedResponse;
-        }
-
+  // JS/CSS with hash in filename - cache forever (immutable)
+  if (url.pathname.startsWith('/assets/') && /\.[a-f0-9]{8,}\./.test(url.pathname)) {
+    event.respondWith(
+      caches.match(request).then(cachedResponse => {
+        if (cachedResponse) return cachedResponse;
         return fetch(request).then(response => {
-          // Don't cache non-successful responses
-          if (!response || response.status !== 200) {
-            return response;
+          if (response.ok) {
+            const responseClone = response.clone();
+            caches.open(STATIC_CACHE).then(cache => cache.put(request, responseClone));
           }
-
-          const responseClone = response.clone();
-          caches.open(DYNAMIC_CACHE).then(cache => {
-            cache.put(request, responseClone);
-          });
-
           return response;
         });
       })
-      .catch(() => {
-        // Return offline page for navigation requests
-        if (request.mode === 'navigate') {
-          return caches.match('/');
-        }
+    );
+    return;
+  }
+
+  // Other static assets - cache first with network fallback
+  event.respondWith(
+    caches.match(request)
+      .then(cachedResponse => {
+        if (cachedResponse) return cachedResponse;
+        return fetch(request).then(response => {
+          if (!response || response.status !== 200) return response;
+          const responseClone = response.clone();
+          caches.open(DYNAMIC_CACHE).then(cache => cache.put(request, responseClone));
+          return response;
+        });
       })
+      .catch(() => null)
   );
 });
 

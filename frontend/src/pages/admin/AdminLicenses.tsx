@@ -448,7 +448,11 @@ export default function AdminLicenses() {
               <button
                 onClick={() => {
                   if (pendingFormData) {
-                    createMutation.mutate({ ...pendingFormData, force_transfer: true })
+                    createMutation.mutate({
+                      ...pendingFormData,
+                      end_date: pendingFormData.end_date || null,
+                      force_transfer: true
+                    })
                   }
                 }}
                 className="btn-primary flex items-center gap-2"
