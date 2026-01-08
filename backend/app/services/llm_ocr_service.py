@@ -27,38 +27,45 @@ Extraia os itens/transações e retorne um JSON válido com este formato:
 
 ==== REGRAS CRÍTICAS PARA FATURA DE CARTÃO DE CRÉDITO ====
 
-⚠️ ATENÇÃO: A fatura de cartão tem DUAS SEÇÕES DISTINTAS. Você DEVE identificar a seção correta:
+⚠️ ATENÇÃO: A fatura de cartão tem MÚLTIPLAS SEÇÕES. Extraia APENAS da seção correta:
 
 1️⃣ SEÇÃO DE RESUMO/CABEÇALHO (IGNORAR COMPLETAMENTE):
    - Fica no TOPO da fatura
    - Contém: "Valor do Documento", "Pagamento mínimo", "Opções de parcelamento"
    - Mostra simulações de parcelamento como "1 + 11 de R$ 142,71" - NÃO SÃO COMPRAS!
-   - Essas são OPÇÕES DE PAGAMENTO DA FATURA, não transações reais
 
-2️⃣ SEÇÃO DE TRANSAÇÕES/DESPESAS (EXTRAIR DAQUI):
-   - Geralmente chamada "Despesas da fatura", "Lançamentos", "Transações"
-   - Tem formato de TABELA/LISTA com colunas: DATA | DESCRIÇÃO | VALOR
-   - Cada linha é uma compra real com:
-     * Data específica (ex: "02 dez", "15 jan")
-     * Nome do estabelecimento (ex: "APPLE.COM/BILL", "UBER *TRIP", "MERCADO LIVRE")
-     * Valor da transação
+2️⃣ SEÇÃO "DESPESAS DA FATURA" ou "FATURA ATUAL" (✅ EXTRAIR DAQUI):
+   - É a seção PRINCIPAL com as transações do mês atual
+   - Tem formato de TABELA/LISTA com: DATA | DESCRIÇÃO | VALOR
+   - Extraia TODAS as transações desta seção
 
-❌ NUNCA EXTRAIA (são informações de resumo, não transações):
-- "Parcelamento Fatura" ou "Parcelamento Total" - opção de parcelar a fatura
-- "1 + X de R$ XXX" - simulação de parcelamento da fatura
-- "Pagamento mínimo" - valor mínimo para não ficar inadimplente
-- "Valor do Documento" / "Total da fatura" - soma total
-- "Fatura atual" / "Despesas do mês" (quando é valor único/total)
+3️⃣ SEÇÃO "PRÓXIMA FATURA" ou "PRÓXIMAS PARCELAS" (🚫 IGNORAR COMPLETAMENTE):
+   - Mostra parcelas que serão cobradas NO PRÓXIMO MÊS
+   - Mesmo que tenha data, descrição e valor - NÃO EXTRAIA!
+   - Geralmente aparece após a fatura atual, com título "Próxima fatura"
+   - As parcelas aqui são FUTURAS, não devem ser contabilizadas agora
+
+🚫 COMO IDENTIFICAR A SEÇÃO "PRÓXIMA FATURA" (IGNORAR):
+   - Título contém: "Próxima fatura", "Próximas parcelas", "Lançamentos futuros"
+   - Aparece DEPOIS da seção de despesas da fatura atual
+   - Mostra o número da parcela seguinte (ex: se na fatura atual é 5/12, aqui será 6/12)
+   - Data geralmente é do próximo mês
+
+❌ NUNCA EXTRAIA:
+- TODA a seção "Próxima fatura" / "Próximas parcelas" - são FUTURAS!
+- "Parcelamento Fatura" / "Parcelamento Total" - opção de parcelar a fatura
+- "1 + X de R$ XXX" - simulação de parcelamento
+- "Pagamento mínimo" - informativo
+- "Valor do Documento" / "Total da fatura" - totais
 - Limite disponível, limite total
-- Encargos, IOF, juros (exceto se listados como transação com data)
-- Seção "Próxima fatura" - são parcelas futuras
+- Encargos, IOF, juros (exceto se na seção de despesas com data)
 
-✅ EXTRAIA APENAS linhas que tenham TODOS estes elementos:
-- Uma DATA (ex: "02 dez", "23/12", "15 de janeiro")
-- Um ESTABELECIMENTO/DESCRIÇÃO (ex: "APPLE.COM/BILL", "STEAM", "SEGURO CARTAO")
-- Um VALOR específico daquela transação
+✅ EXTRAIA APENAS da seção "Despesas da fatura" / "Fatura atual":
+- Transações com DATA específica
+- Nome do ESTABELECIMENTO
+- VALOR individual da transação
 
-Para cada transação extraída:
+Para cada transação:
 - Despesas/compras: valor POSITIVO
 - Pagamentos/créditos/estornos: valor NEGATIVO
 
