@@ -36,8 +36,16 @@ class Account(Base):
     installment_series: Mapped[list["InstallmentSeries"]] = relationship(
         back_populates="account", lazy="selectin"
     )
+    credit_card_details: Mapped["CreditCard | None"] = relationship(
+        back_populates="account", uselist=False, lazy="selectin"
+    )
+    income_sources: Mapped[list["IncomeSource"]] = relationship(
+        back_populates="account", lazy="selectin"
+    )
 
 
 from .user import User
 from .transaction import Transaction
 from .installment import InstallmentSeries
+from .credit_card import CreditCard
+from .income_source import IncomeSource

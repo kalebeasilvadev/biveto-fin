@@ -29,6 +29,16 @@ class Transaction(Base):
     merchant_id: Mapped[int | None] = mapped_column(ForeignKey("merchants.id"))
     document_id: Mapped[int | None] = mapped_column(ForeignKey("documents.id"))
 
+    # Credit card link (for expenses on credit card)
+    credit_card_id: Mapped[int | None] = mapped_column(
+        ForeignKey("credit_cards.id", ondelete="SET NULL"), index=True
+    )
+
+    # Income source link (for income transactions)
+    income_source_id: Mapped[int | None] = mapped_column(
+        ForeignKey("income_sources.id", ondelete="SET NULL"), index=True
+    )
+
     type: Mapped[str] = mapped_column(String(10))  # TransactionType
     amount: Mapped[float] = mapped_column(Numeric(12, 2))
     currency: Mapped[str] = mapped_column(String(3), default="BRL")
@@ -78,6 +88,10 @@ class Transaction(Base):
     )
     audit_logs: Mapped[list["TransactionAudit"]] = relationship(
         back_populates="transaction", lazy="selectin"
+    )
+    credit_card: Mapped["CreditCard | None"] = relationship(lazy="selectin")
+    income_source: Mapped["IncomeSource | None"] = relationship(
+        back_populates="transactions", lazy="selectin"
     )
 
     # Computed properties for API responses

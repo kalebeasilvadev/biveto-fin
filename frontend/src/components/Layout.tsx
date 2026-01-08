@@ -20,6 +20,8 @@ import {
   ChevronRight,
   Moon,
   Sun,
+  Briefcase,
+  BadgeDollarSign,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { clsx } from 'clsx'
@@ -32,9 +34,11 @@ const mainNavItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/transactions', icon: Receipt, label: 'Transações' },
   { to: '/accounts', icon: Building, label: 'Contas' },
+  { to: '/credit-cards', icon: CreditCard, label: 'Cartões' },
+  { to: '/income-sources', icon: Briefcase, label: 'Receitas' },
   { to: '/budget', icon: Wallet, label: 'Orçamento' },
   { to: '/goals', icon: Target, label: 'Metas' },
-  { to: '/debts', icon: CreditCard, label: 'Dívidas' },
+  { to: '/debts', icon: BadgeDollarSign, label: 'Dívidas' },
   { to: '/recurring', icon: Repeat, label: 'Recorrentes' },
   { to: '/upload', icon: Upload, label: 'Adicionar' },
   { to: '/insights', icon: Lightbulb, label: 'Insights' },

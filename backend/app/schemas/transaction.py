@@ -20,6 +20,8 @@ class TransactionCreate(TransactionBase):
     category_id: int | None = None
     merchant_name: str | None = None
     ownership_type: OwnershipType = OwnershipType.PERSONAL
+    credit_card_id: int | None = None  # For credit card expenses
+    income_source_id: int | None = None  # For income transactions
 
 
 class TransactionConfirm(BaseModel):
@@ -34,6 +36,8 @@ class TransactionConfirm(BaseModel):
     tags: list[str] | None = None
     is_fixed: bool = False
     ownership_type: OwnershipType = OwnershipType.PERSONAL
+    credit_card_id: int | None = None  # For credit card expenses
+    income_source_id: int | None = None  # For income transactions
 
     # Campos de parcelamento
     is_installment: bool = False
@@ -60,6 +64,8 @@ class TransactionResponse(TransactionBase):
     category_id: int | None
     merchant_id: int | None
     document_id: int | None
+    credit_card_id: int | None = None
+    income_source_id: int | None = None
     is_recurring: bool
     is_paid: bool = True
     installment_series_id: int | None = None
@@ -73,6 +79,8 @@ class TransactionResponse(TransactionBase):
     category_name: str | None = None
     account_name: str | None = None
     merchant_name: str | None = None
+    credit_card_name: str | None = None
+    income_source_name: str | None = None
 
     # Indicador de parcelamento
     @property

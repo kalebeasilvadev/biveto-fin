@@ -13,6 +13,8 @@ from .goal import Goal, GoalContribution, GoalType, GoalStatus
 from .debt import Debt, DebtPayment, DebtType, DebtStatus, PayoffStrategy
 from .invitation import Invitation, InvitationStatus
 from .recurring import RecurringTransaction, RecurrenceFrequency, RecurringStatus
+from .credit_card import CreditCard, PointsProgram
+from .income_source import IncomeSource, IncomeType, IncomeFrequency
 
 __all__ = [
     "License",
@@ -49,4 +51,9 @@ __all__ = [
     "RecurringTransaction",
     "RecurrenceFrequency",
     "RecurringStatus",
+    "CreditCard",
+    "PointsProgram",
+    "IncomeSource",
+    "IncomeType",
+    "IncomeFrequency",
 ]

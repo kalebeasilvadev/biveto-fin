@@ -252,3 +252,19 @@ export const familyApi = {
   cancelInvitation: (id: number) => api.delete(`/family/invitations/${id}`),
   resendInvitation: (id: number) => api.post(`/family/invitations/${id}/resend`),
 }
+
+export const creditCardsApi = {
+  list: () => api.get('/credit-cards'),
+  get: (id: number) => api.get(`/credit-cards/${id}`),
+  create: (data: unknown) => api.post('/credit-cards', data),
+  update: (id: number, data: unknown) => api.patch(`/credit-cards/${id}`, data),
+  delete: (id: number) => api.delete(`/credit-cards/${id}`),
+}
+
+export const incomeSourcesApi = {
+  list: () => api.get('/income-sources'),
+  get: (id: number) => api.get(`/income-sources/${id}`),
+  create: (data: unknown) => api.post('/income-sources', data),
+  update: (id: number, data: unknown) => api.patch(`/income-sources/${id}`, data),
+  delete: (id: number) => api.delete(`/income-sources/${id}`),
+}

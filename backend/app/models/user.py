@@ -66,6 +66,12 @@ class User(Base):
         uselist=False,
         lazy="selectin"
     )
+    credit_cards: Mapped[list["CreditCard"]] = relationship(
+        back_populates="user", lazy="selectin", cascade="all, delete-orphan"
+    )
+    income_sources: Mapped[list["IncomeSource"]] = relationship(
+        back_populates="user", lazy="selectin", cascade="all, delete-orphan"
+    )
 
     @property
     def household_role(self) -> str | None:
@@ -99,3 +105,5 @@ from .license import License
 from .invitation import Invitation
 from .recurring import RecurringTransaction
 from .household import HouseholdMember
+from .credit_card import CreditCard
+from .income_source import IncomeSource
