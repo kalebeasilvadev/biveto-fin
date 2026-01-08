@@ -65,6 +65,15 @@ const statusLabels: Record<string, string> = {
   cancelled: 'Cancelado',
 }
 
+// Helper to get local date in YYYY-MM-DD format (avoid timezone issues)
+const getLocalDateString = () => {
+  const today = new Date()
+  const year = today.getFullYear()
+  const month = String(today.getMonth() + 1).padStart(2, '0')
+  const day = String(today.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 export default function Recurring() {
   const queryClient = useQueryClient()
   const [showForm, setShowForm] = useState(false)
@@ -79,7 +88,7 @@ export default function Recurring() {
     frequency: 'monthly',
     day_of_month: '1',
     day_of_week: '',
-    start_date: new Date().toISOString().split('T')[0],
+    start_date: getLocalDateString(),
     end_date: '',
   })
 
@@ -180,7 +189,7 @@ export default function Recurring() {
       frequency: 'monthly',
       day_of_month: '1',
       day_of_week: '',
-      start_date: new Date().toISOString().split('T')[0],
+      start_date: getLocalDateString(),
       end_date: '',
     })
   }
@@ -249,25 +258,25 @@ export default function Recurring() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Despesas Recorrentes</h1>
           <p className="text-gray-500 dark:text-gray-400 mt-1">
             Gerencie seus gastos fixos como aluguel, assinaturas e contas
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
           <button
             onClick={() => generateMutation.mutate()}
             disabled={generateMutation.isPending}
-            className="btn-secondary flex items-center gap-2"
+            className="btn-secondary flex items-center justify-center gap-2 w-full sm:w-auto"
           >
             <Calendar className="w-4 h-4" />
             Gerar Pendentes
           </button>
           <button
             onClick={() => setShowForm(true)}
-            className="btn-primary flex items-center gap-2"
+            className="btn-primary flex items-center justify-center gap-2 w-full sm:w-auto"
           >
             <Plus className="w-4 h-4" />
             Nova Recorrência
@@ -331,14 +340,14 @@ export default function Recurring() {
 
       {/* Form Modal */}
       {showForm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <h2 className="text-xl font-semibold mb-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-slate-800 rounded-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <h2 className="text-xl font-semibold mb-4 dark:text-white">
               {editingId ? 'Editar Recorrência' : 'Nova Recorrência'}
             </h2>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Nome *
                 </label>
                 <input
@@ -353,7 +362,7 @@ export default function Recurring() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Valor *
                   </label>
                   <input
@@ -368,7 +377,7 @@ export default function Recurring() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Tipo *
                   </label>
                   <select
@@ -384,7 +393,7 @@ export default function Recurring() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Conta *
                   </label>
                   <select
@@ -402,7 +411,7 @@ export default function Recurring() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Categoria
                   </label>
                   <select
@@ -422,7 +431,7 @@ export default function Recurring() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Frequência *
                   </label>
                   <select
@@ -438,7 +447,7 @@ export default function Recurring() {
                 </div>
                 {formData.frequency === 'monthly' && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       Dia do Mês
                     </label>
                     <input
@@ -453,7 +462,7 @@ export default function Recurring() {
                 )}
                 {formData.frequency === 'weekly' && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       Dia da Semana
                     </label>
                     <select
@@ -473,7 +482,7 @@ export default function Recurring() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Data Início *
                   </label>
                   <input
@@ -485,7 +494,7 @@ export default function Recurring() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Data Fim (opcional)
                   </label>
                   <input
@@ -498,7 +507,7 @@ export default function Recurring() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Descrição
                 </label>
                 <textarea

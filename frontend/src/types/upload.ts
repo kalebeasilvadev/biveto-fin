@@ -48,9 +48,18 @@ export const CATEGORY_MAP: Record<string, string> = {
   'outros': 'Outros',
 }
 
+// Helper to get local date in YYYY-MM-DD format
+const getLocalDateString = () => {
+  const today = new Date()
+  const year = today.getFullYear()
+  const month = String(today.getMonth() + 1).padStart(2, '0')
+  const day = String(today.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 export const initialFormData: TransactionFormData = {
   amount: '',
-  date: new Date().toISOString().split('T')[0],
+  date: getLocalDateString(),
   account_id: '',
   category_id: '',
   merchant_name: '',

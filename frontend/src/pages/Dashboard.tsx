@@ -57,8 +57,8 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-500">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
+        <p className="text-gray-500 dark:text-gray-400">
           {format(now, "MMMM 'de' yyyy", { locale: ptBR })}
         </p>
       </div>
@@ -68,12 +68,12 @@ export default function Dashboard() {
         <div className="card">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-500">Receitas</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Receitas</p>
               <p className="text-2xl font-bold text-income">
                 {formatCurrency(summary?.total_income || 0)}
               </p>
             </div>
-            <div className="p-3 bg-green-100 rounded-full">
+            <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-full">
               <TrendingUp className="text-income" size={24} />
             </div>
           </div>
@@ -82,12 +82,12 @@ export default function Dashboard() {
         <div className="card">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-500">Despesas</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Despesas</p>
               <p className="text-2xl font-bold text-expense">
                 {formatCurrency(summary?.total_expense || 0)}
               </p>
             </div>
-            <div className="p-3 bg-red-100 rounded-full">
+            <div className="p-3 bg-red-100 dark:bg-red-900/30 rounded-full">
               <TrendingDown className="text-expense" size={24} />
             </div>
           </div>
@@ -115,7 +115,7 @@ export default function Dashboard() {
         <div className="card">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-500">Saldo do mês</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Saldo do mês</p>
               <p
                 className={`text-2xl font-bold ${
                   (summary?.balance || 0) >= 0 ? 'text-income' : 'text-expense'
@@ -124,7 +124,7 @@ export default function Dashboard() {
                 {formatCurrency(summary?.balance || 0)}
               </p>
             </div>
-            <div className="p-3 bg-blue-100 rounded-full">
+            <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-full">
               <Wallet className="text-blue-600" size={24} />
             </div>
           </div>
@@ -134,7 +134,7 @@ export default function Dashboard() {
       {/* Gastos por categoria */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="card">
-          <h2 className="text-lg font-semibold mb-4">Gastos por Categoria</h2>
+          <h2 className="text-lg font-semibold mb-4 dark:text-white">Gastos por Categoria</h2>
           {summary?.categories && summary.categories.length > 0 ? (
             <div className="flex items-center gap-6">
               <div className="w-48 h-48">
@@ -169,10 +169,10 @@ export default function Dashboard() {
                       className="w-3 h-3 rounded-full"
                       style={{ backgroundColor: COLORS[index % COLORS.length] }}
                     />
-                    <span className="text-sm flex-1 truncate">
+                    <span className="text-sm flex-1 truncate dark:text-gray-300">
                       {cat.category_name}
                     </span>
-                    <span className="text-sm font-medium">
+                    <span className="text-sm font-medium dark:text-gray-300">
                       {cat.percentage.toFixed(0)}%
                     </span>
                   </div>
@@ -180,14 +180,14 @@ export default function Dashboard() {
               </div>
             </div>
           ) : (
-            <p className="text-gray-500 text-center py-8">
+            <p className="text-gray-500 dark:text-gray-400 text-center py-8">
               Nenhuma transação registrada
             </p>
           )}
         </div>
 
         <div className="card">
-          <h2 className="text-lg font-semibold mb-4">Maiores Gastos</h2>
+          <h2 className="text-lg font-semibold mb-4 dark:text-white">Maiores Gastos</h2>
           {summary?.categories && summary.categories.length > 0 ? (
             <div className="space-y-3">
               {summary.categories.slice(0, 5).map((cat: { category_id: number; category_name: string; total: number; count: number; percentage: number }, index: number) => (
@@ -201,8 +201,8 @@ export default function Dashboard() {
                       style={{ backgroundColor: COLORS[index % COLORS.length] }}
                     />
                     <div>
-                      <p className="font-medium">{cat.category_name}</p>
-                      <p className="text-sm text-gray-500">
+                      <p className="font-medium dark:text-white">{cat.category_name}</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
                         {cat.count} transações
                       </p>
                     </div>
@@ -211,7 +211,7 @@ export default function Dashboard() {
                     <span className="font-semibold text-expense">
                       {formatCurrency(cat.total)}
                     </span>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
                       {cat.percentage.toFixed(0)}%
                     </p>
                   </div>
@@ -219,7 +219,7 @@ export default function Dashboard() {
               ))}
             </div>
           ) : (
-            <p className="text-gray-500 text-center py-8">
+            <p className="text-gray-500 dark:text-gray-400 text-center py-8">
               Nenhuma despesa registrada
             </p>
           )}

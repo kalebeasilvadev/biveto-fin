@@ -105,7 +105,7 @@ export default function Layout() {
         {/* Desktop Sidebar */}
         <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:fixed lg:inset-y-0 bg-white border-r border-gray-100 dark:bg-slate-800 dark:border-slate-700">
           {/* Logo */}
-          <div className="flex items-center h-16 px-6 border-b border-gray-100">
+          <div className="flex items-center h-16 px-6 border-b border-gray-100 dark:border-slate-700">
             <img src="/logo.svg" alt="Biveto" className="h-9" />
           </div>
 
@@ -119,8 +119,8 @@ export default function Layout() {
                   clsx(
                     'flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium transition-all duration-200',
                     isActive
-                      ? 'bg-biveto-light text-biveto shadow-sm'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                      ? 'bg-biveto-light text-biveto shadow-sm dark:bg-biveto/20 dark:text-biveto'
+                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-slate-700 dark:hover:text-white'
                   )
                 }
               >
@@ -132,15 +132,15 @@ export default function Layout() {
             {/* Admin Menu */}
             {user?.is_admin && (
               <>
-                <div className="border-t border-gray-100 my-3" />
+                <div className="border-t border-gray-100 dark:border-slate-700 my-3" />
                 <NavLink
                   to="/admin"
                   className={({ isActive }) =>
                     clsx(
                       'flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium transition-all duration-200',
                       isActive
-                        ? 'bg-blue-50 text-blue-700 shadow-sm'
-                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                        ? 'bg-blue-50 text-blue-700 shadow-sm dark:bg-blue-900/30 dark:text-blue-400'
+                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-slate-700 dark:hover:text-white'
                     )
                   }
                 >
@@ -152,16 +152,16 @@ export default function Layout() {
           </nav>
 
           {/* User section */}
-          <div className="p-4 border-t border-gray-100">
-            <div className="flex items-center gap-3 p-2 rounded-xl hover:bg-gray-50 transition-colors">
+          <div className="p-4 border-t border-gray-100 dark:border-slate-700">
+            <div className="flex items-center gap-3 p-2 rounded-xl hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">
               <div className="avatar avatar-sm">
                 {user?.name?.charAt(0).toUpperCase() || 'U'}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 truncate">
+                <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
                   {user?.name || 'Usuário'}
                 </p>
-                <p className="text-xs text-gray-500 truncate">
+                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
                   {user?.email || ''}
                 </p>
               </div>
@@ -201,12 +201,12 @@ export default function Layout() {
         {/* Mobile Sidebar */}
         <aside
           className={clsx(
-            'fixed inset-y-0 left-0 z-50 w-72 bg-white shadow-xl transform transition-transform duration-300 ease-out lg:hidden flex flex-col',
+            'fixed inset-y-0 left-0 z-50 w-72 bg-white dark:bg-slate-800 shadow-xl transform transition-transform duration-300 ease-out lg:hidden flex flex-col',
             mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
           )}
         >
           {/* Header */}
-          <div className="flex items-center justify-between h-14 px-4 border-b border-gray-100">
+          <div className="flex items-center justify-between h-14 px-4 border-b border-gray-100 dark:border-slate-700">
             <img src="/logo.svg" alt="Biveto" className="h-8" />
             <button
               onClick={() => setMobileMenuOpen(false)}
@@ -217,16 +217,16 @@ export default function Layout() {
           </div>
 
           {/* User info */}
-          <div className="p-4 border-b border-gray-100">
+          <div className="p-4 border-b border-gray-100 dark:border-slate-700">
             <div className="flex items-center gap-3">
               <div className="avatar">
                 {user?.name?.charAt(0).toUpperCase() || 'U'}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-medium text-gray-900 truncate">
+                <p className="font-medium text-gray-900 dark:text-white truncate">
                   {user?.name || 'Usuário'}
                 </p>
-                <p className="text-sm text-gray-500 truncate">
+                <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
                   {user?.email || ''}
                 </p>
               </div>
@@ -243,8 +243,8 @@ export default function Layout() {
                   clsx(
                     'flex items-center justify-between px-4 py-3 rounded-xl font-medium transition-all duration-200',
                     isActive
-                      ? 'bg-biveto-light text-biveto'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                      ? 'bg-biveto-light text-biveto dark:bg-biveto/20'
+                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-slate-700 dark:hover:text-white'
                   )
                 }
               >
@@ -252,22 +252,22 @@ export default function Layout() {
                   <item.icon size={20} />
                   <span>{item.label}</span>
                 </div>
-                <ChevronRight size={16} className="text-gray-400" />
+                <ChevronRight size={16} className="text-gray-400 dark:text-gray-500" />
               </NavLink>
             ))}
 
             {/* Admin Menu */}
             {user?.is_admin && (
               <>
-                <div className="border-t border-gray-100 my-3" />
+                <div className="border-t border-gray-100 dark:border-slate-700 my-3" />
                 <NavLink
                   to="/admin"
                   className={({ isActive }) =>
                     clsx(
                       'flex items-center justify-between px-4 py-3 rounded-xl font-medium transition-all duration-200',
                       isActive
-                        ? 'bg-blue-50 text-blue-700'
-                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                        ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-slate-700 dark:hover:text-white'
                     )
                   }
                 >
@@ -275,24 +275,24 @@ export default function Layout() {
                     <Settings size={20} />
                     <span>Admin</span>
                   </div>
-                  <ChevronRight size={16} className="text-gray-400" />
+                  <ChevronRight size={16} className="text-gray-400 dark:text-gray-500" />
                 </NavLink>
               </>
             )}
           </nav>
 
           {/* Settings & Logout - with extra padding for bottom nav + safe area */}
-          <div className="p-4 border-t border-gray-100 space-y-2 pb-safe" style={{ paddingBottom: 'max(1rem, calc(env(safe-area-inset-bottom) + 5rem))' }}>
+          <div className="p-4 border-t border-gray-100 dark:border-slate-700 space-y-2 pb-safe" style={{ paddingBottom: 'max(1rem, calc(env(safe-area-inset-bottom) + 5rem))' }}>
             <NavLink
               to="/settings"
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-xl font-medium transition-colors"
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 text-gray-700 bg-gray-50 hover:bg-gray-100 dark:text-gray-300 dark:bg-slate-700 dark:hover:bg-slate-600 rounded-xl font-medium transition-colors"
             >
               <Settings size={20} />
               <span>Configurações</span>
             </NavLink>
             <button
               onClick={handleLogout}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 text-red-600 bg-red-50 hover:bg-red-100 rounded-xl font-medium transition-colors"
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 text-red-600 bg-red-50 hover:bg-red-100 dark:bg-red-900/30 dark:hover:bg-red-900/50 rounded-xl font-medium transition-colors"
             >
               <LogOut size={20} />
               <span>Sair da conta</span>

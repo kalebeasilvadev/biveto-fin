@@ -414,8 +414,8 @@ export default function Upload() {
           />
         )}
 
-        {/* Account selector - always shown for batch operations */}
-        {(!isManual && document?.extracted_items && document.extracted_items.length > 0) && (
+        {/* Account selector - shown for batch operations only when NOT editing an item */}
+        {(!isManual && document?.extracted_items && document.extracted_items.length > 0 && editingItemIndex === null) && (
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Conta *</label>
             <select
