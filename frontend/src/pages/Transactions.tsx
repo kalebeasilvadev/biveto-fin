@@ -269,13 +269,67 @@ export default function Transactions() {
               {isExporting ? 'Exportando...' : 'Exportar'}
             </span>
           </button>
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className="btn-secondary flex items-center gap-2"
-          >
-            <Filter size={18} />
-            <span className="hidden sm:inline">Filtros</span>
-          </button>
+          <div className="relative">
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={clsx(
+                'btn-secondary flex items-center gap-2',
+                categoryFilter && 'ring-2 ring-biveto ring-offset-1'
+              )}
+            >
+              <Filter size={18} />
+              <span className="hidden sm:inline">Filtros</span>
+              {categoryFilter && (
+                <span className="w-2 h-2 bg-biveto rounded-full" />
+              )}
+            </button>
+            {/* Filter Popover */}
+            {showFilters && (
+              <>
+                {/* Backdrop to close on outside click */}
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setShowFilters(false)}
+                />
+                <div className="absolute right-0 top-full mt-2 z-50 w-72 bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-gray-200 dark:border-slate-700 p-4 animate-in fade-in slide-in-from-top-2 duration-200">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="font-medium dark:text-white">Filtros</h3>
+                    {categoryFilter && (
+                      <button
+                        onClick={() => {
+                          setCategoryFilter('')
+                          setShowFilters(false)
+                        }}
+                        className="text-xs text-biveto hover:underline"
+                      >
+                        Limpar
+                      </button>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Categoria
+                    </label>
+                    <select
+                      value={categoryFilter}
+                      onChange={(e) => {
+                        handleFilterChange(e.target.value)
+                        setShowFilters(false)
+                      }}
+                      className="input"
+                    >
+                      <option value="">Todas as categorias</option>
+                      {categories.map((cat) => (
+                        <option key={cat.id} value={cat.id}>
+                          {cat.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
           <Link to="/upload" className="btn-primary flex items-center gap-2">
             <Plus size={18} />
             <span className="hidden sm:inline">Adicionar</span>
@@ -305,30 +359,6 @@ export default function Transactions() {
           </button>
         )}
       </div>
-
-      {showFilters && (
-        <div className="card">
-          <div className="flex gap-4">
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Categoria
-              </label>
-              <select
-                value={categoryFilter}
-                onChange={(e) => handleFilterChange(e.target.value)}
-                className="input"
-              >
-                <option value="">Todas</option>
-                {categories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </div>
-      )}
 
       {isLoading ? (
         <div className="flex items-center justify-center h-64">
