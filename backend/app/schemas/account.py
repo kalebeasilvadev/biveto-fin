@@ -19,6 +19,7 @@ class AccountCreate(AccountBase):
 
 class AccountUpdate(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=100)
+    balance: float | None = None
     color: str | None = None
     icon: str | None = None
     is_active: bool | None = None
