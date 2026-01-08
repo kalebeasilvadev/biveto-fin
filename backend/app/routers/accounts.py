@@ -132,12 +132,31 @@ async def get_account(
     db: DbSession,
 ):
     """Retorna uma conta específica com saldo atualizado"""
-    result = await db.execute(
-        select(Account).where(
-            Account.id == account_id,
-            Account.user_id == current_user.id,
+    household_user_ids = await get_household_user_ids(db, current_user)
+
+    if household_user_ids:
+        result = await db.execute(
+            select(Account).where(
+                Account.id == account_id,
+                or_(
+                    and_(
+                        Account.user_id == current_user.id,
+                        Account.ownership_type == "personal"
+                    ),
+                    and_(
+                        Account.user_id.in_(household_user_ids),
+                        Account.ownership_type == "household"
+                    )
+                )
+            )
         )
-    )
+    else:
+        result = await db.execute(
+            select(Account).where(
+                Account.id == account_id,
+                Account.user_id == current_user.id,
+            )
+        )
     account = result.scalar_one_or_none()
     if not account:
         raise HTTPException(status_code=404, detail="Conta não encontrada")
@@ -168,12 +187,31 @@ async def update_account(
     db: DbSession,
 ):
     """Atualiza uma conta"""
-    result = await db.execute(
-        select(Account).where(
-            Account.id == account_id,
-            Account.user_id == current_user.id,
+    household_user_ids = await get_household_user_ids(db, current_user)
+
+    if household_user_ids:
+        result = await db.execute(
+            select(Account).where(
+                Account.id == account_id,
+                or_(
+                    and_(
+                        Account.user_id == current_user.id,
+                        Account.ownership_type == "personal"
+                    ),
+                    and_(
+                        Account.user_id.in_(household_user_ids),
+                        Account.ownership_type == "household"
+                    )
+                )
+            )
         )
-    )
+    else:
+        result = await db.execute(
+            select(Account).where(
+                Account.id == account_id,
+                Account.user_id == current_user.id,
+            )
+        )
     account = result.scalar_one_or_none()
     if not account:
         raise HTTPException(status_code=404, detail="Conta não encontrada")
@@ -193,12 +231,31 @@ async def delete_account(
     db: DbSession,
 ):
     """Remove uma conta"""
-    result = await db.execute(
-        select(Account).where(
-            Account.id == account_id,
-            Account.user_id == current_user.id,
+    household_user_ids = await get_household_user_ids(db, current_user)
+
+    if household_user_ids:
+        result = await db.execute(
+            select(Account).where(
+                Account.id == account_id,
+                or_(
+                    and_(
+                        Account.user_id == current_user.id,
+                        Account.ownership_type == "personal"
+                    ),
+                    and_(
+                        Account.user_id.in_(household_user_ids),
+                        Account.ownership_type == "household"
+                    )
+                )
+            )
         )
-    )
+    else:
+        result = await db.execute(
+            select(Account).where(
+                Account.id == account_id,
+                Account.user_id == current_user.id,
+            )
+        )
     account = result.scalar_one_or_none()
     if not account:
         raise HTTPException(status_code=404, detail="Conta não encontrada")

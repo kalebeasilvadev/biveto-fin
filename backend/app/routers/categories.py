@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from sqlalchemy import select, or_
+from sqlalchemy import select
 
 from ..core.deps import CurrentUser, DbSession
 from ..models.category import Category
@@ -10,14 +10,11 @@ router = APIRouter()
 
 @router.get("", response_model=list[CategoryResponse])
 async def list_categories(current_user: CurrentUser, db: DbSession):
-    """Lista todas as categorias (do sistema + do usuário)"""
+    """Lista todas as categorias do usuário (padrão + personalizadas)"""
+    # Retorna apenas categorias do usuário (tanto is_system=True quanto False)
+    # Cada usuário tem suas próprias categorias criadas no setup inicial
     result = await db.execute(
-        select(Category).where(
-            or_(
-                Category.is_system == True,
-                Category.user_id == current_user.id,
-            )
-        )
+        select(Category).where(Category.user_id == current_user.id)
     )
     return result.scalars().all()
 

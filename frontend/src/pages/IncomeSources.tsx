@@ -27,6 +27,8 @@ interface IncomeSource {
   is_variable: boolean
   frequency: string
   payment_day: number | null
+  use_business_day: boolean
+  business_day_number: number | null
   benefit_provider: string | null
   account_name: string | null
   is_active: boolean
@@ -93,6 +95,8 @@ export default function IncomeSources() {
     is_variable: false,
     frequency: 'monthly',
     payment_day: '',
+    use_business_day: false,
+    business_day_number: '',
     account_id: '',
     benefit_provider: '',
     ownership_type: 'personal' as 'personal' | 'household',
@@ -145,6 +149,8 @@ export default function IncomeSources() {
       is_variable: false,
       frequency: 'monthly',
       payment_day: '',
+      use_business_day: false,
+      business_day_number: '',
       account_id: '',
       benefit_provider: '',
       ownership_type: 'personal',
@@ -162,6 +168,8 @@ export default function IncomeSources() {
       is_variable: source.is_variable,
       frequency: source.frequency,
       payment_day: source.payment_day?.toString() || '',
+      use_business_day: source.use_business_day || false,
+      business_day_number: source.business_day_number?.toString() || '',
       account_id: '',
       benefit_provider: source.benefit_provider || '',
       ownership_type: 'personal',
@@ -182,7 +190,11 @@ export default function IncomeSources() {
       expected_amount: formData.expected_amount ? parseFloat(formData.expected_amount) : null,
       is_variable: formData.is_variable,
       frequency: formData.frequency,
-      payment_day: formData.payment_day ? parseInt(formData.payment_day) : null,
+      payment_day: formData.use_business_day ? null : (formData.payment_day ? parseInt(formData.payment_day) : null),
+      use_business_day: formData.use_business_day,
+      business_day_number: formData.use_business_day && formData.business_day_number
+        ? parseInt(formData.business_day_number)
+        : null,
       account_id: formData.account_id ? parseInt(formData.account_id) : null,
       benefit_provider: formData.benefit_provider || null,
       ownership_type: formData.ownership_type,
@@ -303,11 +315,15 @@ export default function IncomeSources() {
                     <span className="bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2 py-1 rounded">
                       {frequencies.find(f => f.value === source.frequency)?.label}
                     </span>
-                    {source.payment_day && (
+                    {source.use_business_day && source.business_day_number ? (
+                      <span className="bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 px-2 py-1 rounded">
+                        {source.business_day_number}º dia útil
+                      </span>
+                    ) : source.payment_day ? (
                       <span className="bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 px-2 py-1 rounded">
                         Dia {source.payment_day}
                       </span>
-                    )}
+                    ) : null}
                     {source.benefit_provider && (
                       <span className="bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 px-2 py-1 rounded">
                         {source.benefit_provider}
@@ -410,35 +426,96 @@ export default function IncomeSources() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Frequência
-                  </label>
-                  <select
-                    value={formData.frequency}
-                    onChange={(e) => setFormData({ ...formData, frequency: e.target.value })}
-                    className="input"
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Frequência
+                </label>
+                <select
+                  value={formData.frequency}
+                  onChange={(e) => setFormData({ ...formData, frequency: e.target.value })}
+                  className="input"
+                >
+                  {frequencies.map((freq) => (
+                    <option key={freq.value} value={freq.value}>{freq.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Data do Pagamento
+                </label>
+                <div className="grid grid-cols-2 gap-2 mb-3">
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, use_business_day: false, business_day_number: '' })}
+                    className={clsx(
+                      'flex items-center justify-center gap-2 p-3 rounded-lg border-2 transition-all text-sm',
+                      !formData.use_business_day
+                        ? 'border-biveto bg-biveto-light dark:bg-biveto/20 text-biveto font-medium'
+                        : 'border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:border-gray-300'
+                    )}
                   >
-                    {frequencies.map((freq) => (
-                      <option key={freq.value} value={freq.value}>{freq.label}</option>
-                    ))}
-                  </select>
+                    <Calendar size={18} />
+                    Dia fixo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, use_business_day: true, payment_day: '' })}
+                    className={clsx(
+                      'flex items-center justify-center gap-2 p-3 rounded-lg border-2 transition-all text-sm',
+                      formData.use_business_day
+                        ? 'border-biveto bg-biveto-light dark:bg-biveto/20 text-biveto font-medium'
+                        : 'border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:border-gray-300'
+                    )}
+                  >
+                    <Briefcase size={18} />
+                    Dia útil
+                  </button>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Dia do Pagamento
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="31"
-                    value={formData.payment_day}
-                    onChange={(e) => setFormData({ ...formData, payment_day: e.target.value })}
-                    className="input"
-                    placeholder="5"
-                  />
-                </div>
+
+                {!formData.use_business_day ? (
+                  <div>
+                    <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                      Dia do mês (1-31)
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="31"
+                      value={formData.payment_day}
+                      onChange={(e) => setFormData({ ...formData, payment_day: e.target.value })}
+                      className="input"
+                      placeholder="5"
+                    />
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                      Qual dia útil do mês?
+                    </label>
+                    <select
+                      value={formData.business_day_number}
+                      onChange={(e) => setFormData({ ...formData, business_day_number: e.target.value })}
+                      className="input"
+                    >
+                      <option value="">Selecione</option>
+                      <option value="1">1º dia útil</option>
+                      <option value="2">2º dia útil</option>
+                      <option value="3">3º dia útil</option>
+                      <option value="4">4º dia útil</option>
+                      <option value="5">5º dia útil</option>
+                      <option value="6">6º dia útil</option>
+                      <option value="7">7º dia útil</option>
+                      <option value="10">10º dia útil</option>
+                      <option value="15">15º dia útil</option>
+                      <option value="20">20º dia útil</option>
+                    </select>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Considera feriados nacionais brasileiros
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div>

@@ -12,6 +12,8 @@ class IncomeSourceBase(BaseModel):
     is_variable: bool = False
     frequency: IncomeFrequency = IncomeFrequency.MONTHLY
     payment_day: int | None = Field(None, ge=1, le=31)
+    use_business_day: bool = False  # Se True, usa dia útil ao invés de dia fixo
+    business_day_number: int | None = Field(None, ge=1, le=23)  # Qual dia útil (ex: 5 para 5º dia útil)
     benefit_card_number: str | None = Field(None, max_length=20)
     benefit_provider: str | None = None
     is_taxable: bool = True
@@ -33,6 +35,8 @@ class IncomeSourceUpdate(BaseModel):
     is_variable: bool | None = None
     frequency: IncomeFrequency | None = None
     payment_day: int | None = Field(None, ge=1, le=31)
+    use_business_day: bool | None = None
+    business_day_number: int | None = Field(None, ge=1, le=23)
     account_id: int | None = None
     category_id: int | None = None
     benefit_card_number: str | None = Field(None, max_length=20)
@@ -71,6 +75,8 @@ class IncomeSourceListResponse(BaseModel):
     is_variable: bool
     frequency: str
     payment_day: int | None
+    use_business_day: bool
+    business_day_number: int | None
     benefit_provider: str | None
     account_name: str | None
     is_active: bool

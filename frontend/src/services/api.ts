@@ -128,12 +128,25 @@ api.interceptors.request.use(async (config) => {
   return config
 })
 
+// Rotas que não devem tentar refresh automático em caso de 401
+const authRoutes = ['/auth/login', '/auth/register', '/auth/invite', '/auth/refresh', '/auth/reset-password']
+
+const isAuthRoute = (url: string | undefined): boolean => {
+  if (!url) return false
+  return authRoutes.some(route => url.includes(route))
+}
+
 // Interceptor de resposta para tratar erros 401 inesperados
 api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean }
     const store = useAuthStore.getState()
+
+    // Se é uma rota de autenticação, não tenta refresh - apenas retorna o erro
+    if (isAuthRoute(originalRequest?.url)) {
+      return Promise.reject(error)
+    }
 
     // Se recebeu 401 e não é retry, tenta refresh
     if (error.response?.status === 401 && !originalRequest._retry) {

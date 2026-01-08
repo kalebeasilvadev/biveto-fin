@@ -1,6 +1,8 @@
 from __future__ import annotations
-from fastapi import APIRouter, HTTPException, status
+from datetime import date
+from fastapi import APIRouter, HTTPException, status, Query
 from sqlalchemy import select, or_, and_
+from pydantic import BaseModel
 
 from ..core.deps import CurrentUser, DbSession
 from ..models.income_source import IncomeSource
@@ -13,6 +15,31 @@ from ..schemas.income_source import (
     IncomeSourceResponse,
     IncomeSourceListResponse,
 )
+from ..services.income_transaction_service import IncomeTransactionService
+from ..services.business_day_service import get_nth_business_day, get_payment_date_for_income
+
+
+class GenerateTransactionsRequest(BaseModel):
+    year: int
+    month: int
+    overwrite: bool = False
+
+
+class TransactionPreview(BaseModel):
+    source_id: int
+    source_name: str
+    type: str
+    amount: float
+    date: str
+    is_business_day: bool
+    business_day_number: int | None
+
+
+class BusinessDayResponse(BaseModel):
+    year: int
+    month: int
+    business_day_number: int
+    date: str
 
 router = APIRouter()
 
@@ -81,6 +108,8 @@ async def list_income_sources(current_user: CurrentUser, db: DbSession):
                 is_variable=source.is_variable,
                 frequency=source.frequency,
                 payment_day=source.payment_day,
+                use_business_day=source.use_business_day,
+                business_day_number=source.business_day_number,
                 benefit_provider=source.benefit_provider,
                 account_name=account_name,
                 is_active=source.is_active,
@@ -125,6 +154,8 @@ async def create_income_source(
         is_variable=data.is_variable,
         frequency=data.frequency.value,
         payment_day=data.payment_day,
+        use_business_day=data.use_business_day,
+        business_day_number=data.business_day_number,
         account_id=data.account_id,
         category_id=data.category_id,
         benefit_card_number=data.benefit_card_number,
@@ -341,3 +372,105 @@ async def delete_income_source(
 
     await db.delete(source)
     await db.commit()
+
+
+# ========== Geração de Transações ==========
+
+@router.get("/utils/business-day", response_model=BusinessDayResponse)
+async def get_business_day(
+    year: int = Query(..., ge=2020, le=2100),
+    month: int = Query(..., ge=1, le=12),
+    n: int = Query(..., ge=1, le=23, description="Qual dia útil (ex: 5 para 5º dia útil)"),
+    current_user: CurrentUser = None,
+):
+    """
+    Calcula o N-ésimo dia útil de um mês.
+    Considera feriados nacionais brasileiros.
+    """
+    try:
+        business_day = get_nth_business_day(year, month, n)
+        return BusinessDayResponse(
+            year=year,
+            month=month,
+            business_day_number=n,
+            date=business_day.isoformat()
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/generate-transactions")
+async def generate_income_transactions(
+    data: GenerateTransactionsRequest,
+    current_user: CurrentUser,
+    db: DbSession,
+):
+    """
+    Gera transações no histórico para todas as fontes de receita ativas.
+    Útil para criar o histórico de receitas mensais como salário, benefícios, etc.
+    """
+    service = IncomeTransactionService(db)
+    transactions = await service.generate_income_transactions(
+        user_id=current_user.id,
+        year=data.year,
+        month=data.month,
+        overwrite=data.overwrite
+    )
+
+    return {
+        "message": f"{len(transactions)} transações criadas/atualizadas",
+        "count": len(transactions),
+        "year": data.year,
+        "month": data.month,
+    }
+
+
+@router.get("/preview-transactions", response_model=list[TransactionPreview])
+async def preview_income_transactions(
+    year: int = Query(..., ge=2020, le=2100),
+    month: int = Query(..., ge=1, le=12),
+    current_user: CurrentUser = None,
+    db: DbSession = None,
+):
+    """
+    Retorna uma prévia das transações que seriam criadas para um mês.
+    Não cria nada no banco, apenas mostra o que seria gerado.
+    """
+    service = IncomeTransactionService(db)
+    preview = await service.preview_transactions(
+        user_id=current_user.id,
+        year=year,
+        month=month
+    )
+    return preview
+
+
+@router.post("/{source_id}/generate-transaction")
+async def generate_single_source_transaction(
+    source_id: int,
+    data: GenerateTransactionsRequest,
+    current_user: CurrentUser,
+    db: DbSession,
+):
+    """
+    Gera transação para uma fonte de receita específica.
+    """
+    service = IncomeTransactionService(db)
+    transactions = await service.generate_for_specific_source(
+        source_id=source_id,
+        user_id=current_user.id,
+        year=data.year,
+        month=data.month,
+        overwrite=data.overwrite
+    )
+
+    if not transactions:
+        raise HTTPException(
+            status_code=404,
+            detail="Fonte não encontrada ou transação já existe"
+        )
+
+    return {
+        "message": f"{len(transactions)} transação(ões) criada(s)",
+        "count": len(transactions),
+    }

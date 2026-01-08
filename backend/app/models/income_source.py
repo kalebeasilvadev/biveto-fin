@@ -60,6 +60,8 @@ class IncomeSource(Base):
     # Frequency and dates
     frequency: Mapped[str] = mapped_column(String(20), default="monthly")  # IncomeFrequency enum
     payment_day: Mapped[int | None] = mapped_column(Integer)  # Day of month when received (1-31)
+    use_business_day: Mapped[bool] = mapped_column(Boolean, default=False)  # Use business day instead of fixed day
+    business_day_number: Mapped[int | None] = mapped_column(Integer)  # Which business day (e.g., 5 for 5th business day)
 
     # Linked account (where money goes)
     account_id: Mapped[int | None] = mapped_column(ForeignKey("accounts.id", ondelete="SET NULL"))

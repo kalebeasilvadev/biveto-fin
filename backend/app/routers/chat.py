@@ -37,9 +37,10 @@ async def get_suggestions(
     Retorna sugestões de perguntas iniciais baseadas nos dados do usuário.
     """
     service = FinancialAgentService(db)
-    query_context = {"period": None}
-    context = await service._get_comprehensive_context(current_user, query_context)
-    suggestions = service._generate_smart_suggestions("", context)
+    # Usa período vazio (será preenchido com mês atual pelo serviço)
+    query_context = {"period": {}}
+    context = await service.get_suggestions_context(current_user, query_context)
+    suggestions = service.generate_smart_suggestions("", context)
 
     return {
         "suggestions": suggestions,

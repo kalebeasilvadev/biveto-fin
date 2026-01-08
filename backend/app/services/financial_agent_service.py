@@ -189,18 +189,16 @@ class FinancialAgentService:
         """Busca contexto financeiro completo e detalhado"""
         context = {}
         today = date.today()
-        period = query_context.get("period", {})
+        period = query_context.get("period") or {}
         period_start = period.get("start", date(today.year, today.month, 1))
         period_end = period.get("end", today)
         period_label = period.get("label", "Período selecionado")
 
         household_user_ids = await self._get_household_user_ids(user)
 
-        # 1. Buscar todas as categorias
+        # 1. Buscar categorias do usuário
         categories_result = await self.db.execute(
-            select(Category).where(
-                or_(Category.user_id == user.id, Category.is_system == True)
-            )
+            select(Category).where(Category.user_id == user.id)
         )
         categories = {c.id: c.name for c in categories_result.scalars().all()}
         context["categorias_disponiveis"] = list(categories.values())
@@ -659,3 +657,12 @@ Termine com uma pergunta ou sugestão de ação quando apropriado."""
             )
         )
         return list(result.scalars().all())
+
+    # Public methods for external use
+    async def get_suggestions_context(self, user: User, query_context: dict) -> dict:
+        """Public wrapper for getting context for suggestions"""
+        return await self._get_comprehensive_context(user, query_context)
+
+    def generate_smart_suggestions(self, message: str, context: dict) -> list[str]:
+        """Public wrapper for generating suggestions"""
+        return self._generate_smart_suggestions(message, context)
