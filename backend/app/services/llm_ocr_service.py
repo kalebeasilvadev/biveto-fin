@@ -25,6 +25,43 @@ Extraia os itens/transações e retorne um JSON válido com este formato:
   "document_type": "cupom_fiscal"
 }
 
+==== REGRAS CRÍTICAS PARA FATURA DE CARTÃO DE CRÉDITO ====
+
+⚠️ ATENÇÃO: A fatura de cartão tem DUAS SEÇÕES DISTINTAS. Você DEVE identificar a seção correta:
+
+1️⃣ SEÇÃO DE RESUMO/CABEÇALHO (IGNORAR COMPLETAMENTE):
+   - Fica no TOPO da fatura
+   - Contém: "Valor do Documento", "Pagamento mínimo", "Opções de parcelamento"
+   - Mostra simulações de parcelamento como "1 + 11 de R$ 142,71" - NÃO SÃO COMPRAS!
+   - Essas são OPÇÕES DE PAGAMENTO DA FATURA, não transações reais
+
+2️⃣ SEÇÃO DE TRANSAÇÕES/DESPESAS (EXTRAIR DAQUI):
+   - Geralmente chamada "Despesas da fatura", "Lançamentos", "Transações"
+   - Tem formato de TABELA/LISTA com colunas: DATA | DESCRIÇÃO | VALOR
+   - Cada linha é uma compra real com:
+     * Data específica (ex: "02 dez", "15 jan")
+     * Nome do estabelecimento (ex: "APPLE.COM/BILL", "UBER *TRIP", "MERCADO LIVRE")
+     * Valor da transação
+
+❌ NUNCA EXTRAIA (são informações de resumo, não transações):
+- "Parcelamento Fatura" ou "Parcelamento Total" - opção de parcelar a fatura
+- "1 + X de R$ XXX" - simulação de parcelamento da fatura
+- "Pagamento mínimo" - valor mínimo para não ficar inadimplente
+- "Valor do Documento" / "Total da fatura" - soma total
+- "Fatura atual" / "Despesas do mês" (quando é valor único/total)
+- Limite disponível, limite total
+- Encargos, IOF, juros (exceto se listados como transação com data)
+- Seção "Próxima fatura" - são parcelas futuras
+
+✅ EXTRAIA APENAS linhas que tenham TODOS estes elementos:
+- Uma DATA (ex: "02 dez", "23/12", "15 de janeiro")
+- Um ESTABELECIMENTO/DESCRIÇÃO (ex: "APPLE.COM/BILL", "STEAM", "SEGURO CARTAO")
+- Um VALOR específico daquela transação
+
+Para cada transação extraída:
+- Despesas/compras: valor POSITIVO
+- Pagamentos/créditos/estornos: valor NEGATIVO
+
 ==== REGRA MAIS IMPORTANTE ====
 
 PARA CUPOM FISCAL / NOTA FISCAL DE SUPERMERCADO:
@@ -37,10 +74,6 @@ PARA CUPOM FISCAL / NOTA FISCAL DE SUPERMERCADO:
   * Informações do estabelecimento (CNPJ, endereço, etc.)
 - TODOS os valores de produtos devem ser POSITIVOS (são despesas)
 - Se um item aparece com valor negativo no cupom (desconto), IGNORE esse item completamente
-
-PARA FATURA DE CARTÃO DE CRÉDITO:
-- Extraia compras (valores positivos = despesa)
-- Extraia pagamentos/créditos como valores NEGATIVOS (ex: "PAGAMENTO DE FATURA" = amount negativo)
 
 ==== LEITURA DE NOMES DE PRODUTOS (OCR) ====
 
@@ -131,13 +164,37 @@ Saída correta:
 }
 IMPORTANTE: "DESC QTD" e "TOTAL" foram IGNORADOS pois não são produtos!
 
-FATURA CARTÃO:
+FATURA CARTÃO (ex: Banco Inter, Nubank):
+Entrada na imagem:
+"Valor do Documento: R$ 1.567,89
+Pagamento mínimo: R$ 156,79
+Opções de parcelamento:
+- 1 + 11 de R$ 142,71
+- 1 + 5 de R$ 285,43
+
+Despesas da fatura:
+02 dez  APPLE.COM/BILL          R$ 9,90
+02 dez  SEGURO CARTAO CTP       R$ 15,90
+15 dez  STEAM 02/12             R$ 105,66
+20 dez  UBER *TRIP              R$ 23,45"
+
+Saída CORRETA (extrair apenas da seção "Despesas da fatura"):
 {
   "items": [
-    {"description": "Steam", "amount": 105.66, "installment_current": 2, "installment_total": 12, "is_installment": true},
-    {"description": "Pagamento Fatura", "amount": -1556.82, "is_installment": false}
+    {"description": "APPLE.COM/BILL", "amount": 9.90, "date": "2025-12-02", "category": "assinaturas", "is_installment": false},
+    {"description": "Seguro Cartão CTP", "amount": 15.90, "date": "2025-12-02", "category": "outros", "is_installment": false},
+    {"description": "Steam", "amount": 105.66, "date": "2025-12-15", "category": "lazer", "installment_current": 2, "installment_total": 12, "is_installment": true},
+    {"description": "Uber", "amount": 23.45, "date": "2025-12-20", "category": "transporte", "is_installment": false}
   ],
   "document_type": "fatura_cartao"
+}
+
+⚠️ ERRADO - NÃO faça assim (extraindo opções de parcelamento):
+{
+  "items": [
+    {"description": "Parcelamento Fatura", "amount": 142.71},  // ERRADO! É simulação
+    {"description": "Pagamento mínimo", "amount": 156.79}      // ERRADO! É resumo
+  ]
 }
 
 Retorne APENAS o JSON válido, sem explicações."""
