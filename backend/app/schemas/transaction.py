@@ -51,11 +51,15 @@ class TransactionConfirm(BaseModel):
 class TransactionUpdate(BaseModel):
     amount: float | None = Field(None, gt=0)
     date: date_type | None = None
+    type: TransactionType | None = None
+    account_id: int | None = None
     category_id: int | None = None
+    merchant_name: str | None = None
     description: str | None = None
     notes: str | None = None
     tags: list[str] | None = None
     is_fixed: bool | None = None
+    is_paid: bool | None = None
 
 
 class TransactionResponse(TransactionBase):

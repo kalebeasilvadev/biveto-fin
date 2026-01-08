@@ -6,6 +6,7 @@ from fastapi import HTTPException, status
 
 from ..models.transaction import Transaction, TransactionAudit, TransactionType
 from ..models.merchant import Merchant
+from ..models.account import Account
 from ..models.user import User
 from ..models.household import HouseholdMember
 from ..schemas.transaction import TransactionCreate, TransactionUpdate, TransactionConfirm
@@ -340,8 +341,44 @@ class TransactionService:
                 detail="Transação não encontrada",
             )
 
+        update_data = data.model_dump(exclude_unset=True)
+
+        # Handle special field: merchant_name -> merchant_id
+        if "merchant_name" in update_data:
+            merchant_name = update_data.pop("merchant_name")
+            if merchant_name:
+                merchant_id = await self._get_or_create_merchant(merchant_name)
+                update_data["merchant_id"] = merchant_id
+            else:
+                update_data["merchant_id"] = None
+
+        # Handle special field: account_id - validate ownership
+        if "account_id" in update_data:
+            account_id = update_data["account_id"]
+            household_ids = await self._get_household_user_ids(user)
+            if household_ids:
+                result = await self.db.execute(
+                    select(Account).where(
+                        Account.id == account_id,
+                        or_(
+                            and_(Account.user_id == user.id, Account.ownership_type == "personal"),
+                            and_(Account.user_id.in_(household_ids), Account.ownership_type == "household")
+                        )
+                    )
+                )
+            else:
+                result = await self.db.execute(
+                    select(Account).where(Account.id == account_id, Account.user_id == user.id)
+                )
+            if not result.scalar_one_or_none():
+                raise HTTPException(status_code=400, detail="Conta não encontrada")
+
+        # Handle enum field: type
+        if "type" in update_data and update_data["type"]:
+            update_data["type"] = update_data["type"].value
+
         # Registrar alterações para auditoria
-        for field, value in data.model_dump(exclude_unset=True).items():
+        for field, value in update_data.items():
             old_value = getattr(transaction, field)
             if old_value != value:
                 audit = TransactionAudit(
