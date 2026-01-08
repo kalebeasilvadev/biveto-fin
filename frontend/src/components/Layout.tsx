@@ -92,7 +92,7 @@ export default function Layout() {
       {/* Mobile header */}
       <header className="lg:hidden fixed top-0 left-0 right-0 z-40 glass border-b border-gray-200/50 dark:bg-slate-900/80 dark:border-slate-700">
         <div className="flex items-center justify-between px-4 h-14">
-          <img src="/logo.svg" alt="Biveto" className="h-8" />
+          <img src={isDark ? "/logo-white.svg" : "/logo.svg"} alt="Biveto" className="h-8" />
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             className="btn-icon"
@@ -108,7 +108,7 @@ export default function Layout() {
         <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:fixed lg:inset-y-0 bg-white border-r border-gray-100 dark:bg-slate-800 dark:border-slate-700">
           {/* Logo */}
           <div className="flex items-center h-16 px-6 border-b border-gray-100 dark:border-slate-700">
-            <img src="/logo.svg" alt="Biveto" className="h-9" />
+            <img src={isDark ? "/logo-white.svg" : "/logo.svg"} alt="Biveto" className="h-9" />
           </div>
 
           {/* Navigation */}
@@ -209,7 +209,7 @@ export default function Layout() {
         >
           {/* Header */}
           <div className="flex items-center justify-between h-14 px-4 border-b border-gray-100 dark:border-slate-700">
-            <img src="/logo.svg" alt="Biveto" className="h-8" />
+            <img src={isDark ? "/logo-white.svg" : "/logo.svg"} alt="Biveto" className="h-8" />
             <button
               onClick={() => setMobileMenuOpen(false)}
               className="btn-icon"

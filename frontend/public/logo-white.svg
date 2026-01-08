@@ -1,13 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 60">
   <defs>
-    <linearGradient id="logoGradientWhite" x1="0%" y1="0%" x2="100%" y2="100%">
+    <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" style="stop-color:#1E3A5F"/>
       <stop offset="100%" style="stop-color:#102a43"/>
     </linearGradient>
   </defs>
 
   <!-- Icon container -->
-  <rect x="0" y="5" width="50" height="50" rx="10" fill="url(#logoGradientWhite)"/>
+  <rect x="0" y="5" width="50" height="50" rx="10" fill="url(#logoGradient)"/>
 
   <!-- B with bars -->
   <g fill="white">
@@ -27,6 +27,6 @@
   <!-- Green dot -->
   <circle cx="44" cy="12" r="5" fill="#4ade80"/>
 
-  <!-- Text "Biveto" in white -->
-  <text x="60" y="40" font-family="Inter, system-ui, sans-serif" font-size="28" font-weight="700" fill="white">Biveto</text>
+  <!-- Text "Biveto" - WHITE for dark mode -->
+  <text x="60" y="40" font-family="Inter, system-ui, sans-serif" font-size="28" font-weight="700" fill="#ffffff">Biveto</text>
 </svg>
