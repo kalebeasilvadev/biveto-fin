@@ -18,5 +18,13 @@ jobs:
 
       - uses: superfly/flyctl-actions/setup-flyctl@master
 
+      - name: Set Fly.io secrets
+        run: |
+          flyctl secrets set \
+            GOOGLE_API_KEY="${{ secrets.GOOGLE_API_KEY }}" \
+            SECRET_KEY="${{ secrets.SECRET_KEY }}" \
+            DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+            --stage
+
       - name: Deploy to Fly.io
         run: flyctl deploy --remote-only
