@@ -272,8 +272,8 @@ export default function Goals() {
       {/* Create Goal Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto">
-            <h3 className="text-lg font-semibold mb-4">Nova Meta</h3>
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Nova Meta</h3>
             <form
               onSubmit={(e) => {
                 e.preventDefault()
@@ -290,13 +290,13 @@ export default function Goals() {
             >
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Nome da Meta
                   </label>
                   <input type="text" name="name" className="input" required />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Tipo
                   </label>
                   <select name="type" className="input" required>
@@ -306,7 +306,7 @@ export default function Goals() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Valor Alvo
                   </label>
                   <input
@@ -319,7 +319,7 @@ export default function Goals() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Valor Inicial (opcional)
                   </label>
                   <input
@@ -332,13 +332,13 @@ export default function Goals() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Data Limite (opcional)
                   </label>
                   <input type="date" name="target_date" className="input" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Descrição (opcional)
                   </label>
                   <textarea name="description" className="input" rows={2} />
@@ -368,8 +368,8 @@ export default function Goals() {
       {/* Contribute Modal */}
       {showContributeModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
-            <h3 className="text-lg font-semibold mb-4">Adicionar Contribuição</h3>
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Adicionar Contribuição</h3>
             <form
               onSubmit={(e) => {
                 e.preventDefault()
@@ -386,7 +386,7 @@ export default function Goals() {
             >
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Valor
                   </label>
                   <input
@@ -399,7 +399,7 @@ export default function Goals() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Data
                   </label>
                   <input
@@ -411,7 +411,7 @@ export default function Goals() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Observação (opcional)
                   </label>
                   <input type="text" name="notes" className="input" />
@@ -441,8 +441,8 @@ export default function Goals() {
       {/* Emergency Fund Modal */}
       {showEmergencyModal && emergencyData && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
-            <h3 className="text-lg font-semibold mb-4">Reserva de Emergência</h3>
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Reserva de Emergência</h3>
             <div className="space-y-4">
               <div className="p-4 bg-blue-50 rounded-lg">
                 <p className="text-sm text-gray-600">Média de gastos mensais</p>
@@ -489,15 +489,15 @@ export default function Goals() {
       {/* PNIF Modal */}
       {showPnifModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
-            <h3 className="text-lg font-semibold mb-2">Cálculo PNIF</h3>
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">Cálculo PNIF</h3>
             <p className="text-sm text-gray-500 mb-4">
               Patrimônio Necessário para Independência Financeira (Gustavo Cerbasi)
             </p>
             <form onSubmit={fetchPnif}>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Sua Idade
                   </label>
                   <input
@@ -510,7 +510,7 @@ export default function Goals() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Renda Anual Bruta
                   </label>
                   <input
@@ -523,7 +523,7 @@ export default function Goals() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Retorno Anual Esperado (%)
                   </label>
                   <input

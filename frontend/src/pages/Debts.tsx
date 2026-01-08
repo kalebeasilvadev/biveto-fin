@@ -392,8 +392,8 @@ export default function Debts() {
       {/* Create Debt Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto">
-            <h3 className="text-lg font-semibold mb-4">Registrar Dívida</h3>
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Registrar Dívida</h3>
             <form
               onSubmit={(e) => {
                 e.preventDefault()
@@ -414,13 +414,13 @@ export default function Debts() {
             >
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Nome da Dívida
                   </label>
                   <input type="text" name="name" className="input" required />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Tipo
                   </label>
                   <select name="type" className="input" required>
@@ -430,14 +430,14 @@ export default function Debts() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Credor (opcional)
                   </label>
                   <input type="text" name="creditor" className="input" placeholder="Ex: Nubank" />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       Valor Original
                     </label>
                     <input
@@ -449,7 +449,7 @@ export default function Debts() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       Saldo Atual
                     </label>
                     <input
@@ -462,7 +462,7 @@ export default function Debts() {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Pagamento Mínimo
                   </label>
                   <input
@@ -475,7 +475,7 @@ export default function Debts() {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       Taxa de Juros (%)
                     </label>
                     <input
@@ -487,7 +487,7 @@ export default function Debts() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       Tipo de Juros
                     </label>
                     <select name="interest_type" className="input" required>
@@ -498,7 +498,7 @@ export default function Debts() {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       Data de Início
                     </label>
                     <input
@@ -510,7 +510,7 @@ export default function Debts() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       Dia de Vencimento
                     </label>
                     <input
@@ -548,8 +548,8 @@ export default function Debts() {
       {/* Payment Modal */}
       {showPaymentModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
-            <h3 className="text-lg font-semibold mb-4">Registrar Pagamento</h3>
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Registrar Pagamento</h3>
             <form
               onSubmit={(e) => {
                 e.preventDefault()
@@ -566,7 +566,7 @@ export default function Debts() {
             >
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Valor do Pagamento
                   </label>
                   <input
@@ -579,7 +579,7 @@ export default function Debts() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Data do Pagamento
                   </label>
                   <input
@@ -591,7 +591,7 @@ export default function Debts() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Observação (opcional)
                   </label>
                   <input type="text" name="notes" className="input" />
@@ -621,8 +621,8 @@ export default function Debts() {
       {/* Strategy Comparison Modal */}
       {showStrategyModal && strategyData && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
-            <h3 className="text-lg font-semibold mb-4">Comparação de Estratégias</h3>
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Comparação de Estratégias</h3>
 
             <div className="grid grid-cols-2 gap-4 mb-6">
               {/* Snowball */}

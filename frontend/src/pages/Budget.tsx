@@ -236,8 +236,8 @@ export default function Budget() {
       {/* Add Item Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
-            <h3 className="text-lg font-semibold mb-4">Adicionar Limite</h3>
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Adicionar Limite</h3>
             <form
               onSubmit={(e) => {
                 e.preventDefault()
@@ -251,7 +251,7 @@ export default function Budget() {
             >
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Categoria
                   </label>
                   <select name="category_id" className="input" required>
@@ -264,7 +264,7 @@ export default function Budget() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Valor Planejado
                   </label>
                   <input
@@ -277,8 +277,8 @@ export default function Budget() {
                   />
                 </div>
                 <div className="flex items-center gap-2">
-                  <input type="checkbox" name="is_fixed" id="is_fixed" />
-                  <label htmlFor="is_fixed" className="text-sm text-gray-700">
+                  <input type="checkbox" name="is_fixed" id="is_fixed" className="rounded border-gray-300 dark:border-gray-600" />
+                  <label htmlFor="is_fixed" className="text-sm text-gray-700 dark:text-gray-300">
                     Gasto fixo (não varia mensalmente)
                   </label>
                 </div>
@@ -307,8 +307,8 @@ export default function Budget() {
       {/* Copy Budget Modal */}
       {showCopyModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
-            <h3 className="text-lg font-semibold mb-4">Copiar Orçamento</h3>
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Copiar Orçamento</h3>
             <form
               onSubmit={(e) => {
                 e.preventDefault()
@@ -321,12 +321,12 @@ export default function Budget() {
                 })
               }}
             >
-              <p className="text-sm text-gray-600 mb-4">
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
                 Copiar limites de outro mês para {monthNames[month - 1]} {year}
               </p>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Mês origem
                   </label>
                   <select name="from_month" className="input" defaultValue={month === 1 ? 12 : month - 1}>
@@ -336,7 +336,7 @@ export default function Budget() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Ano origem
                   </label>
                   <input

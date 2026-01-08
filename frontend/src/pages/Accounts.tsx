@@ -275,19 +275,19 @@ export default function Accounts() {
       {/* Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg w-full max-w-md">
-            <div className="flex items-center justify-between p-4 border-b">
-              <h2 className="text-lg font-semibold">
+          <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-md">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                 {editingAccount ? 'Editar Conta' : 'Nova Conta'}
               </h2>
-              <button onClick={closeModal} className="text-gray-500 hover:text-gray-700">
+              <button onClick={closeModal} className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
                 <X size={20} />
               </button>
             </div>
 
             <div className="p-4 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Nome
                 </label>
                 <input
@@ -300,7 +300,7 @@ export default function Accounts() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Tipo
                 </label>
                 <select
@@ -317,7 +317,7 @@ export default function Accounts() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Saldo Inicial
                 </label>
                 <input
@@ -331,7 +331,7 @@ export default function Accounts() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Cor
                 </label>
                 <div className="flex gap-2">
@@ -342,7 +342,7 @@ export default function Accounts() {
                       onClick={() => setFormData({ ...formData, color })}
                       className={clsx(
                         'w-8 h-8 rounded-full transition-transform',
-                        formData.color === color && 'ring-2 ring-offset-2 ring-primary-500 scale-110'
+                        formData.color === color && 'ring-2 ring-offset-2 ring-primary-500 scale-110 dark:ring-offset-gray-800'
                       )}
                       style={{ backgroundColor: color }}
                     />
@@ -352,7 +352,7 @@ export default function Accounts() {
 
               {showOwnershipSelector && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Visibilidade
                   </label>
                   <div className="grid grid-cols-2 gap-2">
@@ -362,12 +362,12 @@ export default function Accounts() {
                       className={clsx(
                         'flex items-center gap-2 p-3 rounded-lg border-2 transition-all',
                         formData.ownership_type === 'personal'
-                          ? 'border-biveto bg-biveto-light'
-                          : 'border-gray-200 hover:border-gray-300'
+                          ? 'border-biveto bg-biveto-light dark:bg-biveto/20'
+                          : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
                       )}
                     >
                       <User size={20} className={formData.ownership_type === 'personal' ? 'text-biveto' : 'text-gray-400'} />
-                      <span className={clsx('text-sm font-medium', formData.ownership_type === 'personal' ? 'text-biveto' : 'text-gray-600')}>
+                      <span className={clsx('text-sm font-medium', formData.ownership_type === 'personal' ? 'text-biveto' : 'text-gray-600 dark:text-gray-400')}>
                         Pessoal
                       </span>
                     </button>
@@ -377,12 +377,12 @@ export default function Accounts() {
                       className={clsx(
                         'flex items-center gap-2 p-3 rounded-lg border-2 transition-all',
                         formData.ownership_type === 'household'
-                          ? 'border-biveto bg-biveto-light'
-                          : 'border-gray-200 hover:border-gray-300'
+                          ? 'border-biveto bg-biveto-light dark:bg-biveto/20'
+                          : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
                       )}
                     >
                       <Users size={20} className={formData.ownership_type === 'household' ? 'text-biveto' : 'text-gray-400'} />
-                      <span className={clsx('text-sm font-medium', formData.ownership_type === 'household' ? 'text-biveto' : 'text-gray-600')}>
+                      <span className={clsx('text-sm font-medium', formData.ownership_type === 'household' ? 'text-biveto' : 'text-gray-600 dark:text-gray-400')}>
                         Familia
                       </span>
                     </button>
