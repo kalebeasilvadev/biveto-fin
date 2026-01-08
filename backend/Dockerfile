@@ -61,4 +61,4 @@ RUN mkdir -p uploads data
 EXPOSE 8080
 
 # Run migrations and start server
-CMD ["sh", "-c", "alembic upgrade head 2>/dev/null || echo 'Migration skipped' && uvicorn app.main:app --host 0.0.0.0 --port 8080"]
+CMD ["sh", "-c", "echo 'Running database migrations...' && alembic upgrade head && echo 'Migrations completed!' && uvicorn app.main:app --host 0.0.0.0 --port 8080"]
