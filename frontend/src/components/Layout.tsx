@@ -65,21 +65,30 @@ export default function Layout() {
   const location = useLocation()
 
   const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+  const hasValidSession = useAuthStore((state) => state.hasValidSession)
 
-  // Fetch user info on mount to get is_admin
+  // Fetch user info on mount to get is_admin (only if session is valid)
   useEffect(() => {
     const fetchUser = async () => {
+      // Verifica se a sessão é válida antes de fazer requisição
+      if (!hasValidSession()) {
+        return
+      }
+
       try {
         const response = await api.get('/users/me')
         setUser(response.data)
       } catch {
-        // Ignore errors
+        // Erros são tratados pelo interceptor do Axios
+        // Não precisa fazer nada aqui
       }
     }
-    if (!user?.is_admin) {
+
+    // Só busca se não tiver is_admin carregado e sessão for válida
+    if (!user?.is_admin && hasValidSession()) {
       fetchUser()
     }
-  }, [])
+  }, [user?.is_admin, hasValidSession, setUser])
 
   // Close mobile menu on route change
   useEffect(() => {
