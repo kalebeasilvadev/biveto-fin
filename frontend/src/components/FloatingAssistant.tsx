@@ -90,10 +90,8 @@ export default function FloatingAssistant() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const location = useLocation()
 
-  // Don't show on chat page
-  if (location.pathname === '/chat') {
-    return null
-  }
+  // Check if we're on chat page (for conditional rendering later)
+  const isOnChatPage = location.pathname === '/chat'
 
   const { data: suggestionsData } = useQuery({
     queryKey: ['chat-suggestions'],
@@ -209,6 +207,11 @@ export default function FloatingAssistant() {
     if (currentConversation?.id === id) {
       startNewConversation()
     }
+  }
+
+  // Don't show on chat page
+  if (isOnChatPage) {
+    return null
   }
 
   return (
