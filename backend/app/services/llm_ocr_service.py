@@ -150,13 +150,21 @@ class LLMOCRService:
         self.provider = settings.vision_provider
         self.model = settings.vision_model
 
-    def _convert_pdf_to_images(self, pdf_content: bytes) -> list[tuple[bytes, str]]:
-        """Converte PDF para lista de imagens (uma por página)"""
+    def _convert_pdf_to_images(self, pdf_content: bytes) -> tuple[list[tuple[bytes, str]], str | None]:
+        """Converte PDF para lista de imagens (uma por página)
+
+        Returns:
+            Tuple of (images list, error message or None)
+        """
         try:
             import fitz  # pymupdf
 
             images = []
             pdf_doc = fitz.open(stream=pdf_content, filetype="pdf")
+
+            if len(pdf_doc) == 0:
+                pdf_doc.close()
+                return [], "PDF não contém páginas"
 
             for page_num in range(len(pdf_doc)):
                 page = pdf_doc[page_num]
@@ -167,30 +175,40 @@ class LLMOCRService:
                 images.append((img_bytes, 'image/png'))
 
             pdf_doc.close()
-            return images
+            return images, None
+        except ImportError as e:
+            return [], f"PyMuPDF não instalado: {e}"
         except Exception as e:
-            print(f"Erro ao converter PDF: {e}")
-            return []
+            return [], f"Erro ao converter PDF: {e}"
 
     async def extract_from_image(self, image_content: bytes, mime_type: str = 'image/png') -> dict:
         """Extrai dados da imagem usando o provider configurado"""
         try:
             # Se for PDF, converter para imagens e processar todas as páginas
             if mime_type == 'application/pdf' or mime_type.endswith('/pdf'):
-                images = self._convert_pdf_to_images(image_content)
+                images, pdf_error = self._convert_pdf_to_images(image_content)
+                if pdf_error:
+                    return {'items': [], 'error': pdf_error}
                 if not images:
-                    return {'items': [], 'error': 'Não foi possível processar o PDF'}
+                    return {'items': [], 'error': 'PDF não gerou imagens para processar'}
 
                 # Processar todas as páginas e combinar resultados
                 all_items = []
                 document_type = None
+                errors = []
 
-                for img_content, img_mime in images:
+                for page_num, (img_content, img_mime) in enumerate(images, 1):
                     result = await self._process_single_image(img_content, img_mime)
+                    if result.get('error'):
+                        errors.append(f"Página {page_num}: {result['error']}")
                     if result.get('items'):
                         all_items.extend(result['items'])
                     if result.get('document_type') and not document_type:
                         document_type = result['document_type']
+
+                # Se não extraiu nenhum item e teve erros, retornar os erros
+                if not all_items and errors:
+                    return {'items': [], 'error': '; '.join(errors)}
 
                 return {
                     'items': all_items,
@@ -200,7 +218,7 @@ class LLMOCRService:
                 return await self._process_single_image(image_content, mime_type)
 
         except Exception as e:
-            return {'items': [], 'error': str(e)}
+            return {'items': [], 'error': f'Erro inesperado: {str(e)}'}
 
     async def _process_single_image(self, image_content: bytes, mime_type: str) -> dict:
         """Processa uma única imagem"""

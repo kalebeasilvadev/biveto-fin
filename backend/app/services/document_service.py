@@ -155,13 +155,18 @@ class DocumentService:
         """Processa documento e extrai dados (NÃO salva - retorna para confirmação)"""
         try:
             document.status = DocumentStatus.PROCESSING
+            await self.db.flush()
 
             # Extrair dados com LLM
             extraction_data = await self._extract_data(document, content)
 
-            document.status = DocumentStatus.COMPLETED
-            document.processed_at = datetime.utcnow()
+            # Se houve erro na extração, marcar como falha
+            if extraction_data is None or (not extraction_data.get('items') and document.error_message):
+                document.status = DocumentStatus.FAILED
+            else:
+                document.status = DocumentStatus.COMPLETED
 
+            document.processed_at = datetime.utcnow()
             await self.db.flush()
             await self.db.refresh(document)
 
