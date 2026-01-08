@@ -95,6 +95,7 @@ async def list_accounts(current_user: CurrentUser, db: DbSession):
             "icon": account.icon,
             "is_active": account.is_active,
             "ownership_type": account.ownership_type,
+            "created_at": account.created_at,
         }
         accounts_with_balance.append(account_dict)
 
@@ -155,6 +156,7 @@ async def get_account(
         "icon": account.icon,
         "is_active": account.is_active,
         "ownership_type": account.ownership_type,
+        "created_at": account.created_at,
     }
 
 
