@@ -37,8 +37,8 @@ export default function UploadSelector({
   }
 
   return (
-    <div className="max-w-lg mx-auto space-y-6 pb-20">
-      <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Adicionar Transação</h1>
+    <div className="max-w-md mx-auto space-y-6 pb-20 min-h-[70vh] flex flex-col justify-center">
+      <h1 className="text-2xl font-bold text-gray-900 dark:text-white text-center">Adicionar Transação</h1>
 
       <div className="grid grid-cols-1 gap-4">
         {/* Camera - Primary action */}

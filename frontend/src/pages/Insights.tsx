@@ -89,19 +89,19 @@ export default function Insights() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Insights</h1>
-        <p className="text-gray-500">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Insights</h1>
+        <p className="text-gray-500 dark:text-gray-400">
           Análise dos últimos 30 dias com recomendações acionáveis
         </p>
       </div>
 
       {insights.length === 0 ? (
         <div className="card text-center py-12">
-          <Lightbulb className="mx-auto text-gray-400 mb-4" size={48} />
-          <p className="text-gray-500">
+          <Lightbulb className="mx-auto text-gray-400 dark:text-gray-500 mb-4" size={48} />
+          <p className="text-gray-500 dark:text-gray-400">
             Nenhum insight disponível ainda.
           </p>
-          <p className="text-sm text-gray-400 mt-2">
+          <p className="text-sm text-gray-400 dark:text-gray-500 mt-2">
             Adicione mais transações para receber análises personalizadas.
           </p>
         </div>
@@ -131,29 +131,29 @@ export default function Insights() {
                       </span>
                     </div>
 
-                    <h3 className="text-lg font-semibold text-gray-900">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                       {insight.title}
                     </h3>
 
-                    <p className="text-gray-600 mt-1">{insight.description}</p>
+                    <p className="text-gray-600 dark:text-gray-300 mt-1">{insight.description}</p>
 
-                    <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-                      <p className="text-sm text-gray-500">
+                    <div className="mt-4 p-3 bg-gray-50 dark:bg-slate-700/50 rounded-lg">
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
                         <strong>Cálculo:</strong> {insight.calculation}
                       </p>
-                      <p className="text-sm font-medium mt-2">
+                      <p className="text-sm font-medium mt-2 dark:text-gray-300">
                         Impacto potencial:{' '}
-                        <span className="text-primary-600">
+                        <span className="text-primary-600 dark:text-primary-400">
                           {formatCurrency(insight.impact_value)}/mês
                         </span>
                       </p>
                     </div>
 
-                    <div className="mt-4 p-3 bg-primary-50 rounded-lg border border-primary-100">
-                      <p className="text-sm font-medium text-primary-700">
+                    <div className="mt-4 p-3 bg-primary-50 dark:bg-primary-900/30 rounded-lg border border-primary-100 dark:border-primary-800">
+                      <p className="text-sm font-medium text-primary-700 dark:text-primary-300">
                         Ação sugerida:
                       </p>
-                      <p className="text-sm text-primary-600 mt-1">
+                      <p className="text-sm text-primary-600 dark:text-primary-400 mt-1">
                         {insight.action}
                       </p>
                     </div>
