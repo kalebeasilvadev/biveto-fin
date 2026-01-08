@@ -451,6 +451,9 @@ class LLMOCRService:
         'limite total',
         'próxima fatura',
         'próximas parcelas',
+        'pagamento de fatura',  # Não é despesa, é pagamento do cartão
+        'pagamento fatura',
+        'pag fatura',
     ]
 
     def _is_invalid_description(self, description: str) -> bool:
