@@ -536,6 +536,10 @@
     animation-name: slide-in-from-bottom;
   }
 
+  .animate-slide-up {
+    animation: slide-in-from-bottom 0.3s ease-out;
+  }
+
   /* Biveto Gradient utilities */
   .gradient-biveto {
     background: linear-gradient(135deg, #1E3A5F 0%, #243b53 100%);

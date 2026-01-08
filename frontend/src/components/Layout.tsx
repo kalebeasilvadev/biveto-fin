@@ -25,6 +25,7 @@ import { useState, useEffect } from 'react'
 import { clsx } from 'clsx'
 import api from '../services/api'
 import FloatingAssistant from './FloatingAssistant'
+import QuickTransactionModal from './QuickTransactionModal'
 
 // Main navigation items
 const mainNavItems = [
@@ -51,6 +52,7 @@ const bottomNavItems = [
 
 export default function Layout() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [showQuickTransaction, setShowQuickTransaction] = useState(false)
   const logout = useAuthStore((state) => state.logout)
   const user = useAuthStore((state) => state.user)
   const setUser = useAuthStore((state) => state.setUser)
@@ -318,33 +320,41 @@ export default function Layout() {
       {/* Floating Assistant Button */}
       <FloatingAssistant />
 
+      {/* Quick Transaction Modal */}
+      <QuickTransactionModal
+        isOpen={showQuickTransaction}
+        onClose={() => setShowQuickTransaction(false)}
+      />
+
       {/* Mobile Bottom Navigation */}
       <nav className="bottom-nav">
-        {bottomNavItems.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            className={({ isActive }) =>
-              item.primary
-                ? 'relative -mt-5'
-                : clsx(
-                    'bottom-nav-item',
-                    isActive && 'bottom-nav-item-active'
-                  )
-            }
-          >
-            {item.primary ? (
+        {bottomNavItems.map((item) =>
+          item.primary ? (
+            <button
+              key={item.to}
+              onClick={() => setShowQuickTransaction(true)}
+              className="relative -mt-5"
+            >
               <div className="w-14 h-14 rounded-2xl gradient-biveto shadow-lg shadow-biveto flex items-center justify-center text-white active:scale-95 transition-transform">
                 <item.icon size={26} strokeWidth={2.5} />
               </div>
-            ) : (
-              <>
-                <item.icon size={22} />
-                <span className="text-[10px] font-medium">{item.label}</span>
-              </>
-            )}
-          </NavLink>
-        ))}
+            </button>
+          ) : (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={({ isActive }) =>
+                clsx(
+                  'bottom-nav-item',
+                  isActive && 'bottom-nav-item-active'
+                )
+              }
+            >
+              <item.icon size={22} />
+              <span className="text-[10px] font-medium">{item.label}</span>
+            </NavLink>
+          )
+        )}
       </nav>
     </div>
   )
