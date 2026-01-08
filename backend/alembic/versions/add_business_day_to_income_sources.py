@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = 'add_business_day_fields'
-down_revision = 'add_credit_cards_and_income_sources'
+down_revision = 'add_credit_income'
 branch_labels = None
 depends_on = None
 
