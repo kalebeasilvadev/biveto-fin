@@ -20,11 +20,31 @@ jobs:
 
       - name: Set Fly.io secrets
         run: |
-          flyctl secrets set \
-            GOOGLE_API_KEY="${{ secrets.GOOGLE_API_KEY }}" \
-            SECRET_KEY="${{ secrets.SECRET_KEY }}" \
-            DATABASE_URL="${{ secrets.DATABASE_URL }}" \
-            --stage
+          # Only set secrets if they are defined in GitHub
+          SECRETS_CMD="flyctl secrets set"
+          NEED_SET=false
+
+          if [ -n "${{ secrets.DATABASE_URL }}" ]; then
+            SECRETS_CMD="$SECRETS_CMD DATABASE_URL=\"${{ secrets.DATABASE_URL }}\""
+            NEED_SET=true
+          fi
+
+          if [ -n "${{ secrets.SECRET_KEY }}" ]; then
+            SECRETS_CMD="$SECRETS_CMD SECRET_KEY=\"${{ secrets.SECRET_KEY }}\""
+            NEED_SET=true
+          fi
+
+          if [ -n "${{ secrets.GOOGLE_API_KEY }}" ]; then
+            SECRETS_CMD="$SECRETS_CMD GOOGLE_API_KEY=\"${{ secrets.GOOGLE_API_KEY }}\""
+            NEED_SET=true
+          fi
+
+          if [ "$NEED_SET" = true ]; then
+            eval "$SECRETS_CMD --stage"
+            echo "✓ Secrets staged for deployment"
+          else
+            echo "⚠ No secrets to set (using existing Fly.io secrets)"
+          fi
 
       - name: Deploy to Fly.io
         run: flyctl deploy --remote-only
