@@ -84,7 +84,7 @@ export default function Chat() {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [conversationId, setConversationId] = useState<string | null>(null)
-  const [showSidebar, setShowSidebar] = useState(true)
+  const [showSidebar, setShowSidebar] = useState(false) // Hidden by default on mobile
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const { data: suggestionsData, isLoading: loadingSuggestions } = useQuery({
@@ -216,12 +216,21 @@ export default function Chat() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-8rem)] -mx-4 lg:-mx-8 -my-4 lg:-my-8">
+    <div className="flex h-[calc(100vh-12rem)] lg:h-[calc(100vh-8rem)] -mx-4 lg:-mx-8 -my-4 lg:-my-8 relative overflow-hidden">
+      {/* Sidebar overlay for mobile */}
+      {showSidebar && (
+        <div
+          className="fixed inset-0 bg-black/30 z-40 lg:hidden"
+          onClick={() => setShowSidebar(false)}
+        />
+      )}
+
       {/* Sidebar with conversation history */}
       <div
         className={clsx(
-          'w-80 border-r border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/50 flex-shrink-0 flex flex-col transition-all duration-300',
-          showSidebar ? 'translate-x-0' : '-translate-x-full absolute lg:relative'
+          'w-72 lg:w-80 border-r border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/50 flex-shrink-0 flex flex-col transition-transform duration-300 z-50',
+          'fixed lg:relative inset-y-0 left-0 lg:translate-x-0',
+          showSidebar ? 'translate-x-0' : '-translate-x-full'
         )}
       >
         {/* Sidebar Header */}
@@ -285,14 +294,15 @@ export default function Chat() {
       </div>
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 w-full">
         {/* Header */}
         <div className="flex items-center gap-3 px-4 lg:px-6 py-4 border-b border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800">
           <button
             onClick={() => setShowSidebar(!showSidebar)}
-            className="lg:hidden p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+            className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+            title="Histórico de conversas"
           >
-            <History size={20} />
+            <History size={20} className="text-gray-600 dark:text-gray-400" />
           </button>
           <div className="p-2.5 bg-primary-100 dark:bg-primary-900/30 rounded-full">
             <Bot className="text-primary-600 dark:text-primary-400" size={22} />
