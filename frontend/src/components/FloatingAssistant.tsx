@@ -235,7 +235,7 @@ export default function FloatingAssistant() {
           'fixed z-50 bg-white dark:bg-slate-800 shadow-2xl transition-all duration-300 flex flex-col',
           isExpanded
             ? 'inset-4 lg:inset-8 rounded-2xl'
-            : 'bottom-24 right-4 lg:bottom-6 lg:right-6 w-[calc(100%-2rem)] max-w-md h-[70vh] max-h-[600px] rounded-2xl',
+            : 'bottom-24 left-4 right-4 lg:left-auto lg:right-6 lg:w-96 h-[70vh] max-h-[600px] rounded-2xl',
           isOpen ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'
         )}
       >
