@@ -51,14 +51,20 @@ Extraia os itens/transações e retorne um JSON válido com este formato:
    - Mostra o número da parcela seguinte (ex: se na fatura atual é 5/12, aqui será 6/12)
    - Data geralmente é do próximo mês
 
-❌ NUNCA EXTRAIA:
+❌ NUNCA EXTRAIA (são resumos/totais, NÃO são transações):
+- "Despesas do mês" - é um TOTAL, não uma transação individual!
+- "Fatura atual" - é um TOTAL, não uma transação individual!
+- "Total da fatura" / "Valor do Documento" - totais
 - TODA a seção "Próxima fatura" / "Próximas parcelas" - são FUTURAS!
 - "Parcelamento Fatura" / "Parcelamento Total" - opção de parcelar a fatura
 - "1 + X de R$ XXX" - simulação de parcelamento
 - "Pagamento mínimo" - informativo
-- "Valor do Documento" / "Total da fatura" - totais
 - Limite disponível, limite total
 - Encargos, IOF, juros (exceto se na seção de despesas com data)
+
+⚠️ "Despesas do mês" e "Fatura atual" são LABELS de totais, não transações!
+Se você vir "Despesas do mês R$ 1.178,99" - isso é o TOTAL das despesas, NÃO uma transação.
+Transações reais têm nome de ESTABELECIMENTO (ex: "APPLE.COM/BILL", "UBER *TRIP").
 
 ✅ EXTRAIA APENAS da seção "Despesas da fatura" / "Fatura atual":
 - Transações com DATA específica
@@ -432,6 +438,62 @@ class LLMOCRService:
             content = result['content'][0]['text']
             return self._parse_response(content)
 
+    # Padrões de descrição que indicam totais/resumos (não são transações reais)
+    INVALID_DESCRIPTIONS = [
+        'despesas do mês',
+        'fatura atual',
+        'total da fatura',
+        'valor do documento',
+        'pagamento mínimo',
+        'parcelamento fatura',
+        'parcelamento total',
+        'limite disponível',
+        'limite total',
+        'próxima fatura',
+        'próximas parcelas',
+    ]
+
+    def _is_invalid_description(self, description: str) -> bool:
+        """Verifica se a descrição é um total/resumo ao invés de uma transação real"""
+        desc_lower = description.lower().strip()
+        for invalid in self.INVALID_DESCRIPTIONS:
+            if invalid in desc_lower or desc_lower in invalid:
+                return True
+        return False
+
+    def _filter_duplicate_installments(self, items: list) -> list:
+        """
+        Remove parcelas duplicadas (mesma descrição e valor, mas número de parcela diferente).
+        Mantém apenas a parcela com menor número (da fatura atual, não da próxima).
+        """
+        # Agrupar por (descrição normalizada, valor)
+        groups = {}
+        for item in items:
+            key = (item['description'].lower().strip(), item['amount'])
+            if key not in groups:
+                groups[key] = []
+            groups[key].append(item)
+
+        # Para cada grupo, manter apenas o item com menor número de parcela
+        # ou o item não-parcelado
+        filtered = []
+        for key, group in groups.items():
+            if len(group) == 1:
+                filtered.append(group[0])
+            else:
+                # Se tem itens parcelados, pegar o de menor número de parcela
+                installment_items = [i for i in group if i.get('is_installment')]
+                non_installment_items = [i for i in group if not i.get('is_installment')]
+
+                if installment_items:
+                    # Ordenar pelo número da parcela e pegar o menor
+                    installment_items.sort(key=lambda x: x.get('installment_current', 999))
+                    filtered.append(installment_items[0])
+                elif non_installment_items:
+                    filtered.append(non_installment_items[0])
+
+        return filtered
+
     def _parse_response(self, content: str) -> dict:
         """Parseia a resposta JSON da LLM"""
         try:
@@ -480,8 +542,14 @@ class LLMOCRService:
                     else:
                         is_installment = False
 
+                description = str(item.get('description', 'Item'))[:200]
+
+                # Filtrar descrições inválidas (totais, resumos, etc.)
+                if self._is_invalid_description(description):
+                    continue
+
                 normalized = {
-                    'description': str(item.get('description', 'Item'))[:200],
+                    'description': description,
                     'amount': float(amount) if amount else 0,
                     'date': item.get('date'),
                     'category': item.get('category'),
@@ -494,6 +562,9 @@ class LLMOCRService:
                 # Aceitar tanto despesas (positivo) quanto pagamentos/créditos (negativo)
                 if normalized['amount'] != 0:
                     items.append(normalized)
+
+            # Filtrar duplicatas (mesma descrição/valor com números de parcela diferentes)
+            items = self._filter_duplicate_installments(items)
 
             return {
                 'items': items,
