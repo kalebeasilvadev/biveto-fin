@@ -300,8 +300,8 @@ export default function AdminUsers() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Usuários</h1>
-          <p className="text-gray-500">Gerencie os usuários e convites</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Usuários</h1>
+          <p className="text-gray-500 dark:text-gray-400">Gerencie os usuários e convites</p>
         </div>
         <div className="flex gap-2">
           <button
@@ -322,15 +322,15 @@ export default function AdminUsers() {
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-gray-200">
+      <div className="border-b border-gray-200 dark:border-slate-700">
         <nav className="flex gap-4">
           <button
             onClick={() => setActiveTab('users')}
             className={clsx(
               'pb-3 text-sm font-medium border-b-2 transition-colors',
               activeTab === 'users'
-                ? 'border-biveto text-biveto'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
+                ? 'border-biveto text-biveto dark:text-primary-400'
+                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
             )}
           >
             Usuários ({users?.data?.length || 0})
@@ -340,8 +340,8 @@ export default function AdminUsers() {
             className={clsx(
               'pb-3 text-sm font-medium border-b-2 transition-colors',
               activeTab === 'invitations'
-                ? 'border-biveto text-biveto'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
+                ? 'border-biveto text-biveto dark:text-primary-400'
+                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
             )}
           >
             Convites ({invitations?.length || 0})
@@ -352,40 +352,40 @@ export default function AdminUsers() {
       {/* Users Tab */}
       {activeTab === 'users' && (
         <div className="card overflow-hidden">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+          <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
+            <thead className="bg-gray-50 dark:bg-slate-700/50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Usuário
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Status
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Licença
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Criado em
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Ações
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
               {users?.data?.map((user: User) => (
                 <tr key={user.id}>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div>
-                      <div className="text-sm font-medium text-gray-900 flex items-center gap-2">
+                      <div className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
                         {user.name}
                         {user.is_admin && (
-                          <span className="px-2 py-0.5 text-xs bg-blue-100 text-blue-800 rounded-full">
+                          <span className="px-2 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 rounded-full">
                             Admin
                           </span>
                         )}
                       </div>
-                      <div className="text-sm text-gray-500">{user.email}</div>
+                      <div className="text-sm text-gray-500 dark:text-gray-400">{user.email}</div>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -393,17 +393,17 @@ export default function AdminUsers() {
                       className={clsx(
                         'px-2 py-1 text-xs rounded-full',
                         user.is_active
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-red-100 text-red-800'
+                          ? 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300'
+                          : 'bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-300'
                       )}
                     >
                       {user.is_active ? 'Ativo' : 'Inativo'}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                     {user.license_id ? `#${user.license_id}` : '-'}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                     {new Date(user.created_at).toLocaleDateString('pt-BR')}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -413,8 +413,8 @@ export default function AdminUsers() {
                         className={clsx(
                           'p-1.5 rounded-lg transition-colors',
                           user.is_admin
-                            ? 'text-blue-600 hover:bg-blue-50'
-                            : 'text-gray-400 hover:bg-gray-100'
+                            ? 'text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30'
+                            : 'text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700'
                         )}
                         title={user.is_admin ? 'Remover admin' : 'Tornar admin'}
                       >
@@ -423,21 +423,21 @@ export default function AdminUsers() {
                       <button
                         onClick={() => handleResetPassword(user)}
                         disabled={resetPasswordMutation.isPending}
-                        className="p-1.5 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg"
+                        className="p-1.5 text-gray-400 hover:text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/30 rounded-lg"
                         title="Resetar senha"
                       >
                         <KeyRound size={18} />
                       </button>
                       <button
                         onClick={() => openEditModal(user)}
-                        className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-gray-100 rounded-lg"
+                        className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg"
                         title="Editar"
                       >
                         <Edit2 size={18} />
                       </button>
                       <button
                         onClick={() => handleDelete(user)}
-                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-gray-100 rounded-lg"
+                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg"
                         title="Excluir"
                       >
                         <Trash2 size={18} />
@@ -459,49 +459,49 @@ export default function AdminUsers() {
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
             </div>
           ) : invitations?.length === 0 ? (
-            <div className="text-center py-12 text-gray-500">
+            <div className="text-center py-12 text-gray-500 dark:text-gray-400">
               Nenhum convite enviado ainda
             </div>
           ) : (
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
+              <thead className="bg-gray-50 dark:bg-slate-700/50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Email
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Status
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Licença
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Enviado por
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Expira em
                   </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Ações
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
                 {invitations?.map((inv: Invitation) => (
                   <tr key={inv.id}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                       {inv.email}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {getStatusBadge(inv.status)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                       {inv.license_code || '-'}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                       {inv.invited_by_name}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                       {new Date(inv.expires_at).toLocaleString('pt-BR')}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -510,14 +510,14 @@ export default function AdminUsers() {
                           <button
                             onClick={() => resendMutation.mutate(inv.id)}
                             disabled={resendMutation.isPending}
-                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"
+                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg"
                             title="Reenviar"
                           >
                             <Send size={18} />
                           </button>
                           <button
                             onClick={() => handleCancelInvite(inv)}
-                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
+                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg"
                             title="Cancelar"
                           >
                             <XCircle size={18} />
@@ -536,19 +536,19 @@ export default function AdminUsers() {
       {/* User Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg w-full max-w-md p-6">
+          <div className="bg-white dark:bg-slate-800 rounded-lg w-full max-w-md p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                 {editingUser ? 'Editar Usuário' : 'Novo Usuário'}
               </h2>
-              <button onClick={closeModal} className="text-gray-400 hover:text-gray-600">
+              <button onClick={closeModal} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
                 <X size={20} />
               </button>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Nome
                 </label>
                 <input
@@ -561,7 +561,7 @@ export default function AdminUsers() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Email
                 </label>
                 <input
@@ -574,7 +574,7 @@ export default function AdminUsers() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Senha {editingUser && '(deixe vazio para manter)'}
                 </label>
                 <input
@@ -588,7 +588,7 @@ export default function AdminUsers() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Licença
                 </label>
                 <select
@@ -615,7 +615,7 @@ export default function AdminUsers() {
                   onChange={(e) => setForm({ ...form, is_admin: e.target.checked })}
                   className="rounded"
                 />
-                <label htmlFor="is_admin" className="text-sm text-gray-700">
+                <label htmlFor="is_admin" className="text-sm text-gray-700 dark:text-gray-300">
                   Administrador
                 </label>
               </div>
@@ -642,21 +642,21 @@ export default function AdminUsers() {
       {/* Invite Modal */}
       {showInviteModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg w-full max-w-md p-6">
+          <div className="bg-white dark:bg-slate-800 rounded-lg w-full max-w-md p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold">Convidar Usuário</h2>
-              <button onClick={closeInviteModal} className="text-gray-400 hover:text-gray-600">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Convidar Usuário</h2>
+              <button onClick={closeInviteModal} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
                 <X size={20} />
               </button>
             </div>
 
-            <p className="text-sm text-gray-600 mb-4">
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
               Um email será enviado com um link para criar a conta.
             </p>
 
             <form onSubmit={handleInvite} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Email
                 </label>
                 <input
@@ -670,7 +670,7 @@ export default function AdminUsers() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Licença (opcional)
                 </label>
                 <select
@@ -690,7 +690,7 @@ export default function AdminUsers() {
               </div>
 
               {inviteMutation.isError && (
-                <div className="p-3 bg-red-50 text-red-700 rounded-lg text-sm">
+                <div className="p-3 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-lg text-sm">
                   {getApiErrorMessage(inviteMutation.error, 'Erro ao enviar convite')}
                 </div>
               )}
@@ -716,23 +716,23 @@ export default function AdminUsers() {
       {/* Confirmation Modal */}
       {confirmAction && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl w-full max-w-md p-6 mx-4">
+          <div className="bg-white dark:bg-slate-800 rounded-xl w-full max-w-md p-6 mx-4">
             <div className="flex items-start gap-4">
               <div className={clsx(
                 'flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center',
-                confirmAction.type === 'delete' ? 'bg-red-100' : 'bg-orange-100'
+                confirmAction.type === 'delete' ? 'bg-red-100 dark:bg-red-900/50' : 'bg-orange-100 dark:bg-orange-900/50'
               )}>
                 {confirmAction.type === 'delete' ? (
-                  <AlertTriangle className="w-5 h-5 text-red-600" />
+                  <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
                 ) : confirmAction.type === 'resetPassword' ? (
-                  <KeyRound className="w-5 h-5 text-orange-600" />
+                  <KeyRound className="w-5 h-5 text-orange-600 dark:text-orange-400" />
                 ) : (
-                  <XCircle className="w-5 h-5 text-orange-600" />
+                  <XCircle className="w-5 h-5 text-orange-600 dark:text-orange-400" />
                 )}
               </div>
               <div className="flex-1">
-                <h3 className="text-lg font-semibold text-gray-900">{confirmAction.title}</h3>
-                <p className="mt-2 text-sm text-gray-600">{confirmAction.message}</p>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{confirmAction.title}</h3>
+                <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">{confirmAction.message}</p>
               </div>
             </div>
             <div className="flex justify-end gap-3 mt-6">

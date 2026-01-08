@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v19';
+const CACHE_VERSION = 'v21';
 const CACHE_NAME = `biveto-${CACHE_VERSION}`;
 const STATIC_CACHE = `biveto-static-${CACHE_VERSION}`;
 const DYNAMIC_CACHE = `biveto-dynamic-${CACHE_VERSION}`;

@@ -169,11 +169,11 @@ export default function Family() {
     return (
       <div className="max-w-2xl mx-auto">
         <div className="card text-center py-12">
-          <Users size={48} className="mx-auto text-gray-300 mb-4" />
-          <h2 className="text-lg font-semibold text-gray-900 mb-2">
+          <Users size={48} className="mx-auto text-gray-300 dark:text-gray-600 mb-4" />
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
             Sem Plano Familiar
           </h2>
-          <p className="text-gray-500">
+          <p className="text-gray-500 dark:text-gray-400">
             Voce ainda nao possui uma licenca vinculada.
             <br />
             Entre em contato com o administrador.
@@ -188,13 +188,13 @@ export default function Family() {
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Familia</h1>
-        <p className="text-gray-500">Gerencie os membros do seu plano familiar</p>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Familia</h1>
+        <p className="text-gray-500 dark:text-gray-400">Gerencie os membros do seu plano familiar</p>
       </div>
 
       {/* Success/Error alerts */}
       {success && (
-        <div className="flex items-center gap-2 p-3 bg-green-50 text-green-700 rounded-lg">
+        <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-lg">
           <Check size={18} />
           <span>{success}</span>
         </div>
@@ -203,15 +203,15 @@ export default function Family() {
       {/* Plan Info Card */}
       <div className="card">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">Seu Plano</h2>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Seu Plano</h2>
           <span
             className={clsx(
               'px-3 py-1 text-sm font-medium rounded-full uppercase',
               familyContext.license_type === 'premium'
-                ? 'bg-purple-100 text-purple-800'
+                ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-400'
                 : familyContext.license_type === 'lifetime'
-                ? 'bg-yellow-100 text-yellow-800'
-                : 'bg-gray-100 text-gray-800'
+                ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-400'
+                : 'bg-gray-100 dark:bg-slate-700 text-gray-800 dark:text-gray-300'
             )}
           >
             {familyContext.license_type}
@@ -219,20 +219,20 @@ export default function Family() {
         </div>
 
         <div className="grid grid-cols-2 gap-4">
-          <div className="p-3 bg-gray-50 rounded-lg">
-            <p className="text-sm text-gray-500">Membros</p>
-            <p className="text-2xl font-bold text-gray-900">
+          <div className="p-3 bg-gray-50 dark:bg-slate-700/50 rounded-lg">
+            <p className="text-sm text-gray-500 dark:text-gray-400">Membros</p>
+            <p className="text-2xl font-bold text-gray-900 dark:text-white">
               {familyContext.member_count}
               <span className="text-base font-normal text-gray-400">
                 /{familyContext.max_members}
               </span>
             </p>
           </div>
-          <div className="p-3 bg-gray-50 rounded-lg">
-            <p className="text-sm text-gray-500">Seu Papel</p>
+          <div className="p-3 bg-gray-50 dark:bg-slate-700/50 rounded-lg">
+            <p className="text-sm text-gray-500 dark:text-gray-400">Seu Papel</p>
             <div className="flex items-center gap-2 mt-1">
               {getRoleIcon(familyContext.is_owner ? 'owner' : 'member')}
-              <span className="text-lg font-semibold text-gray-900">
+              <span className="text-lg font-semibold text-gray-900 dark:text-white">
                 {familyContext.is_owner ? 'Proprietario' : 'Membro'}
               </span>
             </div>
@@ -243,7 +243,7 @@ export default function Family() {
       {/* Members Card */}
       <div className="card">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
             <Users size={20} />
             Membros
           </h2>
@@ -259,7 +259,7 @@ export default function Family() {
         </div>
 
         {!canAddMore && familyContext.can_invite && (
-          <div className="flex items-center gap-2 p-3 mb-4 bg-orange-50 text-orange-700 rounded-lg">
+          <div className="flex items-center gap-2 p-3 mb-4 bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 rounded-lg">
             <AlertCircle size={18} />
             <span>Limite de membros atingido</span>
           </div>
@@ -272,7 +272,7 @@ export default function Family() {
               className="flex items-center justify-between p-3 bg-gray-50 dark:bg-slate-700/50 rounded-lg"
             >
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-biveto-light flex items-center justify-center text-biveto font-semibold">
+                <div className="w-10 h-10 rounded-full bg-biveto-light dark:bg-primary-900/30 flex items-center justify-center text-biveto dark:text-primary-400 font-semibold">
                   {member.user_name?.charAt(0).toUpperCase() || member.user_email?.charAt(0).toUpperCase() || '?'}
                 </div>
                 <div>
@@ -318,7 +318,7 @@ export default function Family() {
       {/* Pending Invitations */}
       {familyContext.can_invite && (
         <div className="card">
-          <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-4">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2 mb-4">
             <Mail size={20} />
             Convites Pendentes
           </h2>
@@ -332,13 +332,13 @@ export default function Family() {
               {invitations.map((inv) => (
                 <div
                   key={inv.id}
-                  className="flex items-center justify-between p-3 bg-orange-50 rounded-lg"
+                  className="flex items-center justify-between p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg"
                 >
                   <div className="flex items-center gap-3">
-                    <Clock size={20} className="text-orange-500" />
+                    <Clock size={20} className="text-orange-500 dark:text-orange-400" />
                     <div>
-                      <p className="font-medium text-gray-900">{inv.email}</p>
-                      <p className="text-sm text-gray-500">
+                      <p className="font-medium text-gray-900 dark:text-white">{inv.email}</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
                         Expira em{' '}
                         {new Date(inv.expires_at).toLocaleDateString('pt-BR')}
                       </p>
@@ -347,7 +347,7 @@ export default function Family() {
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => resendInviteMutation.mutate(inv.id)}
-                      className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"
+                      className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg"
                       disabled={resendInviteMutation.isPending}
                       title="Reenviar"
                     >
@@ -355,7 +355,7 @@ export default function Family() {
                     </button>
                     <button
                       onClick={() => cancelInviteMutation.mutate(inv.id)}
-                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
+                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg"
                       disabled={cancelInviteMutation.isPending}
                       title="Cancelar"
                     >
@@ -366,7 +366,7 @@ export default function Family() {
               ))}
             </div>
           ) : (
-            <p className="text-center text-gray-500 py-4">
+            <p className="text-center text-gray-500 dark:text-gray-400 py-4">
               Nenhum convite pendente
             </p>
           )}
@@ -376,22 +376,22 @@ export default function Family() {
       {/* Invite Modal */}
       {showInviteModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg w-full max-w-md p-6">
+          <div className="bg-white dark:bg-slate-800 rounded-lg w-full max-w-md p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold">Convidar Membro</h2>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Convidar Membro</h2>
               <button
                 onClick={() => {
                   setShowInviteModal(false)
                   setError('')
                 }}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
               >
                 <X size={20} />
               </button>
             </div>
 
             {error && (
-              <div className="flex items-center gap-2 p-3 mb-4 bg-red-50 text-red-700 rounded-lg">
+              <div className="flex items-center gap-2 p-3 mb-4 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-lg">
                 <AlertCircle size={18} />
                 <span>{error}</span>
               </div>
@@ -399,7 +399,7 @@ export default function Family() {
 
             <form onSubmit={handleInvite} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Email *
                 </label>
                 <input
@@ -413,7 +413,7 @@ export default function Family() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Apelido (opcional)
                 </label>
                 <input

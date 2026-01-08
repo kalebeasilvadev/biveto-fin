@@ -209,8 +209,8 @@ export default function AdminLicenses() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Licenças</h1>
-          <p className="text-gray-500">Gerencie as licenças do sistema</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Licenças</h1>
+          <p className="text-gray-500 dark:text-gray-400">Gerencie as licenças do sistema</p>
         </div>
         <button
           onClick={() => setShowModal(true)}
@@ -231,10 +231,10 @@ export default function AdminLicenses() {
                     className={clsx(
                       'px-2 py-1 text-xs font-medium rounded-full uppercase',
                       license.type === 'premium'
-                        ? 'bg-purple-100 text-purple-800'
+                        ? 'bg-purple-100 dark:bg-purple-900/50 text-purple-800 dark:text-purple-300'
                         : license.type === 'lifetime'
-                        ? 'bg-yellow-100 text-yellow-800'
-                        : 'bg-gray-100 text-gray-800'
+                        ? 'bg-yellow-100 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-300'
+                        : 'bg-gray-100 dark:bg-slate-700 text-gray-800 dark:text-gray-300'
                     )}
                   >
                     {license.type}
@@ -243,8 +243,8 @@ export default function AdminLicenses() {
                     className={clsx(
                       'px-2 py-1 text-xs rounded-full',
                       license.is_valid
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-red-100 text-red-800'
+                        ? 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300'
+                        : 'bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-300'
                     )}
                   >
                     {license.status}
@@ -298,28 +298,28 @@ export default function AdminLicenses() {
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                   <div>
-                    <span className="text-gray-500">Usuários:</span>{' '}
-                    <span className="font-medium">
+                    <span className="text-gray-500 dark:text-gray-400">Usuários:</span>{' '}
+                    <span className="font-medium text-gray-900 dark:text-white">
                       {license.user_count}/{license.max_users}
                     </span>
                   </div>
                   <div>
-                    <span className="text-gray-500">Início:</span>{' '}
-                    <span className="font-medium">
+                    <span className="text-gray-500 dark:text-gray-400">Início:</span>{' '}
+                    <span className="font-medium text-gray-900 dark:text-white">
                       {new Date(license.start_date).toLocaleDateString('pt-BR')}
                     </span>
                   </div>
                   <div>
-                    <span className="text-gray-500">Término:</span>{' '}
-                    <span className="font-medium">
+                    <span className="text-gray-500 dark:text-gray-400">Término:</span>{' '}
+                    <span className="font-medium text-gray-900 dark:text-white">
                       {license.end_date
                         ? new Date(license.end_date).toLocaleDateString('pt-BR')
                         : 'Sem limite'}
                     </span>
                   </div>
                   <div>
-                    <span className="text-gray-500">Criada em:</span>{' '}
-                    <span className="font-medium">
+                    <span className="text-gray-500 dark:text-gray-400">Criada em:</span>{' '}
+                    <span className="font-medium text-gray-900 dark:text-white">
                       {new Date(license.created_at).toLocaleDateString('pt-BR')}
                     </span>
                   </div>
@@ -327,27 +327,27 @@ export default function AdminLicenses() {
 
                 <div className="flex flex-wrap gap-2 mt-3">
                   {license.has_ai_assistant && (
-                    <span className="px-2 py-0.5 text-xs bg-blue-50 text-blue-700 rounded">
+                    <span className="px-2 py-0.5 text-xs bg-blue-50 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded">
                       IA
                     </span>
                   )}
                   {license.has_insights && (
-                    <span className="px-2 py-0.5 text-xs bg-blue-50 text-blue-700 rounded">
+                    <span className="px-2 py-0.5 text-xs bg-blue-50 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded">
                       Insights
                     </span>
                   )}
                   {license.has_debt_strategies && (
-                    <span className="px-2 py-0.5 text-xs bg-blue-50 text-blue-700 rounded">
+                    <span className="px-2 py-0.5 text-xs bg-blue-50 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded">
                       Dívidas
                     </span>
                   )}
                   {license.has_goals && (
-                    <span className="px-2 py-0.5 text-xs bg-blue-50 text-blue-700 rounded">
+                    <span className="px-2 py-0.5 text-xs bg-blue-50 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded">
                       Metas
                     </span>
                   )}
                   {license.has_budget && (
-                    <span className="px-2 py-0.5 text-xs bg-blue-50 text-blue-700 rounded">
+                    <span className="px-2 py-0.5 text-xs bg-blue-50 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded">
                       Orçamento
                     </span>
                   )}
@@ -360,21 +360,21 @@ export default function AdminLicenses() {
                   className={clsx(
                     'px-3 py-1 text-sm rounded-lg transition-colors',
                     license.status === 'active'
-                      ? 'bg-orange-100 text-orange-700 hover:bg-orange-200'
-                      : 'bg-green-100 text-green-700 hover:bg-green-200'
+                      ? 'bg-orange-100 dark:bg-orange-900/50 text-orange-700 dark:text-orange-300 hover:bg-orange-200 dark:hover:bg-orange-900/70'
+                      : 'bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/70'
                   )}
                 >
                   {license.status === 'active' ? 'Suspender' : 'Ativar'}
                 </button>
                 <button
                   onClick={() => openEditModal(license)}
-                  className="p-2 text-gray-400 hover:text-primary-600 hover:bg-gray-100 rounded-lg"
+                  className="p-2 text-gray-400 hover:text-primary-600 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg"
                 >
                   <Edit2 size={18} />
                 </button>
                 <button
                   onClick={() => handleDelete(license)}
-                  className="p-2 text-gray-400 hover:text-red-600 hover:bg-gray-100 rounded-lg"
+                  className="p-2 text-gray-400 hover:text-red-600 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg"
                   disabled={license.user_count > 0}
                 >
                   <Trash2 size={18} />
@@ -385,7 +385,7 @@ export default function AdminLicenses() {
         ))}
 
         {licenses?.data?.length === 0 && (
-          <div className="card text-center py-12 text-gray-500">
+          <div className="card text-center py-12 text-gray-500 dark:text-gray-400">
             Nenhuma licença cadastrada
           </div>
         )}
@@ -483,7 +483,7 @@ export default function AdminLicenses() {
               {/* Campo owner_email - apenas na criacao */}
               {!editingLicense && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Email do Proprietario *
                   </label>
                   <input
@@ -494,7 +494,7 @@ export default function AdminLicenses() {
                     required
                     placeholder="email@exemplo.com"
                   />
-                  <p className="mt-1 text-xs text-gray-500">
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                     Um convite sera enviado automaticamente para este email
                   </p>
                 </div>
@@ -502,7 +502,7 @@ export default function AdminLicenses() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Tipo
                   </label>
                   <select
@@ -518,7 +518,7 @@ export default function AdminLicenses() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Max. Usuarios
                   </label>
                   <input
@@ -532,7 +532,7 @@ export default function AdminLicenses() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Data de Termino (opcional)
                 </label>
                 <input
@@ -544,7 +544,7 @@ export default function AdminLicenses() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Recursos
                 </label>
                 <div className="space-y-2">
@@ -564,14 +564,14 @@ export default function AdminLicenses() {
                         }
                         className="rounded"
                       />
-                      <span className="text-sm text-gray-700">{item.label}</span>
+                      <span className="text-sm text-gray-700 dark:text-gray-300">{item.label}</span>
                     </label>
                   ))}
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Notas
                 </label>
                 <textarea
