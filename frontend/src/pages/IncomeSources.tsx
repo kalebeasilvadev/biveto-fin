@@ -40,6 +40,13 @@ interface Account {
   type: string
 }
 
+const accountTypeLabels: Record<string, string> = {
+  wallet: 'Carteira',
+  bank: 'Banco',
+  credit_card: 'Cartão',
+  investment: 'Investimento',
+}
+
 const incomeTypes = [
   { value: 'salary', label: 'Salário', icon: Briefcase, color: 'text-green-600' },
   { value: 'freelance', label: 'Freelance', icon: Briefcase, color: 'text-blue-600' },
@@ -533,7 +540,9 @@ export default function IncomeSources() {
                 >
                   <option value="">Selecione uma conta</option>
                   {destinationAccounts.map((account) => (
-                    <option key={account.id} value={account.id}>{account.name}</option>
+                    <option key={account.id} value={account.id}>
+                      {account.name} ({accountTypeLabels[account.type] || account.type})
+                    </option>
                   ))}
                 </select>
               </div>

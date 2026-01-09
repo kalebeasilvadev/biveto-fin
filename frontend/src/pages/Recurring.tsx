@@ -35,6 +35,14 @@ interface RecurringSummary {
 interface Account {
   id: number
   name: string
+  type: 'wallet' | 'bank' | 'credit_card' | 'investment'
+}
+
+const accountTypeLabels: Record<string, string> = {
+  wallet: 'Carteira',
+  bank: 'Banco',
+  credit_card: 'Cartão',
+  investment: 'Investimento',
 }
 
 interface Category {
@@ -83,6 +91,7 @@ export default function Recurring() {
     description: '',
     amount: '',
     type: 'expense',
+    is_debit: true, // true = débito em conta (banco/carteira), false = cartão de crédito
     account_id: '',
     category_id: '',
     frequency: 'monthly',
@@ -184,6 +193,7 @@ export default function Recurring() {
       description: '',
       amount: '',
       type: 'expense',
+      is_debit: true,
       account_id: '',
       category_id: '',
       frequency: 'monthly',
@@ -194,13 +204,34 @@ export default function Recurring() {
     })
   }
 
+  // Filtrar contas baseado no tipo de transação
+  const filteredAccounts = accounts.filter((account) => {
+    if (formData.type === 'income') {
+      // Receitas: banco e carteira
+      return account.type === 'bank' || account.type === 'wallet'
+    } else {
+      // Despesas
+      if (formData.is_debit) {
+        // Débito em conta: banco e carteira
+        return account.type === 'bank' || account.type === 'wallet'
+      } else {
+        // Cartão de crédito
+        return account.type === 'credit_card'
+      }
+    }
+  })
+
   const handleEdit = (item: RecurringTransaction) => {
     setEditingId(item.id)
+    // Determinar is_debit baseado no tipo de conta
+    const account = accounts.find(a => a.id === item.account_id)
+    const isDebit = account ? account.type !== 'credit_card' : true
     setFormData({
       name: item.name,
       description: item.description || '',
       amount: item.amount.toString(),
       type: item.type,
+      is_debit: isDebit,
       account_id: item.account_id.toString(),
       category_id: item.category_id?.toString() || '',
       frequency: item.frequency,
@@ -382,7 +413,7 @@ export default function Recurring() {
                   </label>
                   <select
                     value={formData.type}
-                    onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                    onChange={(e) => setFormData({ ...formData, type: e.target.value, account_id: '' })}
                     className="input w-full"
                   >
                     <option value="expense">Despesa</option>
@@ -391,10 +422,45 @@ export default function Recurring() {
                 </div>
               </div>
 
+              {/* Forma de pagamento - só para despesas */}
+              {formData.type === 'expense' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Forma de Pagamento
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, is_debit: true, account_id: '' })}
+                      className={clsx(
+                        'p-3 rounded-lg border-2 text-sm font-medium transition-all',
+                        formData.is_debit
+                          ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300'
+                          : 'border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400'
+                      )}
+                    >
+                      Débito em Conta
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, is_debit: false, account_id: '' })}
+                      className={clsx(
+                        'p-3 rounded-lg border-2 text-sm font-medium transition-all',
+                        !formData.is_debit
+                          ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300'
+                          : 'border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400'
+                      )}
+                    >
+                      Cartão de Crédito
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Conta *
+                    {formData.type === 'expense' && !formData.is_debit ? 'Cartão *' : 'Conta *'}
                   </label>
                   <select
                     value={formData.account_id}
@@ -403,9 +469,9 @@ export default function Recurring() {
                     required
                   >
                     <option value="">Selecione...</option>
-                    {accounts.map((account) => (
+                    {filteredAccounts.map((account) => (
                       <option key={account.id} value={account.id}>
-                        {account.name}
+                        {account.name} ({accountTypeLabels[account.type]})
                       </option>
                     ))}
                   </select>
