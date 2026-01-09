@@ -35,23 +35,26 @@ class AnalyticsService:
 
         # Buscar IDs de transações de pagamento de fatura para excluir
         # (evita contagem dupla: contamos as compras do cartão, não o pagamento da fatura)
-        payment_transaction_ids = await self._get_invoice_payment_transaction_ids(user)
+        try:
+            payment_transaction_ids = await self._get_invoice_payment_transaction_ids(user)
+        except Exception:
+            payment_transaction_ids = set()
 
-        # Calcular totais
-        total_income = sum(
+        # Calcular totais (converter para float para evitar problemas com Decimal)
+        total_income = float(sum(
             t.amount for t in transactions if t.type == TransactionType.INCOME
-        )
+        ) or 0)
         # Excluir transações de pagamento de fatura para evitar contagem dupla
-        total_expense = sum(
+        total_expense = float(sum(
             t.amount for t in transactions
             if t.type == TransactionType.EXPENSE and t.id not in payment_transaction_ids
-        )
+        ) or 0)
 
-        fixed_expenses = sum(
+        fixed_expenses = float(sum(
             t.amount
             for t in transactions
             if t.type == TransactionType.EXPENSE and t.is_fixed and t.id not in payment_transaction_ids
-        )
+        ) or 0)
         variable_expenses = total_expense - fixed_expenses
 
         # Agrupar por categoria (excluindo pagamentos de fatura)
@@ -64,17 +67,20 @@ class AnalyticsService:
         prev_start = period_start - timedelta(days=period_start.day)
         prev_end = period_start - timedelta(days=1)
         prev_transactions = await self._get_transactions(user, prev_start, prev_end)
-        prev_expense = sum(
+        prev_expense = float(sum(
             t.amount for t in prev_transactions
             if t.type == TransactionType.EXPENSE and t.id not in payment_transaction_ids
-        )
+        ) or 0)
 
         expense_variation = None
         if prev_expense > 0:
             expense_variation = ((total_expense - prev_expense) / prev_expense) * 100
 
         # Calcular faturas pendentes (não pagas) do mês
-        pending_invoices = await self._get_pending_invoices_total(user, year, month)
+        try:
+            pending_invoices = await self._get_pending_invoices_total(user, year, month)
+        except Exception:
+            pending_invoices = 0
 
         # Total pendente = faturas não pagas
         pending_total = pending_invoices
@@ -185,46 +191,52 @@ class AnalyticsService:
         Essas transações devem ser excluídas do cálculo de despesas
         para evitar contagem dupla (contamos as compras, não o pagamento).
         """
-        household_user_ids = await self._get_household_user_ids(user)
-        user_ids = [user.id] + household_user_ids if household_user_ids else [user.id]
+        try:
+            household_user_ids = await self._get_household_user_ids(user)
+            user_ids = [user.id] + household_user_ids if household_user_ids else [user.id]
 
-        result = await self.db.execute(
-            select(CreditCardInvoice.payment_transaction_id).where(
-                CreditCardInvoice.user_id.in_(user_ids),
-                CreditCardInvoice.payment_transaction_id.isnot(None)
+            result = await self.db.execute(
+                select(CreditCardInvoice.payment_transaction_id).where(
+                    CreditCardInvoice.user_id.in_(user_ids),
+                    CreditCardInvoice.payment_transaction_id.isnot(None)
+                )
             )
-        )
-        return set(result.scalars().all())
+            return set(result.scalars().all())
+        except Exception:
+            return set()
 
     async def _get_pending_invoices_total(self, user: User, year: int, month: int) -> float:
         """
         Retorna o total de faturas não pagas para o mês.
         Considera faturas com status OPEN, CLOSED ou OVERDUE.
         """
-        household_user_ids = await self._get_household_user_ids(user)
-        user_ids = [user.id] + household_user_ids if household_user_ids else [user.id]
+        try:
+            household_user_ids = await self._get_household_user_ids(user)
+            user_ids = [user.id] + household_user_ids if household_user_ids else [user.id]
 
-        # Buscar faturas não pagas do mês
-        result = await self.db.execute(
-            select(CreditCardInvoice).where(
-                CreditCardInvoice.user_id.in_(user_ids),
-                CreditCardInvoice.reference_year == year,
-                CreditCardInvoice.reference_month == month,
-                CreditCardInvoice.status.in_([
-                    InvoiceStatus.OPEN.value,
-                    InvoiceStatus.CLOSED.value,
-                    InvoiceStatus.OVERDUE.value,
-                ])
+            # Buscar faturas não pagas do mês
+            result = await self.db.execute(
+                select(CreditCardInvoice).where(
+                    CreditCardInvoice.user_id.in_(user_ids),
+                    CreditCardInvoice.reference_year == year,
+                    CreditCardInvoice.reference_month == month,
+                    CreditCardInvoice.status.in_([
+                        InvoiceStatus.OPEN.value,
+                        InvoiceStatus.CLOSED.value,
+                        InvoiceStatus.OVERDUE.value,
+                    ])
+                )
             )
-        )
-        invoices = result.scalars().all()
+            invoices = result.scalars().all()
 
-        # Somar total das faturas menos o que já foi pago parcialmente
-        total = sum(
-            float(inv.total_amount or 0) - float(inv.paid_amount or 0)
-            for inv in invoices
-        )
-        return total
+            # Somar total das faturas menos o que já foi pago parcialmente
+            total = sum(
+                float(inv.total_amount or 0) - float(inv.paid_amount or 0)
+                for inv in invoices
+            )
+            return total
+        except Exception:
+            return 0.0
 
     async def _group_by_category(
         self, transactions: list[Transaction], exclude_ids: set[int] | None = None
