@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Check, AlertCircle, User, Users } from 'lucide-react'
+import { Check, AlertCircle, User, Users, Repeat } from 'lucide-react'
 import { clsx } from 'clsx'
 import { TransactionFormData } from '../../types/upload'
 
@@ -263,6 +263,43 @@ export default function TransactionForm({
               </span>
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Recurring section - only for manual mode and NOT installments */}
+      {isManual && !formData.is_installment && (
+        <div className="bg-purple-50 dark:bg-purple-900/30 rounded-xl p-4 space-y-3">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={formData.create_recurring}
+              onChange={(e) => onChange({ create_recurring: e.target.checked })}
+              className="w-4 h-4 text-purple-600 rounded"
+            />
+            <Repeat size={18} className="text-purple-600" />
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              Criar como transação recorrente
+            </span>
+          </label>
+
+          {formData.create_recurring && (
+            <div>
+              <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Frequência</label>
+              <select
+                value={formData.recurring_frequency}
+                onChange={(e) => onChange({ recurring_frequency: e.target.value as 'daily' | 'weekly' | 'monthly' | 'yearly' })}
+                className="input"
+              >
+                <option value="daily">Diário</option>
+                <option value="weekly">Semanal</option>
+                <option value="monthly">Mensal</option>
+                <option value="yearly">Anual</option>
+              </select>
+              <p className="text-xs text-purple-600 dark:text-purple-400 mt-2">
+                A recorrência será criada automaticamente na tela de Recorrências
+              </p>
+            </div>
+          )}
         </div>
       )}
 

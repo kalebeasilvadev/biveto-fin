@@ -9,6 +9,7 @@ from ..models.merchant import Merchant
 from ..models.account import Account
 from ..models.user import User
 from ..models.household import HouseholdMember
+from ..models.recurring import RecurringTransaction
 from ..schemas.transaction import TransactionCreate, TransactionUpdate, TransactionConfirm
 from .installment_service import InstallmentService
 
@@ -42,7 +43,57 @@ class TransactionService:
         self.db.add(transaction)
         await self.db.flush()
         await self.db.refresh(transaction)
+
+        # Criar recorrência se solicitado
+        if data.create_recurring and data.recurring_frequency:
+            await self._create_recurring_from_transaction(user, data, transaction)
+
         return transaction
+
+    async def _create_recurring_from_transaction(
+        self, user: User, data: TransactionCreate, transaction: Transaction
+    ) -> RecurringTransaction:
+        """Cria uma transação recorrente baseada em uma transação criada"""
+        # Verificar se já existe recorrência similar
+        existing = await self.db.execute(
+            select(RecurringTransaction).where(
+                RecurringTransaction.user_id == user.id,
+                RecurringTransaction.name == (data.description or data.merchant_name or "Recorrente"),
+                RecurringTransaction.amount == data.amount,
+                RecurringTransaction.status == "active",
+            )
+        )
+        if existing.scalar_one_or_none():
+            return None  # Já existe, não criar duplicata
+
+        # Determinar dia do mês ou semana
+        day_of_month = data.recurring_day_of_month
+        day_of_week = data.recurring_day_of_week
+
+        if data.recurring_frequency == "monthly" and not day_of_month:
+            day_of_month = data.date.day  # Usar o dia da transação
+
+        if data.recurring_frequency == "weekly" and day_of_week is None:
+            day_of_week = data.date.weekday()  # Usar o dia da semana da transação
+
+        recurring = RecurringTransaction(
+            user_id=user.id,
+            name=data.description or data.merchant_name or "Recorrente",
+            description=data.notes,
+            amount=data.amount,
+            type=data.type.value if hasattr(data.type, 'value') else data.type,
+            account_id=data.account_id,
+            category_id=data.category_id,
+            frequency=data.recurring_frequency,
+            day_of_month=day_of_month,
+            day_of_week=day_of_week,
+            start_date=data.date,
+            status="active",
+            last_generated_date=data.date,  # Já foi gerada (a transação atual)
+        )
+        self.db.add(recurring)
+        await self.db.flush()
+        return recurring
 
     async def confirm_from_document(
         self, user: User, data: TransactionConfirm

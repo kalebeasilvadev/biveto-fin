@@ -23,6 +23,12 @@ class TransactionCreate(TransactionBase):
     credit_card_id: int | None = None  # For credit card expenses
     income_source_id: int | None = None  # For income transactions
 
+    # Campos para criar recorrência junto com a transação
+    create_recurring: bool = False
+    recurring_frequency: str | None = None  # 'daily', 'weekly', 'monthly', 'yearly'
+    recurring_day_of_month: int | None = None  # Para frequência mensal
+    recurring_day_of_week: int | None = None  # Para frequência semanal (0-6)
+
 
 class TransactionConfirm(BaseModel):
     """Confirmação de transação a partir de documento processado"""

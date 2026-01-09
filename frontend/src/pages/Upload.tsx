@@ -190,6 +190,9 @@ export default function Upload() {
       merchant_name: formData.merchant_name || null,
       description: formData.description || null,
       ownership_type: formData.ownership_type,
+      // Campos de recorrência
+      create_recurring: formData.create_recurring,
+      recurring_frequency: formData.create_recurring ? formData.recurring_frequency : null,
     })
   }
 

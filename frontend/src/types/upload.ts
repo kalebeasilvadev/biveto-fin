@@ -30,6 +30,9 @@ export interface TransactionFormData {
   installment_current: string
   installment_total: string
   ownership_type: 'personal' | 'household'
+  // Campos para criar recorrência
+  create_recurring: boolean
+  recurring_frequency: 'daily' | 'weekly' | 'monthly' | 'yearly'
 }
 
 export const CATEGORY_MAP: Record<string, string> = {
@@ -69,4 +72,6 @@ export const initialFormData: TransactionFormData = {
   installment_current: '',
   installment_total: '',
   ownership_type: 'personal',
+  create_recurring: false,
+  recurring_frequency: 'monthly',
 }
