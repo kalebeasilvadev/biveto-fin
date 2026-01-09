@@ -223,10 +223,16 @@ export default function Upload() {
           results.push(result)
           setBatchAddSuccess(prev => prev + 1)
         } catch (error: unknown) {
-          const err = error as { response?: { status?: number; data?: { detail?: string } } }
-          if (err.response?.status === 409) {
+          // Axios error structure
+          const axiosError = error as { response?: { status?: number; data?: { detail?: string } }; status?: number }
+          const status = axiosError.response?.status || axiosError.status
+          const detail = axiosError.response?.data?.detail
+
+          console.log('Batch add error:', { status, detail, error })
+
+          if (status === 409) {
             // Guardar como duplicado pendente para o usuário decidir
-            const message = err.response.data?.detail || item.description
+            const message = detail || item.description
             duplicates.push({
               index: item.index,
               data: item.data,
@@ -235,23 +241,21 @@ export default function Upload() {
             })
           } else {
             // Para outros erros, adicionar como pulado
-            const errorMessage = err.response?.data?.detail || item.description
+            const errorMessage = detail || item.description
             skipped.push(`Erro: ${errorMessage}`)
             setBatchAddSkipped(prev => [...prev, `Erro: ${errorMessage}`])
           }
         }
       }
 
-      // Atualizar lista de duplicados pendentes
-      if (duplicates.length > 0) {
-        setPendingDuplicates(prev => [...prev, ...duplicates])
-      }
-
       return { results, skipped, duplicates }
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      // Atualizar lista de duplicados pendentes APÓS a mutação completar
+      if (data.duplicates.length > 0) {
+        setPendingDuplicates(prev => [...prev, ...data.duplicates])
+      }
       invalidateTransactionCaches()
-      // Não redirecionar automaticamente - usuário fecha manualmente
     },
   })
 
