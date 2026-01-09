@@ -54,6 +54,7 @@ class CreditCard(Base):
 
     # Annual fee
     annual_fee: Mapped[float | None] = mapped_column(Numeric(10, 2))
+    annual_fee_frequency: Mapped[str] = mapped_column(String(20), default="monthly")  # 'monthly' or 'yearly'
     annual_fee_waived: Mapped[bool] = mapped_column(Boolean, default=False)
 
     # Additional benefits

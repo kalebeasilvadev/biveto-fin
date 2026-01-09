@@ -16,6 +16,7 @@ class CreditCardBase(BaseModel):
     card_variant: str | None = None
     last_four_digits: str | None = Field(None, max_length=4)
     annual_fee: float | None = None
+    annual_fee_frequency: str = "monthly"  # 'monthly' or 'yearly'
     annual_fee_waived: bool = False
     benefits_notes: str | None = None
 
@@ -41,6 +42,7 @@ class CreditCardUpdate(BaseModel):
     card_variant: str | None = None
     last_four_digits: str | None = Field(None, max_length=4)
     annual_fee: float | None = None
+    annual_fee_frequency: str | None = None
     annual_fee_waived: bool | None = None
     benefits_notes: str | None = None
     is_active: bool | None = None
@@ -85,6 +87,7 @@ class CreditCardListResponse(BaseModel):
     card_variant: str | None
     last_four_digits: str | None
     annual_fee: float | None
+    annual_fee_frequency: str
     annual_fee_waived: bool
     color: str | None
     icon: str | None

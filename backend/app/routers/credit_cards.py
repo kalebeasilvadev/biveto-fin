@@ -77,6 +77,7 @@ async def list_credit_cards(current_user: CurrentUser, db: DbSession):
             card_variant=card.card_variant,
             last_four_digits=card.last_four_digits,
             annual_fee=float(card.annual_fee) if card.annual_fee else None,
+            annual_fee_frequency=card.annual_fee_frequency,
             annual_fee_waived=card.annual_fee_waived,
             color=account.color,
             icon=account.icon,
@@ -123,6 +124,7 @@ async def create_credit_card(
         card_variant=data.card_variant,
         last_four_digits=data.last_four_digits,
         annual_fee=data.annual_fee,
+        annual_fee_frequency=data.annual_fee_frequency,
         annual_fee_waived=data.annual_fee_waived,
         benefits_notes=data.benefits_notes,
     )
@@ -235,8 +237,8 @@ async def update_credit_card(
         "credit_limit", "closing_day", "due_day", "has_points",
         "points_program", "points_program_name", "points_factor",
         "points_factor_international", "card_brand", "card_variant",
-        "last_four_digits", "annual_fee", "annual_fee_waived",
-        "benefits_notes", "is_active"
+        "last_four_digits", "annual_fee", "annual_fee_frequency",
+        "annual_fee_waived", "benefits_notes", "is_active"
     ]
     account_fields = ["name", "color", "icon"]
 

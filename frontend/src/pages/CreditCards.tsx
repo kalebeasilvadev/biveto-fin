@@ -31,6 +31,7 @@ interface CreditCard {
   icon: string | null
   is_active: boolean
   annual_fee: number | null
+  annual_fee_frequency: 'monthly' | 'yearly'
   annual_fee_waived: boolean
 }
 
@@ -77,6 +78,7 @@ export default function CreditCards() {
     card_variant: '',
     last_four_digits: '',
     annual_fee: '',
+    annual_fee_frequency: 'monthly' as 'monthly' | 'yearly',
     annual_fee_waived: false,
     benefits_notes: '',
     color: '#1e1e1e',
@@ -131,6 +133,7 @@ export default function CreditCards() {
       card_variant: '',
       last_four_digits: '',
       annual_fee: '',
+      annual_fee_frequency: 'monthly' as 'monthly' | 'yearly',
       annual_fee_waived: false,
       benefits_notes: '',
       color: '#1e1e1e',
@@ -152,8 +155,9 @@ export default function CreditCards() {
       card_brand: card.card_brand || '',
       card_variant: card.card_variant || '',
       last_four_digits: card.last_four_digits || '',
-      annual_fee: '',
-      annual_fee_waived: false,
+      annual_fee: card.annual_fee?.toString() || '',
+      annual_fee_frequency: card.annual_fee_frequency || 'monthly',
+      annual_fee_waived: card.annual_fee_waived || false,
       benefits_notes: '',
       color: card.color || '#1e1e1e',
     })
@@ -179,6 +183,7 @@ export default function CreditCards() {
       card_variant: formData.card_variant || null,
       last_four_digits: formData.last_four_digits || null,
       annual_fee: formData.annual_fee ? parseFloat(formData.annual_fee) : null,
+      annual_fee_frequency: formData.annual_fee_frequency,
       annual_fee_waived: formData.annual_fee_waived,
       benefits_notes: formData.benefits_notes || null,
       color: formData.color,
@@ -343,7 +348,7 @@ export default function CreditCards() {
                   )}>
                     {(!card.annual_fee || card.annual_fee === 0 || card.annual_fee_waived)
                       ? 'Anuidade isenta'
-                      : `Anuidade: ${card.annual_fee.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`
+                      : `${card.annual_fee.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}${card.annual_fee_frequency === 'monthly' ? '/mês' : '/ano'}`
                     }
                   </span>
                 </div>
@@ -541,31 +546,46 @@ export default function CreditCards() {
               </div>
 
               {/* Annual Fee */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Anuidade
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={formData.annual_fee}
-                    onChange={(e) => setFormData({ ...formData, annual_fee: e.target.value })}
-                    className="input"
-                    placeholder="0.00"
-                  />
-                </div>
-                <div className="flex items-end pb-2">
-                  <label className="flex items-center gap-2">
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Anuidade
+                    </label>
                     <input
-                      type="checkbox"
-                      checked={formData.annual_fee_waived}
-                      onChange={(e) => setFormData({ ...formData, annual_fee_waived: e.target.checked })}
-                      className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                      type="number"
+                      step="0.01"
+                      value={formData.annual_fee}
+                      onChange={(e) => setFormData({ ...formData, annual_fee: e.target.value })}
+                      className="input"
+                      placeholder="0.00"
+                      disabled={formData.annual_fee_waived}
                     />
-                    <span className="text-sm text-gray-700 dark:text-gray-300">Isento</span>
-                  </label>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Cobrança
+                    </label>
+                    <select
+                      value={formData.annual_fee_frequency}
+                      onChange={(e) => setFormData({ ...formData, annual_fee_frequency: e.target.value as 'monthly' | 'yearly' })}
+                      className="input"
+                      disabled={formData.annual_fee_waived}
+                    >
+                      <option value="monthly">Mensal</option>
+                      <option value="yearly">Anual</option>
+                    </select>
+                  </div>
                 </div>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={formData.annual_fee_waived}
+                    onChange={(e) => setFormData({ ...formData, annual_fee_waived: e.target.checked })}
+                    className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                  />
+                  <span className="text-sm text-gray-700 dark:text-gray-300">Anuidade isenta</span>
+                </label>
               </div>
 
               {/* Benefits Notes */}
