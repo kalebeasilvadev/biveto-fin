@@ -8,7 +8,6 @@ import {
   Trash2,
   X,
   Star,
-  Calendar,
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import EmptyState from '../components/EmptyState'
