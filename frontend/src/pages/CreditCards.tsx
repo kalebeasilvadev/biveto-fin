@@ -91,11 +91,17 @@ export default function CreditCards() {
 
   const cards: CreditCard[] = data?.data || []
 
+  // Função para invalidar caches relacionados a cartões
+  const invalidateCreditCardCaches = () => {
+    queryClient.invalidateQueries({ queryKey: ['credit-cards'] })
+    queryClient.invalidateQueries({ queryKey: ['accounts'] })
+    queryClient.invalidateQueries({ queryKey: ['analytics'] })
+  }
+
   const createMutation = useMutation({
     mutationFn: (data: unknown) => creditCardsApi.create(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['credit-cards'] })
-      queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      invalidateCreditCardCaches()
       closeModal()
     },
   })
@@ -104,8 +110,7 @@ export default function CreditCards() {
     mutationFn: ({ id, data }: { id: number; data: unknown }) =>
       creditCardsApi.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['credit-cards'] })
-      queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      invalidateCreditCardCaches()
       closeModal()
     },
   })
@@ -113,8 +118,7 @@ export default function CreditCards() {
   const deleteMutation = useMutation({
     mutationFn: (id: number) => creditCardsApi.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['credit-cards'] })
-      queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      invalidateCreditCardCaches()
     },
   })
 

@@ -112,13 +112,21 @@ export default function Transactions() {
     queryFn: accountsApi.list,
   })
 
+  // Função para invalidar todos os caches relacionados a transações
+  const invalidateTransactionCaches = () => {
+    queryClient.invalidateQueries({ queryKey: ['transactions'] })
+    queryClient.invalidateQueries({ queryKey: ['accounts'] })
+    queryClient.invalidateQueries({ queryKey: ['analytics'] })
+    queryClient.invalidateQueries({ queryKey: ['credit-cards'] })
+    queryClient.invalidateQueries({ queryKey: ['budget'] })
+    queryClient.invalidateQueries({ queryKey: ['recurring'] })
+  }
+
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: Record<string, unknown> }) =>
       transactionsApi.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['transactions'] })
-      queryClient.invalidateQueries({ queryKey: ['accounts'] })
-      queryClient.invalidateQueries({ queryKey: ['analytics'] })
+      invalidateTransactionCaches()
       closeEditModal()
     },
   })
@@ -126,9 +134,7 @@ export default function Transactions() {
   const deleteMutation = useMutation({
     mutationFn: (id: number) => transactionsApi.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['transactions'] })
-      queryClient.invalidateQueries({ queryKey: ['accounts'] })
-      queryClient.invalidateQueries({ queryKey: ['analytics'] })
+      invalidateTransactionCaches()
       closeEditModal()
     },
   })

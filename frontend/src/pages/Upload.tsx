@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { documentsApi, transactionsApi, accountsApi, categoriesApi, familyApi, getApiErrorMessage } from '../services/api'
 import { X, CreditCard, Repeat } from 'lucide-react'
 import {
@@ -19,6 +19,7 @@ import {
 
 export default function Upload() {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const [mode, setMode] = useState<UploadMode>('select')
   const [document, setDocument] = useState<Document | null>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
@@ -111,14 +112,30 @@ export default function Upload() {
     },
   })
 
+  // Função para invalidar todos os caches relacionados a transações
+  const invalidateTransactionCaches = () => {
+    queryClient.invalidateQueries({ queryKey: ['transactions'] })
+    queryClient.invalidateQueries({ queryKey: ['accounts'] })
+    queryClient.invalidateQueries({ queryKey: ['analytics'] })
+    queryClient.invalidateQueries({ queryKey: ['credit-cards'] })
+    queryClient.invalidateQueries({ queryKey: ['budget'] })
+    queryClient.invalidateQueries({ queryKey: ['recurring'] })
+  }
+
   const confirmMutation = useMutation({
     mutationFn: (data: unknown) => transactionsApi.confirm(data),
-    onSuccess: () => navigate('/transactions'),
+    onSuccess: () => {
+      invalidateTransactionCaches()
+      navigate('/transactions')
+    },
   })
 
   const createMutation = useMutation({
     mutationFn: (data: unknown) => transactionsApi.create(data),
-    onSuccess: () => navigate('/transactions'),
+    onSuccess: () => {
+      invalidateTransactionCaches()
+      navigate('/transactions')
+    },
   })
 
   const batchAddMutation = useMutation({
@@ -145,6 +162,7 @@ export default function Upload() {
       return { results, skipped }
     },
     onSuccess: (data) => {
+      invalidateTransactionCaches()
       if (data.results.length > 0) {
         if (data.skipped.length > 0) {
           setTimeout(() => navigate('/transactions'), 2000)

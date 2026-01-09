@@ -133,11 +133,17 @@ export default function Recurring() {
     },
   })
 
+  // Função para invalidar caches relacionados a recorrências
+  const invalidateRecurringCaches = () => {
+    queryClient.invalidateQueries({ queryKey: ['recurring'] })
+    queryClient.invalidateQueries({ queryKey: ['recurring-summary'] })
+    queryClient.invalidateQueries({ queryKey: ['analytics'] })
+  }
+
   const createMutation = useMutation({
     mutationFn: (data: unknown) => recurringApi.create(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['recurring'] })
-      queryClient.invalidateQueries({ queryKey: ['recurring-summary'] })
+      invalidateRecurringCaches()
       resetForm()
     },
   })
@@ -146,8 +152,7 @@ export default function Recurring() {
     mutationFn: ({ id, data }: { id: number; data: unknown }) =>
       recurringApi.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['recurring'] })
-      queryClient.invalidateQueries({ queryKey: ['recurring-summary'] })
+      invalidateRecurringCaches()
       resetForm()
     },
   })
@@ -155,32 +160,30 @@ export default function Recurring() {
   const deleteMutation = useMutation({
     mutationFn: (id: number) => recurringApi.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['recurring'] })
-      queryClient.invalidateQueries({ queryKey: ['recurring-summary'] })
+      invalidateRecurringCaches()
     },
   })
 
   const pauseMutation = useMutation({
     mutationFn: (id: number) => recurringApi.pause(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['recurring'] })
-      queryClient.invalidateQueries({ queryKey: ['recurring-summary'] })
+      invalidateRecurringCaches()
     },
   })
 
   const resumeMutation = useMutation({
     mutationFn: (id: number) => recurringApi.resume(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['recurring'] })
-      queryClient.invalidateQueries({ queryKey: ['recurring-summary'] })
+      invalidateRecurringCaches()
     },
   })
 
   const generateMutation = useMutation({
     mutationFn: () => recurringApi.generate(),
     onSuccess: (response) => {
-      queryClient.invalidateQueries({ queryKey: ['recurring'] })
+      invalidateRecurringCaches()
       queryClient.invalidateQueries({ queryKey: ['transactions'] })
+      queryClient.invalidateQueries({ queryKey: ['accounts'] })
       alert(`${response.data.generated_count} transações geradas!`)
     },
   })

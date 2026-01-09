@@ -90,10 +90,17 @@ export default function Accounts() {
     (acc: Account) => acc.type !== 'credit_card'
   )
 
+  // Função para invalidar caches relacionados a contas
+  const invalidateAccountCaches = () => {
+    queryClient.invalidateQueries({ queryKey: ['accounts'] })
+    queryClient.invalidateQueries({ queryKey: ['analytics'] })
+    queryClient.invalidateQueries({ queryKey: ['transactions'] })
+  }
+
   const createMutation = useMutation({
     mutationFn: (data: unknown) => accountsApi.create(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      invalidateAccountCaches()
       closeModal()
     },
   })
@@ -102,7 +109,7 @@ export default function Accounts() {
     mutationFn: ({ id, data }: { id: number; data: unknown }) =>
       accountsApi.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      invalidateAccountCaches()
       closeModal()
     },
   })
@@ -110,7 +117,7 @@ export default function Accounts() {
   const deleteMutation = useMutation({
     mutationFn: (id: number) => accountsApi.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      invalidateAccountCaches()
     },
   })
 

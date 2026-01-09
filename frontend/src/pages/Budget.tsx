@@ -57,10 +57,16 @@ export default function Budget() {
   const categories: Category[] = categoriesData?.data || []
   const expenseCategories = categories.filter((c) => c.type === 'expense')
 
+  // Função para invalidar caches relacionados a orçamento
+  const invalidateBudgetCaches = () => {
+    queryClient.invalidateQueries({ queryKey: ['budget'] })
+    queryClient.invalidateQueries({ queryKey: ['analytics'] })
+  }
+
   const addItemMutation = useMutation({
     mutationFn: (data: unknown) => budgetsApi.addItem(year, month, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['budget', year, month] })
+      invalidateBudgetCaches()
       setShowAddModal(false)
     },
   })
@@ -68,14 +74,14 @@ export default function Budget() {
   const deleteItemMutation = useMutation({
     mutationFn: (itemId: number) => budgetsApi.deleteItem(year, month, itemId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['budget', year, month] })
+      invalidateBudgetCaches()
     },
   })
 
   const copyBudgetMutation = useMutation({
     mutationFn: (data: unknown) => budgetsApi.copy(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['budget', year, month] })
+      invalidateBudgetCaches()
       setShowCopyModal(false)
     },
   })

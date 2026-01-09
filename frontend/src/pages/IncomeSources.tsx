@@ -126,10 +126,16 @@ export default function IncomeSources() {
     (acc) => acc.type === 'bank' || acc.type === 'wallet'
   )
 
+  // Função para invalidar caches relacionados a fontes de renda
+  const invalidateIncomeSourceCaches = () => {
+    queryClient.invalidateQueries({ queryKey: ['income-sources'] })
+    queryClient.invalidateQueries({ queryKey: ['analytics'] })
+  }
+
   const createMutation = useMutation({
     mutationFn: (data: unknown) => incomeSourcesApi.create(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['income-sources'] })
+      invalidateIncomeSourceCaches()
       closeModal()
     },
   })
@@ -138,7 +144,7 @@ export default function IncomeSources() {
     mutationFn: ({ id, data }: { id: number; data: unknown }) =>
       incomeSourcesApi.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['income-sources'] })
+      invalidateIncomeSourceCaches()
       closeModal()
     },
   })
@@ -146,7 +152,7 @@ export default function IncomeSources() {
   const deleteMutation = useMutation({
     mutationFn: (id: number) => incomeSourcesApi.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['income-sources'] })
+      invalidateIncomeSourceCaches()
     },
   })
 
