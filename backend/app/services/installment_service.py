@@ -10,6 +10,7 @@ from ..models.installment import InstallmentSeries, InstallmentSeriesStatus
 from ..models.transaction import Transaction, TransactionType
 from ..models.merchant import Merchant
 from ..models.user import User
+from ..models.credit_card import CreditCard
 
 
 class InstallmentService:
@@ -319,10 +320,24 @@ class InstallmentService:
     ) -> list[Transaction]:
         """
         Cria transações para parcelas futuras (marcadas como não pagas).
+        Também cria as faturas futuras correspondentes se o cartão de crédito estiver vinculado.
 
-        Útil para visualizar compromissos futuros.
+        Útil para visualizar compromissos futuros e projetar faturas.
         """
         created_transactions = []
+
+        # Buscar cartão de crédito se houver
+        credit_card = None
+        invoice_service = None
+        if series.credit_card_id:
+            result = await self.db.execute(
+                select(CreditCard).where(CreditCard.id == series.credit_card_id)
+            )
+            credit_card = result.scalar_one_or_none()
+
+            if credit_card:
+                from .invoice_service import InvoiceService
+                invoice_service = InvoiceService(self.db)
 
         for i in range(from_installment + 1, series.installment_count + 1):
             existing = await self.find_existing_installment(series, i)
@@ -332,12 +347,28 @@ class InstallmentService:
             # Calcular data estimada da parcela
             estimated_date = series.first_installment_date + relativedelta(months=i - 1)
 
+            # Se tem cartão de crédito, obter/criar fatura para o período
+            invoice_id = None
+            if credit_card and invoice_service:
+                period = invoice_service.calculate_invoice_period(credit_card, estimated_date)
+                invoice = await invoice_service.get_or_create_invoice(
+                    user=user,
+                    credit_card=credit_card,
+                    reference_month=period['reference_month'],
+                    reference_year=period['reference_year'],
+                    closing_date=period['closing_date'],
+                    due_date=period['due_date'],
+                )
+                invoice_id = invoice.id
+
             transaction = Transaction(
                 user_id=user.id,
                 account_id=series.account_id,
                 category_id=series.category_id,
                 merchant_id=series.merchant_id,
                 document_id=None,
+                credit_card_id=series.credit_card_id,
+                invoice_id=invoice_id,
                 installment_series_id=series.id,
                 type=TransactionType.EXPENSE,
                 amount=series.installment_amount,
@@ -354,7 +385,134 @@ class InstallmentService:
 
         await self.db.flush()
 
+        # Atualizar totais das faturas criadas
+        if credit_card and invoice_service:
+            from ..models.credit_card_invoice import CreditCardInvoice
+            invoice_ids = set(t.invoice_id for t in created_transactions if t.invoice_id)
+            for inv_id in invoice_ids:
+                result = await self.db.execute(
+                    select(CreditCardInvoice).where(CreditCardInvoice.id == inv_id)
+                )
+                invoice = result.scalar_one_or_none()
+                if invoice:
+                    await invoice_service.update_invoice_total(invoice)
+
         return created_transactions
+
+    async def confirm_existing_installment(
+        self,
+        user: User,
+        series: InstallmentSeries,
+        installment_number: int,
+        document_id: int | None = None,
+        actual_amount: float | None = None,
+        actual_date: date | None = None,
+    ) -> Transaction | None:
+        """
+        Confirma uma parcela existente (criada como futura) quando o PDF da fatura é enviado.
+
+        Atualiza:
+        - document_id: vincula ao documento
+        - is_paid: marca como paga
+        - amount: atualiza se diferente (ex: correção de valor)
+        - date: atualiza se diferente
+
+        Retorna a transação atualizada ou None se não existir.
+        """
+        existing = await self.find_existing_installment(series, installment_number)
+
+        if not existing:
+            return None
+
+        # Atualizar campos
+        if document_id:
+            existing.document_id = document_id
+
+        if not existing.is_paid:
+            existing.is_paid = True
+            series.paid_count += 1
+
+            if series.paid_count >= series.installment_count:
+                series.status = InstallmentSeriesStatus.COMPLETED
+
+        # Atualizar valor se diferente (diferença maior que 1 centavo)
+        if actual_amount and abs(float(existing.amount) - actual_amount) > 0.01:
+            existing.amount = actual_amount
+
+        # Atualizar data se fornecida e diferente
+        if actual_date and existing.date != actual_date:
+            existing.date = actual_date
+
+        await self.db.flush()
+        await self.db.refresh(existing)
+
+        return existing
+
+    async def find_matching_transaction_for_pdf(
+        self,
+        user: User,
+        merchant_name: str,
+        amount: float,
+        transaction_date: date,
+        installment_number: int | None = None,
+        installment_total: int | None = None,
+        credit_card_id: int | None = None,
+    ) -> Transaction | None:
+        """
+        Busca uma transação existente (parcela futura ou recorrente projetada)
+        que corresponda aos dados do PDF.
+
+        Usado para evitar duplicatas quando o PDF real é enviado.
+
+        Critérios de match:
+        - Mesmo cartão de crédito
+        - Valor similar (±5%)
+        - Data próxima (±15 dias)
+        - Se for parcela: mesmo installment_number e installment_total
+        - Descrição similar (contém mesmo merchant)
+        """
+        normalized_merchant = merchant_name.lower().strip()
+        min_amount = amount * 0.95
+        max_amount = amount * 1.05
+        min_date = transaction_date - timedelta(days=15)
+        max_date = transaction_date + timedelta(days=15)
+
+        query = select(Transaction).where(
+            and_(
+                Transaction.user_id == user.id,
+                Transaction.amount >= min_amount,
+                Transaction.amount <= max_amount,
+                Transaction.date >= min_date,
+                Transaction.date <= max_date,
+                Transaction.is_paid == False,  # Transação futura/projetada
+            )
+        )
+
+        if credit_card_id:
+            query = query.where(Transaction.credit_card_id == credit_card_id)
+
+        # Se for parcela, filtrar por número
+        if installment_number and installment_total:
+            query = query.where(
+                and_(
+                    Transaction.installment_number == installment_number,
+                    Transaction.installment_total == installment_total,
+                )
+            )
+
+        result = await self.db.execute(query)
+        candidates = list(result.scalars().all())
+
+        if not candidates:
+            return None
+
+        # Filtrar por merchant name similar
+        for tx in candidates:
+            if tx.description and normalized_merchant in tx.description.lower():
+                return tx
+
+        # Se não encontrou match exato, retornar o primeiro candidato
+        return candidates[0] if candidates else None
 
     async def get_user_series(
         self,

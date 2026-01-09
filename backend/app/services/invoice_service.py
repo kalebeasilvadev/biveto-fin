@@ -14,6 +14,7 @@ from ..models.account import Account
 from ..models.category import Category
 from ..models.user import User
 from ..models.document import Document
+from ..models.recurring import RecurringTransaction
 
 
 class InvoiceService:
@@ -629,3 +630,124 @@ class InvoiceService:
         await self.db.refresh(invoice)
 
         return invoice
+
+    async def project_recurring_to_invoices(
+        self,
+        user: User,
+        credit_card: CreditCard,
+        months_ahead: int = 6,
+    ) -> list[Transaction]:
+        """
+        Projeta transações recorrentes para faturas futuras.
+
+        Busca todas as transações recorrentes ativas que estão vinculadas
+        à conta do cartão de crédito e cria transações projetadas (is_paid=False)
+        para os próximos N meses.
+
+        Args:
+            user: Usuário
+            credit_card: Cartão de crédito
+            months_ahead: Número de meses para projetar (default: 6)
+
+        Returns:
+            Lista de transações projetadas criadas
+        """
+        today = date.today()
+        created_transactions = []
+
+        # Buscar recorrentes ativas vinculadas à conta do cartão
+        result = await self.db.execute(
+            select(RecurringTransaction).where(
+                and_(
+                    RecurringTransaction.user_id == user.id,
+                    RecurringTransaction.account_id == credit_card.account_id,
+                    RecurringTransaction.status == "active",
+                    RecurringTransaction.type == "expense",
+                )
+            )
+        )
+        recurring_list = list(result.scalars().all())
+
+        if not recurring_list:
+            return []
+
+        # Para cada recorrente, projetar para os próximos meses
+        for recurring in recurring_list:
+            for month_offset in range(1, months_ahead + 1):
+                # Calcular data da transação
+                projected_date = today + relativedelta(months=month_offset)
+
+                # Ajustar para o dia do mês configurado
+                if recurring.day_of_month:
+                    try:
+                        projected_date = date(
+                            projected_date.year,
+                            projected_date.month,
+                            min(recurring.day_of_month, 28)
+                        )
+                    except ValueError:
+                        projected_date = date(
+                            projected_date.year,
+                            projected_date.month,
+                            28
+                        )
+
+                # Verificar se já existe transação para esta data e recorrente
+                existing_result = await self.db.execute(
+                    select(Transaction).where(
+                        and_(
+                            Transaction.recurring_id == recurring.id,
+                            Transaction.date >= projected_date - relativedelta(days=10),
+                            Transaction.date <= projected_date + relativedelta(days=10),
+                        )
+                    )
+                )
+                if existing_result.scalar_one_or_none():
+                    continue  # Já existe, pular
+
+                # Calcular período da fatura
+                period = self.calculate_invoice_period(credit_card, projected_date)
+
+                # Obter ou criar fatura
+                invoice = await self.get_or_create_invoice(
+                    user=user,
+                    credit_card=credit_card,
+                    reference_month=period['reference_month'],
+                    reference_year=period['reference_year'],
+                    closing_date=period['closing_date'],
+                    due_date=period['due_date'],
+                )
+
+                # Criar transação projetada
+                transaction = Transaction(
+                    user_id=user.id,
+                    account_id=credit_card.account_id,
+                    category_id=recurring.category_id,
+                    credit_card_id=credit_card.id,
+                    invoice_id=invoice.id,
+                    recurring_id=recurring.id,
+                    type=TransactionType.EXPENSE.value,
+                    amount=recurring.amount,
+                    date=projected_date,
+                    description=f"{recurring.name} (projetado)",
+                    is_paid=False,  # Transação futura/projetada
+                    is_fixed=True,
+                    ownership_type=recurring.ownership_type,
+                )
+
+                self.db.add(transaction)
+                created_transactions.append(transaction)
+
+        await self.db.flush()
+
+        # Atualizar totais das faturas
+        invoice_ids = set(t.invoice_id for t in created_transactions if t.invoice_id)
+        for inv_id in invoice_ids:
+            result = await self.db.execute(
+                select(CreditCardInvoice).where(CreditCardInvoice.id == inv_id)
+            )
+            invoice = result.scalar_one_or_none()
+            if invoice:
+                await self.update_invoice_total(invoice)
+
+        return created_transactions

@@ -2,6 +2,7 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 from fastapi import APIRouter, HTTPException, status, Query
+from pydantic import BaseModel
 from sqlalchemy import select, func
 
 from ..core.deps import CurrentUser, DbSession
@@ -590,4 +591,115 @@ async def detect_card_from_document(
     return CardDetectionResult(
         detected_cards=detected_cards,
         suggested_card_id=cards[0].id if cards else None,
+    )
+
+
+class ProjectFutureRequest(BaseModel):
+    credit_card_id: int
+    months_ahead: int = 6
+    include_installments: bool = True
+    include_recurring: bool = True
+
+
+class ProjectFutureResponse(BaseModel):
+    message: str
+    invoices_created: int
+    transactions_created: int
+
+
+@router.post("/project-future", response_model=ProjectFutureResponse)
+async def project_future_transactions(
+    data: ProjectFutureRequest,
+    current_user: CurrentUser,
+    db: DbSession,
+):
+    """
+    Projeta transações futuras (parcelas e recorrentes) para faturas futuras.
+
+    Útil para:
+    - Visualizar compromissos futuros no cartão
+    - Antecipar o valor das próximas faturas
+    - Planejar pagamentos
+
+    As transações projetadas são marcadas como is_paid=False e serão
+    atualizadas quando o PDF real da fatura for enviado.
+    """
+    # Buscar cartão de crédito
+    card_result = await db.execute(
+        select(CreditCard).where(
+            CreditCard.id == data.credit_card_id,
+            CreditCard.user_id == current_user.id,
+        )
+    )
+    credit_card = card_result.scalar_one_or_none()
+
+    if not credit_card:
+        raise HTTPException(status_code=404, detail="Cartão não encontrado")
+
+    total_transactions = 0
+    invoices_before = set()
+    invoices_after = set()
+
+    # Contar faturas antes
+    inv_result = await db.execute(
+        select(CreditCardInvoice.id).where(
+            CreditCardInvoice.credit_card_id == data.credit_card_id
+        )
+    )
+    invoices_before = set(inv_result.scalars().all())
+
+    service = InvoiceService(db)
+
+    # Projetar recorrentes
+    if data.include_recurring:
+        recurring_txs = await service.project_recurring_to_invoices(
+            user=current_user,
+            credit_card=credit_card,
+            months_ahead=data.months_ahead,
+        )
+        total_transactions += len(recurring_txs)
+
+    # Parcelas futuras já são criadas automaticamente quando uma compra parcelada é registrada
+    # com create_future_installments=True, mas podemos forçar a atualização aqui
+    if data.include_installments:
+        from ..services.installment_service import InstallmentService
+        from ..models.installment import InstallmentSeries, InstallmentSeriesStatus
+
+        installment_service = InstallmentService(db)
+
+        # Buscar séries ativas do cartão
+        series_result = await db.execute(
+            select(InstallmentSeries).where(
+                InstallmentSeries.user_id == current_user.id,
+                InstallmentSeries.credit_card_id == data.credit_card_id,
+                InstallmentSeries.status == InstallmentSeriesStatus.ACTIVE,
+            )
+        )
+        series_list = list(series_result.scalars().all())
+
+        for series in series_list:
+            # Criar parcelas futuras que ainda não existem
+            future_txs = await installment_service.create_future_installments(
+                user=current_user,
+                series=series,
+                from_installment=series.paid_count,
+            )
+            total_transactions += len(future_txs)
+
+    await db.commit()
+
+    # Contar faturas depois
+    inv_result = await db.execute(
+        select(CreditCardInvoice.id).where(
+            CreditCardInvoice.credit_card_id == data.credit_card_id
+        )
+    )
+    invoices_after = set(inv_result.scalars().all())
+
+    new_invoices = len(invoices_after - invoices_before)
+
+    return ProjectFutureResponse(
+        message=f"Projeção concluída: {total_transactions} transações e {new_invoices} faturas criadas",
+        invoices_created=new_invoices,
+        transactions_created=total_transactions,
     )

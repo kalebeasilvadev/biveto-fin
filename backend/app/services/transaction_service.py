@@ -1,5 +1,5 @@
 from __future__ import annotations
-from datetime import date
+from datetime import date, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_, func
 from fastapi import HTTPException, status
@@ -335,27 +335,52 @@ class TransactionService:
 
         else:
             # Transação simples (não parcelada)
-            transaction = Transaction(
-                user_id=user.id,
-                account_id=data.account_id,
-                document_id=data.document_id,
-                category_id=data.category_id,
-                merchant_id=merchant_id,
-                credit_card_id=credit_card_id,
-                invoice_id=invoice.id if invoice else None,
-                income_source_id=getattr(data, 'income_source_id', None),
-                type=TransactionType.EXPENSE,
+            # Primeiro, verificar se existe uma transação projetada (futura) que corresponda
+            existing_projected = await self._find_matching_projected_transaction(
+                user=user,
+                merchant_name=data.merchant_name or data.description,
                 amount=data.amount,
-                date=data.date,
-                description=data.description,
-                tags=data.tags,
-                is_fixed=data.is_fixed,
-                ownership_type=data.ownership_type.value if hasattr(data.ownership_type, 'value') else data.ownership_type,
+                transaction_date=data.date,
+                credit_card_id=credit_card_id,
             )
-            self.db.add(transaction)
-            await self.db.flush()
-            await self.db.refresh(transaction)
-            result["transaction"] = transaction
+
+            if existing_projected:
+                # Atualizar a transação existente ao invés de criar nova
+                existing_projected.document_id = data.document_id
+                existing_projected.is_paid = True
+                if data.category_id:
+                    existing_projected.category_id = data.category_id
+                if merchant_id:
+                    existing_projected.merchant_id = merchant_id
+                if data.description:
+                    existing_projected.description = data.description
+
+                await self.db.flush()
+                await self.db.refresh(existing_projected)
+                result["transaction"] = existing_projected
+                result["was_projected"] = True  # Flag para indicar que atualizou uma projeção
+            else:
+                transaction = Transaction(
+                    user_id=user.id,
+                    account_id=data.account_id,
+                    document_id=data.document_id,
+                    category_id=data.category_id,
+                    merchant_id=merchant_id,
+                    credit_card_id=credit_card_id,
+                    invoice_id=invoice.id if invoice else None,
+                    income_source_id=getattr(data, 'income_source_id', None),
+                    type=TransactionType.EXPENSE,
+                    amount=data.amount,
+                    date=data.date,
+                    description=data.description,
+                    tags=data.tags,
+                    is_fixed=data.is_fixed,
+                    ownership_type=data.ownership_type.value if hasattr(data.ownership_type, 'value') else data.ownership_type,
+                )
+                self.db.add(transaction)
+                await self.db.flush()
+                await self.db.refresh(transaction)
+                result["transaction"] = transaction
 
         # Atualizar total da fatura se houver
         if invoice and invoice_service:
@@ -654,3 +679,95 @@ class TransactionService:
             await self.db.flush()
 
         return merchant.id
+
+    async def _find_matching_projected_transaction(
+        self,
+        user: User,
+        merchant_name: str | None,
+        amount: float,
+        transaction_date: date,
+        credit_card_id: int | None = None,
+    ) -> Transaction | None:
+        """
+        Busca uma transação projetada (futura/não paga) que corresponda aos dados.
+
+        Usado para evitar duplicatas quando o PDF real é enviado.
+        Transações projetadas são criadas a partir de:
+        - Recorrentes (Netflix, aluguel, etc.)
+        - Parcelas futuras de compras parceladas
+
+        Critérios de match:
+        - Mesmo cartão de crédito (se fornecido)
+        - Valor similar (±5%)
+        - Data próxima (±15 dias)
+        - is_paid = False (transação futura/projetada)
+        - Descrição similar (se disponível)
+        """
+        if not merchant_name:
+            return None
+
+        normalized_merchant = merchant_name.lower().strip()[:50]  # Primeiros 50 chars
+        min_amount = amount * 0.95
+        max_amount = amount * 1.05
+        min_date = transaction_date - timedelta(days=15)
+        max_date = transaction_date + timedelta(days=15)
+
+        query = select(Transaction).where(
+            and_(
+                Transaction.user_id == user.id,
+                Transaction.amount >= min_amount,
+                Transaction.amount <= max_amount,
+                Transaction.date >= min_date,
+                Transaction.date <= max_date,
+                Transaction.is_paid == False,  # Transação futura/projetada
+                Transaction.document_id.is_(None),  # Não vinculada a documento ainda
+            )
+        )
+
+        if credit_card_id:
+            query = query.where(Transaction.credit_card_id == credit_card_id)
+
+        result = await self.db.execute(query)
+        candidates = list(result.scalars().all())
+
+        if not candidates:
+            return None
+
+        # Buscar melhor match por descrição
+        best_match = None
+        best_score = 0
+
+        for tx in candidates:
+            score = 0
+            if tx.description:
+                tx_desc = tx.description.lower()
+                # Verifica se o merchant está na descrição
+                if normalized_merchant in tx_desc:
+                    score += 10
+                # Verifica palavras em comum
+                merchant_words = set(normalized_merchant.split())
+                desc_words = set(tx_desc.split())
+                common_words = merchant_words & desc_words
+                score += len(common_words) * 2
+
+            # Bonus por data exata
+            if tx.date == transaction_date:
+                score += 5
+
+            # Bonus por valor exato
+            if abs(float(tx.amount) - amount) < 0.01:
+                score += 5
+
+            # Bonus se é de recorrente ou parcela
+            if tx.recurring_id or tx.installment_series_id:
+                score += 3
+
+            if score > best_score:
+                best_score = score
+                best_match = tx
+
+        # Retorna match apenas se tiver score mínimo
+        if best_score >= 5:
+            return best_match
+
+        return None
