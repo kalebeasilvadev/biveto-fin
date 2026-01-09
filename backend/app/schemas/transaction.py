@@ -45,6 +45,10 @@ class TransactionConfirm(BaseModel):
     credit_card_id: int | None = None  # For credit card expenses
     income_source_id: int | None = None  # For income transactions
 
+    # Campos de fatura (quando vem de PDF de fatura)
+    invoice_month: int | None = None  # Mês de referência da fatura (1-12)
+    invoice_year: int | None = None   # Ano de referência da fatura
+
     # Campos de parcelamento
     is_installment: bool = False
     installment_current: int | None = None
@@ -66,6 +70,7 @@ class TransactionUpdate(BaseModel):
     tags: list[str] | None = None
     is_fixed: bool | None = None
     is_paid: bool | None = None
+    invoice_id: int | None = None  # Para mover transação entre faturas
 
 
 class TransactionResponse(TransactionBase):
@@ -75,6 +80,7 @@ class TransactionResponse(TransactionBase):
     merchant_id: int | None
     document_id: int | None
     credit_card_id: int | None = None
+    invoice_id: int | None = None
     income_source_id: int | None = None
     is_recurring: bool
     is_paid: bool = True
@@ -91,6 +97,7 @@ class TransactionResponse(TransactionBase):
     merchant_name: str | None = None
     credit_card_name: str | None = None
     income_source_name: str | None = None
+    invoice_display: str | None = None  # Ex: "Jan/2026"
 
     # Indicador de parcelamento
     @property

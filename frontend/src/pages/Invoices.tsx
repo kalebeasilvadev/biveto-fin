@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { invoicesApi, creditCardsApi, accountsApi } from '../services/api'
+import { invoicesApi, creditCardsApi, accountsApi, transactionsApi } from '../services/api'
 import {
   CreditCard,
   Calendar,
@@ -11,6 +11,8 @@ import {
   Receipt,
   DollarSign,
   X,
+  Trash2,
+  ArrowRightLeft,
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import EmptyState from '../components/EmptyState'
@@ -70,6 +72,10 @@ export default function Invoices() {
   const [selectedInvoice, setSelectedInvoice] = useState<number | null>(null)
   const [showPayModal, setShowPayModal] = useState(false)
   const [invoiceToPay, setInvoiceToPay] = useState<Invoice | null>(null)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [invoiceToDelete, setInvoiceToDelete] = useState<Invoice | null>(null)
+  const [showMoveModal, setShowMoveModal] = useState(false)
+  const [transactionToMove, setTransactionToMove] = useState<{ id: number; description: string } | null>(null)
 
   const { data: cardsData } = useQuery({
     queryKey: ['credit-cards'],
@@ -106,6 +112,33 @@ export default function Invoices() {
       queryClient.invalidateQueries({ queryKey: ['transactions'] })
       setShowPayModal(false)
       setInvoiceToPay(null)
+    },
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => invoicesApi.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invoices'] })
+      queryClient.invalidateQueries({ queryKey: ['invoice'] })
+      queryClient.invalidateQueries({ queryKey: ['transactions'] })
+      queryClient.invalidateQueries({ queryKey: ['credit-cards'] })
+      setShowDeleteModal(false)
+      setInvoiceToDelete(null)
+      if (selectedInvoice === invoiceToDelete?.id) {
+        setSelectedInvoice(null)
+      }
+    },
+  })
+
+  const moveTransactionMutation = useMutation({
+    mutationFn: ({ transactionId, invoiceId }: { transactionId: number; invoiceId: number | null }) =>
+      transactionsApi.update(transactionId, { invoice_id: invoiceId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invoices'] })
+      queryClient.invalidateQueries({ queryKey: ['invoice'] })
+      queryClient.invalidateQueries({ queryKey: ['transactions'] })
+      setShowMoveModal(false)
+      setTransactionToMove(null)
     },
   })
 
@@ -277,17 +310,30 @@ export default function Invoices() {
                     </span>
                   </div>
 
-                  {invoice.status !== 'paid' && invoice.remaining_amount > 0 && (
+                  <div className="mt-3 flex gap-2">
+                    {invoice.status !== 'paid' && invoice.remaining_amount > 0 && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handlePayClick(invoice)
+                        }}
+                        className="btn-primary flex-1"
+                      >
+                        Pagar Fatura
+                      </button>
+                    )}
                     <button
                       onClick={(e) => {
                         e.stopPropagation()
-                        handlePayClick(invoice)
+                        setInvoiceToDelete(invoice)
+                        setShowDeleteModal(true)
                       }}
-                      className="mt-3 w-full btn-primary"
+                      className="btn-secondary px-3"
+                      title="Excluir fatura"
                     >
-                      Pagar Fatura
+                      <Trash2 size={18} />
                     </button>
-                  )}
+                  </div>
                 </div>
               )
             })
@@ -319,7 +365,7 @@ export default function Invoices() {
                   {invoiceDetail.transactions.map((t) => (
                     <div
                       key={t.id}
-                      className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700"
+                      className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 group"
                     >
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-gray-900 dark:text-white text-sm truncate">
@@ -334,9 +380,24 @@ export default function Invoices() {
                           )}
                         </p>
                       </div>
-                      <p className="font-semibold text-gray-900 dark:text-white text-sm ml-2">
-                        {formatCurrency(t.amount)}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold text-gray-900 dark:text-white text-sm">
+                          {formatCurrency(t.amount)}
+                        </p>
+                        <button
+                          onClick={() => {
+                            setTransactionToMove({
+                              id: t.id,
+                              description: t.description || t.merchant_name || 'Transação',
+                            })
+                            setShowMoveModal(true)
+                          }}
+                          className="p-1 opacity-0 group-hover:opacity-100 hover:bg-gray-200 dark:hover:bg-slate-600 rounded transition-opacity"
+                          title="Mover para outra fatura"
+                        >
+                          <ArrowRightLeft size={14} className="text-gray-500" />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -423,6 +484,109 @@ export default function Invoices() {
                   disabled={payMutation.isPending}
                 >
                   {payMutation.isPending ? 'Pagando...' : 'Confirmar Pagamento'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Exclusão */}
+      {showDeleteModal && invoiceToDelete && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
+              Excluir Fatura
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+              Tem certeza que deseja excluir a fatura?
+            </p>
+            <p className="text-sm font-medium text-gray-900 dark:text-white mb-4">
+              {invoiceToDelete.credit_card_name} - {invoiceToDelete.period_display}
+            </p>
+            <div className="bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3 mb-4">
+              <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                As {invoiceToDelete.transaction_count} transações desta fatura serão desvinculadas, mas não excluídas.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDeleteModal(false)
+                  setInvoiceToDelete(null)
+                }}
+                className="btn-secondary flex-1"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => deleteMutation.mutate(invoiceToDelete.id)}
+                className="btn-primary flex-1 bg-red-600 hover:bg-red-700"
+                disabled={deleteMutation.isPending}
+              >
+                {deleteMutation.isPending ? 'Excluindo...' : 'Excluir'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Mover Transação */}
+      {showMoveModal && transactionToMove && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
+              Mover Transação
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+              Mover "{transactionToMove.description}" para:
+            </p>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault()
+                const formData = new FormData(e.currentTarget)
+                const invoiceId = formData.get('invoice_id')
+                moveTransactionMutation.mutate({
+                  transactionId: transactionToMove.id,
+                  invoiceId: invoiceId ? Number(invoiceId) : null,
+                })
+              }}
+            >
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Fatura de Destino
+                  </label>
+                  <select name="invoice_id" className="input">
+                    <option value="">Nenhuma (desvincular)</option>
+                    {invoices
+                      .filter((inv) => inv.id !== selectedInvoice)
+                      .map((inv) => (
+                        <option key={inv.id} value={inv.id}>
+                          {inv.credit_card_name} - {inv.period_display}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              </div>
+              <div className="flex gap-2 mt-6">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowMoveModal(false)
+                    setTransactionToMove(null)
+                  }}
+                  className="btn-secondary flex-1"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="btn-primary flex-1"
+                  disabled={moveTransactionMutation.isPending}
+                >
+                  {moveTransactionMutation.isPending ? 'Movendo...' : 'Mover'}
                 </button>
               </div>
             </form>

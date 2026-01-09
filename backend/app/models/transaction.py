@@ -117,6 +117,25 @@ class Transaction(Base):
     def merchant_name(self) -> str | None:
         return self.merchant.name if self.merchant else None
 
+    @property
+    def credit_card_name(self) -> str | None:
+        if self.credit_card and self.credit_card.account:
+            return self.credit_card.account.name
+        return None
+
+    @property
+    def income_source_name(self) -> str | None:
+        return self.income_source.name if self.income_source else None
+
+    @property
+    def invoice_display(self) -> str | None:
+        if self.invoice:
+            months = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
+                      "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
+            month_name = months[self.invoice.reference_month - 1]
+            return f"{month_name}/{self.invoice.reference_year}"
+        return None
+
 
 class TransactionAudit(Base):
     """Log de alterações para auditoria"""

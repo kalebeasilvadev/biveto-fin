@@ -299,6 +299,9 @@ export default function Upload() {
           installment_current: item.is_installment && item.installment_current ? item.installment_current : null,
           installment_total: item.is_installment && item.installment_total ? item.installment_total : null,
           credit_card_id: selectedCreditCardId ? parseInt(selectedCreditCardId) : null,
+          // Invoice period from PDF (so all items go to the same invoice)
+          invoice_month: document.card_info?.invoice_month || null,
+          invoice_year: document.card_info?.invoice_year || null,
         }
       }
     })
@@ -331,6 +334,9 @@ export default function Upload() {
         installment_current: item.is_installment && item.installment_current ? item.installment_current : null,
         installment_total: item.is_installment && item.installment_total ? item.installment_total : null,
         credit_card_id: selectedCreditCardId ? parseInt(selectedCreditCardId) : null,
+        // Invoice period from PDF (so all items go to the same invoice)
+        invoice_month: document.card_info?.invoice_month || null,
+        invoice_year: document.card_info?.invoice_year || null,
       }
     }))
 

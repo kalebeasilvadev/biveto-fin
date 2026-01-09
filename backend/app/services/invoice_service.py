@@ -54,12 +54,40 @@ class InvoiceService:
             ref_month = reference_date.month
             ref_year = reference_date.year
 
+        # Usar método auxiliar para calcular datas
+        dates = self.calculate_invoice_dates(credit_card, ref_month, ref_year)
+
+        return {
+            'reference_month': ref_month,
+            'reference_year': ref_year,
+            'closing_date': dates['closing_date'],
+            'due_date': dates['due_date'],
+        }
+
+    def calculate_invoice_dates(
+        self,
+        credit_card: CreditCard,
+        reference_month: int,
+        reference_year: int,
+    ) -> dict:
+        """
+        Calcula as datas de fechamento e vencimento para um mês/ano específico.
+
+        Usado quando o mês/ano da fatura é fornecido explicitamente (ex: de um PDF).
+
+        Retorna:
+        - closing_date: Data de fechamento
+        - due_date: Data de vencimento
+        """
+        closing_day = credit_card.closing_day
+        due_day = credit_card.due_day
+
         # Calcular data de fechamento (no mês de referência)
         try:
-            closing_date = date(ref_year, ref_month, min(closing_day, 28))
+            closing_date = date(reference_year, reference_month, min(closing_day, 28))
         except ValueError:
             # Em caso de dia inválido, usar último dia do mês
-            closing_date = date(ref_year, ref_month, 28)
+            closing_date = date(reference_year, reference_month, 28)
 
         # Calcular data de vencimento
         # Se due_day < closing_day, vencimento é no mês seguinte
@@ -71,13 +99,11 @@ class InvoiceService:
                 due_date = date(due_date_month.year, due_date_month.month, 28)
         else:
             try:
-                due_date = date(ref_year, ref_month, min(due_day, 28))
+                due_date = date(reference_year, reference_month, min(due_day, 28))
             except ValueError:
-                due_date = date(ref_year, ref_month, 28)
+                due_date = date(reference_year, reference_month, 28)
 
         return {
-            'reference_month': ref_month,
-            'reference_year': ref_year,
             'closing_date': closing_date,
             'due_date': due_date,
         }
