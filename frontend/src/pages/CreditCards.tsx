@@ -31,6 +31,8 @@ interface CreditCard {
   color: string | null
   icon: string | null
   is_active: boolean
+  annual_fee: number | null
+  annual_fee_waived: boolean
 }
 
 const pointsPrograms = [
@@ -252,99 +254,101 @@ export default function CreditCards() {
           actionOnClick={openCreateModal}
         />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
           {cards.map((card) => {
             const usagePercent = card.credit_limit > 0 ? (card.current_balance / card.credit_limit) * 100 : 0
             return (
               <div
                 key={card.id}
-                className="card hover:shadow-lg transition-all"
+                className="card p-3 hover:shadow-md transition-all"
               >
-                {/* Card Header with color */}
-                <div
-                  className="h-24 rounded-t-lg -m-4 mb-3 p-4 flex flex-col justify-between text-white"
-                  style={{ backgroundColor: card.color || '#1e1e1e' }}
-                >
-                  <div className="flex justify-between items-start">
+                {/* Card Header - mais compacto */}
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="w-8 h-8 rounded-md flex items-center justify-center"
+                      style={{ backgroundColor: card.color || '#1e1e1e' }}
+                    >
+                      <CreditCardIcon size={16} className="text-white" />
+                    </div>
                     <div>
-                      <p className="font-medium">{card.name}</p>
-                      <p className="text-xs opacity-80">
-                        {card.card_brand} {card.card_variant}
+                      <p className="font-medium text-sm text-gray-900 dark:text-white">{card.name}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        {card.card_brand} {card.last_four_digits && `•••• ${card.last_four_digits}`}
                       </p>
                     </div>
-                    <CreditCardIcon size={24} className="opacity-80" />
                   </div>
-                  {card.last_four_digits && (
-                    <p className="text-sm tracking-wider">•••• {card.last_four_digits}</p>
-                  )}
-                </div>
-
-                <div className="pt-2 space-y-3">
-                  {/* Usage Bar */}
-                  <div>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="text-gray-500 dark:text-gray-400">Utilizado</span>
-                      <span className="font-medium text-gray-900 dark:text-white">
-                        {card.current_balance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                      </span>
-                    </div>
-                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                      <div
-                        className={clsx(
-                          'h-2 rounded-full transition-all',
-                          usagePercent > 80 ? 'bg-red-500' : usagePercent > 50 ? 'bg-yellow-500' : 'bg-green-500'
-                        )}
-                        style={{ width: `${Math.min(usagePercent, 100)}%` }}
-                      />
-                    </div>
-                    <div className="flex justify-between text-xs mt-1 text-gray-500 dark:text-gray-400">
-                      <span>Limite: {card.credit_limit.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-                      <span>{usagePercent.toFixed(0)}%</span>
-                    </div>
-                  </div>
-
-                  {/* Info Row */}
-                  <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
-                    <div className="flex items-center gap-1">
-                      <Calendar size={14} />
-                      <span>Fecha: {card.closing_day}</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Calendar size={14} />
-                      <span>Vence: {card.due_day}</span>
-                    </div>
-                  </div>
-
-                  {/* Points Info */}
-                  {card.has_points && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <Star size={14} className="text-yellow-500" />
-                      <span className="text-gray-600 dark:text-gray-400">
-                        {pointsPrograms.find(p => p.value === card.points_program)?.label || card.points_program}
-                      </span>
-                      {card.points_factor && card.points_factor > 1 && (
-                        <span className="text-xs bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 px-1.5 py-0.5 rounded">
-                          {card.points_factor}x
-                        </span>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Actions */}
-                  <div className="flex justify-end gap-1 pt-2 border-t border-gray-100 dark:border-gray-700">
+                  <div className="flex gap-0.5">
                     <button
                       onClick={() => openEditModal(card)}
-                      className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                      className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
                     >
-                      <Pencil size={16} />
+                      <Pencil size={14} />
                     </button>
                     <button
                       onClick={() => handleDelete(card)}
-                      className="p-2 text-gray-400 hover:text-red-500"
+                      className="p-1.5 text-gray-400 hover:text-red-500"
                     >
-                      <Trash2 size={16} />
+                      <Trash2 size={14} />
                     </button>
                   </div>
+                </div>
+
+                {/* Usage Bar - compacto */}
+                <div className="mb-2">
+                  <div className="flex justify-between text-xs mb-1">
+                    <span className="text-gray-500 dark:text-gray-400">
+                      {card.current_balance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    </span>
+                    <span className={clsx(
+                      'font-medium',
+                      usagePercent > 80 ? 'text-red-500' : usagePercent > 50 ? 'text-yellow-600' : 'text-green-600'
+                    )}>
+                      {usagePercent.toFixed(0)}%
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
+                    <div
+                      className={clsx(
+                        'h-1.5 rounded-full transition-all',
+                        usagePercent > 80 ? 'bg-red-500' : usagePercent > 50 ? 'bg-yellow-500' : 'bg-green-500'
+                      )}
+                      style={{ width: `${Math.min(usagePercent, 100)}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    Limite: {card.credit_limit.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </p>
+                </div>
+
+                {/* Info Tags - compacto */}
+                <div className="flex flex-wrap gap-1 text-xs">
+                  <span className="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 px-1.5 py-0.5 rounded">
+                    Fecha: {card.closing_day}
+                  </span>
+                  <span className="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 px-1.5 py-0.5 rounded">
+                    Vence: {card.due_day}
+                  </span>
+                  {card.has_points && (
+                    <span className="bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                      <Star size={10} />
+                      {pointsPrograms.find(p => p.value === card.points_program)?.label || 'Pontos'}
+                      {card.points_factor && card.points_factor > 1 && ` ${card.points_factor}x`}
+                    </span>
+                  )}
+                  {card.annual_fee !== null && card.annual_fee > 0 && (
+                    <span className={clsx(
+                      'px-1.5 py-0.5 rounded',
+                      card.annual_fee_waived
+                        ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+                        : 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400'
+                    )}>
+                      {card.annual_fee_waived
+                        ? 'Anuidade isenta'
+                        : `Anuidade: ${card.annual_fee.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`
+                      }
+                    </span>
+                  )}
                 </div>
               </div>
             )

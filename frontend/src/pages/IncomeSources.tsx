@@ -114,6 +114,10 @@ export default function IncomeSources() {
 
   const sources: IncomeSource[] = data?.data || []
   const accounts: Account[] = accountsData?.data || []
+  // Filtrar para mostrar apenas banco e carteira como conta de destino
+  const destinationAccounts = accounts.filter(
+    (acc) => acc.type === 'bank' || acc.type === 'wallet'
+  )
 
   const createMutation = useMutation({
     mutationFn: (data: unknown) => incomeSourcesApi.create(data),
@@ -528,7 +532,7 @@ export default function IncomeSources() {
                   className="input"
                 >
                   <option value="">Selecione uma conta</option>
-                  {accounts.map((account) => (
+                  {destinationAccounts.map((account) => (
                     <option key={account.id} value={account.id}>{account.name}</option>
                   ))}
                 </select>

@@ -4,7 +4,6 @@ import { accountsApi, familyApi } from '../services/api'
 import {
   Wallet,
   Building,
-  CreditCard,
   TrendingUp,
   Plus,
   Pencil,
@@ -37,7 +36,6 @@ interface FamilyContext {
 const accountTypes = [
   { value: 'wallet', label: 'Carteira', icon: Wallet },
   { value: 'bank', label: 'Banco', icon: Building },
-  { value: 'credit_card', label: 'Cartão de Crédito', icon: CreditCard },
   { value: 'investment', label: 'Investimento', icon: TrendingUp },
 ]
 
@@ -87,7 +85,10 @@ export default function Accounts() {
 
   const showOwnershipSelector = familyData && familyData.member_count >= 2
 
-  const accounts: Account[] = data?.data || []
+  // Filtrar cartões de crédito - eles têm tela própria
+  const accounts: Account[] = (data?.data || []).filter(
+    (acc: Account) => acc.type !== 'credit_card'
+  )
 
   const createMutation = useMutation({
     mutationFn: (data: unknown) => accountsApi.create(data),
