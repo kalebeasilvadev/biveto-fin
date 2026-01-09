@@ -335,19 +335,17 @@ export default function CreditCards() {
                       {card.points_factor && card.points_factor > 1 && ` ${card.points_factor}x`}
                     </span>
                   )}
-                  {card.annual_fee !== null && card.annual_fee > 0 && (
-                    <span className={clsx(
-                      'px-1.5 py-0.5 rounded',
-                      card.annual_fee_waived
-                        ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
-                        : 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400'
-                    )}>
-                      {card.annual_fee_waived
-                        ? 'Anuidade isenta'
-                        : `Anuidade: ${card.annual_fee.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`
-                      }
-                    </span>
-                  )}
+                  <span className={clsx(
+                    'px-1.5 py-0.5 rounded',
+                    (!card.annual_fee || card.annual_fee === 0 || card.annual_fee_waived)
+                      ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+                      : 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400'
+                  )}>
+                    {(!card.annual_fee || card.annual_fee === 0 || card.annual_fee_waived)
+                      ? 'Anuidade isenta'
+                      : `Anuidade: ${card.annual_fee.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`
+                    }
+                  </span>
                 </div>
               </div>
             )
