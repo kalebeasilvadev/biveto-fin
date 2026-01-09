@@ -555,8 +555,20 @@ class InvoiceService:
         self,
         user: User,
         invoice_id: int,
-    ) -> None:
-        """Exclui uma fatura (desvincula transações primeiro)"""
+        delete_transactions: bool = False,
+    ) -> int:
+        """
+        Exclui uma fatura.
+
+        Args:
+            user: Usuário atual
+            invoice_id: ID da fatura
+            delete_transactions: Se True, deleta as transações vinculadas.
+                                 Se False, apenas desvincula (invoice_id = None).
+
+        Returns:
+            Número de transações afetadas (deletadas ou desvinculadas)
+        """
         invoice = await self.get_invoice_by_id(user, invoice_id)
 
         if not invoice:
@@ -565,18 +577,27 @@ class InvoiceService:
                 detail="Fatura não encontrada",
             )
 
-        # Desvincular transações
+        # Buscar transações vinculadas
         result = await self.db.execute(
             select(Transaction).where(Transaction.invoice_id == invoice_id)
         )
         transactions = list(result.scalars().all())
+        transaction_count = len(transactions)
 
-        for transaction in transactions:
-            transaction.invoice_id = None
+        if delete_transactions:
+            # Deletar transações
+            for transaction in transactions:
+                await self.db.delete(transaction)
+        else:
+            # Apenas desvincular
+            for transaction in transactions:
+                transaction.invoice_id = None
 
         # Excluir fatura
         await self.db.delete(invoice)
         await self.db.flush()
+
+        return transaction_count
 
     async def create_invoice_from_document(
         self,

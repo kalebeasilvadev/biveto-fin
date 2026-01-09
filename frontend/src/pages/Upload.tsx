@@ -31,6 +31,8 @@ export default function Upload() {
   const [batchAddSuccess, setBatchAddSuccess] = useState<number>(0)
   const [batchAddSkipped, setBatchAddSkipped] = useState<string[]>([])
   const [batchAddError, setBatchAddError] = useState<string | null>(null)
+  // Duplicados pendentes que o usuário pode forçar
+  const [pendingDuplicates, setPendingDuplicates] = useState<{ index: number; data: unknown; description: string; message: string }[]>([])
 
   // Credit card invoice state
   const [selectedCreditCardId, setSelectedCreditCardId] = useState<string>('')
@@ -170,7 +172,7 @@ export default function Upload() {
     mutationFn: (data: unknown) => transactionsApi.confirm(data),
     onSuccess: () => {
       invalidateTransactionCaches()
-      navigate('/transactions')
+      // Não redirecionar - usuário decide quando sair
     },
   })
 
@@ -178,7 +180,7 @@ export default function Upload() {
     mutationFn: (data: unknown) => transactionsApi.create(data),
     onSuccess: () => {
       invalidateTransactionCaches()
-      navigate('/transactions')
+      // Não redirecionar - usuário decide quando sair
     },
   })
 
@@ -206,24 +208,33 @@ export default function Upload() {
   })
 
   const batchAddMutation = useMutation({
-    mutationFn: async (items: { index: number; data: unknown; description: string }[]) => {
+    mutationFn: async (items: { index: number; data: unknown; description: string; force?: boolean }[]) => {
       const results = []
       const skipped: string[] = []
+      const duplicates: { index: number; data: unknown; description: string; message: string }[] = []
 
       for (const item of items) {
         try {
-          const result = await transactionsApi.confirm(item.data)
+          // Se force=true, adiciona flag force_duplicate
+          const dataToSend = item.force
+            ? { ...(item.data as object), force_duplicate: true }
+            : item.data
+          const result = await transactionsApi.confirm(dataToSend)
           results.push(result)
           setBatchAddSuccess(prev => prev + 1)
         } catch (error: unknown) {
           const err = error as { response?: { status?: number; data?: { detail?: string } } }
           if (err.response?.status === 409) {
-            // Use detailed error message if available, otherwise use item description
-            const skipMessage = err.response.data?.detail || item.description
-            skipped.push(skipMessage)
-            setBatchAddSkipped(prev => [...prev, skipMessage])
+            // Guardar como duplicado pendente para o usuário decidir
+            const message = err.response.data?.detail || item.description
+            duplicates.push({
+              index: item.index,
+              data: item.data,
+              description: item.description,
+              message,
+            })
           } else {
-            // For other errors, add to skipped but continue processing
+            // Para outros erros, adicionar como pulado
             const errorMessage = err.response?.data?.detail || item.description
             skipped.push(`Erro: ${errorMessage}`)
             setBatchAddSkipped(prev => [...prev, `Erro: ${errorMessage}`])
@@ -231,22 +242,16 @@ export default function Upload() {
         }
       }
 
-      return { results, skipped }
-    },
-    onSuccess: (data) => {
-      invalidateTransactionCaches()
-      if (data.results.length > 0) {
-        // Some items were successfully added
-        if (data.skipped.length > 0) {
-          // Wait for user to see skipped items before navigating
-          setTimeout(() => navigate('/transactions'), 3000)
-        } else {
-          navigate('/transactions')
-        }
-      } else if (data.skipped.length > 0) {
-        // All items were skipped - show message but don't navigate automatically
-        // User can see what was skipped and manually navigate
+      // Atualizar lista de duplicados pendentes
+      if (duplicates.length > 0) {
+        setPendingDuplicates(prev => [...prev, ...duplicates])
       }
+
+      return { results, skipped, duplicates }
+    },
+    onSuccess: () => {
+      invalidateTransactionCaches()
+      // Não redirecionar automaticamente - usuário fecha manualmente
     },
   })
 
@@ -300,6 +305,7 @@ export default function Upload() {
     if (selectedItems.length === document.extracted_items.length) {
       setSelectedItems([])
     } else {
+      // Selecionar todos - usuário decide sobre duplicados
       setSelectedItems(document.extracted_items.map((_, i) => i))
     }
   }
@@ -348,6 +354,7 @@ export default function Upload() {
     // For other documents, require account selection
     if (!isCreditCardInvoice && !formData.account_id) return
 
+    // Adicionar todos - usuário decide sobre duplicados
     const itemsToAdd = document.extracted_items.map((item, index) => ({
       index,
       description: item.description || 'Item',
@@ -406,6 +413,30 @@ export default function Upload() {
     })
   }
 
+  // Forçar adição de duplicados pendentes
+  const handleForceAddDuplicates = () => {
+    if (pendingDuplicates.length === 0) return
+
+    const itemsToForce = pendingDuplicates.map(dup => ({
+      index: dup.index,
+      data: dup.data,
+      description: dup.description,
+      force: true,
+    }))
+
+    setPendingDuplicates([])
+    batchAddMutation.mutate(itemsToForce)
+  }
+
+  // Ignorar duplicados pendentes
+  const handleSkipDuplicates = () => {
+    // Adicionar mensagens aos pulados
+    pendingDuplicates.forEach(dup => {
+      setBatchAddSkipped(prev => [...prev, dup.message])
+    })
+    setPendingDuplicates([])
+  }
+
   const resetForm = () => {
     setMode('select')
     setDocument(null)
@@ -415,6 +446,7 @@ export default function Upload() {
     setBatchAddSuccess(0)
     setBatchAddSkipped([])
     setBatchAddError(null)
+    setPendingDuplicates([])
     setFormData(initialFormData)
     setSelectedCreditCardId('')
     setShowCreateCardPrompt(false)
@@ -560,6 +592,21 @@ export default function Upload() {
             batchAddSkipped={batchAddSkipped}
             batchAddError={batchAddError}
             onClearError={() => setBatchAddError(null)}
+            pendingDuplicates={pendingDuplicates}
+            onForceAddDuplicates={handleForceAddDuplicates}
+            onSkipDuplicates={handleSkipDuplicates}
+            onNavigateToTransactions={() => navigate('/transactions')}
+            onReset={() => {
+              setDocument(null)
+              setMode('select')
+              setBatchAddSuccess(0)
+              setBatchAddSkipped([])
+              setBatchAddError(null)
+              setPendingDuplicates([])
+              setSelectedItems([])
+              setEditingItemIndex(null)
+              setSelectedCreditCardId('')
+            }}
           />
         )}
 

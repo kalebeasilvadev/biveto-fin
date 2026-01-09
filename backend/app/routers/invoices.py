@@ -372,16 +372,40 @@ async def update_invoice(
     return build_invoice_response(invoice, credit_card_name=credit_card_name)
 
 
-@router.delete("/{invoice_id}", status_code=204)
+class DeleteInvoiceResponse(BaseModel):
+    message: str
+    transactions_deleted: int
+
+
+@router.delete("/{invoice_id}", response_model=DeleteInvoiceResponse)
 async def delete_invoice(
     invoice_id: int,
     current_user: CurrentUser,
     db: DbSession,
+    delete_transactions: bool = Query(
+        False,
+        description="Se True, deleta as transações vinculadas. Se False, apenas desvincula."
+    ),
 ):
-    """Exclui uma fatura"""
+    """
+    Exclui uma fatura.
+
+    - Se delete_transactions=False (padrão): apenas desvincula as transações
+    - Se delete_transactions=True: deleta a fatura E todas as transações vinculadas
+    """
     service = InvoiceService(db)
-    await service.delete_invoice(current_user, invoice_id)
+    transaction_count = await service.delete_invoice(
+        current_user,
+        invoice_id,
+        delete_transactions=delete_transactions,
+    )
     await db.commit()
+
+    action = "deletadas" if delete_transactions else "desvinculadas"
+    return DeleteInvoiceResponse(
+        message=f"Fatura excluída. {transaction_count} transações {action}.",
+        transactions_deleted=transaction_count if delete_transactions else 0,
+    )
 
 
 @router.post("/{invoice_id}/pay", response_model=InvoiceResponse)

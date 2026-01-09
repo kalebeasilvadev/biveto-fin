@@ -57,6 +57,9 @@ class TransactionConfirm(BaseModel):
     mark_previous_as_paid: bool = False  # Marcar parcelas anteriores como pagas
     create_future_installments: bool = False  # Criar parcelas futuras
 
+    # Forçar salvamento mesmo se detectar duplicado
+    force_duplicate: bool = False
+
 
 class TransactionUpdate(BaseModel):
     amount: float | None = Field(None, gt=0)

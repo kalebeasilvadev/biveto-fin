@@ -7,6 +7,8 @@ export interface ExtractedItem {
   is_installment?: boolean
   installment_current?: number | null
   installment_total?: number | null
+  is_duplicate?: boolean
+  existing_transaction_id?: number | null
 }
 
 export interface CardInfo {

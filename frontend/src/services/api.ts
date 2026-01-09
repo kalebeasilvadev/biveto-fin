@@ -412,7 +412,8 @@ export const invoicesApi = {
   create: (data: unknown) => api.post('/invoices', data),
   createFromDocument: (data: unknown) => api.post('/invoices/from-document', data),
   update: (id: number, data: unknown) => api.patch(`/invoices/${id}`, data),
-  delete: (id: number) => api.delete(`/invoices/${id}`),
+  delete: (id: number, deleteTransactions: boolean = false) =>
+    api.delete(`/invoices/${id}`, { params: { delete_transactions: deleteTransactions } }),
   pay: (id: number, data: { amount: number; payment_account_id: number; payment_date?: string }) =>
     api.post(`/invoices/${id}/pay`, data),
   listByCard: (cardId: number, year?: number) =>

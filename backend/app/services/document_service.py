@@ -1,12 +1,14 @@
 import hashlib
 import os
-from datetime import datetime
+from datetime import datetime, date
+from decimal import Decimal
 from pathlib import Path
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, and_, func
 from fastapi import HTTPException, status, UploadFile
 
 from ..models.document import Document, DocumentExtraction, DocumentStatus
+from ..models.transaction import Transaction
 from ..models.user import User
 from ..core.config import settings
 
@@ -47,9 +49,19 @@ class DocumentService:
         existing_document = existing_result.scalar_one_or_none()
 
         if existing_document:
-            # Reprocessar o documento existente para retornar os itens extraídos
-            with open(existing_document.file_path, "rb") as f:
-                existing_content = f.read()
+            # Verificar se o arquivo ainda existe (pode ter sido perdido em redeploy)
+            if os.path.exists(existing_document.file_path):
+                with open(existing_document.file_path, "rb") as f:
+                    existing_content = f.read()
+            else:
+                # Arquivo perdido - restaurar com o conteúdo atual (mesmo hash = mesmo conteúdo)
+                upload_dir = Path(existing_document.file_path).parent
+                upload_dir.mkdir(parents=True, exist_ok=True)
+                with open(existing_document.file_path, "wb") as f:
+                    f.write(content)
+                existing_content = content
+
+            # Reprocessar o documento para retornar os itens extraídos
             extraction_data = await self._process_document(existing_document, existing_content)
 
             from ..schemas.document import DocumentResponse, ExtractedItemResponse, CardInfoResponse
@@ -99,10 +111,22 @@ class DocumentService:
         response = DocumentResponse.model_validate(document)
         response.is_duplicate = is_duplicate
 
-        # Converter itens extraídos para o formato de resposta
+        # Converter itens extraídos para o formato de resposta e verificar duplicados
         if extraction_data and extraction_data.get('items'):
-            response.extracted_items = [
-                ExtractedItemResponse(
+            extracted_items = []
+            for item in extraction_data['items']:
+                if item.get('amount', 0) == 0:
+                    continue
+
+                # Verificar se já existe transação similar
+                duplicate_info = await self._check_duplicate_transaction(
+                    user=user,
+                    description=item.get('description', 'Item'),
+                    amount=item.get('amount', 0),
+                    item_date=item.get('date'),
+                )
+
+                extracted_items.append(ExtractedItemResponse(
                     description=item.get('description', 'Item'),
                     amount=item.get('amount', 0),
                     date=item.get('date'),
@@ -111,10 +135,11 @@ class DocumentService:
                     is_installment=item.get('is_installment', False),
                     installment_current=item.get('installment_current'),
                     installment_total=item.get('installment_total'),
-                )
-                for item in extraction_data['items']
-                if item.get('amount', 0) != 0  # Aceita positivos e negativos
-            ]
+                    is_duplicate=duplicate_info['is_duplicate'],
+                    existing_transaction_id=duplicate_info.get('transaction_id'),
+                ))
+
+            response.extracted_items = extracted_items
 
         # Incluir informações do cartão (para faturas)
         if extraction_data and extraction_data.get('card_info'):
@@ -259,3 +284,84 @@ class DocumentService:
             'document_type': doc_type,
             'card_info': card_info,
         }
+
+    async def _check_duplicate_transaction(
+        self,
+        user: User,
+        description: str,
+        amount: float,
+        item_date: str | None,
+    ) -> dict:
+        """
+        Verifica se já existe uma transação similar no banco.
+
+        Uma transação é considerada duplicada se:
+        - Mesmo usuário
+        - Mesmo valor (absoluto, com tolerância de R$ 0.01)
+        - Descrição similar (contém partes em comum)
+        - Mesma data (se fornecida)
+
+        Returns:
+            dict com is_duplicate (bool) e transaction_id (int | None)
+        """
+        try:
+            # Converter data se fornecida
+            target_date = None
+            if item_date:
+                try:
+                    target_date = date.fromisoformat(item_date)
+                except ValueError:
+                    pass
+
+            # Buscar transações com mesmo valor (tolerância de 0.01)
+            amount_decimal = Decimal(str(abs(amount)))
+            tolerance = Decimal('0.01')
+
+            query = select(Transaction).where(
+                Transaction.user_id == user.id,
+                func.abs(Transaction.amount - amount_decimal) <= tolerance,
+            )
+
+            # Filtrar por data se disponível
+            if target_date:
+                query = query.where(Transaction.date == target_date)
+
+            result = await self.db.execute(query.limit(10))
+            candidates = list(result.scalars().all())
+
+            if not candidates:
+                return {'is_duplicate': False, 'transaction_id': None}
+
+            # Verificar similaridade de descrição
+            description_lower = description.lower().strip()
+            description_words = set(description_lower.split())
+
+            for txn in candidates:
+                txn_desc = (txn.description or '').lower().strip()
+                txn_words = set(txn_desc.split())
+
+                # Considerar duplicado se:
+                # 1. Descrições são iguais
+                # 2. Uma contém a outra
+                # 3. Têm palavras significativas em comum (>= 50% das palavras)
+                if description_lower == txn_desc:
+                    return {'is_duplicate': True, 'transaction_id': txn.id}
+
+                if description_lower in txn_desc or txn_desc in description_lower:
+                    return {'is_duplicate': True, 'transaction_id': txn.id}
+
+                # Verificar palavras em comum (ignorar palavras curtas)
+                significant_words = {w for w in description_words if len(w) > 3}
+                txn_significant = {w for w in txn_words if len(w) > 3}
+
+                if significant_words and txn_significant:
+                    common = significant_words & txn_significant
+                    similarity = len(common) / max(len(significant_words), len(txn_significant))
+                    if similarity >= 0.5:
+                        return {'is_duplicate': True, 'transaction_id': txn.id}
+
+            return {'is_duplicate': False, 'transaction_id': None}
+
+        except Exception:
+            # Em caso de erro, não marcar como duplicado
+            return {'is_duplicate': False, 'transaction_id': None}

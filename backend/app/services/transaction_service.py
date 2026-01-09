@@ -320,6 +320,7 @@ class TransactionService:
                 document_id=data.document_id,
                 credit_card_id=credit_card_id,
                 invoice_id=invoice.id if invoice else None,
+                force_duplicate=data.force_duplicate,
             )
 
             result["transaction"] = transaction

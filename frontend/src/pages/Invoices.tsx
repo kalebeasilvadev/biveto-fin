@@ -74,6 +74,7 @@ export default function Invoices() {
   const [invoiceToPay, setInvoiceToPay] = useState<Invoice | null>(null)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [invoiceToDelete, setInvoiceToDelete] = useState<Invoice | null>(null)
+  const [deleteTransactions, setDeleteTransactions] = useState(true)
   const [showMoveModal, setShowMoveModal] = useState(false)
   const [transactionToMove, setTransactionToMove] = useState<{ id: number; description: string } | null>(null)
 
@@ -116,14 +117,17 @@ export default function Invoices() {
   })
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => invoicesApi.delete(id),
+    mutationFn: ({ id, deleteTransactions }: { id: number; deleteTransactions: boolean }) =>
+      invoicesApi.delete(id, deleteTransactions),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] })
       queryClient.invalidateQueries({ queryKey: ['invoice'] })
       queryClient.invalidateQueries({ queryKey: ['transactions'] })
       queryClient.invalidateQueries({ queryKey: ['credit-cards'] })
+      queryClient.invalidateQueries({ queryKey: ['analytics'] })
       setShowDeleteModal(false)
       setInvoiceToDelete(null)
+      setDeleteTransactions(true)
       if (selectedInvoice === invoiceToDelete?.id) {
         setSelectedInvoice(null)
       }
@@ -504,24 +508,72 @@ export default function Invoices() {
             <p className="text-sm font-medium text-gray-900 dark:text-white mb-4">
               {invoiceToDelete.credit_card_name} - {invoiceToDelete.period_display}
             </p>
-            <div className="bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3 mb-4">
-              <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                As {invoiceToDelete.transaction_count} transações desta fatura serão desvinculadas, mas não excluídas.
-              </p>
+
+            {/* Opção para deletar transações */}
+            <div className="mb-4 space-y-3">
+              <label className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 dark:border-gray-700 cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-700">
+                <input
+                  type="radio"
+                  name="deleteOption"
+                  checked={deleteTransactions}
+                  onChange={() => setDeleteTransactions(true)}
+                  className="mt-1"
+                />
+                <div>
+                  <p className="font-medium text-gray-900 dark:text-white">
+                    Excluir fatura e transações
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Remove a fatura e todas as {invoiceToDelete.transaction_count} transações vinculadas.
+                    Use esta opção para relançar a fatura.
+                  </p>
+                </div>
+              </label>
+
+              <label className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 dark:border-gray-700 cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-700">
+                <input
+                  type="radio"
+                  name="deleteOption"
+                  checked={!deleteTransactions}
+                  onChange={() => setDeleteTransactions(false)}
+                  className="mt-1"
+                />
+                <div>
+                  <p className="font-medium text-gray-900 dark:text-white">
+                    Apenas desvincular transações
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Remove a fatura mas mantém as transações (elas ficam sem fatura vinculada).
+                  </p>
+                </div>
+              </label>
             </div>
+
+            {deleteTransactions && (
+              <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg p-3 mb-4">
+                <p className="text-sm text-red-800 dark:text-red-200">
+                  Atenção: Esta ação não pode ser desfeita. As transações serão permanentemente excluídas.
+                </p>
+              </div>
+            )}
+
             <div className="flex gap-2">
               <button
                 type="button"
                 onClick={() => {
                   setShowDeleteModal(false)
                   setInvoiceToDelete(null)
+                  setDeleteTransactions(true)
                 }}
                 className="btn-secondary flex-1"
               >
                 Cancelar
               </button>
               <button
-                onClick={() => deleteMutation.mutate(invoiceToDelete.id)}
+                onClick={() => deleteMutation.mutate({
+                  id: invoiceToDelete.id,
+                  deleteTransactions,
+                })}
                 className="btn-primary flex-1 bg-red-600 hover:bg-red-700"
                 disabled={deleteMutation.isPending}
               >

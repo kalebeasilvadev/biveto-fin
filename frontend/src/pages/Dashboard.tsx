@@ -92,6 +92,27 @@ export default function Dashboard() {
               <TrendingDown className="text-expense" size={24} />
             </div>
           </div>
+          {/* Breakdown por tipo */}
+          <div className="mt-2 space-y-1 text-xs text-gray-500 dark:text-gray-400">
+            {(summary?.credit_card_expenses || 0) > 0 && (
+              <div className="flex justify-between">
+                <span>Cartão:</span>
+                <span>{formatCurrency(summary?.credit_card_expenses || 0)}</span>
+              </div>
+            )}
+            {(summary?.debit_cash_expenses || 0) > 0 && (
+              <div className="flex justify-between">
+                <span>Débito/Dinheiro:</span>
+                <span>{formatCurrency(summary?.debit_cash_expenses || 0)}</span>
+              </div>
+            )}
+            {(summary?.fixed_expenses || 0) > 0 && (
+              <div className="flex justify-between">
+                <span>Fixos:</span>
+                <span>{formatCurrency(summary?.fixed_expenses || 0)}</span>
+              </div>
+            )}
+          </div>
           {summary?.expense_variation != null && (
             <div className="mt-2 flex items-center text-sm">
               {summary.expense_variation > 0 ? (

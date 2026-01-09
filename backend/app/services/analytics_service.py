@@ -44,18 +44,33 @@ class AnalyticsService:
         total_income = float(sum(
             t.amount for t in transactions if t.type == TransactionType.INCOME
         ) or 0)
-        # Excluir transações de pagamento de fatura para evitar contagem dupla
-        total_expense = float(sum(
+
+        # Cartão de crédito = total das faturas do mês de referência (não pela data da transação)
+        # Isso reflete o valor que será pago no mês, independente de quando as compras foram feitas
+        credit_card_expenses = await self._get_invoices_total_for_month(user, year, month)
+
+        # Débito/Dinheiro = despesas SEM invoice_id (não são de cartão) no período
+        # Excluindo também pagamentos de fatura para evitar contagem dupla
+        debit_cash_expenses = float(sum(
             t.amount for t in transactions
-            if t.type == TransactionType.EXPENSE and t.id not in payment_transaction_ids
+            if t.type == TransactionType.EXPENSE
+            and t.id not in payment_transaction_ids
+            and getattr(t, 'invoice_id', None) is None
         ) or 0)
 
+        # Total de despesas = faturas do mês + gastos no débito/dinheiro
+        total_expense = credit_card_expenses + debit_cash_expenses
+
+        # Fixos = despesas fixas no débito (não conta cartão pois já está na fatura)
         fixed_expenses = float(sum(
             t.amount
             for t in transactions
-            if t.type == TransactionType.EXPENSE and t.is_fixed and t.id not in payment_transaction_ids
+            if t.type == TransactionType.EXPENSE
+            and t.is_fixed
+            and t.id not in payment_transaction_ids
+            and getattr(t, 'invoice_id', None) is None
         ) or 0)
-        variable_expenses = total_expense - fixed_expenses
+        variable_expenses = debit_cash_expenses - fixed_expenses
 
         # Agrupar por categoria (excluindo pagamentos de fatura)
         categories = await self._group_by_category(transactions, payment_transaction_ids)
@@ -97,6 +112,8 @@ class AnalyticsService:
             margin=total_income - total_expense,
             fixed_expenses=fixed_expenses,
             variable_expenses=variable_expenses,
+            credit_card_expenses=credit_card_expenses,
+            debit_cash_expenses=debit_cash_expenses,
             pending_invoices=pending_invoices,
             pending_total=pending_total,
             available_balance=available_balance,
@@ -204,6 +221,28 @@ class AnalyticsService:
             return set(result.scalars().all())
         except Exception:
             return set()
+
+    async def _get_invoices_total_for_month(self, user: User, year: int, month: int) -> float:
+        """
+        Retorna o total de TODAS as faturas do mês de referência.
+        Isso representa o valor total que será/foi pago no mês, independente do status.
+        """
+        try:
+            household_user_ids = await self._get_household_user_ids(user)
+            user_ids = [user.id] + household_user_ids if household_user_ids else [user.id]
+
+            result = await self.db.execute(
+                select(CreditCardInvoice).where(
+                    CreditCardInvoice.user_id.in_(user_ids),
+                    CreditCardInvoice.reference_year == year,
+                    CreditCardInvoice.reference_month == month,
+                )
+            )
+            invoices = result.scalars().all()
+
+            return float(sum(inv.total_amount or 0 for inv in invoices))
+        except Exception:
+            return 0.0
 
     async def _get_pending_invoices_total(self, user: User, year: int, month: int) -> float:
         """

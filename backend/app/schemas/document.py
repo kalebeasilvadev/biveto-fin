@@ -16,6 +16,10 @@ class ExtractedItemResponse(BaseModel):
     installment_current: int | None = None  # Parcela atual (ex: 3)
     installment_total: int | None = None    # Total de parcelas (ex: 12)
 
+    # Flag de duplicado (já existe transação similar no banco)
+    is_duplicate: bool = False
+    existing_transaction_id: int | None = None
+
     class Config:
         from_attributes = True
 

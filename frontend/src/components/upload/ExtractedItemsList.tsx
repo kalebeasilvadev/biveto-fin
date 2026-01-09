@@ -1,6 +1,12 @@
-import { CheckSquare, Square, CheckCircle2, AlertCircle, Check } from 'lucide-react'
+import { CheckSquare, Square, CheckCircle2, AlertCircle, Check, AlertTriangle } from 'lucide-react'
 import { clsx } from 'clsx'
 import { ExtractedItem, CATEGORY_MAP } from '../../types/upload'
+
+interface PendingDuplicate {
+  index: number
+  description: string
+  message: string
+}
 
 interface ExtractedItemsListProps {
   items: ExtractedItem[]
@@ -17,6 +23,11 @@ interface ExtractedItemsListProps {
   batchAddSkipped: string[]
   batchAddError: string | null
   onClearError: () => void
+  onNavigateToTransactions?: () => void
+  onReset?: () => void
+  pendingDuplicates?: PendingDuplicate[]
+  onForceAddDuplicates?: () => void
+  onSkipDuplicates?: () => void
 }
 
 export default function ExtractedItemsList({
@@ -34,9 +45,31 @@ export default function ExtractedItemsList({
   batchAddSkipped,
   batchAddError,
   onClearError,
+  onNavigateToTransactions,
+  onReset,
+  pendingDuplicates = [],
+  onForceAddDuplicates,
+  onSkipDuplicates,
 }: ExtractedItemsListProps) {
+  const duplicateCount = items.filter(item => item.is_duplicate).length
+
   return (
     <div className="space-y-4">
+      {/* Duplicate warning */}
+      {duplicateCount > 0 && (
+        <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg p-3 flex items-start gap-2">
+          <AlertTriangle className="text-amber-600 flex-shrink-0 mt-0.5" size={16} />
+          <div>
+            <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+              {duplicateCount} item(ns) pode(m) já existir
+            </p>
+            <p className="text-xs text-amber-700 dark:text-amber-300 mt-0.5">
+              Itens marcados com "Duplicado" têm valor e descrição similar a transações existentes.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Header with select all */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -70,9 +103,11 @@ export default function ExtractedItemsList({
               key={index}
               className={clsx(
                 'rounded-xl border-2 transition-all overflow-hidden',
-                isSelected
-                  ? 'border-primary-500 bg-primary-50/50 dark:bg-primary-900/20'
-                  : 'border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-gray-200 dark:hover:border-slate-600'
+                item.is_duplicate
+                  ? 'border-amber-300 dark:border-amber-700 bg-amber-50/50 dark:bg-amber-900/20'
+                  : isSelected
+                    ? 'border-primary-500 bg-primary-50/50 dark:bg-primary-900/20'
+                    : 'border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-gray-200 dark:hover:border-slate-600'
               )}
             >
               {/* Main row */}
@@ -95,6 +130,12 @@ export default function ExtractedItemsList({
                     <p className="font-medium text-gray-900 dark:text-white truncate text-sm">
                       {item.description}
                     </p>
+                    {item.is_duplicate && (
+                      <span className="flex-shrink-0 px-1.5 py-0.5 text-[10px] font-semibold bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 rounded flex items-center gap-1">
+                        <AlertTriangle size={10} />
+                        Duplicado
+                      </span>
+                    )}
                     {item.is_installment && item.installment_current && item.installment_total && (
                       <span className="flex-shrink-0 px-1.5 py-0.5 text-[10px] font-semibold bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded">
                         {item.installment_current}/{item.installment_total}
@@ -167,8 +208,46 @@ export default function ExtractedItemsList({
         </div>
       )}
 
-      {/* Success with skipped items */}
-      {!batchAddPending && batchAddSkipped.length > 0 && batchAddSuccess > 0 && (
+      {/* Pending duplicates - user chooses to force add or skip */}
+      {!batchAddPending && pendingDuplicates.length > 0 && (
+        <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <AlertTriangle className="text-amber-600" size={20} />
+            <span className="font-medium text-amber-800 dark:text-amber-300">
+              {pendingDuplicates.length} item(ns) pode(m) ser duplicado(s)
+            </span>
+          </div>
+          <p className="text-sm text-amber-700 dark:text-amber-400 mb-3">
+            Esses itens já existem como transações. O que deseja fazer?
+          </p>
+          <ul className="text-xs text-amber-700 dark:text-amber-400 list-disc list-inside mb-3 max-h-32 overflow-y-auto">
+            {pendingDuplicates.map((dup, i) => (
+              <li key={i}>{dup.message}</li>
+            ))}
+          </ul>
+          <div className="flex gap-2">
+            {onForceAddDuplicates && (
+              <button
+                onClick={onForceAddDuplicates}
+                className="flex-1 btn-primary py-2 bg-amber-600 hover:bg-amber-700"
+              >
+                Adicionar Mesmo Assim
+              </button>
+            )}
+            {onSkipDuplicates && (
+              <button
+                onClick={onSkipDuplicates}
+                className="flex-1 btn-secondary py-2"
+              >
+                Ignorar
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Success message */}
+      {!batchAddPending && pendingDuplicates.length === 0 && batchAddSuccess > 0 && (
         <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-xl p-4">
           <div className="flex items-center gap-2 mb-2">
             <CheckCircle2 className="text-green-600" size={20} />
@@ -176,20 +255,39 @@ export default function ExtractedItemsList({
               {batchAddSuccess} transações adicionadas!
             </span>
           </div>
-          <div className="bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3 mt-2">
-            <p className="text-sm text-yellow-800 dark:text-yellow-300 font-medium mb-1">
-              {batchAddSkipped.length} item(ns) já existiam e foram ignorados:
-            </p>
-            <ul className="text-xs text-yellow-700 dark:text-yellow-400 list-disc list-inside">
-              {batchAddSkipped.slice(0, 5).map((item, i) => (
-                <li key={i}>{item}</li>
-              ))}
-              {batchAddSkipped.length > 5 && (
-                <li>e mais {batchAddSkipped.length - 5}...</li>
-              )}
-            </ul>
+          {batchAddSkipped.length > 0 && (
+            <div className="bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3 mt-2">
+              <p className="text-sm text-yellow-800 dark:text-yellow-300 font-medium mb-1">
+                {batchAddSkipped.length} item(ns) já existiam e foram ignorados:
+              </p>
+              <ul className="text-xs text-yellow-700 dark:text-yellow-400 list-disc list-inside">
+                {batchAddSkipped.slice(0, 5).map((item, i) => (
+                  <li key={i}>{item}</li>
+                ))}
+                {batchAddSkipped.length > 5 && (
+                  <li>e mais {batchAddSkipped.length - 5}...</li>
+                )}
+              </ul>
+            </div>
+          )}
+          <div className="flex gap-2 mt-3">
+            {onNavigateToTransactions && (
+              <button
+                onClick={onNavigateToTransactions}
+                className="flex-1 btn-primary py-2"
+              >
+                Ver Transações
+              </button>
+            )}
+            {onReset && (
+              <button
+                onClick={onReset}
+                className="flex-1 btn-secondary py-2"
+              >
+                Nova Fatura
+              </button>
+            )}
           </div>
-          <p className="text-xs text-green-600 dark:text-green-400 mt-2">Redirecionando para transações...</p>
         </div>
       )}
 
@@ -230,7 +328,7 @@ export default function ExtractedItemsList({
           <div className="flex gap-2">
             <button
               onClick={onAddAll}
-              disabled={!hasAccount}
+              disabled={!hasAccount || items.length === 0}
               className="flex-1 btn-primary py-3 flex items-center justify-center gap-2 disabled:opacity-50"
             >
               <CheckSquare size={18} />

@@ -216,16 +216,18 @@ class InstallmentService:
         document_id: int | None = None,
         credit_card_id: int | None = None,
         invoice_id: int | None = None,
+        force_duplicate: bool = False,
     ) -> Transaction:
         """Cria uma transação de parcela vinculada a uma série"""
-        # Verificar se parcela já existe
-        existing = await self.find_existing_installment(series, installment_number)
-        if existing:
-            # Usar 409 Conflict para que o frontend trate como "skip e continuar"
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=f"Parcela {installment_number}/{series.installment_count} de '{series.description}' (R$ {series.total_amount:.2f}) já cadastrada em {existing.date.strftime('%d/%m/%Y')}"
-            )
+        # Verificar se parcela já existe (a menos que force_duplicate seja True)
+        if not force_duplicate:
+            existing = await self.find_existing_installment(series, installment_number)
+            if existing:
+                # Usar 409 Conflict para que o frontend trate como "skip e continuar"
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"Parcela {installment_number}/{series.installment_count} de '{series.description}' (R$ {series.total_amount:.2f}) já cadastrada em {existing.date.strftime('%d/%m/%Y')}"
+                )
 
         # Usar credit_card_id da série se não fornecido
         card_id = credit_card_id or series.credit_card_id

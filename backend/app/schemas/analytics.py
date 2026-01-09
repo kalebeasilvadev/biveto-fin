@@ -31,6 +31,10 @@ class AnalyticsSummary(BaseModel):
     fixed_expenses: float
     variable_expenses: float
 
+    # Breakdown de despesas por tipo de pagamento
+    credit_card_expenses: float = 0  # Despesas no cartão de crédito
+    debit_cash_expenses: float = 0  # Despesas no débito/dinheiro
+
     # Valores pendentes (faturas não pagas)
     pending_invoices: float = 0  # Faturas de cartão a pagar
     pending_total: float = 0  # Total a pagar (faturas + recorrentes pendentes)
