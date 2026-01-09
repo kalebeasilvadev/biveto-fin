@@ -15,7 +15,7 @@ Extraia os itens/transações e retorne um JSON válido com este formato:
     {
       "description": "Nome do produto ou estabelecimento",
       "amount": 123.45,
-      "date": "2024-12-25",
+      "date": "2026-01-15",
       "category": "mercado",
       "installment_current": 3,
       "installment_total": 12,
@@ -33,51 +33,110 @@ Extraia os itens/transações e retorne um JSON válido com este formato:
   }
 }
 
-==== REGRAS CRÍTICAS PARA FATURA DE CARTÃO DE CRÉDITO ====
+==== PRIORIDADE MÁXIMA: EXTRAIR CARD_INFO (PARA QUALQUER BANCO) ====
 
-⚠️ ATENÇÃO: A fatura de cartão tem MÚLTIPLAS SEÇÕES. Extraia APENAS da seção correta:
+⚠️ SEMPRE extraia card_info para faturas de cartão de crédito! Esta informação é CRÍTICA.
 
-1️⃣ SEÇÃO DE RESUMO/CABEÇALHO (IGNORAR COMPLETAMENTE):
+📌 **Como encontrar as informações (funciona para QUALQUER banco):**
+
+1. **card_issuer** - Nome do banco/emissor em lowercase:
+   - Procure pelo LOGO ou NOME no cabeçalho da fatura
+   - Exemplos: "itau", "inter", "bradesco", "nubank", "santander", "bb", "caixa", "c6", "xp", "btg", "original", "next", "neon", "pagbank", "picpay", "mercadopago", "digio", "samsclub", "carrefour"
+   - Se não reconhecer, use o nome que aparecer
+
+2. **card_last_digits** - Últimos 4 dígitos do cartão:
+   - Procure padrões como: "Final 8849", "**** 1234", "5312.XXXX.XXXX.8849", "5364****7931"
+   - Pegue sempre os ÚLTIMOS 4 DÍGITOS
+
+3. **invoice_month** e **invoice_year** - Período da fatura:
+   - Procure por: "Vencimento", "Data de Vencimento", "Venc."
+   - Ou: "Fatura de Janeiro/2026", "JAN/2026", "01/2026"
+   - invoice_month = mês (1-12), invoice_year = ano (ex: 2026)
+
+4. **due_date** - Data de vencimento:
+   - Formato de saída: "YYYY-MM-DD"
+   - Procure por: "Vencimento: 15/01/2026", "Venc.: 15 JAN 2026"
+
+5. **total_amount** - Valor total da fatura:
+   - Procure por: "Valor do Documento", "Total da Fatura", "Valor a pagar"
+   - É o valor principal a ser pago
+
+==== REGRAS CRÍTICAS PARA FATURA DE CARTÃO DE CRÉDITO (QUALQUER BANCO) ====
+
+⚠️ TODA fatura de cartão tem estrutura similar. Identifique as seções:
+
+1️⃣ **CABEÇALHO/RESUMO** (extrair card_info, NÃO extrair transações):
    - Fica no TOPO da fatura
-   - Contém: "Valor do Documento", "Pagamento mínimo", "Opções de parcelamento"
-   - Mostra simulações de parcelamento como "1 + 11 de R$ 142,71" - NÃO SÃO COMPRAS!
+   - Contém: número do cartão, vencimento, valor total, pagamento mínimo
+   - EXTRAIA card_info daqui
+   - NÃO extraia transações daqui
 
-2️⃣ SEÇÃO "DESPESAS DA FATURA" ou "FATURA ATUAL" (✅ EXTRAIR DAQUI):
-   - É a seção PRINCIPAL com as transações do mês atual
-   - Tem formato de TABELA/LISTA com: DATA | DESCRIÇÃO | VALOR
-   - Extraia TODAS as transações desta seção
+2️⃣ **LANÇAMENTOS/DESPESAS** (✅ EXTRAIR TRANSAÇÕES DAQUI):
+   - Títulos comuns: "Lançamentos", "Despesas", "Despesas da fatura", "Fatura atual", "Compras e saques", "Demonstrativo"
+   - Formato geral: DATA | DESCRIÇÃO | [PARCELA] | VALOR
+   - Esta é a seção PRINCIPAL - extraia TODAS as transações
 
-3️⃣ SEÇÃO "PRÓXIMA FATURA" ou "PRÓXIMAS PARCELAS" (🚫 IGNORAR COMPLETAMENTE):
-   - Mostra parcelas que serão cobradas NO PRÓXIMO MÊS
-   - Mesmo que tenha data, descrição e valor - NÃO EXTRAIA!
-   - Geralmente aparece após a fatura atual, com título "Próxima fatura"
-   - As parcelas aqui são FUTURAS, não devem ser contabilizadas agora
+3️⃣ **PARCELAS FUTURAS** (🚫 IGNORAR COMPLETAMENTE):
+   - Títulos comuns: "Próximas faturas", "Próxima fatura", "Próximas parcelas", "Saldos futuros", "Parcelados para próximas faturas"
+   - São valores que serão cobrados EM MESES FUTUROS
+   - NÃO EXTRAIA NADA desta seção!
 
-🚫 COMO IDENTIFICAR A SEÇÃO "PRÓXIMA FATURA" (IGNORAR):
-   - Título contém: "Próxima fatura", "Próximas parcelas", "Lançamentos futuros"
-   - Aparece DEPOIS da seção de despesas da fatura atual
-   - Mostra o número da parcela seguinte (ex: se na fatura atual é 5/12, aqui será 6/12)
-   - Data geralmente é do próximo mês
+📌 **PADRÕES UNIVERSAIS DE PARCELAS:**
+- "XX/YY" ou "XX de YY" ou "(Parcela XX de YY)" = parcela XX de um total de YY
+- Pode estar na descrição ou em coluna separada
+- Ex: "STEAM 03/12" = parcela 3 de 12
+- Ex: "(Parcela 05 de 12)" = parcela 5 de 12
+
+📌 **PADRÕES UNIVERSAIS DE PAGAMENTOS/CRÉDITOS:**
+- Palavras-chave: "PAGAMENTO", "CRÉDITO", "ESTORNO", "PAG FATURA"
+- Valores podem ter "-" antes ou depois, ou símbolo "+"
+- SEMPRE retorne como valor NEGATIVO no JSON
+
+==== EXEMPLOS DE FORMATOS POR BANCO (REFERÊNCIA) ====
+
+Os formatos abaixo são EXEMPLOS para ajudar na extração. Se a fatura for de outro banco, use os padrões universais acima.
+
+📌 **ITAÚ:** DD/MM ESTABELECIMENTO XX/YY VALOR
+📌 **INTER:** Data por extenso | Movimentação | Beneficiário | Valor
+📌 **BRADESCO/AMEX:** Data | Histórico | Cidade | R$
+📌 **NUBANK:** Data | Descrição | Valor
+📌 **SANTANDER:** Data | Descrição | Parcela | R$ | US$
+📌 **DIGIO:** Data | Descrição | Parcela | Valor
+📌 **SAM'S/CARREFOUR (CSF):** DD/MM DESCRIÇÃO - X/Y VALOR
+📌 **C6 BANK:** Data | Descrição | Parcela | Valor
+📌 **BANCO DO BRASIL:** Data | Descrição | Parcela | Valor
+📌 **CAIXA:** Data | Descrição | Parcela | Valor
+
+⚠️ REGRA CRÍTICA SOBRE DATAS:
+- As datas na fatura são datas ORIGINAIS das compras (podem ser de meses atrás)
+- Para o campo "date" no JSON, use o MÊS DE REFERÊNCIA da fatura (do vencimento)
+- Se vencimento = 10/01/2026, todas as transações devem ter date em dezembro/2025 ou janeiro/2026
+- NUNCA use datas de 6+ meses atrás (julho, agosto) para uma fatura de janeiro!
+
+Exemplo - Fatura vence 15/01/2026:
+Linha Itaú: "09/07 MOTOCHEFE BRASILIA 06/12 574,13"
+→ {"description": "Motochefe Brasilia", "amount": 574.13, "date": "2026-01-08", "installment_current": 6, "installment_total": 12, "is_installment": true}
+
+Linha Inter: "23 de ago. 2025 | DM *helphbomaxcom (Parcela 05 de 12) | R$ 39,90"
+→ {"description": "DM Helphbomaxcom", "amount": 39.90, "date": "2025-12-23", "installment_current": 5, "installment_total": 12, "is_installment": true}
+
+Linha Bradesco: "08/11 Steam 02/12 SAO PAULO 105,66"
+→ {"description": "Steam", "amount": 105.66, "date": "2025-12-08", "installment_current": 2, "installment_total": 12, "is_installment": true}
 
 ❌ NUNCA EXTRAIA (são resumos/totais, NÃO são transações):
 - "Despesas do mês" - é um TOTAL, não uma transação individual!
-- "Fatura atual" - é um TOTAL, não uma transação individual!
-- "Total da fatura" / "Valor do Documento" - totais
-- TODA a seção "Próxima fatura" / "Próximas parcelas" - são FUTURAS!
+- "Total da fatura" / "Valor do Documento" / "Lançamentos atuais" - totais
+- TODA a seção "Compras parceladas - próximas faturas" - são FUTURAS!
+- "Próxima fatura", "Demais faturas", "Total para próximas faturas"
 - "Parcelamento Fatura" / "Parcelamento Total" - opção de parcelar a fatura
-- "1 + X de R$ XXX" - simulação de parcelamento
-- "Pagamento mínimo" - informativo
-- Limite disponível, limite total
-- Encargos, juros do rotativo (mas INCLUA IOF de transações internacionais no valor!)
+- "Pagamento mínimo", "Parcelas fixas" - informativo
+- Limite disponível, limite total, limites de crédito
+- Simulações de parcelamento, Simulação Saque Cash
+- Encargos, juros do rotativo
 
-⚠️ "Despesas do mês" e "Fatura atual" são LABELS de totais, não transações!
-Se você vir "Despesas do mês R$ 1.178,99" - isso é o TOTAL das despesas, NÃO uma transação.
-Transações reais têm nome de ESTABELECIMENTO (ex: "APPLE.COM/BILL", "UBER *TRIP").
-
-✅ EXTRAIA APENAS da seção "Despesas da fatura" / "Fatura atual":
-- Transações com DATA específica
-- Nome do ESTABELECIMENTO
-- VALOR individual da transação
+✅ EXTRAIA APENAS da seção "Lançamentos: compras e saques":
+- Cada linha com DATA | ESTABELECIMENTO | VALOR
+- Use a data de fechamento da fatura para o campo "date"
 
 Para cada transação:
 - Despesas/compras: valor POSITIVO
@@ -336,6 +395,7 @@ class LLMOCRService:
                 # Processar todas as páginas e combinar resultados
                 all_items = []
                 document_type = None
+                card_info = None
                 errors = []
 
                 for page_num, (img_content, img_mime) in enumerate(images, 1):
@@ -346,14 +406,22 @@ class LLMOCRService:
                         all_items.extend(result['items'])
                     if result.get('document_type') and not document_type:
                         document_type = result['document_type']
+                    # Capturar card_info da primeira página que tiver (geralmente a primeira)
+                    if result.get('card_info') and not card_info:
+                        card_info = result['card_info']
 
                 # Se não extraiu nenhum item e teve erros, retornar os erros
                 if not all_items and errors:
                     return {'items': [], 'error': '; '.join(errors)}
 
+                # Aplicar filtro de duplicatas no conjunto completo de itens de todas as páginas
+                # Isso é importante pois a seção "Próxima fatura" geralmente está em outra página
+                all_items = self._filter_duplicate_installments(all_items)
+
                 return {
                     'items': all_items,
                     'document_type': document_type,
+                    'card_info': card_info,
                 }
             else:
                 return await self._process_single_image(image_content, mime_type)
@@ -525,6 +593,11 @@ class LLMOCRService:
         'pagamento de fatura',  # Não é despesa, é pagamento do cartão
         'pagamento fatura',
         'pag fatura',
+        'pagamento banco csf',  # Pagamento de fatura Carrefour/Sam's
+        'pag boleto bancario',  # Pagamento de boleto
+        'inclusao pgto fatura',  # Pagamento via QR Code
+        'saldo anterior',
+        'saldo fatura anterior',
     ]
 
     def _is_invalid_description(self, description: str) -> bool:
@@ -535,15 +608,52 @@ class LLMOCRService:
                 return True
         return False
 
+    def _normalize_description(self, desc: str) -> str:
+        """Normaliza descrição para comparação, removendo caracteres especiais, números e espaços"""
+        import re
+        # Converter para lowercase
+        desc = desc.lower()
+        # Remover prefixos comuns de e-commerce (ordem importa - mais específicos primeiro)
+        prefixes = [
+            'mercadolivre*', 'mercadolivre ', 'mercadolivre',
+            'mercado*', 'mercado ', 'mercado',
+            'pag*', 'pag ', 'mp*', 'mp ', 'dl*', 'dl ', 'cp*', 'cp ', 'pg*', 'pg '
+        ]
+        for prefix in prefixes:
+            if desc.startswith(prefix):
+                desc = desc[len(prefix):]
+                break  # Remover apenas um prefixo
+        # Remover TODOS os caracteres não-alfabéticos (incluindo espaços e números)
+        # Isso garante que "FAST SHO" == "FASTSHO"
+        desc = re.sub(r'[^a-z]', '', desc)
+        return desc
+
     def _filter_duplicate_installments(self, items: list) -> list:
         """
         Remove parcelas duplicadas (mesma descrição e valor, mas número de parcela diferente).
         Mantém apenas a parcela com menor número (da fatura atual, não da próxima).
+        Também remove duplicatas exatas (mesmo item extraído de páginas diferentes).
         """
-        # Agrupar por (descrição normalizada, valor)
-        groups = {}
+        # Primeiro, remover duplicatas exatas (mesmo item, mesma parcela)
+        seen_exact = set()
+        unique_items = []
         for item in items:
-            key = (item['description'].lower().strip(), item['amount'])
+            # Chave para identificar itens exatamente iguais
+            exact_key = (
+                self._normalize_description(item['description']),
+                item['amount'],
+                item.get('installment_current'),
+                item.get('installment_total'),
+            )
+            if exact_key not in seen_exact:
+                seen_exact.add(exact_key)
+                unique_items.append(item)
+
+        # Agrupar por (descrição normalizada, valor) para encontrar parcelas diferentes do mesmo item
+        groups = {}
+        for item in unique_items:
+            desc_normalized = self._normalize_description(item['description'])
+            key = (desc_normalized, item['amount'])
             if key not in groups:
                 groups[key] = []
             groups[key].append(item)
@@ -556,6 +666,7 @@ class LLMOCRService:
                 filtered.append(group[0])
             else:
                 # Se tem itens parcelados, pegar o de menor número de parcela
+                # (provavelmente é a parcela da fatura atual, não da próxima)
                 installment_items = [i for i in group if i.get('is_installment')]
                 non_installment_items = [i for i in group if not i.get('is_installment')]
 
@@ -564,9 +675,30 @@ class LLMOCRService:
                     installment_items.sort(key=lambda x: x.get('installment_current', 999))
                     filtered.append(installment_items[0])
                 elif non_installment_items:
+                    # Se há múltiplos não-parcelados iguais, pegar apenas um
                     filtered.append(non_installment_items[0])
 
-        return filtered
+        # Segunda passagem: verificar se há valores negativos grandes que representam
+        # o valor total de uma compra parcelada (estorno para parcelamento)
+        final_items = []
+        for item in filtered:
+            # Se é um valor negativo grande
+            if item['amount'] < -50:  # Limiar para considerar "grande"
+                # Verificar se há parcelas do mesmo estabelecimento com valor positivo menor
+                desc_norm = self._normalize_description(item['description'])
+                # Buscar parcelas relacionadas
+                related_installments = [
+                    i for i in filtered
+                    if i.get('is_installment') and
+                    i['amount'] > 0 and
+                    self._normalize_description(i['description']) == desc_norm
+                ]
+                if related_installments:
+                    # Provavelmente é o valor total que foi parcelado - ignorar
+                    continue
+            final_items.append(item)
+
+        return final_items
 
     def _parse_response(self, content: str) -> dict:
         """Parseia a resposta JSON da LLM"""
