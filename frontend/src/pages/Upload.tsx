@@ -187,12 +187,17 @@ export default function Upload() {
           results.push(result)
           setBatchAddSuccess(prev => prev + 1)
         } catch (error: unknown) {
-          const err = error as { response?: { status?: number } }
+          const err = error as { response?: { status?: number; data?: { detail?: string } } }
           if (err.response?.status === 409) {
-            skipped.push(item.description)
-            setBatchAddSkipped(prev => [...prev, item.description])
+            // Use detailed error message if available, otherwise use item description
+            const skipMessage = err.response.data?.detail || item.description
+            skipped.push(skipMessage)
+            setBatchAddSkipped(prev => [...prev, skipMessage])
           } else {
-            throw error
+            // For other errors, add to skipped but continue processing
+            const errorMessage = err.response?.data?.detail || item.description
+            skipped.push(`Erro: ${errorMessage}`)
+            setBatchAddSkipped(prev => [...prev, `Erro: ${errorMessage}`])
           }
         }
       }
@@ -202,16 +207,17 @@ export default function Upload() {
     onSuccess: (data) => {
       invalidateTransactionCaches()
       if (data.results.length > 0) {
+        // Some items were successfully added
         if (data.skipped.length > 0) {
-          setTimeout(() => navigate('/transactions'), 2000)
+          // Wait for user to see skipped items before navigating
+          setTimeout(() => navigate('/transactions'), 3000)
         } else {
           navigate('/transactions')
         }
+      } else if (data.skipped.length > 0) {
+        // All items were skipped - show message but don't navigate automatically
+        // User can see what was skipped and manually navigate
       }
-    },
-    onError: (error: unknown) => {
-      const err = error as { response?: { data?: { detail?: string } }; message?: string }
-      setBatchAddError(err.response?.data?.detail || err.message || 'Erro ao adicionar transações')
     },
   })
 

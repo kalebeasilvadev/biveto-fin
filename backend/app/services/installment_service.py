@@ -28,6 +28,8 @@ class InstallmentService:
         installment_amount: float,
         installment_total: int,
         account_id: int | None = None,
+        transaction_date: date | None = None,
+        installment_number: int | None = None,
     ) -> InstallmentSeries | None:
         """
         Busca uma série de parcelas existente que corresponda aos critérios.
@@ -37,6 +39,7 @@ class InstallmentService:
         - Valor similar (±5%)
         - Mesmo total de parcelas
         - Série ainda ativa
+        - Data da primeira parcela compatível (se fornecida data e número da parcela)
         """
         normalized_merchant = merchant_name.lower().strip()
 
@@ -60,7 +63,29 @@ class InstallmentService:
             query = query.where(InstallmentSeries.account_id == account_id)
 
         result = await self.db.execute(query)
-        return result.scalar_one_or_none()
+        candidates = list(result.scalars().all())
+
+        if not candidates:
+            return None
+
+        # Se temos data e número da parcela, filtrar por compatibilidade de data
+        if transaction_date and installment_number:
+            # Calcular a data esperada da primeira parcela desta compra
+            # Se estou na parcela N com data X, a primeira parcela seria X - (N-1) meses
+            expected_first_date = transaction_date - relativedelta(months=installment_number - 1)
+
+            for series in candidates:
+                # A série é compatível se a first_installment_date está próxima (±45 dias)
+                # da data esperada calculada
+                date_diff = abs((series.first_installment_date - expected_first_date).days)
+                if date_diff <= 45:
+                    return series
+
+            # Nenhuma série com data compatível encontrada
+            return None
+
+        # Sem data para validar, retorna a primeira (comportamento antigo)
+        return candidates[0] if candidates else None
 
     async def find_existing_installment(
         self,
@@ -191,9 +216,10 @@ class InstallmentService:
         # Verificar se parcela já existe
         existing = await self.find_existing_installment(series, installment_number)
         if existing:
+            # Usar 409 Conflict para que o frontend trate como "skip e continuar"
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Parcela {installment_number}/{series.installment_count} já cadastrada"
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Parcela {installment_number}/{series.installment_count} de '{series.description}' (R$ {series.total_amount:.2f}) já cadastrada em {existing.date.strftime('%d/%m/%Y')}"
             )
 
         transaction = Transaction(

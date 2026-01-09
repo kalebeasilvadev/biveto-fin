@@ -418,6 +418,13 @@ class LLMOCRService:
                 # Isso é importante pois a seção "Próxima fatura" geralmente está em outra página
                 all_items = self._filter_duplicate_installments(all_items)
 
+                # Aplicar filtro de parcelas consecutivas (Santander lista todas as 12 parcelas)
+                all_items = self._filter_consecutive_installments(all_items)
+
+                # Aplicar filtro de itens que são resumos (valor igual ao total da fatura)
+                total_amount = card_info.get('total_amount') if card_info else None
+                all_items = self._filter_summary_items(all_items, total_amount)
+
                 return {
                     'items': all_items,
                     'document_type': document_type,
@@ -598,6 +605,10 @@ class LLMOCRService:
         'inclusao pgto fatura',  # Pagamento via QR Code
         'saldo anterior',
         'saldo fatura anterior',
+        'parcela de anuidade',  # Digio - é o total do parcelamento, não transação
+        'anuidade parcelada',
+        'total anuidade',
+        'valor total anuidade',
     ]
 
     def _is_invalid_description(self, description: str) -> bool:
@@ -699,6 +710,84 @@ class LLMOCRService:
             final_items.append(item)
 
         return final_items
+
+    def _filter_summary_items(self, items: list, total_amount: float | None) -> list:
+        """
+        Remove itens que são resumos/totais da fatura, não transações reais.
+        - Itens cujo valor é igual ao total da fatura (resumos)
+        - Itens "Anuidade" sem especificação (Digio mostra "Parcela de anuidade X/Y" como info)
+        """
+        if not total_amount or total_amount <= 0:
+            return items
+
+        filtered = []
+        for item in items:
+            # Se o valor é igual ao total da fatura, provavelmente é um resumo
+            if abs(item['amount'] - total_amount) < 0.01:
+                # Verificar se é um item genérico (anuidade, total, etc.)
+                desc_lower = item['description'].lower()
+                if any(word in desc_lower for word in ['anuidade', 'total', 'fatura', 'valor']):
+                    # Provavelmente é um resumo, não uma transação real
+                    continue
+
+            # Filtrar "Anuidade" genérica com valor alto (> R$ 50)
+            # Anuidades reais são pequenas (R$ 6,99, R$ 16,99, etc.)
+            desc_lower = item['description'].lower().strip()
+            if desc_lower in ['anuidade', 'parcela anuidade', 'parcela de anuidade']:
+                if item['amount'] > 50:
+                    # Provavelmente é o total da anuidade, não a parcela mensal
+                    continue
+
+            filtered.append(item)
+
+        return filtered
+
+    def _filter_consecutive_installments(self, items: list) -> list:
+        """
+        Remove parcelas consecutivas do mesmo item (ex: 01/12, 02/12, 03/12...).
+        O Santander lista TODAS as parcelas futuras na mesma fatura.
+        Mantém apenas a primeira parcela de cada série.
+        """
+        # Agrupar por descrição normalizada
+        groups = {}
+        for item in items:
+            if not item.get('is_installment'):
+                continue
+            desc_norm = self._normalize_description(item['description'])
+            if desc_norm not in groups:
+                groups[desc_norm] = []
+            groups[desc_norm].append(item)
+
+        # Identificar grupos com múltiplas parcelas consecutivas (provável erro)
+        items_to_remove = set()
+        for desc_norm, group in groups.items():
+            if len(group) <= 1:
+                continue
+
+            # Ordenar por número de parcela
+            sorted_group = sorted(group, key=lambda x: x.get('installment_current', 0))
+
+            # Verificar se são parcelas consecutivas (01, 02, 03...)
+            parcels = [g.get('installment_current', 0) for g in sorted_group]
+
+            # Se temos mais de 2 parcelas consecutivas, é provável que sejam parcelas futuras
+            consecutive_count = 1
+            for i in range(1, len(parcels)):
+                if parcels[i] == parcels[i-1] + 1:
+                    consecutive_count += 1
+                else:
+                    consecutive_count = 1
+
+            # Se há 3+ parcelas consecutivas, manter apenas a primeira
+            if consecutive_count >= 3 or len(group) >= 3:
+                # Manter apenas o item com menor número de parcela
+                min_parcel = min(parcels)
+                for item in sorted_group:
+                    if item.get('installment_current', 0) != min_parcel:
+                        items_to_remove.add(id(item))
+
+        # Filtrar itens marcados para remoção
+        return [item for item in items if id(item) not in items_to_remove]
 
     def _parse_response(self, content: str) -> dict:
         """Parseia a resposta JSON da LLM"""

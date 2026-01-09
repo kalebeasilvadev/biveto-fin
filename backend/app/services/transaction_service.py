@@ -167,12 +167,15 @@ class TransactionService:
                     )
             else:
                 # Tentar encontrar série existente
+                # Passa a data e número da parcela para validação de compatibilidade
                 series = await installment_service.find_matching_series(
                     user=user,
                     merchant_name=data.merchant_name or data.description or "Compra",
                     installment_amount=data.amount,
                     installment_total=data.installment_total,
                     account_id=data.account_id,
+                    transaction_date=data.date,
+                    installment_number=data.installment_current,
                 )
 
             # Se não encontrou, criar nova série
