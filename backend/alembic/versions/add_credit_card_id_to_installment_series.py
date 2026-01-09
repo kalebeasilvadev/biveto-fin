@@ -1,7 +1,7 @@
 """Add credit_card_id to installment_series
 
 Revision ID: add_cc_installment
-Revises: add_credit_card_invoices
+Revises: add_cc_invoices
 Create Date: 2026-01-09
 """
 from typing import Sequence, Union
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = 'add_cc_installment'
-down_revision: Union[str, None] = None  # Will be set after running
+down_revision: Union[str, None] = 'add_cc_invoices'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
