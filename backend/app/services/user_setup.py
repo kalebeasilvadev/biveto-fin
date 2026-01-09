@@ -27,23 +27,50 @@ DEFAULT_ACCOUNTS = [
 ]
 
 # Categorias padrão para novos usuários
+# Baseado no método 50-30-20 e apps populares (Mobills, Organizze, GuiaBolso)
+# Referência: https://www.mobills.com.br/blog/planejamento-financeiro/regra-50-30-20/
 DEFAULT_CATEGORIES = [
-    # Despesas
-    {"name": "Alimentação", "type": CategoryType.EXPENSE, "icon": "utensils", "color": "#ef4444"},
-    {"name": "Transporte", "type": CategoryType.EXPENSE, "icon": "car", "color": "#f97316"},
-    {"name": "Moradia", "type": CategoryType.EXPENSE, "icon": "home", "color": "#eab308"},
+    # ========================================
+    # DESPESAS ESSENCIAIS (Necessidades - 50%)
+    # ========================================
+    {"name": "Moradia", "type": CategoryType.EXPENSE, "icon": "home", "color": "#ef4444"},
+    {"name": "Supermercado", "type": CategoryType.EXPENSE, "icon": "shopping-cart", "color": "#f97316"},
+    {"name": "Transporte", "type": CategoryType.EXPENSE, "icon": "car", "color": "#eab308"},
     {"name": "Saúde", "type": CategoryType.EXPENSE, "icon": "heart-pulse", "color": "#22c55e"},
     {"name": "Educação", "type": CategoryType.EXPENSE, "icon": "graduation-cap", "color": "#06b6d4"},
+    {"name": "Contas e Serviços", "type": CategoryType.EXPENSE, "icon": "file-text", "color": "#6366f1"},
+
+    # ========================================
+    # DESPESAS VARIÁVEIS (Desejos - 30%)
+    # ========================================
+    {"name": "Alimentação Fora", "type": CategoryType.EXPENSE, "icon": "utensils", "color": "#ec4899"},
     {"name": "Lazer", "type": CategoryType.EXPENSE, "icon": "gamepad-2", "color": "#8b5cf6"},
-    {"name": "Vestuário", "type": CategoryType.EXPENSE, "icon": "shirt", "color": "#ec4899"},
-    {"name": "Mercado", "type": CategoryType.EXPENSE, "icon": "shopping-cart", "color": "#14b8a6"},
-    {"name": "Contas", "type": CategoryType.EXPENSE, "icon": "file-text", "color": "#6366f1"},
+    {"name": "Vestuário", "type": CategoryType.EXPENSE, "icon": "shirt", "color": "#14b8a6"},
+    {"name": "Beleza e Cuidados", "type": CategoryType.EXPENSE, "icon": "sparkles", "color": "#f472b6"},
+    {"name": "Assinaturas", "type": CategoryType.EXPENSE, "icon": "tv", "color": "#a855f7"},
+    {"name": "Compras Online", "type": CategoryType.EXPENSE, "icon": "package", "color": "#0ea5e9"},
+
+    # ========================================
+    # OUTRAS DESPESAS
+    # ========================================
+    {"name": "Pet", "type": CategoryType.EXPENSE, "icon": "paw-print", "color": "#84cc16"},
+    {"name": "Filhos", "type": CategoryType.EXPENSE, "icon": "baby", "color": "#fbbf24"},
+    {"name": "Presentes e Doações", "type": CategoryType.EXPENSE, "icon": "gift", "color": "#fb7185"},
+    {"name": "Impostos e Taxas", "type": CategoryType.EXPENSE, "icon": "landmark", "color": "#94a3b8"},
+    {"name": "Viagens", "type": CategoryType.EXPENSE, "icon": "plane", "color": "#38bdf8"},
     {"name": "Outros", "type": CategoryType.EXPENSE, "icon": "more-horizontal", "color": "#64748b"},
-    # Receitas
+
+    # ========================================
+    # RECEITAS
+    # ========================================
     {"name": "Salário", "type": CategoryType.INCOME, "icon": "briefcase", "color": "#22c55e"},
     {"name": "Freelance", "type": CategoryType.INCOME, "icon": "laptop", "color": "#3b82f6"},
-    {"name": "Investimentos", "type": CategoryType.INCOME, "icon": "trending-up", "color": "#8b5cf6"},
-    {"name": "Presente", "type": CategoryType.INCOME, "icon": "gift", "color": "#ec4899"},
+    {"name": "Rendimentos", "type": CategoryType.INCOME, "icon": "trending-up", "color": "#8b5cf6"},
+    {"name": "Benefícios", "type": CategoryType.INCOME, "icon": "credit-card", "color": "#f97316"},
+    {"name": "Vendas", "type": CategoryType.INCOME, "icon": "store", "color": "#14b8a6"},
+    {"name": "Aluguel Recebido", "type": CategoryType.INCOME, "icon": "building", "color": "#eab308"},
+    {"name": "Presente Recebido", "type": CategoryType.INCOME, "icon": "gift", "color": "#ec4899"},
+    {"name": "Reembolso", "type": CategoryType.INCOME, "icon": "rotate-ccw", "color": "#06b6d4"},
     {"name": "Outros", "type": CategoryType.INCOME, "icon": "plus-circle", "color": "#64748b"},
 ]
 
