@@ -174,6 +174,7 @@ class InstallmentService:
         account_id: int,
         category_id: int | None = None,
         purchase_date: date | None = None,
+        credit_card_id: int | None = None,
     ) -> InstallmentSeries:
         """Cria uma nova série de parcelas"""
         # Obter ou criar merchant
@@ -193,6 +194,7 @@ class InstallmentService:
             first_installment_date=first_installment_date,
             account_id=account_id,
             category_id=category_id,
+            credit_card_id=credit_card_id,
             status=InstallmentSeriesStatus.ACTIVE,
             paid_count=0,
         )
@@ -211,6 +213,8 @@ class InstallmentService:
         transaction_date: date,
         is_paid: bool = True,
         document_id: int | None = None,
+        credit_card_id: int | None = None,
+        invoice_id: int | None = None,
     ) -> Transaction:
         """Cria uma transação de parcela vinculada a uma série"""
         # Verificar se parcela já existe
@@ -222,12 +226,17 @@ class InstallmentService:
                 detail=f"Parcela {installment_number}/{series.installment_count} de '{series.description}' (R$ {series.total_amount:.2f}) já cadastrada em {existing.date.strftime('%d/%m/%Y')}"
             )
 
+        # Usar credit_card_id da série se não fornecido
+        card_id = credit_card_id or series.credit_card_id
+
         transaction = Transaction(
             user_id=user.id,
             account_id=series.account_id,
             category_id=series.category_id,
             merchant_id=series.merchant_id,
             document_id=document_id,
+            credit_card_id=card_id,
+            invoice_id=invoice_id,
             installment_series_id=series.id,
             type=TransactionType.EXPENSE,
             amount=series.installment_amount,

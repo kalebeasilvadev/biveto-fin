@@ -37,11 +37,14 @@ class InstallmentSeries(Base):
     purchase_date: Mapped[date | None] = mapped_column(Date)  # Data da compra original
     first_installment_date: Mapped[date] = mapped_column(Date)  # Data da primeira parcela
 
-    # Vínculo com conta/categoria
+    # Vínculo com conta/categoria/cartão
     account_id: Mapped[int] = mapped_column(
         ForeignKey("accounts.id", ondelete="CASCADE"), index=True
     )
     category_id: Mapped[int | None] = mapped_column(ForeignKey("categories.id"))
+    credit_card_id: Mapped[int | None] = mapped_column(
+        ForeignKey("credit_cards.id", ondelete="SET NULL"), index=True
+    )
 
     # Status e controle
     status: Mapped[str] = mapped_column(
@@ -61,6 +64,7 @@ class InstallmentSeries(Base):
     account: Mapped["Account"] = relationship(back_populates="installment_series")
     category: Mapped["Category | None"] = relationship()
     merchant: Mapped["Merchant | None"] = relationship()
+    credit_card: Mapped["CreditCard | None"] = relationship()
     transactions: Mapped[list["Transaction"]] = relationship(
         back_populates="installment_series", lazy="selectin"
     )
@@ -87,3 +91,4 @@ from .account import Account
 from .category import Category
 from .merchant import Merchant
 from .transaction import Transaction
+from .credit_card import CreditCard

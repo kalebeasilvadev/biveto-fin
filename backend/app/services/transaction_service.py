@@ -10,8 +10,10 @@ from ..models.account import Account
 from ..models.user import User
 from ..models.household import HouseholdMember
 from ..models.recurring import RecurringTransaction
+from ..models.credit_card import CreditCard
 from ..schemas.transaction import TransactionCreate, TransactionUpdate, TransactionConfirm
 from .installment_service import InstallmentService
+from .invoice_service import InvoiceService
 
 
 class TransactionService:
@@ -23,12 +25,42 @@ class TransactionService:
         if data.merchant_name:
             merchant_id = await self._get_or_create_merchant(data.merchant_name)
 
+        # Vincular à fatura se for cartão de crédito
+        credit_card_id = getattr(data, 'credit_card_id', None)
+        invoice_id = None
+        invoice = None
+
+        if credit_card_id:
+            # Buscar cartão de crédito
+            card_result = await self.db.execute(
+                select(CreditCard).where(
+                    CreditCard.id == credit_card_id,
+                    CreditCard.user_id == user.id,
+                )
+            )
+            credit_card = card_result.scalar_one_or_none()
+
+            if credit_card:
+                # Criar serviço de invoice e obter/criar fatura para o período
+                invoice_service = InvoiceService(self.db)
+                period = invoice_service.calculate_invoice_period(credit_card, data.date)
+                invoice = await invoice_service.get_or_create_invoice(
+                    user=user,
+                    credit_card=credit_card,
+                    reference_month=period['reference_month'],
+                    reference_year=period['reference_year'],
+                    closing_date=period['closing_date'],
+                    due_date=period['due_date'],
+                )
+                invoice_id = invoice.id
+
         transaction = Transaction(
             user_id=user.id,
             account_id=data.account_id,
             category_id=data.category_id,
             merchant_id=merchant_id,
-            credit_card_id=getattr(data, 'credit_card_id', None),
+            credit_card_id=credit_card_id,
+            invoice_id=invoice_id,
             income_source_id=getattr(data, 'income_source_id', None),
             type=data.type,
             amount=data.amount,
@@ -43,6 +75,11 @@ class TransactionService:
         self.db.add(transaction)
         await self.db.flush()
         await self.db.refresh(transaction)
+
+        # Atualizar total da fatura se houver
+        if invoice:
+            invoice_service = InvoiceService(self.db)
+            await invoice_service.update_invoice_total(invoice)
 
         # Criar recorrência se solicitado
         if data.create_recurring and data.recurring_frequency:
@@ -105,6 +142,7 @@ class TransactionService:
         - transaction: Transação criada
         - series: Série de parcelas (se aplicável)
         - created_transactions: Transações adicionais criadas (parcelas anteriores/futuras)
+        - invoice: Fatura vinculada (se cartão de crédito)
         """
         from ..models.document import Document
 
@@ -148,7 +186,38 @@ class TransactionService:
             "transaction": None,
             "series": None,
             "created_transactions": [],
+            "invoice": None,
         }
+
+        # Obter cartão de crédito e preparar fatura se necessário
+        credit_card_id = getattr(data, 'credit_card_id', None)
+        credit_card = None
+        invoice = None
+        invoice_service = None
+
+        if credit_card_id:
+            # Buscar cartão de crédito
+            card_result = await self.db.execute(
+                select(CreditCard).where(
+                    CreditCard.id == credit_card_id,
+                    CreditCard.user_id == user.id,
+                )
+            )
+            credit_card = card_result.scalar_one_or_none()
+
+            if credit_card:
+                # Criar serviço de invoice e obter/criar fatura para o período
+                invoice_service = InvoiceService(self.db)
+                period = invoice_service.calculate_invoice_period(credit_card, data.date)
+                invoice = await invoice_service.get_or_create_invoice(
+                    user=user,
+                    credit_card=credit_card,
+                    reference_month=period['reference_month'],
+                    reference_year=period['reference_year'],
+                    closing_date=period['closing_date'],
+                    due_date=period['due_date'],
+                )
+                result["invoice"] = invoice
 
         # Se é uma transação parcelada
         if data.is_installment and data.installment_current and data.installment_total:
@@ -189,6 +258,7 @@ class TransactionService:
                     first_installment_date=data.date,
                     account_id=data.account_id,
                     category_id=data.category_id,
+                    credit_card_id=credit_card_id,
                 )
 
             result["series"] = series
@@ -210,6 +280,8 @@ class TransactionService:
                 transaction_date=data.date,
                 is_paid=True,
                 document_id=data.document_id,
+                credit_card_id=credit_card_id,
+                invoice_id=invoice.id if invoice else None,
             )
 
             result["transaction"] = transaction
@@ -231,7 +303,8 @@ class TransactionService:
                 document_id=data.document_id,
                 category_id=data.category_id,
                 merchant_id=merchant_id,
-                credit_card_id=getattr(data, 'credit_card_id', None),
+                credit_card_id=credit_card_id,
+                invoice_id=invoice.id if invoice else None,
                 income_source_id=getattr(data, 'income_source_id', None),
                 type=TransactionType.EXPENSE,
                 amount=data.amount,
@@ -245,6 +318,10 @@ class TransactionService:
             await self.db.flush()
             await self.db.refresh(transaction)
             result["transaction"] = transaction
+
+        # Atualizar total da fatura se houver
+        if invoice and invoice_service:
+            await invoice_service.update_invoice_total(invoice)
 
         return result
 
@@ -431,6 +508,10 @@ class TransactionService:
         if "type" in update_data and update_data["type"]:
             update_data["type"] = update_data["type"].value
 
+        # Guardar invoice_id para atualizar total depois se amount mudar
+        invoice_id = transaction.invoice_id
+        amount_changed = "amount" in update_data and update_data["amount"] != transaction.amount
+
         # Registrar alterações para auditoria
         for field, value in update_data.items():
             old_value = getattr(transaction, field)
@@ -447,6 +528,18 @@ class TransactionService:
 
         await self.db.flush()
         await self.db.refresh(transaction)
+
+        # Atualizar total da fatura se amount mudou
+        if amount_changed and invoice_id:
+            from ..models.credit_card_invoice import CreditCardInvoice
+            result = await self.db.execute(
+                select(CreditCardInvoice).where(CreditCardInvoice.id == invoice_id)
+            )
+            invoice = result.scalar_one_or_none()
+            if invoice:
+                invoice_service = InvoiceService(self.db)
+                await invoice_service.update_invoice_total(invoice)
+
         return transaction
 
     async def delete(self, user: User, transaction_id: int) -> None:
@@ -456,7 +549,23 @@ class TransactionService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Transação não encontrada",
             )
+
+        # Guardar invoice_id para atualizar total depois
+        invoice_id = transaction.invoice_id
+
         await self.db.delete(transaction)
+        await self.db.flush()
+
+        # Atualizar total da fatura se estava vinculada
+        if invoice_id:
+            from ..models.credit_card_invoice import CreditCardInvoice
+            result = await self.db.execute(
+                select(CreditCardInvoice).where(CreditCardInvoice.id == invoice_id)
+            )
+            invoice = result.scalar_one_or_none()
+            if invoice:
+                invoice_service = InvoiceService(self.db)
+                await invoice_service.update_invoice_total(invoice)
 
     async def _get_or_create_merchant(self, name: str) -> int:
         normalized = name.lower().strip()
