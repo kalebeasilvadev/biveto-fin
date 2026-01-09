@@ -16,6 +16,7 @@ from .recurring import router as recurring_router
 from .family import router as family_router
 from .credit_cards import router as credit_cards_router
 from .income_sources import router as income_sources_router
+from .invoices import router as invoices_router
 
 api_router = APIRouter()
 
@@ -36,3 +37,4 @@ api_router.include_router(chat_router, prefix="/chat", tags=["Chat - Agente IA"]
 api_router.include_router(admin_router, prefix="/admin", tags=["Admin - Gestao"])
 api_router.include_router(credit_cards_router, prefix="/credit-cards", tags=["Cartões de Crédito"])
 api_router.include_router(income_sources_router, prefix="/income-sources", tags=["Fontes de Receita"])
+api_router.include_router(invoices_router, prefix="/invoices", tags=["Faturas"])

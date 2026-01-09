@@ -22,7 +22,15 @@ Extraia os itens/transações e retorne um JSON válido com este formato:
       "is_installment": true
     }
   ],
-  "document_type": "cupom_fiscal"
+  "document_type": "cupom_fiscal",
+  "card_info": {
+    "card_issuer": "itau",
+    "card_last_digits": "8849",
+    "invoice_month": 1,
+    "invoice_year": 2026,
+    "due_date": "2026-01-15",
+    "total_amount": 3193.12
+  }
 }
 
 ==== REGRAS CRÍTICAS PARA FATURA DE CARTÃO DE CRÉDITO ====
@@ -191,6 +199,40 @@ COMO EXTRAIR:
 - fatura_cartao: fatura de cartão de crédito
 - comprovante: comprovante de pagamento único
 - extrato: extrato bancário
+
+==== CARD_INFO (apenas para fatura_cartao) ====
+
+Para faturas de cartão de crédito, extraia também informações do cartão:
+
+- card_issuer: Nome do banco/emissor em lowercase:
+  * "itau", "nubank", "inter", "santander", "bradesco", "bb", "caixa", "c6", "xp", "btg", "original", "next", "neon", "pagbank", "picpay", "mercadopago"
+  * Identifique pelo logo, nome do banco no cabeçalho, ou domínio do email
+
+- card_last_digits: Últimos 4 dígitos do cartão (se visível na fatura)
+  * Geralmente aparece como "Final 8849" ou "**** 8849" ou "CARTÃO FINAL 8849"
+
+- invoice_month: Mês de referência da fatura (1-12)
+  * Geralmente aparece como "Fatura de Janeiro/2026" ou "JAN/2026"
+
+- invoice_year: Ano de referência (ex: 2026)
+
+- due_date: Data de vencimento no formato "YYYY-MM-DD"
+  * Aparece como "Vencimento: 15/01/2026" ou "Venc.: 15 JAN 2026"
+
+- total_amount: Valor total da fatura (número decimal)
+  * É o "Valor do Documento" ou "Total da Fatura"
+
+Se não conseguir identificar algum campo, omita-o do JSON.
+
+Exemplo para fatura Itaú:
+"card_info": {
+  "card_issuer": "itau",
+  "card_last_digits": "4523",
+  "invoice_month": 1,
+  "invoice_year": 2026,
+  "due_date": "2026-01-25",
+  "total_amount": 1567.89
+}
 
 ==== EXEMPLOS ====
 
@@ -598,10 +640,26 @@ class LLMOCRService:
             # Filtrar duplicatas (mesma descrição/valor com números de parcela diferentes)
             items = self._filter_duplicate_installments(items)
 
-            return {
+            result = {
                 'items': items,
                 'document_type': data.get('document_type'),
             }
+
+            # Extrair informações do cartão (apenas para fatura_cartao)
+            card_info = data.get('card_info')
+            if card_info and isinstance(card_info, dict):
+                result['card_info'] = {
+                    'card_issuer': card_info.get('card_issuer'),
+                    'card_last_digits': str(card_info.get('card_last_digits', ''))[-4:] if card_info.get('card_last_digits') else None,
+                    'invoice_month': card_info.get('invoice_month'),
+                    'invoice_year': card_info.get('invoice_year'),
+                    'due_date': card_info.get('due_date'),
+                    'total_amount': float(card_info.get('total_amount', 0)) if card_info.get('total_amount') else None,
+                }
+                # Remover campos None
+                result['card_info'] = {k: v for k, v in result['card_info'].items() if v is not None}
+
+            return result
 
         except (json.JSONDecodeError, ValueError, KeyError) as e:
             return {

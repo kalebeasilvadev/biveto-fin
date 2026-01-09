@@ -22,6 +22,7 @@ import {
   Sun,
   Briefcase,
   BadgeDollarSign,
+  FileText,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { clsx } from 'clsx'
@@ -35,6 +36,7 @@ const mainNavItems = [
   { to: '/transactions', icon: Receipt, label: 'Transações' },
   { to: '/accounts', icon: Building, label: 'Contas' },
   { to: '/credit-cards', icon: CreditCard, label: 'Cartões' },
+  { to: '/invoices', icon: FileText, label: 'Faturas' },
   { to: '/income-sources', icon: Briefcase, label: 'Receitas' },
   { to: '/budget', icon: Wallet, label: 'Orçamento' },
   { to: '/goals', icon: Target, label: 'Metas' },

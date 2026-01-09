@@ -392,3 +392,27 @@ export const incomeSourcesApi = {
   update: (id: number, data: unknown) => api.patch(`/income-sources/${id}`, data),
   delete: (id: number) => api.delete(`/income-sources/${id}`),
 }
+
+export const invoicesApi = {
+  list: (params?: {
+    credit_card_id?: number
+    status?: string
+    year?: number
+    month?: number
+    limit?: number
+    offset?: number
+  }) => api.get('/invoices', { params }),
+  get: (id: number) => api.get(`/invoices/${id}`),
+  create: (data: unknown) => api.post('/invoices', data),
+  createFromDocument: (data: unknown) => api.post('/invoices/from-document', data),
+  update: (id: number, data: unknown) => api.patch(`/invoices/${id}`, data),
+  delete: (id: number) => api.delete(`/invoices/${id}`),
+  pay: (id: number, data: { amount: number; payment_account_id: number; payment_date?: string }) =>
+    api.post(`/invoices/${id}/pay`, data),
+  listByCard: (cardId: number, year?: number) =>
+    api.get(`/invoices/credit-card/${cardId}`, { params: year ? { year } : {} }),
+  getCurrentByCard: (cardId: number) =>
+    api.get(`/invoices/credit-card/${cardId}/current`),
+  detectCard: (documentData: { card_issuer?: string; card_last_digits?: string }) =>
+    api.post('/invoices/detect-card', documentData),
+}

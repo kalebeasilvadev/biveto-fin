@@ -46,6 +46,7 @@ class Document(Base):
         back_populates="document", lazy="selectin", order_by="desc(DocumentExtraction.version)"
     )
     transaction: Mapped["Transaction | None"] = relationship(back_populates="document", uselist=False)
+    invoice: Mapped["CreditCardInvoice | None"] = relationship(back_populates="document", uselist=False)
 
 
 class DocumentExtraction(Base):
@@ -86,3 +87,4 @@ class DocumentExtraction(Base):
 
 from .user import User
 from .transaction import Transaction
+from .credit_card_invoice import CreditCardInvoice

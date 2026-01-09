@@ -9,11 +9,22 @@ export interface ExtractedItem {
   installment_total?: number | null
 }
 
+export interface CardInfo {
+  card_issuer?: string
+  card_last_digits?: string
+  invoice_month?: number
+  invoice_year?: number
+  due_date?: string
+  total_amount?: number
+}
+
 export interface Document {
   id: number
   status: 'pending' | 'processing' | 'completed' | 'failed'
   extracted_items: ExtractedItem[]
   is_duplicate?: boolean
+  document_type?: 'cupom_fiscal' | 'fatura_cartao' | 'comprovante' | 'extrato'
+  card_info?: CardInfo
 }
 
 export type UploadMode = 'select' | 'upload' | 'camera' | 'manual' | 'confirm'

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { documentsApi, transactionsApi, accountsApi, categoriesApi, familyApi, getApiErrorMessage } from '../services/api'
+import { documentsApi, transactionsApi, accountsApi, categoriesApi, familyApi, creditCardsApi, getApiErrorMessage } from '../services/api'
 import { X, CreditCard, Repeat } from 'lucide-react'
 import {
   Document,
@@ -31,6 +31,9 @@ export default function Upload() {
   const [batchAddSuccess, setBatchAddSuccess] = useState<number>(0)
   const [batchAddSkipped, setBatchAddSkipped] = useState<string[]>([])
   const [batchAddError, setBatchAddError] = useState<string | null>(null)
+
+  // Credit card invoice state
+  const [selectedCreditCardId, setSelectedCreditCardId] = useState<string>('')
 
   // Prevent accidental page reload
   useEffect(() => {
@@ -69,9 +72,18 @@ export default function Upload() {
     },
   })
 
+  const { data: creditCardsData } = useQuery({
+    queryKey: ['credit-cards'],
+    queryFn: creditCardsApi.list,
+  })
+
   const accounts = accountsData?.data || []
   const categories = categoriesData?.data || []
+  const creditCards = creditCardsData?.data || []
   const showOwnershipSelector = familyData && familyData.member_count >= 2
+
+  // Check if document is a credit card invoice
+  const isCreditCardInvoice = document?.document_type === 'fatura_cartao'
 
   // Helper: find category by suggested name
   const findCategoryId = (suggestedCategory: string | null): string => {
@@ -120,6 +132,7 @@ export default function Upload() {
     queryClient.invalidateQueries({ queryKey: ['credit-cards'] })
     queryClient.invalidateQueries({ queryKey: ['budget'] })
     queryClient.invalidateQueries({ queryKey: ['recurring'] })
+    queryClient.invalidateQueries({ queryKey: ['invoices'] })
   }
 
   const confirmMutation = useMutation({
@@ -232,7 +245,11 @@ export default function Upload() {
   }
 
   const handleBatchAdd = () => {
-    if (!document?.extracted_items || !formData.account_id) return
+    if (!document?.extracted_items) return
+    // For credit card invoices, require credit card selection
+    if (isCreditCardInvoice && !selectedCreditCardId) return
+    // For other documents, require account selection
+    if (!isCreditCardInvoice && !formData.account_id) return
 
     const itemsToAdd = selectedItems.map(index => {
       const item = document.extracted_items[index]
@@ -250,6 +267,7 @@ export default function Upload() {
           is_installment: item.is_installment || false,
           installment_current: item.is_installment && item.installment_current ? item.installment_current : null,
           installment_total: item.is_installment && item.installment_total ? item.installment_total : null,
+          credit_card_id: selectedCreditCardId ? parseInt(selectedCreditCardId) : null,
         }
       }
     })
@@ -261,7 +279,11 @@ export default function Upload() {
   }
 
   const handleAddAll = () => {
-    if (!document?.extracted_items || !formData.account_id) return
+    if (!document?.extracted_items) return
+    // For credit card invoices, require credit card selection
+    if (isCreditCardInvoice && !selectedCreditCardId) return
+    // For other documents, require account selection
+    if (!isCreditCardInvoice && !formData.account_id) return
 
     const itemsToAdd = document.extracted_items.map((item, index) => ({
       index,
@@ -277,6 +299,7 @@ export default function Upload() {
         is_installment: item.is_installment || false,
         installment_current: item.is_installment && item.installment_current ? item.installment_current : null,
         installment_total: item.is_installment && item.installment_total ? item.installment_total : null,
+        credit_card_id: selectedCreditCardId ? parseInt(selectedCreditCardId) : null,
       }
     }))
 
@@ -314,6 +337,7 @@ export default function Upload() {
     setBatchAddSkipped([])
     setBatchAddError(null)
     setFormData(initialFormData)
+    setSelectedCreditCardId('')
   }
 
   // Render camera mode
@@ -426,7 +450,7 @@ export default function Upload() {
             onEditItem={handleEditItem}
             onBatchAdd={handleBatchAdd}
             onAddAll={handleAddAll}
-            hasAccount={!!formData.account_id}
+            hasAccount={isCreditCardInvoice ? !!selectedCreditCardId : !!formData.account_id}
             batchAddPending={batchAddMutation.isPending}
             batchAddSuccess={batchAddSuccess}
             batchAddSkipped={batchAddSkipped}
@@ -435,8 +459,50 @@ export default function Upload() {
           />
         )}
 
+        {/* Credit card selector - shown for credit card invoices */}
+        {(!isManual && isCreditCardInvoice && document?.extracted_items && document.extracted_items.length > 0 && editingItemIndex === null) && (
+          <div className="space-y-4">
+            {document.card_info && (
+              <div className="bg-blue-50 dark:bg-blue-900/30 rounded-lg p-3 text-sm">
+                <p className="text-blue-800 dark:text-blue-300">
+                  <strong>Cartão detectado:</strong>{' '}
+                  {document.card_info.card_issuer?.toUpperCase() || 'Desconhecido'}
+                  {document.card_info.card_last_digits && ` ****${document.card_info.card_last_digits}`}
+                  {document.card_info.invoice_month && document.card_info.invoice_year && (
+                    <span className="ml-2">
+                      (Fatura {document.card_info.invoice_month}/{document.card_info.invoice_year})
+                    </span>
+                  )}
+                </p>
+              </div>
+            )}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Cartão de Crédito *
+              </label>
+              <select
+                value={selectedCreditCardId}
+                onChange={(e) => {
+                  setSelectedCreditCardId(e.target.value)
+                  // Auto-select the card's linked account
+                  const card = creditCards.find((c: { id: number }) => c.id === parseInt(e.target.value))
+                  if (card?.account_id) {
+                    setFormData(prev => ({ ...prev, account_id: String(card.account_id) }))
+                  }
+                }}
+                className="input"
+              >
+                <option value="">Selecione o cartão</option>
+                {creditCards.map((card: { id: number; name: string }) => (
+                  <option key={card.id} value={card.id}>{card.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
+
         {/* Account selector - shown for batch operations only when NOT editing an item */}
-        {(!isManual && document?.extracted_items && document.extracted_items.length > 0 && editingItemIndex === null) && (
+        {(!isManual && document?.extracted_items && document.extracted_items.length > 0 && editingItemIndex === null && !isCreditCardInvoice) && (
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Conta *</label>
             <select

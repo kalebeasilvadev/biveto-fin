@@ -15,6 +15,7 @@ from .invitation import Invitation, InvitationStatus
 from .recurring import RecurringTransaction, RecurrenceFrequency, RecurringStatus
 from .credit_card import CreditCard, PointsProgram
 from .income_source import IncomeSource, IncomeType, IncomeFrequency
+from .credit_card_invoice import CreditCardInvoice, InvoiceStatus
 
 __all__ = [
     "License",
@@ -56,4 +57,6 @@ __all__ = [
     "IncomeSource",
     "IncomeType",
     "IncomeFrequency",
+    "CreditCardInvoice",
+    "InvoiceStatus",
 ]

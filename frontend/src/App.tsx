@@ -14,6 +14,7 @@ import Chat from './pages/Chat'
 import Accounts from './pages/Accounts'
 import CreditCards from './pages/CreditCards'
 import IncomeSources from './pages/IncomeSources'
+import Invoices from './pages/Invoices'
 import AdminDashboard from './pages/admin/AdminDashboard'
 import AdminUsers from './pages/admin/AdminUsers'
 import AdminLicenses from './pages/admin/AdminLicenses'
@@ -78,6 +79,7 @@ function App() {
         <Route path="accounts" element={<Accounts />} />
         <Route path="credit-cards" element={<CreditCards />} />
         <Route path="income-sources" element={<IncomeSources />} />
+        <Route path="invoices" element={<Invoices />} />
         <Route path="settings" element={<Settings />} />
         <Route path="family" element={<Family />} />
         {/* Admin routes - protegidas por AdminRoute */}

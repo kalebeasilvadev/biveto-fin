@@ -39,6 +39,11 @@ class Transaction(Base):
         ForeignKey("income_sources.id", ondelete="SET NULL"), index=True
     )
 
+    # Invoice link (for credit card transactions)
+    invoice_id: Mapped[int | None] = mapped_column(
+        ForeignKey("credit_card_invoices.id", ondelete="SET NULL"), index=True
+    )
+
     type: Mapped[str] = mapped_column(String(10))  # TransactionType
     amount: Mapped[float] = mapped_column(Numeric(12, 2))
     currency: Mapped[str] = mapped_column(String(3), default="BRL")
@@ -93,6 +98,11 @@ class Transaction(Base):
     income_source: Mapped["IncomeSource | None"] = relationship(
         back_populates="transactions", lazy="selectin"
     )
+    invoice: Mapped["CreditCardInvoice | None"] = relationship(
+        back_populates="transactions",
+        foreign_keys=[invoice_id],
+        lazy="selectin"
+    )
 
     # Computed properties for API responses
     @property
@@ -133,3 +143,4 @@ from .merchant import Merchant
 from .document import Document
 from .installment import InstallmentSeries
 from .recurring import RecurringTransaction
+from .credit_card_invoice import CreditCardInvoice
