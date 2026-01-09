@@ -9,6 +9,7 @@ from ..models.category import Category
 from ..models.merchant import Merchant
 from ..models.user import User
 from ..models.household import HouseholdMember
+from ..models.credit_card_invoice import CreditCardInvoice, InvoiceStatus
 from ..schemas.analytics import (
     AnalyticsSummary,
     CategorySummary,
@@ -32,38 +33,54 @@ class AnalyticsService:
         # Buscar transações do período
         transactions = await self._get_transactions(user, period_start, period_end)
 
+        # Buscar IDs de transações de pagamento de fatura para excluir
+        # (evita contagem dupla: contamos as compras do cartão, não o pagamento da fatura)
+        payment_transaction_ids = await self._get_invoice_payment_transaction_ids(user)
+
         # Calcular totais
         total_income = sum(
             t.amount for t in transactions if t.type == TransactionType.INCOME
         )
+        # Excluir transações de pagamento de fatura para evitar contagem dupla
         total_expense = sum(
-            t.amount for t in transactions if t.type == TransactionType.EXPENSE
+            t.amount for t in transactions
+            if t.type == TransactionType.EXPENSE and t.id not in payment_transaction_ids
         )
 
         fixed_expenses = sum(
             t.amount
             for t in transactions
-            if t.type == TransactionType.EXPENSE and t.is_fixed
+            if t.type == TransactionType.EXPENSE and t.is_fixed and t.id not in payment_transaction_ids
         )
         variable_expenses = total_expense - fixed_expenses
 
-        # Agrupar por categoria
-        categories = await self._group_by_category(transactions)
+        # Agrupar por categoria (excluindo pagamentos de fatura)
+        categories = await self._group_by_category(transactions, payment_transaction_ids)
 
-        # Top merchants
-        top_merchants = await self._group_by_merchant(transactions)
+        # Top merchants (excluindo pagamentos de fatura)
+        top_merchants = await self._group_by_merchant(transactions, payment_transaction_ids)
 
         # Período anterior para comparação
         prev_start = period_start - timedelta(days=period_start.day)
         prev_end = period_start - timedelta(days=1)
         prev_transactions = await self._get_transactions(user, prev_start, prev_end)
         prev_expense = sum(
-            t.amount for t in prev_transactions if t.type == TransactionType.EXPENSE
+            t.amount for t in prev_transactions
+            if t.type == TransactionType.EXPENSE and t.id not in payment_transaction_ids
         )
 
         expense_variation = None
         if prev_expense > 0:
             expense_variation = ((total_expense - prev_expense) / prev_expense) * 100
+
+        # Calcular faturas pendentes (não pagas) do mês
+        pending_invoices = await self._get_pending_invoices_total(user, year, month)
+
+        # Total pendente = faturas não pagas
+        pending_total = pending_invoices
+
+        # Saldo disponível = Receitas - Despesas pagas - Pendentes
+        available_balance = total_income - total_expense - pending_total
 
         return AnalyticsSummary(
             period_start=period_start,
@@ -74,6 +91,9 @@ class AnalyticsService:
             margin=total_income - total_expense,
             fixed_expenses=fixed_expenses,
             variable_expenses=variable_expenses,
+            pending_invoices=pending_invoices,
+            pending_total=pending_total,
+            available_balance=available_balance,
             categories=categories,
             top_merchants=top_merchants[:10],
             previous_period_expense=prev_expense if prev_expense > 0 else None,
@@ -159,17 +179,66 @@ class AnalyticsService:
         )
         return list(result.scalars().all())
 
+    async def _get_invoice_payment_transaction_ids(self, user: User) -> set[int]:
+        """
+        Retorna IDs de transações que são pagamentos de fatura.
+        Essas transações devem ser excluídas do cálculo de despesas
+        para evitar contagem dupla (contamos as compras, não o pagamento).
+        """
+        household_user_ids = await self._get_household_user_ids(user)
+        user_ids = [user.id] + household_user_ids if household_user_ids else [user.id]
+
+        result = await self.db.execute(
+            select(CreditCardInvoice.payment_transaction_id).where(
+                CreditCardInvoice.user_id.in_(user_ids),
+                CreditCardInvoice.payment_transaction_id.isnot(None)
+            )
+        )
+        return set(result.scalars().all())
+
+    async def _get_pending_invoices_total(self, user: User, year: int, month: int) -> float:
+        """
+        Retorna o total de faturas não pagas para o mês.
+        Considera faturas com status OPEN, CLOSED ou OVERDUE.
+        """
+        household_user_ids = await self._get_household_user_ids(user)
+        user_ids = [user.id] + household_user_ids if household_user_ids else [user.id]
+
+        # Buscar faturas não pagas do mês
+        result = await self.db.execute(
+            select(CreditCardInvoice).where(
+                CreditCardInvoice.user_id.in_(user_ids),
+                CreditCardInvoice.reference_year == year,
+                CreditCardInvoice.reference_month == month,
+                CreditCardInvoice.status.in_([
+                    InvoiceStatus.OPEN.value,
+                    InvoiceStatus.CLOSED.value,
+                    InvoiceStatus.OVERDUE.value,
+                ])
+            )
+        )
+        invoices = result.scalars().all()
+
+        # Somar total das faturas menos o que já foi pago parcialmente
+        total = sum(
+            float(inv.total_amount or 0) - float(inv.paid_amount or 0)
+            for inv in invoices
+        )
+        return total
+
     async def _group_by_category(
-        self, transactions: list[Transaction]
+        self, transactions: list[Transaction], exclude_ids: set[int] | None = None
     ) -> list[CategorySummary]:
         from collections import defaultdict
 
+        exclude_ids = exclude_ids or set()
+
         by_category: dict[int, list[Transaction]] = defaultdict(list)
         for t in transactions:
-            if t.type == TransactionType.EXPENSE and t.category_id:
+            if t.type == TransactionType.EXPENSE and t.category_id and t.id not in exclude_ids:
                 by_category[t.category_id].append(t)
 
-        total = sum(t.amount for t in transactions if t.type == TransactionType.EXPENSE)
+        total = sum(t.amount for t in transactions if t.type == TransactionType.EXPENSE and t.id not in exclude_ids)
         summaries = []
 
         for category_id, txs in by_category.items():
@@ -195,13 +264,15 @@ class AnalyticsService:
         return sorted(summaries, key=lambda x: x.total, reverse=True)
 
     async def _group_by_merchant(
-        self, transactions: list[Transaction]
+        self, transactions: list[Transaction], exclude_ids: set[int] | None = None
     ) -> list[MerchantSummary]:
         from collections import defaultdict
 
+        exclude_ids = exclude_ids or set()
+
         by_merchant: dict[int | None, list[Transaction]] = defaultdict(list)
         for t in transactions:
-            if t.type == TransactionType.EXPENSE:
+            if t.type == TransactionType.EXPENSE and t.id not in exclude_ids:
                 by_merchant[t.merchant_id].append(t)
 
         summaries = []

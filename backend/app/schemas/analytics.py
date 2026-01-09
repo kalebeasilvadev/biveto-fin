@@ -31,6 +31,11 @@ class AnalyticsSummary(BaseModel):
     fixed_expenses: float
     variable_expenses: float
 
+    # Valores pendentes (faturas não pagas)
+    pending_invoices: float = 0  # Faturas de cartão a pagar
+    pending_total: float = 0  # Total a pagar (faturas + recorrentes pendentes)
+    available_balance: float = 0  # Receita - Despesas - Pendentes
+
     categories: list[CategorySummary]
     top_merchants: list[MerchantSummary]
 

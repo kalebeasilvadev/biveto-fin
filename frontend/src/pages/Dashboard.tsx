@@ -5,9 +5,10 @@ import { ptBR } from 'date-fns/locale'
 import {
   TrendingUp,
   TrendingDown,
-  Wallet,
   ArrowUpRight,
   ArrowDownRight,
+  CreditCard,
+  PiggyBank,
 } from 'lucide-react'
 import {
   PieChart,
@@ -64,7 +65,7 @@ export default function Dashboard() {
       </div>
 
       {/* Cards de resumo */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="card">
           <div className="flex items-center justify-between">
             <div>
@@ -115,19 +116,41 @@ export default function Dashboard() {
         <div className="card">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Saldo do mês</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">A pagar</p>
+              <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">
+                {formatCurrency(summary?.pending_invoices || 0)}
+              </p>
+            </div>
+            <div className="p-3 bg-amber-100 dark:bg-amber-900/30 rounded-full">
+              <CreditCard className="text-amber-600" size={24} />
+            </div>
+          </div>
+          {(summary?.pending_invoices || 0) > 0 && (
+            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+              Faturas pendentes
+            </p>
+          )}
+        </div>
+
+        <div className="card">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Saldo disponível</p>
               <p
                 className={`text-2xl font-bold ${
-                  (summary?.balance || 0) >= 0 ? 'text-income' : 'text-expense'
+                  (summary?.available_balance || 0) >= 0 ? 'text-income' : 'text-expense'
                 }`}
               >
-                {formatCurrency(summary?.balance || 0)}
+                {formatCurrency(summary?.available_balance || 0)}
               </p>
             </div>
             <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-full">
-              <Wallet className="text-blue-600" size={24} />
+              <PiggyBank className="text-blue-600" size={24} />
             </div>
           </div>
+          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+            Receitas - Despesas - Pendentes
+          </p>
         </div>
       </div>
 
