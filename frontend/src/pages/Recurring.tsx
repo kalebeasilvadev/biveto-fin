@@ -117,21 +117,17 @@ export default function Recurring() {
     },
   })
 
-  const { data: accounts = [] } = useQuery<Account[]>({
+  const { data: accountsData } = useQuery({
     queryKey: ['accounts'],
-    queryFn: async () => {
-      const response = await accountsApi.list()
-      return response.data
-    },
+    queryFn: accountsApi.list,
   })
+  const accounts: Account[] = accountsData?.data || []
 
-  const { data: categories = [] } = useQuery<Category[]>({
+  const { data: categoriesData } = useQuery({
     queryKey: ['categories'],
-    queryFn: async () => {
-      const response = await categoriesApi.list()
-      return response.data
-    },
+    queryFn: categoriesApi.list,
   })
+  const categories: Category[] = categoriesData?.data || []
 
   // Função para invalidar caches relacionados a recorrências
   const invalidateRecurringCaches = () => {
