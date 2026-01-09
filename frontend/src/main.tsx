@@ -14,6 +14,24 @@ const queryClient = new QueryClient({
   },
 })
 
+// Listen for service worker updates
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('message', (event) => {
+    if (event.data?.type === 'CACHE_UPDATED') {
+      console.log('Nova versão disponível:', event.data.version)
+      // Reload page to get fresh content
+      window.location.reload()
+    }
+  })
+
+  // Check for updates periodically (every 5 minutes)
+  setInterval(() => {
+    navigator.serviceWorker.getRegistration().then((reg) => {
+      if (reg) reg.update()
+    })
+  }, 5 * 60 * 1000)
+}
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>

@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v23';
+const CACHE_VERSION = 'v24';
 const CACHE_NAME = `biveto-${CACHE_VERSION}`;
 const STATIC_CACHE = `biveto-static-${CACHE_VERSION}`;
 const DYNAMIC_CACHE = `biveto-dynamic-${CACHE_VERSION}`;
@@ -13,28 +13,53 @@ const STATIC_ASSETS = [
   '/icons/icon-512x512.png'
 ];
 
-// Install event - cache static assets
+// Install event - cache static assets (with error handling for each file)
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(STATIC_CACHE)
-      .then(cache => {
+      .then(async cache => {
         console.log('Caching static assets');
-        return cache.addAll(STATIC_ASSETS);
+        // Cache files individually to avoid failing entire install
+        for (const asset of STATIC_ASSETS) {
+          try {
+            await cache.add(asset);
+          } catch (err) {
+            console.warn(`Failed to cache ${asset}:`, err.message);
+          }
+        }
       })
       .then(() => self.skipWaiting())
+      .catch(err => {
+        console.warn('Service worker install error:', err);
+        // Still skip waiting even if caching fails
+        return self.skipWaiting();
+      })
   );
 });
 
-// Activate event - clean old caches
+// Activate event - clean ALL old caches and force refresh
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys => {
+      console.log('Cleaning old caches, current version:', CACHE_VERSION);
       return Promise.all(
         keys
-          .filter(key => key !== STATIC_CACHE && key !== DYNAMIC_CACHE)
-          .map(key => caches.delete(key))
+          .filter(key => !key.includes(CACHE_VERSION))
+          .map(key => {
+            console.log('Deleting old cache:', key);
+            return caches.delete(key);
+          })
       );
-    }).then(() => self.clients.claim())
+    })
+    .then(() => self.clients.claim())
+    .then(() => {
+      // Notify all clients to refresh
+      self.clients.matchAll().then(clients => {
+        clients.forEach(client => {
+          client.postMessage({ type: 'CACHE_UPDATED', version: CACHE_VERSION });
+        });
+      });
+    })
   );
 });
 
