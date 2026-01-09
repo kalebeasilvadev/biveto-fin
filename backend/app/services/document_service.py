@@ -72,7 +72,7 @@ class DocumentService:
         extraction_data = await self._process_document(document, content)
 
         # Retornar resposta com flag de duplicata e itens extraídos (não salvos)
-        from ..schemas.document import DocumentResponse, ExtractedItemResponse
+        from ..schemas.document import DocumentResponse, ExtractedItemResponse, CardInfoResponse
 
         response = DocumentResponse.model_validate(document)
         response.is_duplicate = is_duplicate
@@ -93,6 +93,18 @@ class DocumentService:
                 for item in extraction_data['items']
                 if item.get('amount', 0) != 0  # Aceita positivos e negativos
             ]
+
+        # Incluir informações do cartão (para faturas)
+        if extraction_data and extraction_data.get('card_info'):
+            card_info = extraction_data['card_info']
+            response.card_info = CardInfoResponse(
+                card_issuer=card_info.get('card_issuer'),
+                card_last_digits=card_info.get('card_last_digits'),
+                invoice_month=card_info.get('invoice_month'),
+                invoice_year=card_info.get('invoice_year'),
+                due_date=card_info.get('due_date'),
+                total_amount=card_info.get('total_amount'),
+            )
 
         return response
 
@@ -216,10 +228,12 @@ class DocumentService:
         if doc_type:
             document.document_type = doc_type
 
-        # Retornar itens individuais com categoria
+        # Retornar itens individuais com categoria e info do cartão
         items = result.get('items', [])
+        card_info = result.get('card_info')
 
         return {
             'items': items,
             'document_type': doc_type,
+            'card_info': card_info,
         }

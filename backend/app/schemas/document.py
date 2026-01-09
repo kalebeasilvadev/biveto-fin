@@ -59,6 +59,16 @@ class DocumentExtractionResponse(BaseModel):
         from_attributes = True
 
 
+class CardInfoResponse(BaseModel):
+    """Informações do cartão extraídas de uma fatura"""
+    card_issuer: str | None = None
+    card_last_digits: str | None = None
+    invoice_month: int | None = None
+    invoice_year: int | None = None
+    due_date: str | None = None
+    total_amount: float | None = None
+
+
 class DocumentResponse(BaseModel):
     id: int
     file_hash: str
@@ -75,6 +85,9 @@ class DocumentResponse(BaseModel):
 
     # Alerta de duplicata (não bloqueia, apenas informa)
     is_duplicate: bool = False
+
+    # Informações do cartão (apenas para fatura_cartao)
+    card_info: CardInfoResponse | None = None
 
     class Config:
         from_attributes = True

@@ -118,6 +118,31 @@ export default function Upload() {
           installment_total: firstItem.installment_total?.toString() || '',
         }))
       }
+
+      // Auto-detect credit card if this is a credit card invoice
+      if (doc.document_type === 'fatura_cartao' && doc.card_info && creditCards.length > 0) {
+        const cardInfo = doc.card_info
+        // Try to find a matching card
+        const matchedCard = creditCards.find((card: { id: number; name: string; last_four_digits?: string }) => {
+          // Match by last 4 digits if available
+          if (cardInfo.card_last_digits && card.last_four_digits) {
+            return card.last_four_digits === cardInfo.card_last_digits
+          }
+          // Match by issuer name if no digits
+          if (cardInfo.card_issuer) {
+            return card.name.toLowerCase().includes(cardInfo.card_issuer.toLowerCase())
+          }
+          return false
+        })
+
+        if (matchedCard) {
+          setSelectedCreditCardId(String(matchedCard.id))
+          // Auto-set the account if the card has one
+          if ((matchedCard as { account_id?: number }).account_id) {
+            setFormData(prev => ({ ...prev, account_id: String((matchedCard as { account_id: number }).account_id) }))
+          }
+        }
+      }
     },
     onError: (error: unknown) => {
       setUploadError(getApiErrorMessage(error, 'Erro ao processar documento'))
@@ -397,7 +422,9 @@ export default function Upload() {
                   <CreditCard className="text-primary-600" size={20} />
                 </div>
                 <div>
-                  <p className="font-semibold text-gray-900 dark:text-white">Fatura processada</p>
+                  <p className="font-semibold text-gray-900 dark:text-white">
+                    {isCreditCardInvoice ? 'Fatura de Cartão' : 'Documento processado'}
+                  </p>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
                     {document.extracted_items.length} transação(ões) encontrada(s)
                   </p>
@@ -413,6 +440,27 @@ export default function Upload() {
                 </p>
               </div>
             </div>
+
+            {/* Card info for credit card invoices */}
+            {isCreditCardInvoice && document.card_info && (
+              <div className="flex items-center gap-2 pt-2 border-t border-primary-100 dark:border-primary-800">
+                <CreditCard size={14} className="text-primary-600" />
+                <span className="text-sm text-gray-700 dark:text-gray-300">
+                  {document.card_info.card_issuer?.toUpperCase() || 'Cartão'}
+                  {document.card_info.card_last_digits && ` ****${document.card_info.card_last_digits}`}
+                  {document.card_info.invoice_month && document.card_info.invoice_year && (
+                    <span className="ml-1 text-gray-500 dark:text-gray-400">
+                      • Ref: {document.card_info.invoice_month.toString().padStart(2, '0')}/{document.card_info.invoice_year}
+                    </span>
+                  )}
+                  {document.card_info.due_date && (
+                    <span className="ml-1 text-gray-500 dark:text-gray-400">
+                      • Venc: {new Date(document.card_info.due_date + 'T12:00:00').toLocaleDateString('pt-BR')}
+                    </span>
+                  )}
+                </span>
+              </div>
+            )}
 
             {document.extracted_items.some(item => item.is_installment) && (
               <div className="flex items-center gap-2 pt-2 border-t border-primary-100 dark:border-primary-800">
@@ -461,43 +509,27 @@ export default function Upload() {
 
         {/* Credit card selector - shown for credit card invoices */}
         {(!isManual && isCreditCardInvoice && document?.extracted_items && document.extracted_items.length > 0 && editingItemIndex === null) && (
-          <div className="space-y-4">
-            {document.card_info && (
-              <div className="bg-blue-50 dark:bg-blue-900/30 rounded-lg p-3 text-sm">
-                <p className="text-blue-800 dark:text-blue-300">
-                  <strong>Cartão detectado:</strong>{' '}
-                  {document.card_info.card_issuer?.toUpperCase() || 'Desconhecido'}
-                  {document.card_info.card_last_digits && ` ****${document.card_info.card_last_digits}`}
-                  {document.card_info.invoice_month && document.card_info.invoice_year && (
-                    <span className="ml-2">
-                      (Fatura {document.card_info.invoice_month}/{document.card_info.invoice_year})
-                    </span>
-                  )}
-                </p>
-              </div>
-            )}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Cartão de Crédito *
-              </label>
-              <select
-                value={selectedCreditCardId}
-                onChange={(e) => {
-                  setSelectedCreditCardId(e.target.value)
-                  // Auto-select the card's linked account
-                  const card = creditCards.find((c: { id: number }) => c.id === parseInt(e.target.value))
-                  if (card?.account_id) {
-                    setFormData(prev => ({ ...prev, account_id: String(card.account_id) }))
-                  }
-                }}
-                className="input"
-              >
-                <option value="">Selecione o cartão</option>
-                {creditCards.map((card: { id: number; name: string }) => (
-                  <option key={card.id} value={card.id}>{card.name}</option>
-                ))}
-              </select>
-            </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Cartão de Crédito *
+            </label>
+            <select
+              value={selectedCreditCardId}
+              onChange={(e) => {
+                setSelectedCreditCardId(e.target.value)
+                // Auto-select the card's linked account
+                const card = creditCards.find((c: { id: number }) => c.id === parseInt(e.target.value))
+                if (card?.account_id) {
+                  setFormData(prev => ({ ...prev, account_id: String(card.account_id) }))
+                }
+              }}
+              className="input"
+            >
+              <option value="">Selecione o cartão</option>
+              {creditCards.map((card: { id: number; name: string }) => (
+                <option key={card.id} value={card.id}>{card.name}</option>
+              ))}
+            </select>
           </div>
         )}
 
