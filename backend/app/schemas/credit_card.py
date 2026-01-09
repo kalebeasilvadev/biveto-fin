@@ -80,9 +80,12 @@ class CreditCardListResponse(BaseModel):
     due_day: int
     has_points: bool
     points_program: str | None
+    points_factor: float | None
     card_brand: str | None
     card_variant: str | None
     last_four_digits: str | None
+    annual_fee: float | None
+    annual_fee_waived: bool
     color: str | None
     icon: str | None
     is_active: bool
