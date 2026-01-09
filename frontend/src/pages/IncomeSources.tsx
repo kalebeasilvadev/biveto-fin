@@ -14,6 +14,9 @@ import {
   Gift,
   Users,
   User,
+  PlayCircle,
+  CheckCircle,
+  AlertCircle,
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import EmptyState from '../components/EmptyState'
@@ -90,9 +93,24 @@ function getIncomeTypeInfo(type: string) {
   return incomeTypes.find(t => t.value === type) || incomeTypes[incomeTypes.length - 1]
 }
 
+interface TransactionPreview {
+  source_id: number
+  source_name: string
+  type: string
+  amount: number
+  date: string
+  is_business_day: boolean
+  business_day_number: number | null
+}
+
 export default function IncomeSources() {
   const queryClient = useQueryClient()
   const [showModal, setShowModal] = useState(false)
+  const [showGenerateModal, setShowGenerateModal] = useState(false)
+  const [generateYear, setGenerateYear] = useState(new Date().getFullYear())
+  const [generateMonth, setGenerateMonth] = useState(new Date().getMonth() + 1)
+  const [previewData, setPreviewData] = useState<TransactionPreview[]>([])
+  const [generateResult, setGenerateResult] = useState<{ count: number; message: string } | null>(null)
   const [editingSource, setEditingSource] = useState<IncomeSource | null>(null)
   const [formData, setFormData] = useState({
     name: '',
@@ -153,6 +171,25 @@ export default function IncomeSources() {
     mutationFn: (id: number) => incomeSourcesApi.delete(id),
     onSuccess: () => {
       invalidateIncomeSourceCaches()
+    },
+  })
+
+  const previewMutation = useMutation({
+    mutationFn: ({ year, month }: { year: number; month: number }) =>
+      incomeSourcesApi.previewTransactions(year, month),
+    onSuccess: (response) => {
+      setPreviewData(response.data || [])
+      setGenerateResult(null)
+    },
+  })
+
+  const generateMutation = useMutation({
+    mutationFn: (data: { year: number; month: number; overwrite?: boolean }) =>
+      incomeSourcesApi.generateTransactions(data),
+    onSuccess: (response) => {
+      setGenerateResult(response.data)
+      queryClient.invalidateQueries({ queryKey: ['transactions'] })
+      queryClient.invalidateQueries({ queryKey: ['analytics'] })
     },
   })
 
@@ -230,6 +267,35 @@ export default function IncomeSources() {
     }
   }
 
+  const openGenerateModal = () => {
+    setGenerateYear(new Date().getFullYear())
+    setGenerateMonth(new Date().getMonth() + 1)
+    setPreviewData([])
+    setGenerateResult(null)
+    setShowGenerateModal(true)
+    // Auto-load preview
+    previewMutation.mutate({ year: new Date().getFullYear(), month: new Date().getMonth() + 1 })
+  }
+
+  const closeGenerateModal = () => {
+    setShowGenerateModal(false)
+    setPreviewData([])
+    setGenerateResult(null)
+  }
+
+  const handlePreview = () => {
+    previewMutation.mutate({ year: generateYear, month: generateMonth })
+  }
+
+  const handleGenerate = () => {
+    generateMutation.mutate({ year: generateYear, month: generateMonth })
+  }
+
+  const monthNames = [
+    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+  ]
+
   const totalMonthlyExpected = sources
     .filter(s => s.frequency === 'monthly' && s.expected_amount && !s.is_variable)
     .reduce((sum, s) => sum + (s.expected_amount || 0), 0)
@@ -251,10 +317,18 @@ export default function IncomeSources() {
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Fontes de Receita</h1>
           <p className="text-gray-500 dark:text-gray-400">Gerencie suas fontes de renda e benefícios</p>
         </div>
-        <button onClick={openCreateModal} className="btn-primary flex items-center gap-2">
-          <Plus size={18} />
-          Nova Fonte
-        </button>
+        <div className="flex gap-2">
+          {sources.length > 0 && (
+            <button onClick={openGenerateModal} className="btn-secondary flex items-center gap-2">
+              <PlayCircle size={18} />
+              Registrar Receitas
+            </button>
+          )}
+          <button onClick={openCreateModal} className="btn-primary flex items-center gap-2">
+            <Plus size={18} />
+            Nova Fonte
+          </button>
+        </div>
       </div>
 
       {/* Summary Card */}
@@ -621,6 +695,162 @@ export default function IncomeSources() {
                 >
                   {createMutation.isPending || updateMutation.isPending ? 'Salvando...' : 'Salvar'}
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Generate Income Modal */}
+      {showGenerateModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-lg my-8">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Registrar Receitas do Mês
+              </h2>
+              <button onClick={closeGenerateModal} className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-4 space-y-4">
+              {/* Month/Year Selector */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Mês
+                  </label>
+                  <select
+                    value={generateMonth}
+                    onChange={(e) => {
+                      setGenerateMonth(parseInt(e.target.value))
+                      setPreviewData([])
+                      setGenerateResult(null)
+                    }}
+                    className="input"
+                  >
+                    {monthNames.map((name, index) => (
+                      <option key={index} value={index + 1}>{name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Ano
+                  </label>
+                  <select
+                    value={generateYear}
+                    onChange={(e) => {
+                      setGenerateYear(parseInt(e.target.value))
+                      setPreviewData([])
+                      setGenerateResult(null)
+                    }}
+                    className="input"
+                  >
+                    {[2024, 2025, 2026, 2027].map((year) => (
+                      <option key={year} value={year}>{year}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <button
+                onClick={handlePreview}
+                disabled={previewMutation.isPending}
+                className="btn-secondary w-full"
+              >
+                {previewMutation.isPending ? 'Carregando...' : 'Ver Prévia'}
+              </button>
+
+              {/* Preview List */}
+              {previewData.length > 0 && !generateResult && (
+                <div className="space-y-2">
+                  <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Transações a serem criadas:
+                  </h3>
+                  <div className="max-h-60 overflow-y-auto space-y-2">
+                    {previewData.map((item, index) => {
+                      const typeInfo = getIncomeTypeInfo(item.type)
+                      return (
+                        <div
+                          key={index}
+                          className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className={clsx('p-2 rounded-full bg-white dark:bg-gray-600', typeInfo.color)}>
+                              <DollarSign size={16} />
+                            </div>
+                            <div>
+                              <p className="font-medium text-gray-900 dark:text-white text-sm">
+                                {item.source_name}
+                              </p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">
+                                {new Date(item.date + 'T12:00:00').toLocaleDateString('pt-BR')}
+                                {item.is_business_day && item.business_day_number && (
+                                  <span className="ml-1 text-green-600">({item.business_day_number}º DU)</span>
+                                )}
+                              </p>
+                            </div>
+                          </div>
+                          <p className="font-bold text-green-600">
+                            {item.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          </p>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/30 rounded-lg">
+                    <span className="font-medium text-green-700 dark:text-green-400">Total</span>
+                    <span className="font-bold text-green-700 dark:text-green-400">
+                      {previewData.reduce((sum, item) => sum + item.amount, 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {previewData.length === 0 && !previewMutation.isPending && !generateResult && (
+                <div className="flex flex-col items-center justify-center py-8 text-gray-500 dark:text-gray-400">
+                  <AlertCircle size={40} className="mb-2 opacity-50" />
+                  <p className="text-sm">Nenhuma fonte de receita mensal encontrada</p>
+                  <p className="text-xs">ou transações já foram registradas para este mês</p>
+                </div>
+              )}
+
+              {/* Success Message */}
+              {generateResult && (
+                <div className="flex flex-col items-center justify-center py-8">
+                  <CheckCircle size={48} className="text-green-500 mb-3" />
+                  <p className="text-lg font-medium text-gray-900 dark:text-white">
+                    {generateResult.count} transação(ões) criada(s)!
+                  </p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    {monthNames[generateMonth - 1]} de {generateYear}
+                  </p>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex gap-2 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <button onClick={closeGenerateModal} className="btn-secondary flex-1">
+                  {generateResult ? 'Fechar' : 'Cancelar'}
+                </button>
+                {!generateResult && previewData.length > 0 && (
+                  <button
+                    onClick={handleGenerate}
+                    disabled={generateMutation.isPending}
+                    className="btn-primary flex-1 flex items-center justify-center gap-2"
+                  >
+                    {generateMutation.isPending ? (
+                      'Registrando...'
+                    ) : (
+                      <>
+                        <CheckCircle size={18} />
+                        Confirmar Registro
+                      </>
+                    )}
+                  </button>
+                )}
               </div>
             </div>
           </div>

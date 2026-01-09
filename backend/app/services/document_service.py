@@ -37,14 +37,36 @@ class DocumentService:
         # Calcular hash para dedupe
         file_hash = hashlib.sha256(content).hexdigest()
 
-        # Verificar duplicata (apenas alerta, não bloqueia)
-        existing = await self.db.execute(
+        # Verificar duplicata - retornar documento existente se já foi enviado
+        existing_result = await self.db.execute(
             select(Document).where(
                 Document.user_id == user.id,
                 Document.file_hash == file_hash,
             ).limit(1)
         )
-        is_duplicate = existing.scalar_one_or_none() is not None
+        existing_document = existing_result.scalar_one_or_none()
+
+        if existing_document:
+            # Reprocessar o documento existente para retornar os itens extraídos
+            with open(existing_document.file_path, "rb") as f:
+                existing_content = f.read()
+            extraction_data = await self._process_document(existing_document, existing_content)
+
+            from ..schemas.document import DocumentResponse, ExtractedItemResponse, CardInfoResponse
+
+            response = DocumentResponse.model_validate(existing_document)
+            response.is_duplicate = True
+
+            if extraction_data:
+                response.extracted_items = [
+                    ExtractedItemResponse(**item) for item in extraction_data.get("items", [])
+                ]
+                if extraction_data.get("card_info"):
+                    response.card_info = CardInfoResponse(**extraction_data["card_info"])
+
+            return response
+
+        is_duplicate = False
 
         # Salvar arquivo
         upload_dir = Path(settings.upload_dir) / str(user.id)

@@ -1,10 +1,12 @@
 from __future__ import annotations
 from fastapi import APIRouter, HTTPException, status
-from sqlalchemy import select, or_, and_
+from sqlalchemy import select, or_, and_, func
+from decimal import Decimal
 
 from ..core.deps import CurrentUser, DbSession
 from ..models.credit_card import CreditCard
 from ..models.account import Account, AccountType
+from ..models.transaction import Transaction
 from ..models.household import HouseholdMember
 from ..schemas.credit_card import (
     CreditCardCreate,
@@ -60,14 +62,33 @@ async def list_credit_cards(current_user: CurrentUser, db: DbSession):
 
     cards = result.all()
 
+    # Calcular limite usado para cada cartão a partir das transações
+    card_ids = [card.id for card, _ in cards]
+    used_limits = {}
+
+    if card_ids:
+        used_result = await db.execute(
+            select(
+                Transaction.credit_card_id,
+                func.coalesce(func.sum(Transaction.amount), 0).label('total_used')
+            )
+            .where(
+                Transaction.credit_card_id.in_(card_ids),
+                Transaction.type == 'expense'
+            )
+            .group_by(Transaction.credit_card_id)
+        )
+        for row in used_result:
+            used_limits[row.credit_card_id] = float(row.total_used)
+
     return [
         CreditCardListResponse(
             id=card.id,
             account_id=card.account_id,
             name=account.name,
             credit_limit=float(card.credit_limit),
-            current_balance=float(account.balance),
-            available_limit=float(card.credit_limit) - float(account.balance),
+            current_balance=used_limits.get(card.id, 0.0),
+            available_limit=float(card.credit_limit) - used_limits.get(card.id, 0.0),
             closing_day=card.closing_day,
             due_day=card.due_day,
             has_points=card.has_points,

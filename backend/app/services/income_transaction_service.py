@@ -166,6 +166,11 @@ class IncomeTransactionService:
                 return None
 
         # Criar nova transação
+        # Description includes source company name for clarity
+        description = source.name
+        if source.source_name:
+            description = f"{source.name} - {source.source_name}"
+
         transaction = Transaction(
             user_id=source.user_id,
             account_id=source.account_id,
@@ -174,8 +179,7 @@ class IncomeTransactionService:
             type=TransactionType.INCOME.value,
             amount=source.expected_amount or 0,
             date=payment_date,
-            description=source.name,
-            merchant_name=source.source_name,
+            description=description,
             ownership_type=source.ownership_type,
         )
         self.db.add(transaction)

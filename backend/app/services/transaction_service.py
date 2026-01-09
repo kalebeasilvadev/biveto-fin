@@ -162,20 +162,38 @@ class TransactionService:
                     detail="Documento não encontrado",
                 )
 
-            # Verificar idempotência por item específico (document_id + merchant_name + amount)
-            # Permite múltiplos itens do mesmo documento, mas não duplicatas exatas
+            # Verificar idempotência - duas verificações:
+            # 1. Mesmo documento: description + amount (evita re-processar mesmo item)
+            # 2. Qualquer documento: description + amount + date (evita duplicatas de PDFs reenviados)
             if data.merchant_name:
-                existing = await self.db.execute(
+                # Verificação 1: Mesmo documento
+                existing_same_doc = await self.db.execute(
                     select(Transaction).where(
                         Transaction.document_id == data.document_id,
                         Transaction.description == data.merchant_name,
                         Transaction.amount == data.amount,
                     )
                 )
-                if existing.scalar_one_or_none():
+                if existing_same_doc.scalar_one_or_none():
                     raise HTTPException(
                         status_code=status.HTTP_409_CONFLICT,
                         detail=f"Item já adicionado: {data.merchant_name}",
+                    )
+
+                # Verificação 2: Qualquer documento do usuário com mesmo description + amount + date
+                existing_any_doc = await self.db.execute(
+                    select(Transaction).where(
+                        Transaction.user_id == user.id,
+                        Transaction.description == data.merchant_name,
+                        Transaction.amount == data.amount,
+                        Transaction.date == data.date,
+                    )
+                )
+                existing_tx = existing_any_doc.scalar_one_or_none()
+                if existing_tx:
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail=f"Transação já existe: {data.merchant_name} - R$ {data.amount:.2f} em {data.date.strftime('%d/%m/%Y')}",
                     )
 
         merchant_id = None
