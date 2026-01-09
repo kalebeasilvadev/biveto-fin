@@ -421,4 +421,20 @@ export const invoicesApi = {
     api.get(`/invoices/credit-card/${cardId}/current`),
   detectCard: (documentData: { card_issuer?: string; card_last_digits?: string }) =>
     api.post('/invoices/detect-card', documentData),
+  createCardFromInvoice: (data: {
+    card_issuer: string
+    card_last_digits?: string
+    card_name?: string
+    closing_day?: number
+    due_day?: number
+    credit_limit?: number
+    color?: string
+    icon?: string
+  }) => api.post('/invoices/create-card-from-invoice', data),
+  projectFuture: (data: {
+    credit_card_id: number
+    months_ahead?: number
+    include_installments?: boolean
+    include_recurring?: boolean
+  }) => api.post('/invoices/project-future', data),
 }

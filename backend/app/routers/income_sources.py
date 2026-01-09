@@ -19,10 +19,16 @@ from ..services.income_transaction_service import IncomeTransactionService
 from ..services.business_day_service import get_nth_business_day, get_payment_date_for_income
 
 
+class SourceAmountOverride(BaseModel):
+    source_id: int
+    amount: float
+
+
 class GenerateTransactionsRequest(BaseModel):
     year: int
     month: int
     overwrite: bool = False
+    amount_overrides: list[SourceAmountOverride] | None = None
 
 
 class TransactionPreview(BaseModel):
@@ -56,6 +62,89 @@ async def get_household_user_ids(db, user) -> list[int]:
     )
     return list(result.scalars().all())
 
+
+# ========== Rotas estáticas DEVEM vir antes de /{source_id} ==========
+
+@router.get("/utils/business-day", response_model=BusinessDayResponse)
+async def get_business_day(
+    year: int = Query(..., ge=2020, le=2100),
+    month: int = Query(..., ge=1, le=12),
+    n: int = Query(..., ge=1, le=23, description="Qual dia útil (ex: 5 para 5º dia útil)"),
+    current_user: CurrentUser = None,
+):
+    """
+    Calcula o N-ésimo dia útil de um mês.
+    Considera feriados nacionais brasileiros.
+    """
+    try:
+        business_day = get_nth_business_day(year, month, n)
+        return BusinessDayResponse(
+            year=year,
+            month=month,
+            business_day_number=n,
+            date=business_day.isoformat()
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/preview-transactions", response_model=list[TransactionPreview])
+async def preview_income_transactions(
+    year: int = Query(..., ge=2020, le=2100),
+    month: int = Query(..., ge=1, le=12),
+    current_user: CurrentUser = None,
+    db: DbSession = None,
+):
+    """
+    Retorna uma prévia das transações que seriam criadas para um mês.
+    Não cria nada no banco, apenas mostra o que seria gerado.
+    """
+    service = IncomeTransactionService(db)
+    preview = await service.preview_transactions(
+        user_id=current_user.id,
+        year=year,
+        month=month
+    )
+    return preview
+
+
+@router.post("/generate-transactions")
+async def generate_income_transactions(
+    data: GenerateTransactionsRequest,
+    current_user: CurrentUser,
+    db: DbSession,
+):
+    """
+    Gera transações no histórico para todas as fontes de receita ativas.
+    Útil para criar o histórico de receitas mensais como salário, benefícios, etc.
+    Permite sobrescrever os valores esperados com amount_overrides.
+    """
+    # Convert overrides to dict for easier lookup
+    amount_overrides_dict = None
+    if data.amount_overrides:
+        amount_overrides_dict = {
+            override.source_id: override.amount
+            for override in data.amount_overrides
+        }
+
+    service = IncomeTransactionService(db)
+    transactions = await service.generate_income_transactions(
+        user_id=current_user.id,
+        year=data.year,
+        month=data.month,
+        overwrite=data.overwrite,
+        amount_overrides=amount_overrides_dict
+    )
+
+    return {
+        "message": f"{len(transactions)} transações criadas/atualizadas",
+        "count": len(transactions),
+        "year": data.year,
+        "month": data.month,
+    }
+
+
+# ========== Rotas CRUD ==========
 
 @router.get("", response_model=list[IncomeSourceListResponse])
 async def list_income_sources(current_user: CurrentUser, db: DbSession):
@@ -374,76 +463,7 @@ async def delete_income_source(
     await db.commit()
 
 
-# ========== Geração de Transações ==========
-
-@router.get("/utils/business-day", response_model=BusinessDayResponse)
-async def get_business_day(
-    year: int = Query(..., ge=2020, le=2100),
-    month: int = Query(..., ge=1, le=12),
-    n: int = Query(..., ge=1, le=23, description="Qual dia útil (ex: 5 para 5º dia útil)"),
-    current_user: CurrentUser = None,
-):
-    """
-    Calcula o N-ésimo dia útil de um mês.
-    Considera feriados nacionais brasileiros.
-    """
-    try:
-        business_day = get_nth_business_day(year, month, n)
-        return BusinessDayResponse(
-            year=year,
-            month=month,
-            business_day_number=n,
-            date=business_day.isoformat()
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@router.post("/generate-transactions")
-async def generate_income_transactions(
-    data: GenerateTransactionsRequest,
-    current_user: CurrentUser,
-    db: DbSession,
-):
-    """
-    Gera transações no histórico para todas as fontes de receita ativas.
-    Útil para criar o histórico de receitas mensais como salário, benefícios, etc.
-    """
-    service = IncomeTransactionService(db)
-    transactions = await service.generate_income_transactions(
-        user_id=current_user.id,
-        year=data.year,
-        month=data.month,
-        overwrite=data.overwrite
-    )
-
-    return {
-        "message": f"{len(transactions)} transações criadas/atualizadas",
-        "count": len(transactions),
-        "year": data.year,
-        "month": data.month,
-    }
-
-
-@router.get("/preview-transactions", response_model=list[TransactionPreview])
-async def preview_income_transactions(
-    year: int = Query(..., ge=2020, le=2100),
-    month: int = Query(..., ge=1, le=12),
-    current_user: CurrentUser = None,
-    db: DbSession = None,
-):
-    """
-    Retorna uma prévia das transações que seriam criadas para um mês.
-    Não cria nada no banco, apenas mostra o que seria gerado.
-    """
-    service = IncomeTransactionService(db)
-    preview = await service.preview_transactions(
-        user_id=current_user.id,
-        year=year,
-        month=month
-    )
-    return preview
-
+# ========== Rotas com {source_id} no final ==========
 
 @router.post("/{source_id}/generate-transaction")
 async def generate_single_source_transaction(

@@ -110,6 +110,7 @@ export default function IncomeSources() {
   const [generateYear, setGenerateYear] = useState(new Date().getFullYear())
   const [generateMonth, setGenerateMonth] = useState(new Date().getMonth() + 1)
   const [previewData, setPreviewData] = useState<TransactionPreview[]>([])
+  const [editedAmounts, setEditedAmounts] = useState<Record<number, number>>({})
   const [generateResult, setGenerateResult] = useState<{ count: number; message: string } | null>(null)
   const [editingSource, setEditingSource] = useState<IncomeSource | null>(null)
   const [formData, setFormData] = useState({
@@ -178,14 +179,25 @@ export default function IncomeSources() {
     mutationFn: ({ year, month }: { year: number; month: number }) =>
       incomeSourcesApi.previewTransactions(year, month),
     onSuccess: (response) => {
-      setPreviewData(response.data || [])
+      const data = response.data || []
+      setPreviewData(data)
+      // Initialize edited amounts with original values
+      const initialAmounts: Record<number, number> = {}
+      data.forEach((item: TransactionPreview) => {
+        initialAmounts[item.source_id] = item.amount
+      })
+      setEditedAmounts(initialAmounts)
       setGenerateResult(null)
     },
   })
 
   const generateMutation = useMutation({
-    mutationFn: (data: { year: number; month: number; overwrite?: boolean }) =>
-      incomeSourcesApi.generateTransactions(data),
+    mutationFn: (data: {
+      year: number
+      month: number
+      overwrite?: boolean
+      amount_overrides?: Array<{ source_id: number; amount: number }>
+    }) => incomeSourcesApi.generateTransactions(data),
     onSuccess: (response) => {
       setGenerateResult(response.data)
       queryClient.invalidateQueries({ queryKey: ['transactions'] })
@@ -271,6 +283,7 @@ export default function IncomeSources() {
     setGenerateYear(new Date().getFullYear())
     setGenerateMonth(new Date().getMonth() + 1)
     setPreviewData([])
+    setEditedAmounts({})
     setGenerateResult(null)
     setShowGenerateModal(true)
     // Auto-load preview
@@ -280,6 +293,7 @@ export default function IncomeSources() {
   const closeGenerateModal = () => {
     setShowGenerateModal(false)
     setPreviewData([])
+    setEditedAmounts({})
     setGenerateResult(null)
   }
 
@@ -288,7 +302,32 @@ export default function IncomeSources() {
   }
 
   const handleGenerate = () => {
-    generateMutation.mutate({ year: generateYear, month: generateMonth })
+    // Build amount overrides for any values that were changed
+    const amount_overrides: Array<{ source_id: number; amount: number }> = []
+    previewData.forEach((item) => {
+      const editedAmount = editedAmounts[item.source_id]
+      // Only include if the amount was edited (different from original)
+      if (editedAmount !== undefined && editedAmount !== item.amount) {
+        amount_overrides.push({
+          source_id: item.source_id,
+          amount: editedAmount,
+        })
+      }
+    })
+
+    generateMutation.mutate({
+      year: generateYear,
+      month: generateMonth,
+      amount_overrides: amount_overrides.length > 0 ? amount_overrides : undefined,
+    })
+  }
+
+  const handleAmountChange = (sourceId: number, value: string) => {
+    const numValue = parseFloat(value) || 0
+    setEditedAmounts((prev) => ({
+      ...prev,
+      [sourceId]: numValue,
+    }))
   }
 
   const monthNames = [
@@ -772,10 +811,17 @@ export default function IncomeSources() {
                   <div className="max-h-60 overflow-y-auto space-y-2">
                     {previewData.map((item, index) => {
                       const typeInfo = getIncomeTypeInfo(item.type)
+                      const currentAmount = editedAmounts[item.source_id] ?? item.amount
+                      const isEdited = editedAmounts[item.source_id] !== undefined && editedAmounts[item.source_id] !== item.amount
                       return (
                         <div
                           key={index}
-                          className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
+                          className={clsx(
+                            'flex items-center justify-between p-3 rounded-lg',
+                            isEdited
+                              ? 'bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700'
+                              : 'bg-gray-50 dark:bg-gray-700'
+                          )}
                         >
                           <div className="flex items-center gap-3">
                             <div className={clsx('p-2 rounded-full bg-white dark:bg-gray-600', typeInfo.color)}>
@@ -793,9 +839,30 @@ export default function IncomeSources() {
                               </p>
                             </div>
                           </div>
-                          <p className="font-bold text-green-600">
-                            {item.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                          </p>
+                          <div className="flex items-center gap-2">
+                            <span className="text-gray-400 text-sm">R$</span>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={currentAmount}
+                              onChange={(e) => handleAmountChange(item.source_id, e.target.value)}
+                              className={clsx(
+                                'w-28 text-right font-bold px-2 py-1 rounded border text-sm',
+                                isEdited
+                                  ? 'border-amber-400 bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400'
+                                  : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-600 text-green-600 dark:text-green-400'
+                              )}
+                            />
+                            {isEdited && (
+                              <button
+                                onClick={() => handleAmountChange(item.source_id, String(item.amount))}
+                                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                title="Restaurar valor original"
+                              >
+                                <X size={14} />
+                              </button>
+                            )}
+                          </div>
                         </div>
                       )
                     })}
@@ -803,9 +870,15 @@ export default function IncomeSources() {
                   <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/30 rounded-lg">
                     <span className="font-medium text-green-700 dark:text-green-400">Total</span>
                     <span className="font-bold text-green-700 dark:text-green-400">
-                      {previewData.reduce((sum, item) => sum + item.amount, 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                      {previewData.reduce((sum, item) => sum + (editedAmounts[item.source_id] ?? item.amount), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                     </span>
                   </div>
+                  {previewData.some((item) => editedAmounts[item.source_id] !== undefined && editedAmounts[item.source_id] !== item.amount) && (
+                    <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                      <Pencil size={12} />
+                      Valores alterados serão usados no registro
+                    </p>
+                  )}
                 </div>
               )}
 

@@ -594,6 +594,25 @@ async def detect_card_from_document(
     )
 
 
+class CreateCardFromInvoiceRequest(BaseModel):
+    """Dados para criar um cartão a partir de uma fatura"""
+    card_issuer: str  # "itau", "nubank", etc.
+    card_last_digits: str | None = None  # "8849"
+    card_name: str | None = None  # "Itaú Visa Platinum"
+    closing_day: int = 1  # Dia do mês de fechamento
+    due_day: int = 10  # Dia do mês de vencimento
+    credit_limit: float = 0  # Limite do cartão (pode ser 0 se desconhecido)
+    color: str | None = None
+    icon: str | None = None
+
+
+class CreateCardFromInvoiceResponse(BaseModel):
+    credit_card_id: int
+    account_id: int
+    account_name: str
+    message: str
+
+
 class ProjectFutureRequest(BaseModel):
     credit_card_id: int
     months_ahead: int = 6
@@ -605,6 +624,116 @@ class ProjectFutureResponse(BaseModel):
     message: str
     invoices_created: int
     transactions_created: int
+
+
+# Mapeamento de cores por banco
+BANK_COLORS = {
+    'itau': '#EC7000',  # Laranja Itaú
+    'nubank': '#820AD1',  # Roxo Nubank
+    'inter': '#FF7A00',  # Laranja Inter
+    'santander': '#EC0000',  # Vermelho Santander
+    'bradesco': '#CC092F',  # Vermelho Bradesco
+    'bb': '#FFCC00',  # Amarelo BB
+    'caixa': '#005CA9',  # Azul Caixa
+    'c6': '#1A1A1A',  # Preto C6
+    'xp': '#FFD100',  # Amarelo XP
+    'btg': '#000000',  # Preto BTG
+    'original': '#00A857',  # Verde Original
+    'next': '#00E676',  # Verde Next
+    'neon': '#00D4AA',  # Verde Neon
+    'pagbank': '#00AB4E',  # Verde PagBank
+    'picpay': '#21C25E',  # Verde PicPay
+    'mercadopago': '#00B1EA',  # Azul MercadoPago
+    'digio': '#0052FF',  # Azul Digio
+    'ame': '#FF007A',  # Rosa Ame
+    'default': '#6366F1',  # Índigo (padrão)
+}
+
+
+@router.post("/create-card-from-invoice", response_model=CreateCardFromInvoiceResponse, status_code=201)
+async def create_card_from_invoice(
+    data: CreateCardFromInvoiceRequest,
+    current_user: CurrentUser,
+    db: DbSession,
+):
+    """
+    Cria um novo cartão de crédito a partir dos dados extraídos de uma fatura.
+
+    Útil quando o usuário envia uma fatura de um cartão que ainda não está cadastrado.
+    O sistema extrai as informações do PDF e usa este endpoint para criar o cartão.
+    """
+    from ..models.account import Account, AccountType
+    from ..models.credit_card import CreditCard
+    from decimal import Decimal
+
+    # Gerar nome do cartão se não fornecido
+    issuer_names = {
+        'itau': 'Itaú',
+        'nubank': 'Nubank',
+        'inter': 'Inter',
+        'santander': 'Santander',
+        'bradesco': 'Bradesco',
+        'bb': 'Banco do Brasil',
+        'caixa': 'Caixa',
+        'c6': 'C6 Bank',
+        'xp': 'XP',
+        'btg': 'BTG Pactual',
+        'original': 'Original',
+        'next': 'Next',
+        'neon': 'Neon',
+        'pagbank': 'PagBank',
+        'picpay': 'PicPay',
+        'mercadopago': 'Mercado Pago',
+        'digio': 'Digio',
+    }
+
+    issuer_display = issuer_names.get(data.card_issuer.lower(), data.card_issuer.title())
+
+    if data.card_name:
+        account_name = data.card_name
+    elif data.card_last_digits:
+        account_name = f"{issuer_display} *{data.card_last_digits}"
+    else:
+        account_name = f"{issuer_display} Cartão"
+
+    # Usar cor do banco ou cor fornecida
+    color = data.color or BANK_COLORS.get(data.card_issuer.lower(), BANK_COLORS['default'])
+    icon = data.icon or "credit-card"
+
+    # Criar conta
+    account = Account(
+        user_id=current_user.id,
+        name=account_name,
+        type=AccountType.CREDIT_CARD.value,
+        balance=Decimal('0'),
+        currency="BRL",
+        color=color,
+        icon=icon,
+        ownership_type="personal",
+    )
+    db.add(account)
+    await db.flush()
+
+    # Criar cartão de crédito
+    credit_card = CreditCard(
+        account_id=account.id,
+        user_id=current_user.id,
+        credit_limit=Decimal(str(data.credit_limit)),
+        closing_day=data.closing_day,
+        due_day=data.due_day,
+        last_four_digits=data.card_last_digits,
+        is_active=True,
+    )
+    db.add(credit_card)
+    await db.commit()
+    await db.refresh(credit_card)
+
+    return CreateCardFromInvoiceResponse(
+        credit_card_id=credit_card.id,
+        account_id=account.id,
+        account_name=account_name,
+        message=f"Cartão '{account_name}' criado com sucesso!",
+    )
 
 
 @router.post("/project-future", response_model=ProjectFutureResponse)

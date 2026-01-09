@@ -21,7 +21,8 @@ class IncomeTransactionService:
         user_id: int,
         year: int,
         month: int,
-        overwrite: bool = False
+        overwrite: bool = False,
+        amount_overrides: Optional[dict[int, float]] = None
     ) -> List[Transaction]:
         """
         Gera transações para todas as fontes de receita ativas de um usuário
@@ -32,6 +33,7 @@ class IncomeTransactionService:
             year: Ano
             month: Mês (1-12)
             overwrite: Se True, recria transações mesmo se já existirem
+            amount_overrides: Dict mapeando source_id para valor customizado
 
         Returns:
             Lista de transações criadas
@@ -55,8 +57,13 @@ class IncomeTransactionService:
         created_transactions = []
 
         for source in sources:
+            # Get custom amount if provided
+            custom_amount = None
+            if amount_overrides and source.id in amount_overrides:
+                custom_amount = amount_overrides[source.id]
+
             transactions = await self._generate_for_source(
-                source, year, month, overwrite
+                source, year, month, overwrite, custom_amount
             )
             created_transactions.extend(transactions)
 
@@ -68,10 +75,18 @@ class IncomeTransactionService:
         source: IncomeSource,
         year: int,
         month: int,
-        overwrite: bool
+        overwrite: bool,
+        custom_amount: Optional[float] = None
     ) -> List[Transaction]:
         """
         Gera transações para uma fonte de receita específica.
+
+        Args:
+            source: Fonte de receita
+            year: Ano
+            month: Mês
+            overwrite: Se deve sobrescrever transações existentes
+            custom_amount: Valor customizado (sobrescreve expected_amount)
         """
         transactions = []
 
@@ -85,7 +100,7 @@ class IncomeTransactionService:
             )
 
             transaction = await self._create_transaction_if_not_exists(
-                source, payment_date, overwrite
+                source, payment_date, overwrite, custom_amount
             )
             if transaction:
                 transactions.append(transaction)
@@ -100,7 +115,7 @@ class IncomeTransactionService:
                 source.use_business_day,
                 source.business_day_number
             )
-            t1 = await self._create_transaction_if_not_exists(source, first_date, overwrite)
+            t1 = await self._create_transaction_if_not_exists(source, first_date, overwrite, custom_amount)
             if t1:
                 transactions.append(t1)
 
@@ -111,7 +126,7 @@ class IncomeTransactionService:
                 last_day = monthrange(year, month)[1]
                 if second_day <= last_day:
                     second_date = date(year, month, second_day)
-                    t2 = await self._create_transaction_if_not_exists(source, second_date, overwrite)
+                    t2 = await self._create_transaction_if_not_exists(source, second_date, overwrite, custom_amount)
                     if t2:
                         transactions.append(t2)
 
@@ -122,7 +137,7 @@ class IncomeTransactionService:
             current_date = date(year, month, source.payment_day or 1)
 
             while current_date.month == month:
-                t = await self._create_transaction_if_not_exists(source, current_date, overwrite)
+                t = await self._create_transaction_if_not_exists(source, current_date, overwrite, custom_amount)
                 if t:
                     transactions.append(t)
                 current_date = date(
@@ -139,11 +154,21 @@ class IncomeTransactionService:
         self,
         source: IncomeSource,
         payment_date: date,
-        overwrite: bool
+        overwrite: bool,
+        custom_amount: Optional[float] = None
     ) -> Optional[Transaction]:
         """
         Cria uma transação se não existir uma para a mesma fonte e data.
+
+        Args:
+            source: Fonte de receita
+            payment_date: Data do pagamento
+            overwrite: Se deve sobrescrever transações existentes
+            custom_amount: Valor customizado (sobrescreve expected_amount)
         """
+        # Determinar o valor a ser usado
+        amount = custom_amount if custom_amount is not None else (source.expected_amount or 0)
+
         # Verificar se já existe transação para esta fonte e data
         existing = await self.db.execute(
             select(Transaction).where(
@@ -158,7 +183,7 @@ class IncomeTransactionService:
         if existing_transaction:
             if overwrite:
                 # Atualizar transação existente
-                existing_transaction.amount = source.expected_amount or 0
+                existing_transaction.amount = amount
                 existing_transaction.description = f"{source.name} (atualizado)"
                 return existing_transaction
             else:
@@ -177,7 +202,7 @@ class IncomeTransactionService:
             category_id=source.category_id,
             income_source_id=source.id,
             type=TransactionType.INCOME.value,
-            amount=source.expected_amount or 0,
+            amount=amount,
             date=payment_date,
             description=description,
             ownership_type=source.ownership_type,

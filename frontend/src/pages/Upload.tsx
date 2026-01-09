@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { documentsApi, transactionsApi, accountsApi, categoriesApi, familyApi, creditCardsApi, getApiErrorMessage } from '../services/api'
-import { X, CreditCard, Repeat } from 'lucide-react'
+import { documentsApi, transactionsApi, accountsApi, categoriesApi, familyApi, creditCardsApi, invoicesApi, getApiErrorMessage } from '../services/api'
+import { X, CreditCard, Repeat, Plus, AlertCircle } from 'lucide-react'
 import {
   Document,
   TransactionFormData,
@@ -34,6 +34,8 @@ export default function Upload() {
 
   // Credit card invoice state
   const [selectedCreditCardId, setSelectedCreditCardId] = useState<string>('')
+  const [showCreateCardPrompt, setShowCreateCardPrompt] = useState(false)
+  const [isCreatingCard, setIsCreatingCard] = useState(false)
 
   // Prevent accidental page reload
   useEffect(() => {
@@ -137,10 +139,14 @@ export default function Upload() {
 
         if (matchedCard) {
           setSelectedCreditCardId(String(matchedCard.id))
+          setShowCreateCardPrompt(false)
           // Auto-set the account if the card has one
           if ((matchedCard as { account_id?: number }).account_id) {
             setFormData(prev => ({ ...prev, account_id: String((matchedCard as { account_id: number }).account_id) }))
           }
+        } else {
+          // No matching card found - show prompt to create one
+          setShowCreateCardPrompt(true)
         }
       }
     },
@@ -173,6 +179,29 @@ export default function Upload() {
     onSuccess: () => {
       invalidateTransactionCaches()
       navigate('/transactions')
+    },
+  })
+
+  const createCardMutation = useMutation({
+    mutationFn: (cardInfo: {
+      card_issuer: string
+      card_last_digits?: string
+      card_name?: string
+      closing_day?: number
+      due_day?: number
+    }) => invoicesApi.createCardFromInvoice(cardInfo),
+    onSuccess: (response) => {
+      const data = response.data as { credit_card_id: number; account_id: number; account_name: string }
+      // Select the newly created card
+      setSelectedCreditCardId(String(data.credit_card_id))
+      setFormData(prev => ({ ...prev, account_id: String(data.account_id) }))
+      setShowCreateCardPrompt(false)
+      setIsCreatingCard(false)
+      // Refresh credit cards list
+      queryClient.invalidateQueries({ queryKey: ['credit-cards'] })
+    },
+    onError: () => {
+      setIsCreatingCard(false)
     },
   })
 
@@ -364,6 +393,19 @@ export default function Upload() {
     }
   }
 
+  const handleCreateCard = () => {
+    if (!document?.card_info) return
+
+    setIsCreatingCard(true)
+    createCardMutation.mutate({
+      card_issuer: document.card_info.card_issuer || 'outro',
+      card_last_digits: document.card_info.card_last_digits,
+      card_name: document.card_info.card_name,
+      closing_day: document.card_info.closing_day,
+      due_day: document.card_info.due_day,
+    })
+  }
+
   const resetForm = () => {
     setMode('select')
     setDocument(null)
@@ -375,6 +417,8 @@ export default function Upload() {
     setBatchAddError(null)
     setFormData(initialFormData)
     setSelectedCreditCardId('')
+    setShowCreateCardPrompt(false)
+    setIsCreatingCard(false)
   }
 
   // Render camera mode
@@ -521,27 +565,77 @@ export default function Upload() {
 
         {/* Credit card selector - shown for credit card invoices */}
         {(!isManual && isCreditCardInvoice && document?.extracted_items && document.extracted_items.length > 0 && editingItemIndex === null) && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Cartão de Crédito *
-            </label>
-            <select
-              value={selectedCreditCardId}
-              onChange={(e) => {
-                setSelectedCreditCardId(e.target.value)
-                // Auto-select the card's linked account
-                const card = creditCards.find((c: { id: number }) => c.id === parseInt(e.target.value))
-                if (card?.account_id) {
-                  setFormData(prev => ({ ...prev, account_id: String(card.account_id) }))
-                }
-              }}
-              className="input"
-            >
-              <option value="">Selecione o cartão</option>
-              {creditCards.map((card: { id: number; name: string }) => (
-                <option key={card.id} value={card.id}>{card.name}</option>
-              ))}
-            </select>
+          <div className="space-y-3">
+            {/* Card creation prompt */}
+            {showCreateCardPrompt && document.card_info && (
+              <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="text-amber-600 flex-shrink-0 mt-0.5" size={20} />
+                  <div className="flex-1">
+                    <p className="font-medium text-amber-800 dark:text-amber-300">
+                      Cartão não cadastrado
+                    </p>
+                    <p className="text-sm text-amber-700 dark:text-amber-400 mt-1">
+                      Detectamos uma fatura do{' '}
+                      <strong>{document.card_info.card_issuer?.toUpperCase() || 'cartão'}</strong>
+                      {document.card_info.card_last_digits && ` final ${document.card_info.card_last_digits}`}.
+                      Deseja cadastrar este cartão automaticamente?
+                    </p>
+                    <div className="flex gap-2 mt-3">
+                      <button
+                        onClick={handleCreateCard}
+                        disabled={isCreatingCard}
+                        className="btn-primary text-sm flex items-center gap-2"
+                      >
+                        <Plus size={16} />
+                        {isCreatingCard ? 'Criando...' : 'Criar Cartão'}
+                      </button>
+                      <button
+                        onClick={() => setShowCreateCardPrompt(false)}
+                        className="btn-secondary text-sm"
+                      >
+                        Selecionar Manualmente
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Cartão de Crédito *
+              </label>
+              <select
+                value={selectedCreditCardId}
+                onChange={(e) => {
+                  setSelectedCreditCardId(e.target.value)
+                  setShowCreateCardPrompt(false)
+                  // Auto-select the card's linked account
+                  const card = creditCards.find((c: { id: number }) => c.id === parseInt(e.target.value))
+                  if (card?.account_id) {
+                    setFormData(prev => ({ ...prev, account_id: String(card.account_id) }))
+                  }
+                }}
+                className="input"
+              >
+                <option value="">Selecione o cartão</option>
+                {creditCards.map((card: { id: number; name: string }) => (
+                  <option key={card.id} value={card.id}>{card.name}</option>
+                ))}
+              </select>
+              {creditCards.length === 0 && !showCreateCardPrompt && (
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Nenhum cartão cadastrado.{' '}
+                  <button
+                    onClick={() => setShowCreateCardPrompt(true)}
+                    className="text-primary-600 hover:underline"
+                  >
+                    Criar um cartão
+                  </button>
+                </p>
+              )}
+            </div>
           </div>
         )}
 

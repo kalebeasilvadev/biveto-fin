@@ -12,9 +12,13 @@ export interface ExtractedItem {
 export interface CardInfo {
   card_issuer?: string
   card_last_digits?: string
+  card_name?: string
   invoice_month?: number
   invoice_year?: number
   due_date?: string
+  closing_date?: string
+  closing_day?: number
+  due_day?: number
   total_amount?: number
 }
 

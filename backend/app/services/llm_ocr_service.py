@@ -26,8 +26,10 @@ Extraia os itens/transações e retorne um JSON válido com este formato:
   "card_info": {
     "card_issuer": "itau",
     "card_last_digits": "8849",
+    "card_name": "Itaú Personnalité Visa Infinite",
     "invoice_month": 1,
     "invoice_year": 2026,
+    "closing_date": "2026-01-08",
     "due_date": "2026-01-15",
     "total_amount": 3193.12
   }
@@ -270,13 +272,22 @@ Para faturas de cartão de crédito, extraia também informações do cartão:
 - card_last_digits: Últimos 4 dígitos do cartão (se visível na fatura)
   * Geralmente aparece como "Final 8849" ou "**** 8849" ou "CARTÃO FINAL 8849"
 
+- card_name: Nome completo do cartão (se visível)
+  * Ex: "Itaú Personnalité Visa Infinite", "Nubank Ultravioleta", "Inter Black"
+  * Geralmente aparece no cabeçalho da fatura perto do logo
+
 - invoice_month: Mês de referência da fatura (1-12)
   * Geralmente aparece como "Fatura de Janeiro/2026" ou "JAN/2026"
 
 - invoice_year: Ano de referência (ex: 2026)
 
-- due_date: Data de vencimento no formato "YYYY-MM-DD"
+- closing_date: Data de FECHAMENTO da fatura no formato "YYYY-MM-DD"
+  * Aparece como "Fechamento: 08/01/2026" ou "Data de corte: 08 JAN 2026"
+  * É a data até quando as compras entram nesta fatura
+
+- due_date: Data de VENCIMENTO no formato "YYYY-MM-DD"
   * Aparece como "Vencimento: 15/01/2026" ou "Venc.: 15 JAN 2026"
+  * É a data limite para pagamento
 
 - total_amount: Valor total da fatura (número decimal)
   * É o "Valor do Documento" ou "Total da Fatura"
@@ -287,9 +298,11 @@ Exemplo para fatura Itaú:
 "card_info": {
   "card_issuer": "itau",
   "card_last_digits": "4523",
+  "card_name": "Itaú Visa Platinum",
   "invoice_month": 1,
   "invoice_year": 2026,
-  "due_date": "2026-01-25",
+  "closing_date": "2026-01-08",
+  "due_date": "2026-01-15",
   "total_amount": 1567.89
 }
 
@@ -872,11 +885,31 @@ class LLMOCRService:
                 result['card_info'] = {
                     'card_issuer': card_info.get('card_issuer'),
                     'card_last_digits': str(card_info.get('card_last_digits', ''))[-4:] if card_info.get('card_last_digits') else None,
+                    'card_name': card_info.get('card_name'),
                     'invoice_month': card_info.get('invoice_month'),
                     'invoice_year': card_info.get('invoice_year'),
+                    'closing_date': card_info.get('closing_date'),
                     'due_date': card_info.get('due_date'),
                     'total_amount': float(card_info.get('total_amount', 0)) if card_info.get('total_amount') else None,
                 }
+
+                # Extrair dia de fechamento e vencimento das datas
+                if result['card_info'].get('closing_date'):
+                    try:
+                        from datetime import datetime
+                        closing = datetime.strptime(result['card_info']['closing_date'], '%Y-%m-%d')
+                        result['card_info']['closing_day'] = closing.day
+                    except ValueError:
+                        pass
+
+                if result['card_info'].get('due_date'):
+                    try:
+                        from datetime import datetime
+                        due = datetime.strptime(result['card_info']['due_date'], '%Y-%m-%d')
+                        result['card_info']['due_day'] = due.day
+                    except ValueError:
+                        pass
+
                 # Remover campos None
                 result['card_info'] = {k: v for k, v in result['card_info'].items() if v is not None}
 
