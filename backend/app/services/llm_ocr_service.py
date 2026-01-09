@@ -60,7 +60,7 @@ Extraia os itens/transações e retorne um JSON válido com este formato:
 - "1 + X de R$ XXX" - simulação de parcelamento
 - "Pagamento mínimo" - informativo
 - Limite disponível, limite total
-- Encargos, IOF, juros (exceto se na seção de despesas com data)
+- Encargos, juros do rotativo (mas INCLUA IOF de transações internacionais no valor!)
 
 ⚠️ "Despesas do mês" e "Fatura atual" são LABELS de totais, não transações!
 Se você vir "Despesas do mês R$ 1.178,99" - isso é o TOTAL das despesas, NÃO uma transação.
@@ -74,6 +74,35 @@ Transações reais têm nome de ESTABELECIMENTO (ex: "APPLE.COM/BILL", "UBER *TR
 Para cada transação:
 - Despesas/compras: valor POSITIVO
 - Pagamentos/créditos/estornos: valor NEGATIVO
+
+==== TRANSAÇÕES INTERNACIONAIS (IOF) ====
+
+⚠️ MUITO IMPORTANTE: Para compras internacionais, use o VALOR TOTAL com IOF!
+
+Faturas de cartão brasileiras têm uma seção "Lançamentos Internacionais" que mostra:
+- Valor da transação em moeda estrangeira (ex: US$ 10,00)
+- Valor convertido em reais (ex: R$ 58,40)
+- Repasse de IOF (ex: R$ 2,04)
+- **Total lançamentos inter. em R$** (ex: R$ 60,44) ← USE ESTE VALOR!
+
+REGRA: Quando extrair transações internacionais:
+- O "amount" deve ser o TOTAL incluindo IOF (ex: 60.44, não 58.40)
+- O IOF é um imposto que o cliente PAGA, então deve ser incluído no valor
+- Se a fatura mostrar apenas o valor sem IOF, mas tiver "Repasse de IOF" abaixo, SOME os dois valores
+
+Exemplo:
+Entrada:
+"Lançamentos internacionais
+17/12 Trae SINGAPORE       US$ 10,00    R$ 58,40
+Total transações inter. em R$           R$ 58,40
+Repasse de IOF em R$                    R$ 2,04
+Total lançamentos inter. em R$          R$ 60,44"
+
+Saída CORRETA:
+{"description": "Trae", "amount": 60.44, "date": "2025-12-17", "category": "outros"}
+
+Saída ERRADA:
+{"description": "Trae", "amount": 58.40, ...}  // Falta o IOF!
 
 ==== REGRA MAIS IMPORTANTE ====
 
