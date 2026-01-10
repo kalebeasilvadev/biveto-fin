@@ -74,9 +74,20 @@ Extraia os itens/transações e retorne um JSON válido com este formato:
    - NÃO extraia transações daqui
 
 2️⃣ **LANÇAMENTOS/DESPESAS** (✅ EXTRAIR TRANSAÇÕES DAQUI):
-   - Títulos comuns: "Lançamentos", "Despesas", "Despesas da fatura", "Fatura atual", "Compras e saques", "Demonstrativo"
+   - Títulos comuns: "Lançamentos", "Despesas", "Despesas da fatura", "Fatura atual", "Compras e saques", "Demonstrativo", "Detalhamento da Fatura"
    - Formato geral: DATA | DESCRIÇÃO | [PARCELA] | VALOR
    - Esta é a seção PRINCIPAL - extraia TODAS as transações
+
+   ⚠️ REGRA CRÍTICA: EXTRAIA **TODAS** AS TRANSAÇÕES, SEM EXCEÇÃO!
+   - Se houver 30 transações, extraia as 30
+   - Se houver parcelas repetidas (ex: GOBLINFACTORY 01/12, 02/12, 03/12... 12/12), extraia CADA UMA SEPARADAMENTE
+   - NUNCA agrupe ou resuma transações
+   - NUNCA pule transações por serem "similares"
+
+   ⚠️ MÚLTIPLOS CARTÕES NA MESMA FATURA:
+   - Algumas faturas têm TITULAR + ADICIONAL(IS)
+   - Procure por seções como "@ NOME - XXXX XXXX XXXX 1234" (cartão adicional)
+   - Extraia transações de TODOS os cartões (titular E adicionais)
 
 3️⃣ **PARCELAS FUTURAS** (🚫 IGNORAR COMPLETAMENTE):
    - Títulos comuns: "Próximas faturas", "Próxima fatura", "Próximas parcelas", "Saldos futuros", "Parcelados para próximas faturas"
