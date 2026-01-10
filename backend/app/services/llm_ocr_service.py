@@ -481,7 +481,7 @@ class LLMOCRService:
             return {'items': [], 'error': 'GOOGLE_API_KEY não configurada. Obtenha em: https://aistudio.google.com/apikey'}
 
         image_base64 = base64.b64encode(image_content).decode('utf-8')
-        model = self.model or 'gemini-2.0-flash'
+        model = self.model or 'gemini-2.5-flash'
 
         async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.post(
@@ -504,7 +504,7 @@ class LLMOCRService:
                     }],
                     'generationConfig': {
                         'temperature': 0.1,
-                        'maxOutputTokens': 4000,
+                        'maxOutputTokens': 8000,
                     }
                 },
             )
