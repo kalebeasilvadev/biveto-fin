@@ -114,13 +114,25 @@ Os formatos abaixo são EXEMPLOS para ajudar na extração. Se a fatura for de o
 📌 **BRADESCO/AMEX:** Data | Histórico | Cidade | R$
 📌 **NUBANK:** Data | Descrição | Valor
 📌 **SANTANDER:** Data | Descrição | Parcela | R$ | US$
-   - ⚠️ SANTANDER IMPORTANTE: Extrai TODAS as parcelas separadamente!
-   - O Santander mostra várias parcelas do mesmo produto (ex: 03/12, 04/12, 05/12...)
-   - Extraia CADA parcela como item separado
-   - "PAGAMENTO DE FATURA-INTERNET" = pagamento (valor NEGATIVO)
+   - ⚠️ SANTANDER FORMATO ESPECIAL DE PARCELAMENTO:
+   - O Santander mostra TODAS as parcelas futuras + um CRÉDITO que cancela as futuras
+   - Exemplo: GOBLINFACTORY mostra parcelas 01/12, 02/12... 12/12 (todas) + crédito -1289.94
+   - REGRA: Para cada parcelamento, extraia APENAS UMA parcela (a do mês atual)
+   - O crédito grande (ex: -1289.94) NÃO deve ser extraído (é ajuste interno)
+   - Como identificar a parcela atual: é a primeira ou a mais baixa do grupo
+   - "PAGAMENTO DE FATURA-INTERNET" = pagamento recebido (valor NEGATIVO) - EXTRAIR!
    - Seção "TITULAR" e "@NOME - XXXX XXXX XXXX 1234" = cartões diferentes, extraia de AMBOS
+   - Créditos pequenos (ex: -0.02, -97.44) = EXTRAIR como valores negativos
 📌 **DIGIO:** Data | Descrição | Parcela | Valor
-📌 **SAM'S/CARREFOUR (CSF):** DD/MM DESCRIÇÃO - X/Y VALOR
+📌 **CARREFOUR/SAM'S (Banco CSF):** DD/MM DESCRIÇÃO - X/Y VALOR
+   - ⚠️ CARREFOUR: Leia COM ATENÇÃO os valores - OCR pode confundir números
+   - Formato: DATA | DESCRIÇÃO-PARCELA | VALOR R$
+   - Exemplo: "18/04 CRF 4 BSB BRASILIA SUL - 9/15  372,27"
+   - O hífen separa descrição da parcela (9/15 = parcela 9 de 15)
+   - "Pagamento Banco CSF" = pagamento (valor NEGATIVO com hífen no final: "1.621,02-")
+   - "SALDO FATURA ANTERIOR" = NÃO EXTRAIR (é informativo)
+   - IGNORE a página de "PARCELE FÁCIL" - são simulações, não transações
+   - ANUIDADE Diferenciada também é uma transação válida
 📌 **C6 BANK:** Data | Descrição | Parcela | Valor
 📌 **BANCO DO BRASIL:** Data | Descrição | Parcela | Valor
 📌 **CAIXA:** Data | Descrição | Parcela | Valor
@@ -873,8 +885,9 @@ class LLMOCRService:
                 else:
                     consecutive_count = 1
 
-            # Se há 3+ parcelas consecutivas, manter apenas a primeira
-            if consecutive_count >= 3 or len(group) >= 3:
+            # Se há 6+ parcelas consecutivas, manter apenas a primeira
+            # (aumentado de 3 para 6 para ser menos agressivo)
+            if consecutive_count >= 6 or len(group) >= 6:
                 # Manter apenas o item com menor número de parcela
                 min_parcel = min(parcels)
                 for item in sorted_group:
