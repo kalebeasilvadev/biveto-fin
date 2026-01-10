@@ -212,18 +212,25 @@ class DocumentService:
 
     async def _process_document(self, document: Document, content: bytes) -> dict | None:
         """Processa documento e extrai dados (NÃO salva - retorna para confirmação)"""
+        import logging
+        logger = logging.getLogger(__name__)
+
         try:
+            logger.info(f"Processing document {document.id}, mime_type: {document.mime_type}")
             document.status = DocumentStatus.PROCESSING
             await self.db.flush()
 
             # Extrair dados com LLM
             extraction_data = await self._extract_data(document, content)
+            logger.info(f"Extraction result for document {document.id}: items={len(extraction_data.get('items', [])) if extraction_data else 0}, error={document.error_message}")
 
             # Se houve erro na extração, marcar como falha
             if extraction_data is None or (not extraction_data.get('items') and document.error_message):
                 document.status = DocumentStatus.FAILED
+                logger.warning(f"Document {document.id} marked as FAILED: {document.error_message}")
             else:
                 document.status = DocumentStatus.COMPLETED
+                logger.info(f"Document {document.id} marked as COMPLETED")
 
             document.processed_at = datetime.utcnow()
             await self.db.flush()
@@ -232,6 +239,7 @@ class DocumentService:
             return extraction_data
 
         except Exception as e:
+            logger.error(f"Exception processing document {document.id}: {e}", exc_info=True)
             document.status = DocumentStatus.FAILED
             document.error_message = str(e)
             await self.db.flush()
