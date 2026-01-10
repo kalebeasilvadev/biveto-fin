@@ -546,7 +546,7 @@ class LLMOCRService:
                             ]
                         }
                     ],
-                    'max_tokens': 4000,
+                    'max_tokens': 8000,
                     'temperature': 0.1,
                 },
             )
@@ -581,7 +581,7 @@ class LLMOCRService:
                 },
                 json={
                     'model': 'claude-3-haiku-20240307',
-                    'max_tokens': 4000,
+                    'max_tokens': 8000,
                     'messages': [
                         {
                             'role': 'user',
