@@ -114,6 +114,11 @@ Os formatos abaixo são EXEMPLOS para ajudar na extração. Se a fatura for de o
 📌 **BRADESCO/AMEX:** Data | Histórico | Cidade | R$
 📌 **NUBANK:** Data | Descrição | Valor
 📌 **SANTANDER:** Data | Descrição | Parcela | R$ | US$
+   - ⚠️ SANTANDER IMPORTANTE: Extrai TODAS as parcelas separadamente!
+   - O Santander mostra várias parcelas do mesmo produto (ex: 03/12, 04/12, 05/12...)
+   - Extraia CADA parcela como item separado
+   - "PAGAMENTO DE FATURA-INTERNET" = pagamento (valor NEGATIVO)
+   - Seção "TITULAR" e "@NOME - XXXX XXXX XXXX 1234" = cartões diferentes, extraia de AMBOS
 📌 **DIGIO:** Data | Descrição | Parcela | Valor
 📌 **SAM'S/CARREFOUR (CSF):** DD/MM DESCRIÇÃO - X/Y VALOR
 📌 **C6 BANK:** Data | Descrição | Parcela | Valor
@@ -408,7 +413,7 @@ class LLMOCRService:
     async def extract_from_image(self, image_content: bytes, mime_type: str = 'image/png') -> dict:
         """Extrai dados da imagem usando o provider configurado"""
         try:
-            # Se for PDF, converter para imagens e processar todas as páginas
+            # Se for PDF, converter para imagens e processar todas as páginas JUNTAS
             if mime_type == 'application/pdf' or mime_type.endswith('/pdf'):
                 images, pdf_error = self._convert_pdf_to_images(image_content)
                 if pdf_error:
@@ -416,30 +421,42 @@ class LLMOCRService:
                 if not images:
                     return {'items': [], 'error': 'PDF não gerou imagens para processar'}
 
-                # Processar todas as páginas e combinar resultados
-                all_items = []
-                document_type = None
-                card_info = None
-                errors = []
+                # Se temos múltiplas páginas e estamos usando Google, enviar todas juntas
+                # Isso dá ao modelo contexto completo do documento
+                if len(images) > 1 and self.provider == 'google':
+                    result = await self._call_google_multi_page(images)
+                else:
+                    # Fallback: processar páginas separadamente
+                    all_items = []
+                    document_type = None
+                    card_info = None
+                    errors = []
 
-                for page_num, (img_content, img_mime) in enumerate(images, 1):
-                    result = await self._process_single_image(img_content, img_mime)
-                    if result.get('error'):
-                        errors.append(f"Página {page_num}: {result['error']}")
-                    if result.get('items'):
-                        all_items.extend(result['items'])
-                    if result.get('document_type') and not document_type:
-                        document_type = result['document_type']
-                    # Capturar card_info da primeira página que tiver (geralmente a primeira)
-                    if result.get('card_info') and not card_info:
-                        card_info = result['card_info']
+                    for page_num, (img_content, img_mime) in enumerate(images, 1):
+                        page_result = await self._process_single_image(img_content, img_mime)
+                        if page_result.get('error'):
+                            errors.append(f"Página {page_num}: {page_result['error']}")
+                        if page_result.get('items'):
+                            all_items.extend(page_result['items'])
+                        if page_result.get('document_type') and not document_type:
+                            document_type = page_result['document_type']
+                        if page_result.get('card_info') and not card_info:
+                            card_info = page_result['card_info']
 
-                # Se não extraiu nenhum item e teve erros, retornar os erros
-                if not all_items and errors:
-                    return {'items': [], 'error': '; '.join(errors)}
+                    if not all_items and errors:
+                        return {'items': [], 'error': '; '.join(errors)}
 
-                # Aplicar filtro de duplicatas no conjunto completo de itens de todas as páginas
-                # Isso é importante pois a seção "Próxima fatura" geralmente está em outra página
+                    result = {
+                        'items': all_items,
+                        'document_type': document_type,
+                        'card_info': card_info,
+                    }
+
+                # Aplicar filtros no resultado
+                all_items = result.get('items', [])
+                card_info = result.get('card_info')
+
+                # Aplicar filtro de duplicatas no conjunto completo de itens
                 all_items = self._filter_duplicate_installments(all_items)
 
                 # Aplicar filtro de parcelas consecutivas (Santander lista todas as 12 parcelas)
@@ -451,7 +468,7 @@ class LLMOCRService:
 
                 return {
                     'items': all_items,
-                    'document_type': document_type,
+                    'document_type': result.get('document_type'),
                     'card_info': card_info,
                 }
             else:
@@ -504,7 +521,7 @@ class LLMOCRService:
                     }],
                     'generationConfig': {
                         'temperature': 0.1,
-                        'maxOutputTokens': 8000,
+                        'maxOutputTokens': 16000,
                     }
                 },
             )
@@ -513,6 +530,59 @@ class LLMOCRService:
                 return {'items': [], 'error': f'Google API error: {response.status_code}'}
 
             result = response.json()
+            content = result['candidates'][0]['content']['parts'][0]['text']
+            return self._parse_response(content)
+
+    async def _call_google_multi_page(self, images: list[tuple[bytes, str]]) -> dict:
+        """Chama Google Gemini API com múltiplas páginas de uma vez para melhor contexto"""
+        api_key = settings.google_api_key
+        if not api_key:
+            return {'items': [], 'error': 'GOOGLE_API_KEY não configurada'}
+
+        model = self.model or 'gemini-2.0-flash'
+
+        # Construir partes da mensagem: prompt + todas as imagens
+        parts = [{'text': EXTRACTION_PROMPT + "\n\n⚠️ ATENÇÃO: Este documento tem MÚLTIPLAS PÁGINAS. Extraia TODAS as transações de TODAS as páginas!"}]
+
+        for i, (img_content, img_mime) in enumerate(images):
+            image_base64 = base64.b64encode(img_content).decode('utf-8')
+            parts.append({
+                'inline_data': {
+                    'mime_type': img_mime,
+                    'data': image_base64,
+                }
+            })
+            # Adicionar marcador de página para ajudar o modelo
+            parts.append({'text': f'[Página {i+1} de {len(images)}]'})
+
+        async with httpx.AsyncClient(timeout=120.0) as client:  # Timeout maior para múltiplas páginas
+            response = await client.post(
+                f'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent',
+                headers={
+                    'x-goog-api-key': api_key,
+                    'Content-Type': 'application/json',
+                },
+                json={
+                    'contents': [{
+                        'parts': parts
+                    }],
+                    'generationConfig': {
+                        'temperature': 0.1,
+                        'maxOutputTokens': 32000,  # Muito mais tokens para documento completo
+                    }
+                },
+            )
+
+            if response.status_code != 200:
+                error_detail = response.text[:500] if response.text else 'Unknown error'
+                return {'items': [], 'error': f'Google API error: {response.status_code} - {error_detail}'}
+
+            result = response.json()
+
+            # Verificar se há candidatos na resposta
+            if not result.get('candidates'):
+                return {'items': [], 'error': 'Google API retornou resposta vazia'}
+
             content = result['candidates'][0]['content']['parts'][0]['text']
             return self._parse_response(content)
 
@@ -609,6 +679,7 @@ class LLMOCRService:
             return self._parse_response(content)
 
     # Padrões de descrição que indicam totais/resumos (não são transações reais)
+    # NOTA: NÃO incluir pagamentos de fatura com valor negativo - são créditos válidos!
     INVALID_DESCRIPTIONS = [
         'despesas do mês',
         'fatura atual',
@@ -621,12 +692,12 @@ class LLMOCRService:
         'limite total',
         'próxima fatura',
         'próximas parcelas',
-        'pagamento de fatura',  # Não é despesa, é pagamento do cartão
-        'pagamento fatura',
-        'pag fatura',
-        'pagamento banco csf',  # Pagamento de fatura Carrefour/Sam's
-        'pag boleto bancario',  # Pagamento de boleto
-        'inclusao pgto fatura',  # Pagamento via QR Code
+        # REMOVIDO: 'pagamento de fatura' - é crédito válido quando valor é negativo
+        # REMOVIDO: 'pagamento fatura' - é crédito válido quando valor é negativo
+        # REMOVIDO: 'pag fatura' - é crédito válido quando valor é negativo
+        'pagamento banco csf',  # Pagamento de fatura Carrefour/Sam's (INFO, não transação)
+        'pag boleto bancario',  # Pagamento de boleto (INFO, não transação)
+        'inclusao pgto fatura',  # Pagamento via QR Code (INFO, não transação)
         'saldo anterior',
         'saldo fatura anterior',
         'parcela de anuidade',  # Digio - é o total do parcelamento, não transação
