@@ -1,13 +1,15 @@
 from __future__ import annotations
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Query
 from sqlalchemy import select, or_, and_, func
 from decimal import Decimal
+from pydantic import BaseModel
 
 from ..core.deps import CurrentUser, DbSession
 from ..models.credit_card import CreditCard
 from ..models.account import Account, AccountType
 from ..models.transaction import Transaction
 from ..models.household import HouseholdMember
+from ..services.invoice_service import InvoiceService
 from ..schemas.credit_card import (
     CreditCardCreate,
     CreditCardUpdate,
@@ -338,3 +340,49 @@ async def delete_credit_card(
         await db.delete(card)
 
     await db.commit()
+
+
+class ProjectRecurringResponse(BaseModel):
+    """Resposta da projeção de recorrentes"""
+    message: str
+    transactions_created: int
+    months_projected: int
+
+
+@router.post("/{card_id}/project-recurring", response_model=ProjectRecurringResponse)
+async def project_recurring_transactions(
+    card_id: int,
+    current_user: CurrentUser,
+    db: DbSession,
+    months_ahead: int = Query(6, ge=1, le=12, description="Número de meses para projetar"),
+):
+    """
+    Projeta transações recorrentes para faturas futuras do cartão.
+
+    Busca todas as transações recorrentes ativas vinculadas ao cartão
+    e cria projeções (is_paid=False) para os próximos N meses.
+    """
+    # Verificar se o cartão pertence ao usuário
+    result = await db.execute(
+        select(CreditCard).where(
+            CreditCard.id == card_id,
+            CreditCard.user_id == current_user.id,
+        )
+    )
+    card = result.scalar_one_or_none()
+    if not card:
+        raise HTTPException(status_code=404, detail="Cartão não encontrado")
+
+    # Projetar recorrentes
+    service = InvoiceService(db)
+    created_transactions = await service.project_recurring_to_invoices(
+        user=current_user,
+        credit_card=card,
+        months_ahead=months_ahead,
+    )
+
+    return ProjectRecurringResponse(
+        message=f"Projeção concluída com sucesso",
+        transactions_created=len(created_transactions),
+        months_projected=months_ahead,
+    )

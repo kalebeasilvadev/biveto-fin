@@ -1,4 +1,4 @@
-import { CheckSquare, Square, CheckCircle2, AlertCircle, Check, AlertTriangle } from 'lucide-react'
+import { CheckSquare, Square, CheckCircle2, AlertCircle, Check, AlertTriangle, Clock } from 'lucide-react'
 import { clsx } from 'clsx'
 import { ExtractedItem, CATEGORY_MAP } from '../../types/upload'
 
@@ -6,6 +6,15 @@ interface PendingDuplicate {
   index: number
   description: string
   message: string
+}
+
+interface ProjectedInfo {
+  has_projected: boolean
+  projected_transaction_id?: number
+  projected_date?: string
+  series_id?: number
+  series_description?: string
+  message?: string
 }
 
 interface ExtractedItemsListProps {
@@ -28,6 +37,8 @@ interface ExtractedItemsListProps {
   pendingDuplicates?: PendingDuplicate[]
   onForceAddDuplicates?: () => void
   onSkipDuplicates?: () => void
+  projectedInfo?: Record<number, ProjectedInfo>
+  isCheckingProjected?: boolean
 }
 
 export default function ExtractedItemsList({
@@ -50,11 +61,38 @@ export default function ExtractedItemsList({
   pendingDuplicates = [],
   onForceAddDuplicates,
   onSkipDuplicates,
+  projectedInfo = {},
+  isCheckingProjected = false,
 }: ExtractedItemsListProps) {
   const duplicateCount = items.filter(item => item.is_duplicate).length
+  const projectedCount = Object.values(projectedInfo).filter(info => info.has_projected).length
 
   return (
     <div className="space-y-4">
+      {/* Projected installments info */}
+      {isCheckingProjected && (
+        <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 flex items-center gap-2">
+          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600" />
+          <p className="text-sm text-blue-700 dark:text-blue-300">
+            Verificando parcelas projetadas...
+          </p>
+        </div>
+      )}
+
+      {!isCheckingProjected && projectedCount > 0 && (
+        <div className="bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-800 rounded-lg p-3 flex items-start gap-2">
+          <Clock className="text-purple-600 flex-shrink-0 mt-0.5" size={16} />
+          <div>
+            <p className="text-sm font-medium text-purple-800 dark:text-purple-200">
+              {projectedCount} parcela(s) já projetada(s)
+            </p>
+            <p className="text-xs text-purple-700 dark:text-purple-300 mt-0.5">
+              Essas parcelas já existem como projeções de faturas anteriores e serão confirmadas automaticamente.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Duplicate warning */}
       {duplicateCount > 0 && (
         <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg p-3 flex items-start gap-2">
@@ -130,7 +168,13 @@ export default function ExtractedItemsList({
                     <p className="font-medium text-gray-900 dark:text-white truncate text-sm">
                       {item.description}
                     </p>
-                    {item.is_duplicate && (
+                    {projectedInfo[index]?.has_projected && (
+                      <span className="flex-shrink-0 px-1.5 py-0.5 text-[10px] font-semibold bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 rounded flex items-center gap-1" title={projectedInfo[index]?.message}>
+                        <Clock size={10} />
+                        Projetado
+                      </span>
+                    )}
+                    {item.is_duplicate && !projectedInfo[index]?.has_projected && (
                       <span className="flex-shrink-0 px-1.5 py-0.5 text-[10px] font-semibold bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 rounded flex items-center gap-1">
                         <AlertTriangle size={10} />
                         Duplicado

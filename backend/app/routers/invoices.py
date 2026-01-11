@@ -52,6 +52,7 @@ def build_invoice_response(
         paid_at=invoice.paid_at,
         payment_account_id=invoice.payment_account_id,
         payment_transaction_id=invoice.payment_transaction_id,
+        payment_transaction_ids=invoice.payment_transaction_ids,
         notes=invoice.notes,
         created_at=invoice.created_at,
         updated_at=invoice.updated_at,
@@ -75,6 +76,10 @@ async def list_invoices(
 ):
     """Lista faturas do usuário"""
     service = InvoiceService(db)
+
+    # Lazy update: atualiza status das faturas baseado em datas
+    await service.update_invoice_statuses()
+
     invoices = await service.list_invoices(
         user=current_user,
         credit_card_id=credit_card_id,
@@ -168,6 +173,7 @@ async def get_invoice(
             amount=float(t.amount),
             installment_number=t.installment_number,
             installment_total=t.installment_total,
+            is_paid=t.is_paid,
         ))
 
     return InvoiceDetailResponse(

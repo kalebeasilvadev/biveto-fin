@@ -1,6 +1,10 @@
+from __future__ import annotations
+
 from datetime import date
 import csv
 import io
+from typing import Optional
+
 from fastapi import APIRouter, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -239,3 +243,100 @@ async def delete_transaction(
     """Remove uma transação"""
     service = TransactionService(db)
     await service.delete(current_user, transaction_id)
+
+
+class ExtractedItemCheck(BaseModel):
+    """Item extraído para verificar se existe projeção"""
+    index: int
+    description: str
+    amount: float
+    date: Optional[date] = None
+    is_installment: bool = False
+    installment_current: Optional[int] = None
+    installment_total: Optional[int] = None
+
+
+class ProjectedMatchResult(BaseModel):
+    """Resultado da verificação de match com projeção"""
+    index: int
+    has_projected: bool
+    projected_transaction_id: Optional[int] = None
+    projected_date: Optional[date] = None
+    series_id: Optional[int] = None
+    series_description: Optional[str] = None
+    message: Optional[str] = None
+
+
+class CheckProjectedRequest(BaseModel):
+    """Request para verificar projeções"""
+    items: list[ExtractedItemCheck]
+    credit_card_id: Optional[int] = None
+    invoice_month: Optional[int] = None
+    invoice_year: Optional[int] = None
+
+
+class CheckProjectedResponse(BaseModel):
+    """Response com resultados das verificações"""
+    results: list[ProjectedMatchResult]
+    total_projected: int
+
+
+@router.post("/check-projected", response_model=CheckProjectedResponse)
+async def check_projected_transactions(
+    data: CheckProjectedRequest,
+    current_user: CurrentUser,
+    db: DbSession,
+):
+    """
+    Verifica quais itens extraídos têm parcelas/transações projetadas.
+
+    Usado pelo frontend para mostrar ao usuário quais itens já existem
+    como projeções futuras e serão confirmados ao invés de criados.
+    """
+    from ..services.installment_service import InstallmentService
+
+    installment_service = InstallmentService(db)
+    results = []
+    total_projected = 0
+
+    for item in data.items:
+        result = ProjectedMatchResult(
+            index=item.index,
+            has_projected=False,
+        )
+
+        if item.is_installment and item.installment_current and item.installment_total:
+            # Para itens parcelados, buscar série existente
+            series = await installment_service.find_matching_series(
+                user=current_user,
+                merchant_name=item.description,
+                installment_amount=item.amount,
+                installment_total=item.installment_total,
+                account_id=None,  # Não temos account_id aqui
+                transaction_date=item.date,
+                installment_number=item.installment_current,
+            )
+
+            if series:
+                # Verificar se existe parcela projetada
+                existing = await installment_service.find_existing_installment(
+                    series, item.installment_current
+                )
+
+                if existing and not existing.is_paid:
+                    result.has_projected = True
+                    result.projected_transaction_id = existing.id
+                    result.projected_date = existing.date
+                    result.series_id = series.id
+                    result.series_description = series.description
+                    result.message = f"Parcela {item.installment_current}/{item.installment_total} já projetada para {existing.date.strftime('%d/%m/%Y')}"
+                    total_projected += 1
+                elif existing and existing.is_paid:
+                    result.message = f"Parcela {item.installment_current}/{item.installment_total} já confirmada em {existing.date.strftime('%d/%m/%Y')}"
+
+        results.append(result)
+
+    return CheckProjectedResponse(
+        results=results,
+        total_projected=total_projected,
+    )

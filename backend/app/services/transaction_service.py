@@ -310,29 +310,72 @@ class TransactionService:
                 )
                 result["created_transactions"].extend(previous_transactions)
 
-            # Criar transação da parcela atual
-            transaction = await installment_service.create_installment_transaction(
-                user=user,
-                series=series,
-                installment_number=data.installment_current,
-                transaction_date=data.date,
-                is_paid=True,
-                document_id=data.document_id,
-                credit_card_id=credit_card_id,
-                invoice_id=invoice.id if invoice else None,
-                force_duplicate=data.force_duplicate,
+            # Verificar se existe parcela projetada (is_paid=False) para confirmar
+            existing_installment = await installment_service.find_existing_installment(
+                series, data.installment_current
             )
 
-            result["transaction"] = transaction
-
-            # Se solicitado, criar parcelas futuras
-            if data.create_future_installments:
-                future_transactions = await installment_service.create_future_installments(
+            if existing_installment and not existing_installment.is_paid:
+                # Confirmar parcela projetada ao invés de criar nova
+                transaction = await installment_service.confirm_existing_installment(
                     user=user,
                     series=series,
-                    from_installment=data.installment_current,
+                    installment_number=data.installment_current,
+                    document_id=data.document_id,
+                    actual_amount=data.amount,
+                    actual_date=data.date,
                 )
-                result["created_transactions"].extend(future_transactions)
+                result["transaction"] = transaction
+                result["was_projected"] = True  # Flag indicando que confirmou projeção
+
+                # Atualizar invoice_id se necessário
+                if invoice and transaction.invoice_id != invoice.id:
+                    transaction.invoice_id = invoice.id
+                    await self.db.flush()
+
+            elif existing_installment and existing_installment.is_paid:
+                # Parcela já confirmada - verificar se é duplicata ou forçar
+                if not data.force_duplicate:
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail=f"Parcela {data.installment_current}/{data.installment_total} já confirmada em {existing_installment.date.strftime('%d/%m/%Y')}"
+                    )
+                # Se force_duplicate, criar nova transação
+                transaction = await installment_service.create_installment_transaction(
+                    user=user,
+                    series=series,
+                    installment_number=data.installment_current,
+                    transaction_date=data.date,
+                    is_paid=True,
+                    document_id=data.document_id,
+                    credit_card_id=credit_card_id,
+                    invoice_id=invoice.id if invoice else None,
+                    force_duplicate=True,
+                )
+                result["transaction"] = transaction
+            else:
+                # Criar nova transação da parcela atual
+                transaction = await installment_service.create_installment_transaction(
+                    user=user,
+                    series=series,
+                    installment_number=data.installment_current,
+                    transaction_date=data.date,
+                    is_paid=True,
+                    document_id=data.document_id,
+                    credit_card_id=credit_card_id,
+                    invoice_id=invoice.id if invoice else None,
+                    force_duplicate=data.force_duplicate,
+                )
+                result["transaction"] = transaction
+
+                # Se solicitado, criar parcelas futuras (apenas se criou nova transação)
+                if data.create_future_installments:
+                    future_transactions = await installment_service.create_future_installments(
+                        user=user,
+                        series=series,
+                        from_installment=data.installment_current,
+                    )
+                    result["created_transactions"].extend(future_transactions)
 
         else:
             # Transação simples (não parcelada)

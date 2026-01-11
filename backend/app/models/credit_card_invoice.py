@@ -1,9 +1,10 @@
 from datetime import datetime, date
 from decimal import Decimal
 from enum import Enum
-from sqlalchemy import String, ForeignKey, DateTime, Date, Text, Numeric, Integer, UniqueConstraint
+from sqlalchemy import String, ForeignKey, DateTime, Date, Text, Numeric, Integer, UniqueConstraint, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from ..core.database import Base
+from ..core.utils import utc_now
 
 
 class InvoiceStatus(str, Enum):
@@ -56,17 +57,21 @@ class CreditCardInvoice(Base):
     payment_account_id: Mapped[int | None] = mapped_column(
         ForeignKey("accounts.id", ondelete="SET NULL")
     )
-    # Transação de pagamento gerada
+    # Transação de pagamento gerada (mantido para compatibilidade)
     payment_transaction_id: Mapped[int | None] = mapped_column(
         ForeignKey("transactions.id", ondelete="SET NULL")
+    )
+    # Lista de IDs de transações de pagamento (para pagamentos parciais múltiplos)
+    payment_transaction_ids: Mapped[list[int] | None] = mapped_column(
+        JSON, default=list, nullable=True
     )
 
     # Notas/observações
     notes: Mapped[str | None] = mapped_column(Text)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+        DateTime, default=utc_now, onupdate=utc_now
     )
 
     # Relationships

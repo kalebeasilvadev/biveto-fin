@@ -57,6 +57,7 @@ class InvoiceResponse(InvoiceBase):
     paid_at: datetime | None
     payment_account_id: int | None
     payment_transaction_id: int | None
+    payment_transaction_ids: list[int] | None = None
 
     created_at: datetime
     updated_at: datetime
@@ -86,6 +87,7 @@ class InvoiceTransactionResponse(BaseModel):
     amount: float
     installment_number: int | None
     installment_total: int | None
+    is_paid: bool = True  # True = confirmada, False = projetada
 
     class Config:
         from_attributes = True

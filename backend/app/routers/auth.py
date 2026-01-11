@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..core.deps import DbSession, CurrentUser
 from ..core.security import get_password_hash, verify_password, validate_password_or_raise
 from ..core.rate_limit import limiter
+from ..core.utils import utc_now
 from ..models import User, Invitation, InvitationStatus, License
 from ..models.household import HouseholdMember, HouseholdRole
 from ..schemas.user import UserCreate, UserResponse
@@ -67,7 +68,7 @@ async def validate_invitation(token: str, db: DbSession):
         raise HTTPException(status_code=404, detail="Convite não encontrado")
 
     # Verificar se expirou
-    if datetime.utcnow() > invitation.expires_at:
+    if utc_now() > invitation.expires_at:
         if invitation.status == InvitationStatus.PENDING:
             invitation.status = InvitationStatus.EXPIRED
             await db.commit()
@@ -101,7 +102,7 @@ async def register_via_invitation(request: Request, token: str, data: InviteRegi
         raise HTTPException(status_code=404, detail="Convite nao encontrado")
 
     # Verificar validade
-    if datetime.utcnow() > invitation.expires_at:
+    if utc_now() > invitation.expires_at:
         if invitation.status == InvitationStatus.PENDING:
             invitation.status = InvitationStatus.EXPIRED
             await db.commit()
@@ -167,7 +168,7 @@ async def register_via_invitation(request: Request, token: str, data: InviteRegi
 
     # Marcar convite como aceito
     invitation.status = InvitationStatus.ACCEPTED
-    invitation.accepted_at = datetime.utcnow()
+    invitation.accepted_at = utc_now()
 
     await db.commit()
 
@@ -198,7 +199,7 @@ async def validate_reset_token(token: str, db: DbSession):
 
     # Verificar expiração do token (se o campo existir)
     if hasattr(user, 'reset_token_expires') and user.reset_token_expires:
-        if datetime.utcnow() > user.reset_token_expires:
+        if utc_now() > user.reset_token_expires:
             # Limpar token expirado
             user.reset_token = None
             user.reset_token_expires = None
@@ -220,7 +221,7 @@ async def reset_password(request: Request, token: str, data: ResetPasswordReques
 
     # Verificar expiração do token (se o campo existir)
     if hasattr(user, 'reset_token_expires') and user.reset_token_expires:
-        if datetime.utcnow() > user.reset_token_expires:
+        if utc_now() > user.reset_token_expires:
             # Limpar token expirado
             user.reset_token = None
             user.reset_token_expires = None

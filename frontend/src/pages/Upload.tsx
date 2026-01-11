@@ -39,6 +39,17 @@ export default function Upload() {
   const [showCreateCardPrompt, setShowCreateCardPrompt] = useState(false)
   const [isCreatingCard, setIsCreatingCard] = useState(false)
 
+  // Parcelas projetadas state
+  const [projectedInfo, setProjectedInfo] = useState<Record<number, {
+    has_projected: boolean
+    projected_transaction_id?: number
+    projected_date?: string
+    series_id?: number
+    series_description?: string
+    message?: string
+  }>>({})
+  const [isCheckingProjected, setIsCheckingProjected] = useState(false)
+
   // Prevent accidental page reload
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -88,6 +99,61 @@ export default function Upload() {
 
   // Check if document is a credit card invoice
   const isCreditCardInvoice = document?.document_type === 'fatura_cartao'
+
+  // Verificar parcelas projetadas quando documento é carregado
+  useEffect(() => {
+    const checkProjected = async () => {
+      if (!document?.extracted_items || document.extracted_items.length === 0) return
+      if (!isCreditCardInvoice) return
+
+      // Só verificar itens parcelados
+      const installmentItems = document.extracted_items
+        .map((item, index) => ({ ...item, index }))
+        .filter(item => item.is_installment && item.installment_current && item.installment_total)
+
+      if (installmentItems.length === 0) return
+
+      setIsCheckingProjected(true)
+      try {
+        const response = await transactionsApi.checkProjected({
+          items: installmentItems.map(item => ({
+            index: item.index,
+            description: item.description || '',
+            amount: Math.abs(item.amount),
+            date: item.date || undefined,
+            is_installment: item.is_installment || undefined,
+            installment_current: item.installment_current || undefined,
+            installment_total: item.installment_total || undefined,
+          })),
+          credit_card_id: selectedCreditCardId ? parseInt(selectedCreditCardId) : undefined,
+          invoice_month: document.card_info?.invoice_month,
+          invoice_year: document.card_info?.invoice_year,
+        })
+
+        const results = response.data.results as Array<{
+          index: number
+          has_projected: boolean
+          projected_transaction_id?: number
+          projected_date?: string
+          series_id?: number
+          series_description?: string
+          message?: string
+        }>
+
+        const projectedMap: Record<number, typeof results[0]> = {}
+        results.forEach(result => {
+          projectedMap[result.index] = result
+        })
+        setProjectedInfo(projectedMap)
+      } catch (error) {
+        console.error('Erro ao verificar parcelas projetadas:', error)
+      } finally {
+        setIsCheckingProjected(false)
+      }
+    }
+
+    checkProjected()
+  }, [document, selectedCreditCardId, isCreditCardInvoice])
 
   // Helper: find category by suggested name
   const findCategoryId = (suggestedCategory: string | null): string => {
@@ -341,6 +407,11 @@ export default function Upload() {
           // Invoice period from PDF (so all items go to the same invoice)
           invoice_month: document.card_info?.invoice_month || null,
           invoice_year: document.card_info?.invoice_year || null,
+          // Criar parcelas futuras automaticamente para itens parcelados
+          create_future_installments: item.is_installment &&
+            item.installment_current &&
+            item.installment_total &&
+            item.installment_current < item.installment_total,
         }
       }
     })
@@ -377,6 +448,11 @@ export default function Upload() {
         // Invoice period from PDF (so all items go to the same invoice)
         invoice_month: document.card_info?.invoice_month || null,
         invoice_year: document.card_info?.invoice_year || null,
+        // Criar parcelas futuras automaticamente para itens parcelados
+        create_future_installments: item.is_installment &&
+          item.installment_current &&
+          item.installment_total &&
+          item.installment_current < item.installment_total,
       }
     }))
 
@@ -610,7 +686,10 @@ export default function Upload() {
               setSelectedItems([])
               setEditingItemIndex(null)
               setSelectedCreditCardId('')
+              setProjectedInfo({})
             }}
+            projectedInfo={projectedInfo}
+            isCheckingProjected={isCheckingProjected}
           />
         )}
 

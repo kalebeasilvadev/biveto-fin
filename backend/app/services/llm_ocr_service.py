@@ -1,14 +1,26 @@
-"""Serviço de extração de dados usando LLM com visão (multi-provider)"""
+"""Serviço de extração de dados usando LLM com visão (multi-provider)
+
+Melhorias implementadas:
+- future_installments: Calcula parcelas futuras automaticamente
+- Regra de consolidação Santander: Extrai UMA parcela por grupo
+- Validação soma ≈ total_amount: Instruído no prompt
+- API google-genai: SDK oficial com retry automático
+- Retry com exponential backoff: Para erros 503/429
+- Modelo gemini-2.5-flash-lite: Melhor custo/benefício
+"""
+import asyncio
 import base64
 import json
-import httpx
-import io
+import time
 from ..core.config import settings
 
 
-EXTRACTION_PROMPT = """Analise esta imagem de documento financeiro brasileiro (cupom fiscal, fatura de cartão, comprovante, extrato).
+EXTRACTION_PROMPT = """Você é o Agente Especialista de Extração Financeira (Brasil).
+Sua missão é extrair com alta precisão itens/transações de documentos financeiros brasileiros (cupom fiscal, fatura de cartão, comprovante, extrato) e retornar APENAS um JSON válido.
 
-Extraia os itens/transações e retorne um JSON válido com este formato:
+========================
+1) SCHEMA DE SAÍDA (JSON)
+========================
 
 {
   "items": [
@@ -19,10 +31,14 @@ Extraia os itens/transações e retorne um JSON válido com este formato:
       "category": "mercado",
       "installment_current": 3,
       "installment_total": 12,
-      "is_installment": true
+      "is_installment": true,
+      "future_installments": [
+        {"installment": 4, "reference_month": 2, "reference_year": 2026},
+        {"installment": 5, "reference_month": 3, "reference_year": 2026}
+      ]
     }
   ],
-  "document_type": "cupom_fiscal",
+  "document_type": "fatura_cartao",
   "card_info": {
     "card_issuer": "itau",
     "card_last_digits": "8849",
@@ -35,353 +51,209 @@ Extraia os itens/transações e retorne um JSON válido com este formato:
   }
 }
 
-==== PRIORIDADE MÁXIMA: EXTRAIR CARD_INFO (PARA QUALQUER BANCO) ====
+========================
+2) PRIORIDADE MÁXIMA: CARD_INFO
+========================
 
-⚠️ SEMPRE extraia card_info para faturas de cartão de crédito! Esta informação é CRÍTICA.
-
-📌 **Como encontrar as informações (funciona para QUALQUER banco):**
+Para faturas de cartão, SEMPRE extraia card_info:
 
 1. **card_issuer** - Nome do banco/emissor em lowercase:
-   - Procure pelo LOGO ou NOME no cabeçalho da fatura
-   - Exemplos: "itau", "inter", "bradesco", "nubank", "santander", "bb", "caixa", "c6", "xp", "btg", "original", "next", "neon", "pagbank", "picpay", "mercadopago", "digio", "samsclub", "carrefour"
-   - Se não reconhecer, use o nome que aparecer
+   - Exemplos: "itau", "inter", "bradesco", "nubank", "santander", "bb", "digio", "samsclub", "carrefour"
 
 2. **card_last_digits** - Últimos 4 dígitos do cartão:
-   - Procure padrões como: "Final 8849", "**** 1234", "5312.XXXX.XXXX.8849", "5364****7931"
-   - Pegue sempre os ÚLTIMOS 4 DÍGITOS
+   - Padrões: "Final 8849", "**** 1234", "5364****7931"
 
-3. **invoice_month** e **invoice_year** - Período da fatura:
-   - Procure por: "Vencimento", "Data de Vencimento", "Venc."
-   - Ou: "Fatura de Janeiro/2026", "JAN/2026", "01/2026"
-   - invoice_month = mês (1-12), invoice_year = ano (ex: 2026)
+3. **invoice_month/invoice_year** - Período da fatura:
+   - Procure: "Vencimento", "Fatura de Janeiro/2026", "JAN/2026"
 
-4. **due_date** - Data de vencimento:
-   - Formato de saída: "YYYY-MM-DD"
-   - Procure por: "Vencimento: 15/01/2026", "Venc.: 15 JAN 2026"
+4. **due_date** - Data de vencimento (YYYY-MM-DD)
 
-5. **total_amount** - Valor total da fatura:
-   - Procure por: "Valor do Documento", "Total da Fatura", "Valor a pagar"
-   - É o valor principal a ser pago
+5. **closing_date** - Data de fechamento (YYYY-MM-DD)
 
-==== REGRAS CRÍTICAS PARA FATURA DE CARTÃO DE CRÉDITO (QUALQUER BANCO) ====
+6. **total_amount** - Valor total:
+   - Procure: "Valor do Documento", "Total da Fatura", "Total a Pagar", "Saldo desta fatura"
+   - NUNCA use "pagamento mínimo" ou "próxima fatura"
 
-⚠️ TODA fatura de cartão tem estrutura similar. Identifique as seções:
+========================
+3) REGRAS PARA FATURA DE CARTÃO
+========================
 
-1️⃣ **CABEÇALHO/RESUMO** (extrair card_info, NÃO extrair transações):
-   - Fica no TOPO da fatura
-   - Contém: número do cartão, vencimento, valor total, pagamento mínimo
-   - EXTRAIA card_info daqui
-   - NÃO extraia transações daqui
+3.1) SEÇÕES DA FATURA:
 
-2️⃣ **LANÇAMENTOS/DESPESAS** (✅ EXTRAIR TRANSAÇÕES DAQUI):
-   - Títulos comuns: "Lançamentos", "Despesas", "Despesas da fatura", "Fatura atual", "Compras e saques", "Demonstrativo", "Detalhamento da Fatura"
-   - Formato geral: DATA | DESCRIÇÃO | [PARCELA] | VALOR
-   - Esta é a seção PRINCIPAL - extraia TODAS as transações
+1️⃣ CABEÇALHO/RESUMO → Extrair card_info, NÃO extrair transações
 
-   ⚠️ REGRA CRÍTICA: EXTRAIA **TODAS** AS TRANSAÇÕES, SEM EXCEÇÃO!
-   - Se houver 30 transações, extraia as 30
-   - Se houver parcelas repetidas (ex: GOBLINFACTORY 01/12, 02/12, 03/12... 12/12), extraia CADA UMA SEPARADAMENTE
-   - NUNCA agrupe ou resuma transações
-   - NUNCA pule transações por serem "similares"
+2️⃣ LANÇAMENTOS/DESPESAS → EXTRAIR TODAS as transações:
+   - "Lançamentos", "Despesas", "Compras e saques", "Detalhamento da Fatura"
 
-   ⚠️ MÚLTIPLOS CARTÕES NA MESMA FATURA:
-   - Algumas faturas têm TITULAR + ADICIONAL(IS)
-   - Procure por seções como "@ NOME - XXXX XXXX XXXX 1234" (cartão adicional)
-   - Extraia transações de TODOS os cartões (titular E adicionais)
+3️⃣ PAGAMENTOS/CRÉDITOS → EXTRAIR como valores NEGATIVOS:
+   - "PAGAMENTO", "CRÉDITO", "ESTORNO", "PAG FATURA"
+   - category: "pagamento", "credito" ou "estorno"
 
-3️⃣ **PARCELAS FUTURAS** (🚫 IGNORAR COMPLETAMENTE):
-   - Títulos comuns: "Próximas faturas", "Próxima fatura", "Próximas parcelas", "Saldos futuros", "Parcelados para próximas faturas"
-   - São valores que serão cobrados EM MESES FUTUROS
-   - NÃO EXTRAIA NADA desta seção!
+4️⃣ PARCELAS FUTURAS → IGNORAR esta seção:
+   - "Próximas faturas", "Saldos futuros", "Parcelados para próximas faturas"
 
-📌 **PADRÕES UNIVERSAIS DE PARCELAS:**
-- "XX/YY" ou "XX de YY" ou "(Parcela XX de YY)" = parcela XX de um total de YY
-- Pode estar na descrição ou em coluna separada
-- Ex: "STEAM 03/12" = parcela 3 de 12
-- Ex: "(Parcela 05 de 12)" = parcela 5 de 12
+3.2) PARCELAS E FUTURE_INSTALLMENTS (CRÍTICO):
 
-📌 **PADRÕES UNIVERSAIS DE PAGAMENTOS/CRÉDITOS:**
-- Palavras-chave: "PAGAMENTO", "CRÉDITO", "ESTORNO", "PAG FATURA"
-- Valores podem ter "-" antes ou depois, ou símbolo "+"
-- SEMPRE retorne como valor NEGATIVO no JSON
+Para cada item parcelado (is_installment = true), você DEVE calcular as parcelas futuras.
 
-==== EXEMPLOS DE FORMATOS POR BANCO (REFERÊNCIA) ====
+FÓRMULA:
+- Parcela atual: installment_current (ex: 3)
+- Total de parcelas: installment_total (ex: 12)
+- Mês de referência: invoice_month/invoice_year (ex: Janeiro/2026)
 
-Os formatos abaixo são EXEMPLOS para ajudar na extração. Se a fatura for de outro banco, use os padrões universais acima.
+Para cada parcela futura N (onde N > installment_current):
+  meses_a_adicionar = N - installment_current
+  reference_month = (invoice_month + meses_a_adicionar - 1) % 12 + 1
+  reference_year = invoice_year + (invoice_month + meses_a_adicionar - 1) // 12
 
-📌 **ITAÚ:** DD/MM ESTABELECIMENTO XX/YY VALOR
-📌 **INTER:** Data por extenso | Movimentação | Beneficiário | Valor
-📌 **BRADESCO/AMEX:** Data | Histórico | Cidade | R$
-📌 **NUBANK:** Data | Descrição | Valor
-📌 **SANTANDER:** Data | Descrição | Parcela | R$ | US$
-   - ⚠️ SANTANDER FORMATO ESPECIAL DE PARCELAMENTO:
-   - O Santander mostra TODAS as parcelas futuras + um CRÉDITO que cancela as futuras
-   - Exemplo: GOBLINFACTORY mostra parcelas 01/12, 02/12... 12/12 (todas) + crédito -1289.94
-   - REGRA: Para cada parcelamento, extraia APENAS UMA parcela (a do mês atual)
-   - O crédito grande (ex: -1289.94) NÃO deve ser extraído (é ajuste interno)
-   - Como identificar a parcela atual: é a primeira ou a mais baixa do grupo
-   - "PAGAMENTO DE FATURA-INTERNET" = pagamento recebido (valor NEGATIVO) - EXTRAIR!
-   - Seção "TITULAR" e "@NOME - XXXX XXXX XXXX 1234" = cartões diferentes, extraia de AMBOS
-   - Créditos pequenos (ex: -0.02, -97.44) = EXTRAIR como valores negativos
-📌 **DIGIO:** Data | Descrição | Parcela | Valor
-📌 **CARREFOUR/SAM'S (Banco CSF):** DD/MM DESCRIÇÃO - X/Y VALOR
-   - ⚠️ CARREFOUR: Leia COM ATENÇÃO os valores - OCR pode confundir números
-   - Formato: DATA | DESCRIÇÃO-PARCELA | VALOR R$
-   - Exemplo: "18/04 CRF 4 BSB BRASILIA SUL - 9/15  372,27"
-   - O hífen separa descrição da parcela (9/15 = parcela 9 de 15)
-   - "Pagamento Banco CSF" = pagamento (valor NEGATIVO com hífen no final: "1.621,02-")
-   - "SALDO FATURA ANTERIOR" = NÃO EXTRAIR (é informativo)
-   - IGNORE a página de "PARCELE FÁCIL" - são simulações, não transações
-   - ANUIDADE Diferenciada também é uma transação válida
-📌 **C6 BANK:** Data | Descrição | Parcela | Valor
-📌 **BANCO DO BRASIL:** Data | Descrição | Parcela | Valor
-📌 **CAIXA:** Data | Descrição | Parcela | Valor
+EXEMPLO:
+- Item: "Steam" parcela 4/12
+- Fatura: Janeiro/2026
+- future_installments:
+  - Parcela 5 → Fevereiro/2026 (reference_month: 2, reference_year: 2026)
+  - Parcela 6 → Março/2026 (reference_month: 3, reference_year: 2026)
+  - ... até parcela 12 → Setembro/2026 (reference_month: 9, reference_year: 2026)
 
-⚠️ REGRA CRÍTICA SOBRE DATAS:
-- As datas na fatura são datas ORIGINAIS das compras (podem ser de meses atrás)
-- Para o campo "date" no JSON, use o MÊS DE REFERÊNCIA da fatura (do vencimento)
-- Se vencimento = 10/01/2026, todas as transações devem ter date em dezembro/2025 ou janeiro/2026
-- NUNCA use datas de 6+ meses atrás (julho, agosto) para uma fatura de janeiro!
+VIRADA DE ANO:
+- Item: "Loja X" parcela 10/12
+- Fatura: Novembro/2025
+- future_installments:
+  - Parcela 11 → Dezembro/2025 (reference_month: 12, reference_year: 2025)
+  - Parcela 12 → Janeiro/2026 (reference_month: 1, reference_year: 2026)
 
-Exemplo - Fatura vence 15/01/2026:
-Linha Itaú: "09/07 MOTOCHEFE BRASILIA 06/12 574,13"
-→ {"description": "Motochefe Brasilia", "amount": 574.13, "date": "2026-01-08", "installment_current": 6, "installment_total": 12, "is_installment": true}
+IMPORTANTE: O campo future_installments só existe se is_installment = true E installment_current < installment_total.
 
-Linha Inter: "23 de ago. 2025 | DM *helphbomaxcom (Parcela 05 de 12) | R$ 39,90"
-→ {"description": "DM Helphbomaxcom", "amount": 39.90, "date": "2025-12-23", "installment_current": 5, "installment_total": 12, "is_installment": true}
+========================
+4) REGRA ESPECIAL - SANTANDER (MUITO IMPORTANTE)
+========================
 
-Linha Bradesco: "08/11 Steam 02/12 SAO PAULO 105,66"
-→ {"description": "Steam", "amount": 105.66, "date": "2025-12-08", "installment_current": 2, "installment_total": 12, "is_installment": true}
+A fatura Santander mostra TODAS as parcelas futuras no PDF (01/12, 02/12... 12/12).
 
-❌ NUNCA EXTRAIA (são resumos/totais, NÃO são transações):
-- "Despesas do mês" - é um TOTAL, não uma transação individual!
-- "Total da fatura" / "Valor do Documento" / "Lançamentos atuais" - totais
-- TODA a seção "Compras parceladas - próximas faturas" - são FUTURAS!
-- "Próxima fatura", "Demais faturas", "Total para próximas faturas"
-- "Parcelamento Fatura" / "Parcelamento Total" - opção de parcelar a fatura
-- "Pagamento mínimo", "Parcelas fixas" - informativo
-- Limite disponível, limite total, limites de crédito
-- Simulações de parcelamento, Simulação Saque Cash
-- Encargos, juros do rotativo
+REGRA CRÍTICA DE CONSOLIDAÇÃO:
+- Quando o PDF mostrar múltiplas parcelas do MESMO estabelecimento:
+  - EXTRAIR APENAS UMA como item principal (a PRIMEIRA parcela, geralmente 01/XX ou a menor)
+  - As DEMAIS parcelas devem ir para o campo "future_installments"
+  - NÃO extrair cada parcela como item separado!
 
-✅ EXTRAIA APENAS da seção "Lançamentos: compras e saques":
-- Cada linha com DATA | ESTABELECIMENTO | VALOR
-- Use a data de fechamento da fatura para o campo "date"
-
-Para cada transação:
-- Despesas/compras: valor POSITIVO
-- Pagamentos/créditos/estornos: valor NEGATIVO
-
-==== TRANSAÇÕES INTERNACIONAIS (IOF) ====
-
-⚠️ MUITO IMPORTANTE: Para compras internacionais, use o VALOR TOTAL com IOF!
-
-Faturas de cartão brasileiras têm uma seção "Lançamentos Internacionais" que mostra:
-- Valor da transação em moeda estrangeira (ex: US$ 10,00)
-- Valor convertido em reais (ex: R$ 58,40)
-- Repasse de IOF (ex: R$ 2,04)
-- **Total lançamentos inter. em R$** (ex: R$ 60,44) ← USE ESTE VALOR!
-
-REGRA: Quando extrair transações internacionais:
-- O "amount" deve ser o TOTAL incluindo IOF (ex: 60.44, não 58.40)
-- O IOF é um imposto que o cliente PAGA, então deve ser incluído no valor
-- Se a fatura mostrar apenas o valor sem IOF, mas tiver "Repasse de IOF" abaixo, SOME os dois valores
-
-Exemplo:
-Entrada:
-"Lançamentos internacionais
-17/12 Trae SINGAPORE       US$ 10,00    R$ 58,40
-Total transações inter. em R$           R$ 58,40
-Repasse de IOF em R$                    R$ 2,04
-Total lançamentos inter. em R$          R$ 60,44"
-
-Saída CORRETA:
-{"description": "Trae", "amount": 60.44, "date": "2025-12-17", "category": "outros"}
-
-Saída ERRADA:
-{"description": "Trae", "amount": 58.40, ...}  // Falta o IOF!
-
-==== REGRA MAIS IMPORTANTE ====
-
-PARA CUPOM FISCAL / NOTA FISCAL DE SUPERMERCADO:
-- Extraia APENAS os PRODUTOS comprados
-- NÃO EXTRAIA (IGNORE COMPLETAMENTE):
-  * Descontos (ex: "DESCONTO", "DESC", "DESCONTO POR QUANTIDADE", "DESC QTD", valores negativos no cupom)
-  * Totais (ex: "TOTAL", "SUBTOTAL", "TOTAL A PAGAR", "VALOR TOTAL")
-  * Forma de pagamento (ex: "DINHEIRO", "CARTÃO", "PIX", "TROCO", "CREDITO", "DEBITO")
-  * Impostos (ex: "ICMS", "TRIBUTOS", "VALOR APROX TRIBUTOS")
-  * Informações do estabelecimento (CNPJ, endereço, etc.)
-- TODOS os valores de produtos devem ser POSITIVOS (são despesas)
-- Se um item aparece com valor negativo no cupom (desconto), IGNORE esse item completamente
-
-==== LEITURA DE NOMES DE PRODUTOS (OCR) ====
-
-MUITO IMPORTANTE: Cupons fiscais têm abreviações e OCR pode ler errado. INTERPRETE e CORRIJA:
-
-Exemplos de correção obrigatória:
-- "LIMAD KG" ou "LIMAO KG" → "Limão Kg"
-- "ACU REFIN" ou "ACUCAR REF" → "Açúcar Refinado"
-- "ARR BRANCO" → "Arroz Branco"
-- "FGO FRANGO" ou "FRGO" → "Frango"
-- "CONTRA FILE" ou "CTRA FILE" → "Contra Filé"
-- "PAO FRANCES" → "Pão Francês"
-- "DETERG" → "Detergente"
-- "MARG" → "Margarina"
-- "LEITE INTEG" → "Leite Integral"
-- "CERV" → "Cerveja"
-- "REFRIG" → "Refrigerante"
-- "SABAO PO" → "Sabão em Pó"
-- "PAP HIGIEN" → "Papel Higiênico"
-- "OVO VERM" → "Ovo Vermelho"
-- "BATATA ING" → "Batata Inglesa"
-- "CARVAD" ou "CARVAO" → "Carvão"
-- "TRIANGULO EKC EUCALIPTO" → "Carvão Triângulo Eucalipto"
-- "BON FESF" ou "BIFE" → "Bife"
-- "ALCATRA" → "Alcatra"
-- "ARANHA" → "Carne Aranha" (corte de carne)
-- "PRATO DESCART" → "Prato Descartável"
-- "COPOBRAS" → "Copobras" (marca)
-
-Use o contexto para interpretar abreviações de forma legível e natural em português.
-
-==== PARCELAS (para faturas de cartão) ====
-
-PADRÕES DE PARCELAMENTO:
-- "Parcela X de Y" ou "Parcela X/Y"
-- "XX/YY" no final (ex: "Steam 03/12" = parcela 3 de 12)
-- "(Parcela XX de YY)" no final
-- "*nome01/06" = parcela 1 de 6
-
-COMO EXTRAIR:
-- installment_current: número da parcela atual
-- installment_total: total de parcelas
-- is_installment: true
-- O valor deve ser o valor DA PARCELA, não o total
-
-==== DATAS ====
-
-- Formato de saída: YYYY-MM-DD
-- Formatos de entrada: "23/08/2024", "23 de ago. 2024", "08/12" (use ano do contexto)
-
-==== VALORES ====
-
-- Converta R$ para número decimal (R$ 1.234,56 → 1234.56)
-- Para cupom fiscal: TODOS os produtos são valores POSITIVOS
-- Para fatura: pagamentos/créditos são NEGATIVOS
-
-==== CATEGORIAS ====
-
-- alimentacao: restaurantes, pizzarias, delivery, ifood, mc donalds
-- transporte: posto, uber, 99, estacionamento
-- moradia: luz, água, gás, aluguel, condomínio
-- saude: farmácia, hospital, drogaria
-- lazer: cinema, jogos, bar, spotify, netflix, steam, shopee
-- eletronicos: magazine luiza, americanas, kabum, amazon
-- roupas: renner, c&a, riachuelo, zara, shein
-- mercado: supermercado, mercado, atacado, produtos de cupom fiscal
-- assinaturas: spotify, netflix, amazon prime, disney+, gympass
-- outros: quando não se encaixar
-
-==== DOCUMENT_TYPE ====
-
-- cupom_fiscal: nota de supermercado/loja com lista de produtos
-- fatura_cartao: fatura de cartão de crédito
-- comprovante: comprovante de pagamento único
-- extrato: extrato bancário
-
-==== CARD_INFO (apenas para fatura_cartao) ====
-
-Para faturas de cartão de crédito, extraia também informações do cartão:
-
-- card_issuer: Nome do banco/emissor em lowercase:
-  * "itau", "nubank", "inter", "santander", "bradesco", "bb", "caixa", "c6", "xp", "btg", "original", "next", "neon", "pagbank", "picpay", "mercadopago"
-  * Identifique pelo logo, nome do banco no cabeçalho, ou domínio do email
-
-- card_last_digits: Últimos 4 dígitos do cartão (se visível na fatura)
-  * Geralmente aparece como "Final 8849" ou "**** 8849" ou "CARTÃO FINAL 8849"
-
-- card_name: Nome completo do cartão (se visível)
-  * Ex: "Itaú Personnalité Visa Infinite", "Nubank Ultravioleta", "Inter Black"
-  * Geralmente aparece no cabeçalho da fatura perto do logo
-
-- invoice_month: Mês de referência da fatura (1-12)
-  * Geralmente aparece como "Fatura de Janeiro/2026" ou "JAN/2026"
-
-- invoice_year: Ano de referência (ex: 2026)
-
-- closing_date: Data de FECHAMENTO da fatura no formato "YYYY-MM-DD"
-  * Aparece como "Fechamento: 08/01/2026" ou "Data de corte: 08 JAN 2026"
-  * É a data até quando as compras entram nesta fatura
-
-- due_date: Data de VENCIMENTO no formato "YYYY-MM-DD"
-  * Aparece como "Vencimento: 15/01/2026" ou "Venc.: 15 JAN 2026"
-  * É a data limite para pagamento
-
-- total_amount: Valor total da fatura (número decimal)
-  * É o "Valor do Documento" ou "Total da Fatura"
-
-Se não conseguir identificar algum campo, omita-o do JSON.
-
-Exemplo para fatura Itaú:
-"card_info": {
-  "card_issuer": "itau",
-  "card_last_digits": "4523",
-  "card_name": "Itaú Visa Platinum",
-  "invoice_month": 1,
-  "invoice_year": 2026,
-  "closing_date": "2026-01-08",
-  "due_date": "2026-01-15",
-  "total_amount": 1567.89
-}
-
-==== EXEMPLOS ====
-
-CUPOM FISCAL (supermercado):
-Entrada: "LIMAD KG 2,43 | CONTRA FILE KG 185,89 | DESC QTD -1,80 | TOTAL 350,00"
-Saída correta:
+EXEMPLO CORRETO (GOBLINFACTORY com 12 parcelas no PDF):
 {
-  "items": [
-    {"description": "Limão Kg", "amount": 2.43, "category": "mercado"},
-    {"description": "Contra Filé Kg", "amount": 185.89, "category": "mercado"}
-  ],
-  "document_type": "cupom_fiscal"
-}
-IMPORTANTE: "DESC QTD" e "TOTAL" foram IGNORADOS pois não são produtos!
-
-FATURA CARTÃO (ex: Banco Inter, Nubank):
-Entrada na imagem:
-"Valor do Documento: R$ 1.567,89
-Pagamento mínimo: R$ 156,79
-Opções de parcelamento:
-- 1 + 11 de R$ 142,71
-- 1 + 5 de R$ 285,43
-
-Despesas da fatura:
-02 dez  APPLE.COM/BILL          R$ 9,90
-02 dez  SEGURO CARTAO CTP       R$ 15,90
-15 dez  STEAM 02/12             R$ 105,66
-20 dez  UBER *TRIP              R$ 23,45"
-
-Saída CORRETA (extrair apenas da seção "Despesas da fatura"):
-{
-  "items": [
-    {"description": "APPLE.COM/BILL", "amount": 9.90, "date": "2025-12-02", "category": "assinaturas", "is_installment": false},
-    {"description": "Seguro Cartão CTP", "amount": 15.90, "date": "2025-12-02", "category": "outros", "is_installment": false},
-    {"description": "Steam", "amount": 105.66, "date": "2025-12-15", "category": "lazer", "installment_current": 2, "installment_total": 12, "is_installment": true},
-    {"description": "Uber", "amount": 23.45, "date": "2025-12-20", "category": "transporte", "is_installment": false}
-  ],
-  "document_type": "fatura_cartao"
-}
-
-⚠️ ERRADO - NÃO faça assim (extraindo opções de parcelamento):
-{
-  "items": [
-    {"description": "Parcelamento Fatura", "amount": 142.71},  // ERRADO! É simulação
-    {"description": "Pagamento mínimo", "amount": 156.79}      // ERRADO! É resumo
+  "description": "MERCADO*GOBLINFACTORY",
+  "amount": 107.55,
+  "installment_current": 1,
+  "installment_total": 12,
+  "is_installment": true,
+  "future_installments": [
+    {"installment": 2, "reference_month": 2, "reference_year": 2026},
+    {"installment": 3, "reference_month": 3, "reference_year": 2026},
+    ... (até parcela 12)
   ]
 }
 
-Retorne APENAS o JSON válido, sem explicações."""
+EXEMPLO ERRADO (não fazer isso):
+- Extrair 12 itens separados para GOBLINFACTORY
+
+Outras regras Santander:
+- "PAGAMENTO DE FATURA-INTERNET" = pagamento (NEGATIVO) - EXTRAIR!
+- Créditos pequenos (-0.02, -97.44) = EXTRAIR como negativos
+- Crédito grande que cancela parcelas futuras (ex: -1289.94) = NÃO EXTRAIR
+- Múltiplos cartões (TITULAR + @NOME) = Extrair de TODOS
+
+========================
+5) VALIDAÇÃO DE CONSISTÊNCIA (CRÍTICO)
+========================
+
+O JSON deve seguir esta regra:
+
+  SOMA(novos_lançamentos) ≈ total_amount (tolerância: R$ 1,00)
+
+Onde novos_lançamentos = itens com category NÃO em:
+- saldo_anterior
+- pagamento
+- credito
+- estorno
+
+Se a diferença for grande:
+- Verifique se pagamentos estão com category="pagamento"
+- Verifique se saldo anterior está com category="saldo_anterior"
+- Verifique se estornos estão com amount NEGATIVO
+
+========================
+6) REGRAS SOBRE DATAS
+========================
+
+- As datas na fatura são datas ORIGINAIS (podem ser de meses atrás)
+- Para o campo "date", use uma data dentro do ciclo da fatura (invoice_month/invoice_year)
+- Se vencimento = 10/01/2026, transações devem ter date em dezembro/2025 ou janeiro/2026
+- NUNCA use datas de 6+ meses atrás para uma fatura atual!
+
+========================
+7) REGRAS PARA CUPOM FISCAL
+========================
+
+- Extraia APENAS produtos comprados
+- IGNORE: descontos, totais, forma de pagamento, impostos
+- TODOS os valores devem ser POSITIVOS
+- Corrija abreviações OCR (LIMAO KG → Limão Kg)
+
+========================
+8) CATEGORIAS
+========================
+
+- pagamento: PAGAMENTO, PGTO, PAG FATURA (valores negativos)
+- credito: CRÉDITO (valores negativos pequenos)
+- estorno: ESTORNO, devolução (valores negativos)
+- saldo_anterior: SALDO FATURA ANTERIOR (positivo)
+- alimentacao: restaurantes, ifood, delivery
+- transporte: uber, 99, posto, combustível
+- mercado: supermercado, mercado livre
+- assinaturas: streaming, netflix, spotify, gympass
+- lazer: cinema, jogos, steam
+- saude: farmácia, drogaria
+- outros: fallback
+
+========================
+9) DOCUMENT_TYPE
+========================
+
+- cupom_fiscal: nota de supermercado/loja
+- fatura_cartao: fatura de cartão de crédito
+- comprovante: pagamento único
+- extrato: extrato bancário
+
+========================
+10) FORMATOS POR BANCO (REFERÊNCIA)
+========================
+
+📌 ITAÚ: DD/MM ESTABELECIMENTO XX/YY VALOR
+📌 INTER: Data por extenso | Movimentação | Beneficiário | Valor
+📌 BRADESCO/AMEX: Data | Histórico | Cidade | R$
+📌 NUBANK: Data | Descrição | Valor
+📌 SANTANDER: Ver seção 4 (regra especial de consolidação)
+📌 CARREFOUR/SAM'S: DD/MM DESCRIÇÃO - X/Y VALOR
+   - "Pagamento Banco CSF" = pagamento (valor com hífen: "1.621,02-")
+📌 DIGIO: Data | Descrição | Parcela | Valor
+
+========================
+11) O QUE NÃO EXTRAIR
+========================
+
+- "Despesas do mês" (é TOTAL)
+- "Total da fatura" / "Valor do Documento"
+- Seção "Compras parceladas - próximas faturas"
+- "Parcelamento Fatura" / "Parcelamento Total"
+- "Pagamento mínimo", "Parcelas fixas"
+- Limites de crédito
+- Simulações de parcelamento
+
+========================
+RETORNE APENAS O JSON VÁLIDO, SEM EXPLICAÇÕES.
+========================
+"""
+
+
+# Configuração de retry
+DEFAULT_MAX_RETRIES = 3
+DEFAULT_RETRY_DELAY = 2.0  # segundos
 
 
 class LLMOCRService:
@@ -389,7 +261,23 @@ class LLMOCRService:
 
     def __init__(self):
         self.provider = settings.vision_provider
-        self.model = settings.vision_model
+        self.model = settings.vision_model or 'gemini-2.5-flash-lite'
+        self.max_retries = DEFAULT_MAX_RETRIES
+        self.retry_delay = DEFAULT_RETRY_DELAY
+        self._google_client = None
+
+    def _get_google_client(self):
+        """Obtém cliente Google Genai (lazy initialization)"""
+        if self._google_client is None:
+            try:
+                from google import genai
+                api_key = settings.google_api_key
+                if not api_key:
+                    raise ValueError("GOOGLE_API_KEY não configurada")
+                self._google_client = genai.Client(api_key=api_key)
+            except ImportError:
+                raise ImportError("google-genai não instalado. Execute: pip install google-genai")
+        return self._google_client
 
     def _convert_pdf_to_images(self, pdf_content: bytes) -> tuple[list[tuple[bytes, str]], str | None]:
         """Converte PDF para lista de imagens (uma por página)
@@ -422,6 +310,11 @@ class LLMOCRService:
         except Exception as e:
             return [], f"Erro ao converter PDF: {e}"
 
+    def _is_retryable_error(self, error: Exception) -> bool:
+        """Verifica se o erro é retryable (503, 429, etc.)"""
+        error_str = str(error).lower()
+        return any(code in error_str for code in ["503", "429", "unavailable", "overloaded", "rate limit", "resource_exhausted"])
+
     async def extract_from_image(self, image_content: bytes, mime_type: str = 'image/png') -> dict:
         """Extrai dados da imagem usando o provider configurado"""
         try:
@@ -434,7 +327,6 @@ class LLMOCRService:
                     return {'items': [], 'error': 'PDF não gerou imagens para processar'}
 
                 # Se temos múltiplas páginas e estamos usando Google, enviar todas juntas
-                # Isso dá ao modelo contexto completo do documento
                 if len(images) > 1 and self.provider == 'google':
                     result = await self._call_google_multi_page(images)
                 else:
@@ -504,56 +396,157 @@ class LLMOCRService:
             return {'items': [], 'error': str(e)}
 
     async def _call_google(self, image_content: bytes, mime_type: str) -> dict:
-        """Chama Google Gemini API (GRÁTIS!)"""
-        api_key = settings.google_api_key
-        if not api_key:
-            return {'items': [], 'error': 'GOOGLE_API_KEY não configurada. Obtenha em: https://aistudio.google.com/apikey'}
+        """Chama Google Gemini API usando SDK oficial com retry"""
+        try:
+            from google.genai import types
+        except ImportError:
+            # Fallback para httpx se google-genai não estiver instalado
+            return await self._call_google_httpx(image_content, mime_type)
 
+        client = self._get_google_client()
         image_base64 = base64.b64encode(image_content).decode('utf-8')
-        model = self.model or 'gemini-2.0-flash'
 
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            response = await client.post(
-                f'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent',
-                headers={
-                    'x-goog-api-key': api_key,  # API key no header (mais seguro que query param)
-                    'Content-Type': 'application/json',
-                },
-                json={
-                    'contents': [{
-                        'parts': [
-                            {'text': EXTRACTION_PROMPT},
-                            {
-                                'inline_data': {
-                                    'mime_type': mime_type,
-                                    'data': image_base64,
-                                }
-                            }
-                        ]
-                    }],
-                    'generationConfig': {
-                        'temperature': 0.1,
-                        'maxOutputTokens': 16000,
-                    }
-                },
-            )
+        last_error = None
+        for attempt in range(self.max_retries):
+            try:
+                response = client.models.generate_content(
+                    model=self.model,
+                    contents=[
+                        types.Part.from_bytes(
+                            data=image_content,
+                            mime_type=mime_type,
+                        ),
+                        EXTRACTION_PROMPT,
+                    ],
+                    config=types.GenerateContentConfig(
+                        temperature=0.1,
+                        max_output_tokens=16000,
+                    ),
+                )
 
-            if response.status_code != 200:
-                return {'items': [], 'error': f'Google API error: {response.status_code}'}
+                return self._parse_response(response.text)
 
-            result = response.json()
-            content = result['candidates'][0]['content']['parts'][0]['text']
-            return self._parse_response(content)
+            except Exception as e:
+                last_error = e
+                if self._is_retryable_error(e) and attempt < self.max_retries - 1:
+                    wait_time = self.retry_delay * (2 ** attempt)  # Exponential backoff
+                    await asyncio.sleep(wait_time)
+                    continue
+                else:
+                    raise
+
+        return {'items': [], 'error': f'Falha após {self.max_retries} tentativas: {last_error}'}
 
     async def _call_google_multi_page(self, images: list[tuple[bytes, str]]) -> dict:
-        """Chama Google Gemini API com múltiplas páginas de uma vez para melhor contexto"""
+        """Chama Google Gemini API com múltiplas páginas usando SDK oficial"""
+        try:
+            from google.genai import types
+        except ImportError:
+            # Fallback para httpx
+            return await self._call_google_multi_page_httpx(images)
+
+        client = self._get_google_client()
+
+        # Construir partes da mensagem: prompt + todas as imagens
+        parts = [EXTRACTION_PROMPT + "\n\n⚠️ ATENÇÃO: Este documento tem MÚLTIPLAS PÁGINAS. Extraia TODAS as transações de TODAS as páginas!"]
+
+        for i, (img_content, img_mime) in enumerate(images):
+            parts.append(types.Part.from_bytes(data=img_content, mime_type=img_mime))
+            parts.append(f'[Página {i+1} de {len(images)}]')
+
+        last_error = None
+        for attempt in range(self.max_retries):
+            try:
+                response = client.models.generate_content(
+                    model=self.model,
+                    contents=parts,
+                    config=types.GenerateContentConfig(
+                        temperature=0.1,
+                        max_output_tokens=32000,  # Mais tokens para documento completo
+                    ),
+                )
+
+                return self._parse_response(response.text)
+
+            except Exception as e:
+                last_error = e
+                if self._is_retryable_error(e) and attempt < self.max_retries - 1:
+                    wait_time = self.retry_delay * (2 ** attempt)
+                    await asyncio.sleep(wait_time)
+                    continue
+                else:
+                    raise
+
+        return {'items': [], 'error': f'Falha após {self.max_retries} tentativas: {last_error}'}
+
+    async def _call_google_httpx(self, image_content: bytes, mime_type: str) -> dict:
+        """Fallback: Chama Google Gemini API via httpx (se SDK não disponível)"""
+        import httpx
+
         api_key = settings.google_api_key
         if not api_key:
             return {'items': [], 'error': 'GOOGLE_API_KEY não configurada'}
 
-        model = self.model or 'gemini-2.0-flash'
+        image_base64 = base64.b64encode(image_content).decode('utf-8')
 
-        # Construir partes da mensagem: prompt + todas as imagens
+        last_error = None
+        for attempt in range(self.max_retries):
+            try:
+                async with httpx.AsyncClient(timeout=60.0) as client:
+                    response = await client.post(
+                        f'https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent',
+                        headers={
+                            'x-goog-api-key': api_key,
+                            'Content-Type': 'application/json',
+                        },
+                        json={
+                            'contents': [{
+                                'parts': [
+                                    {'text': EXTRACTION_PROMPT},
+                                    {
+                                        'inline_data': {
+                                            'mime_type': mime_type,
+                                            'data': image_base64,
+                                        }
+                                    }
+                                ]
+                            }],
+                            'generationConfig': {
+                                'temperature': 0.1,
+                                'maxOutputTokens': 16000,
+                            }
+                        },
+                    )
+
+                    if response.status_code != 200:
+                        error_msg = f'Google API error: {response.status_code}'
+                        if response.status_code in [503, 429]:
+                            raise Exception(error_msg)
+                        return {'items': [], 'error': error_msg}
+
+                    result = response.json()
+                    content = result['candidates'][0]['content']['parts'][0]['text']
+                    return self._parse_response(content)
+
+            except Exception as e:
+                last_error = e
+                if self._is_retryable_error(e) and attempt < self.max_retries - 1:
+                    wait_time = self.retry_delay * (2 ** attempt)
+                    await asyncio.sleep(wait_time)
+                    continue
+                elif 'httpx' not in str(type(e).__module__):
+                    raise
+
+        return {'items': [], 'error': f'Falha após {self.max_retries} tentativas: {last_error}'}
+
+    async def _call_google_multi_page_httpx(self, images: list[tuple[bytes, str]]) -> dict:
+        """Fallback: Chama Google Gemini API com múltiplas páginas via httpx"""
+        import httpx
+
+        api_key = settings.google_api_key
+        if not api_key:
+            return {'items': [], 'error': 'GOOGLE_API_KEY não configurada'}
+
         parts = [{'text': EXTRACTION_PROMPT + "\n\n⚠️ ATENÇÃO: Este documento tem MÚLTIPLAS PÁGINAS. Extraia TODAS as transações de TODAS as páginas!"}]
 
         for i, (img_content, img_mime) in enumerate(images):
@@ -564,42 +557,55 @@ class LLMOCRService:
                     'data': image_base64,
                 }
             })
-            # Adicionar marcador de página para ajudar o modelo
             parts.append({'text': f'[Página {i+1} de {len(images)}]'})
 
-        async with httpx.AsyncClient(timeout=120.0) as client:  # Timeout maior para múltiplas páginas
-            response = await client.post(
-                f'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent',
-                headers={
-                    'x-goog-api-key': api_key,
-                    'Content-Type': 'application/json',
-                },
-                json={
-                    'contents': [{
-                        'parts': parts
-                    }],
-                    'generationConfig': {
-                        'temperature': 0.1,
-                        'maxOutputTokens': 32000,  # Muito mais tokens para documento completo
-                    }
-                },
-            )
+        last_error = None
+        for attempt in range(self.max_retries):
+            try:
+                async with httpx.AsyncClient(timeout=120.0) as client:
+                    response = await client.post(
+                        f'https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent',
+                        headers={
+                            'x-goog-api-key': api_key,
+                            'Content-Type': 'application/json',
+                        },
+                        json={
+                            'contents': [{'parts': parts}],
+                            'generationConfig': {
+                                'temperature': 0.1,
+                                'maxOutputTokens': 32000,
+                            }
+                        },
+                    )
 
-            if response.status_code != 200:
-                error_detail = response.text[:500] if response.text else 'Unknown error'
-                return {'items': [], 'error': f'Google API error: {response.status_code} - {error_detail}'}
+                    if response.status_code != 200:
+                        error_msg = f'Google API error: {response.status_code}'
+                        if response.status_code in [503, 429]:
+                            raise Exception(error_msg)
+                        return {'items': [], 'error': error_msg}
 
-            result = response.json()
+                    result = response.json()
+                    if not result.get('candidates'):
+                        return {'items': [], 'error': 'Google API retornou resposta vazia'}
 
-            # Verificar se há candidatos na resposta
-            if not result.get('candidates'):
-                return {'items': [], 'error': 'Google API retornou resposta vazia'}
+                    content = result['candidates'][0]['content']['parts'][0]['text']
+                    return self._parse_response(content)
 
-            content = result['candidates'][0]['content']['parts'][0]['text']
-            return self._parse_response(content)
+            except Exception as e:
+                last_error = e
+                if self._is_retryable_error(e) and attempt < self.max_retries - 1:
+                    wait_time = self.retry_delay * (2 ** attempt)
+                    await asyncio.sleep(wait_time)
+                    continue
+                elif 'httpx' not in str(type(e).__module__):
+                    raise
+
+        return {'items': [], 'error': f'Falha após {self.max_retries} tentativas: {last_error}'}
 
     async def _call_openai(self, image_content: bytes, mime_type: str) -> dict:
         """Chama OpenAI API"""
+        import httpx
+
         api_key = settings.openai_api_key
         if not api_key:
             return {'items': [], 'error': 'OPENAI_API_KEY não configurada'}
@@ -642,13 +648,14 @@ class LLMOCRService:
 
     async def _call_anthropic(self, image_content: bytes, mime_type: str) -> dict:
         """Chama Anthropic Claude API"""
+        import httpx
+
         api_key = settings.anthropic_api_key
         if not api_key:
             return {'items': [], 'error': 'ANTHROPIC_API_KEY não configurada'}
 
         image_base64 = base64.b64encode(image_content).decode('utf-8')
 
-        # Converter mime_type para formato aceito pelo Claude
         media_type = mime_type
         if media_type == 'image/jpg':
             media_type = 'image/jpeg'
@@ -691,7 +698,6 @@ class LLMOCRService:
             return self._parse_response(content)
 
     # Padrões de descrição que indicam totais/resumos (não são transações reais)
-    # NOTA: NÃO incluir pagamentos de fatura com valor negativo - são créditos válidos!
     INVALID_DESCRIPTIONS = [
         'despesas do mês',
         'fatura atual',
@@ -704,15 +710,12 @@ class LLMOCRService:
         'limite total',
         'próxima fatura',
         'próximas parcelas',
-        # REMOVIDO: 'pagamento de fatura' - é crédito válido quando valor é negativo
-        # REMOVIDO: 'pagamento fatura' - é crédito válido quando valor é negativo
-        # REMOVIDO: 'pag fatura' - é crédito válido quando valor é negativo
-        'pagamento banco csf',  # Pagamento de fatura Carrefour/Sam's (INFO, não transação)
-        'pag boleto bancario',  # Pagamento de boleto (INFO, não transação)
-        'inclusao pgto fatura',  # Pagamento via QR Code (INFO, não transação)
+        'pagamento banco csf',
+        'pag boleto bancario',
+        'inclusao pgto fatura',
         'saldo anterior',
         'saldo fatura anterior',
-        'parcela de anuidade',  # Digio - é o total do parcelamento, não transação
+        'parcela de anuidade',
         'anuidade parcelada',
         'total anuidade',
         'valor total anuidade',
@@ -727,11 +730,9 @@ class LLMOCRService:
         return False
 
     def _normalize_description(self, desc: str) -> str:
-        """Normaliza descrição para comparação, removendo caracteres especiais, números e espaços"""
+        """Normaliza descrição para comparação"""
         import re
-        # Converter para lowercase
         desc = desc.lower()
-        # Remover prefixos comuns de e-commerce (ordem importa - mais específicos primeiro)
         prefixes = [
             'mercadolivre*', 'mercadolivre ', 'mercadolivre',
             'mercado*', 'mercado ', 'mercado',
@@ -740,23 +741,15 @@ class LLMOCRService:
         for prefix in prefixes:
             if desc.startswith(prefix):
                 desc = desc[len(prefix):]
-                break  # Remover apenas um prefixo
-        # Remover TODOS os caracteres não-alfabéticos (incluindo espaços e números)
-        # Isso garante que "FAST SHO" == "FASTSHO"
+                break
         desc = re.sub(r'[^a-z]', '', desc)
         return desc
 
     def _filter_duplicate_installments(self, items: list) -> list:
-        """
-        Remove parcelas duplicadas (mesma descrição e valor, mas número de parcela diferente).
-        Mantém apenas a parcela com menor número (da fatura atual, não da próxima).
-        Também remove duplicatas exatas (mesmo item extraído de páginas diferentes).
-        """
-        # Primeiro, remover duplicatas exatas (mesmo item, mesma parcela)
+        """Remove parcelas duplicadas, mantendo apenas a de menor número"""
         seen_exact = set()
         unique_items = []
         for item in items:
-            # Chave para identificar itens exatamente iguais
             exact_key = (
                 self._normalize_description(item['description']),
                 item['amount'],
@@ -767,7 +760,6 @@ class LLMOCRService:
                 seen_exact.add(exact_key)
                 unique_items.append(item)
 
-        # Agrupar por (descrição normalizada, valor) para encontrar parcelas diferentes do mesmo item
         groups = {}
         for item in unique_items:
             desc_normalized = self._normalize_description(item['description'])
@@ -776,35 +768,24 @@ class LLMOCRService:
                 groups[key] = []
             groups[key].append(item)
 
-        # Para cada grupo, manter apenas o item com menor número de parcela
-        # ou o item não-parcelado
         filtered = []
         for key, group in groups.items():
             if len(group) == 1:
                 filtered.append(group[0])
             else:
-                # Se tem itens parcelados, pegar o de menor número de parcela
-                # (provavelmente é a parcela da fatura atual, não da próxima)
                 installment_items = [i for i in group if i.get('is_installment')]
                 non_installment_items = [i for i in group if not i.get('is_installment')]
 
                 if installment_items:
-                    # Ordenar pelo número da parcela e pegar o menor
                     installment_items.sort(key=lambda x: x.get('installment_current', 999))
                     filtered.append(installment_items[0])
                 elif non_installment_items:
-                    # Se há múltiplos não-parcelados iguais, pegar apenas um
                     filtered.append(non_installment_items[0])
 
-        # Segunda passagem: verificar se há valores negativos grandes que representam
-        # o valor total de uma compra parcelada (estorno para parcelamento)
         final_items = []
         for item in filtered:
-            # Se é um valor negativo grande
-            if item['amount'] < -50:  # Limiar para considerar "grande"
-                # Verificar se há parcelas do mesmo estabelecimento com valor positivo menor
+            if item['amount'] < -50:
                 desc_norm = self._normalize_description(item['description'])
-                # Buscar parcelas relacionadas
                 related_installments = [
                     i for i in filtered
                     if i.get('is_installment') and
@@ -812,37 +793,26 @@ class LLMOCRService:
                     self._normalize_description(i['description']) == desc_norm
                 ]
                 if related_installments:
-                    # Provavelmente é o valor total que foi parcelado - ignorar
                     continue
             final_items.append(item)
 
         return final_items
 
     def _filter_summary_items(self, items: list, total_amount: float | None) -> list:
-        """
-        Remove itens que são resumos/totais da fatura, não transações reais.
-        - Itens cujo valor é igual ao total da fatura (resumos)
-        - Itens "Anuidade" sem especificação (Digio mostra "Parcela de anuidade X/Y" como info)
-        """
+        """Remove itens que são resumos/totais da fatura"""
         if not total_amount or total_amount <= 0:
             return items
 
         filtered = []
         for item in items:
-            # Se o valor é igual ao total da fatura, provavelmente é um resumo
             if abs(item['amount'] - total_amount) < 0.01:
-                # Verificar se é um item genérico (anuidade, total, etc.)
                 desc_lower = item['description'].lower()
                 if any(word in desc_lower for word in ['anuidade', 'total', 'fatura', 'valor']):
-                    # Provavelmente é um resumo, não uma transação real
                     continue
 
-            # Filtrar "Anuidade" genérica com valor alto (> R$ 50)
-            # Anuidades reais são pequenas (R$ 6,99, R$ 16,99, etc.)
             desc_lower = item['description'].lower().strip()
             if desc_lower in ['anuidade', 'parcela anuidade', 'parcela de anuidade']:
                 if item['amount'] > 50:
-                    # Provavelmente é o total da anuidade, não a parcela mensal
                     continue
 
             filtered.append(item)
@@ -850,12 +820,7 @@ class LLMOCRService:
         return filtered
 
     def _filter_consecutive_installments(self, items: list) -> list:
-        """
-        Remove parcelas consecutivas do mesmo item (ex: 01/12, 02/12, 03/12...).
-        O Santander lista TODAS as parcelas futuras na mesma fatura.
-        Mantém apenas a primeira parcela de cada série.
-        """
-        # Agrupar por descrição normalizada
+        """Remove parcelas consecutivas do mesmo item (Santander)"""
         groups = {}
         for item in items:
             if not item.get('is_installment'):
@@ -865,19 +830,14 @@ class LLMOCRService:
                 groups[desc_norm] = []
             groups[desc_norm].append(item)
 
-        # Identificar grupos com múltiplas parcelas consecutivas (provável erro)
         items_to_remove = set()
         for desc_norm, group in groups.items():
             if len(group) <= 1:
                 continue
 
-            # Ordenar por número de parcela
             sorted_group = sorted(group, key=lambda x: x.get('installment_current', 0))
-
-            # Verificar se são parcelas consecutivas (01, 02, 03...)
             parcels = [g.get('installment_current', 0) for g in sorted_group]
 
-            # Se temos mais de 2 parcelas consecutivas, é provável que sejam parcelas futuras
             consecutive_count = 1
             for i in range(1, len(parcels)):
                 if parcels[i] == parcels[i-1] + 1:
@@ -885,41 +845,33 @@ class LLMOCRService:
                 else:
                     consecutive_count = 1
 
-            # Se há 6+ parcelas consecutivas, manter apenas a primeira
-            # (aumentado de 3 para 6 para ser menos agressivo)
             if consecutive_count >= 6 or len(group) >= 6:
-                # Manter apenas o item com menor número de parcela
                 min_parcel = min(parcels)
                 for item in sorted_group:
                     if item.get('installment_current', 0) != min_parcel:
                         items_to_remove.add(id(item))
 
-        # Filtrar itens marcados para remoção
         return [item for item in items if id(item) not in items_to_remove]
 
     def _parse_response(self, content: str) -> dict:
         """Parseia a resposta JSON da LLM"""
         try:
-            # Limpar markdown code blocks
+            import re
+
             content = content.strip()
             if '```' in content:
-                # Extrair conteúdo entre ```json e ```
-                import re
                 match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', content)
                 if match:
                     content = match.group(1)
 
             data = json.loads(content)
 
-            # Normalizar itens
             items = []
             for item in data.get('items', []):
                 amount = item.get('amount', 0)
                 if isinstance(amount, str):
-                    # Converter string para float
                     amount = float(amount.replace('.', '').replace(',', '.').replace('R$', '').strip())
 
-                # Processar informações de parcelas
                 is_installment = item.get('is_installment', False)
                 installment_current = None
                 installment_total = None
@@ -928,12 +880,10 @@ class LLMOCRService:
                     installment_current = item.get('installment_current')
                     installment_total = item.get('installment_total')
 
-                    # Validar dados de parcela
                     if installment_current and installment_total:
                         try:
                             installment_current = int(installment_current)
                             installment_total = int(installment_total)
-                            # Validar se faz sentido
                             if installment_current < 1 or installment_current > installment_total:
                                 is_installment = False
                                 installment_current = None
@@ -947,7 +897,6 @@ class LLMOCRService:
 
                 description = str(item.get('description', 'Item'))[:200]
 
-                # Filtrar descrições inválidas (totais, resumos, etc.)
                 if self._is_invalid_description(description):
                     continue
 
@@ -962,11 +911,14 @@ class LLMOCRService:
                     'installment_total': installment_total,
                 }
 
-                # Aceitar tanto despesas (positivo) quanto pagamentos/créditos (negativo)
+                # Incluir future_installments se existir
+                future_installments = item.get('future_installments')
+                if future_installments and isinstance(future_installments, list):
+                    normalized['future_installments'] = future_installments
+
                 if normalized['amount'] != 0:
                     items.append(normalized)
 
-            # Filtrar duplicatas (mesma descrição/valor com números de parcela diferentes)
             items = self._filter_duplicate_installments(items)
 
             result = {
@@ -974,7 +926,6 @@ class LLMOCRService:
                 'document_type': data.get('document_type'),
             }
 
-            # Extrair informações do cartão (apenas para fatura_cartao)
             card_info = data.get('card_info')
             if card_info and isinstance(card_info, dict):
                 result['card_info'] = {
@@ -988,7 +939,6 @@ class LLMOCRService:
                     'total_amount': float(card_info.get('total_amount', 0)) if card_info.get('total_amount') else None,
                 }
 
-                # Extrair dia de fechamento e vencimento das datas
                 if result['card_info'].get('closing_date'):
                     try:
                         from datetime import datetime
@@ -1005,7 +955,6 @@ class LLMOCRService:
                     except ValueError:
                         pass
 
-                # Remover campos None
                 result['card_info'] = {k: v for k, v in result['card_info'].items() if v is not None}
 
             return result

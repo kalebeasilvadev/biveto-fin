@@ -9,6 +9,7 @@ import httpx
 import uuid
 import re
 from datetime import date, datetime, timedelta
+from typing import Any
 from dateutil.relativedelta import relativedelta
 from decimal import Decimal
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -99,10 +100,10 @@ class FinancialAgentService:
             data_used=data_used
         )
 
-    def _parse_query(self, message: str) -> dict:
+    def _parse_query(self, message: str) -> dict[str, Any]:
         """Analisa a mensagem para extrair período, categorias e filtros"""
         message_lower = message.lower()
-        query = {
+        query: dict[str, Any] = {
             "period": None,
             "category_keywords": [],
             "merchant_keywords": [],
@@ -185,9 +186,9 @@ class FinancialAgentService:
 
         return query
 
-    async def _get_comprehensive_context(self, user: User, query_context: dict) -> dict:
+    async def _get_comprehensive_context(self, user: User, query_context: dict[str, Any]) -> dict[str, Any]:
         """Busca contexto financeiro completo e detalhado"""
-        context = {}
+        context: dict[str, Any] = {}
         today = date.today()
         period = query_context.get("period") or {}
         period_start = period.get("start", date(today.year, today.month, 1))
@@ -200,7 +201,7 @@ class FinancialAgentService:
         categories_result = await self.db.execute(
             select(Category).where(Category.user_id == user.id)
         )
-        categories = {c.id: c.name for c in categories_result.scalars().all()}
+        categories: dict[int | None, str] = {c.id: c.name for c in categories_result.scalars().all()}
         context["categorias_disponiveis"] = list(categories.values())
 
         # 2. Resumo de contas
@@ -244,7 +245,7 @@ class FinancialAgentService:
 
         # Buscar merchants para mapear IDs para nomes
         merchant_ids = [t.merchant_id for t in txs if t.merchant_id]
-        merchants = {}
+        merchants: dict[int | None, str] = {}
         if merchant_ids:
             merchants_result = await self.db.execute(
                 select(Merchant).where(Merchant.id.in_(merchant_ids))
@@ -270,7 +271,7 @@ class FinancialAgentService:
         }
 
         # 4. Gastos por categoria (DETALHADO)
-        gastos_por_categoria = defaultdict(lambda: {"total": 0, "count": 0, "transacoes": []})
+        gastos_por_categoria: dict[str, Any] = defaultdict(lambda: {"total": 0, "count": 0, "transacoes": []})
         for t in txs:
             if t.type == TransactionType.EXPENSE.value:
                 cat_name = categories.get(t.category_id, "Sem categoria")
@@ -290,7 +291,7 @@ class FinancialAgentService:
         )
 
         # 5. Gastos por estabelecimento
-        gastos_por_estabelecimento = defaultdict(lambda: {"total": 0, "count": 0, "categoria": None})
+        gastos_por_estabelecimento: dict[str, Any] = defaultdict(lambda: {"total": 0, "count": 0, "categoria": None})
         for t in txs:
             if t.type == TransactionType.EXPENSE.value:
                 merchant_name = merchants.get(t.merchant_id, t.description or "Outros")
@@ -304,7 +305,7 @@ class FinancialAgentService:
         )
 
         # 6. Receitas por categoria
-        receitas_por_categoria = defaultdict(lambda: {"total": 0, "count": 0})
+        receitas_por_categoria: dict[str, Any] = defaultdict(lambda: {"total": 0, "count": 0})
         for t in txs:
             if t.type == TransactionType.INCOME.value:
                 cat_name = categories.get(t.category_id, "Sem categoria")

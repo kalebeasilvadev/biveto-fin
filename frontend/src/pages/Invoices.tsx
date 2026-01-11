@@ -43,6 +43,7 @@ interface InvoiceDetail extends Invoice {
     amount: number
     installment_number: number | null
     installment_total: number | null
+    is_paid: boolean
   }[]
 }
 
@@ -365,46 +366,89 @@ export default function Invoices() {
                   Nenhuma transação nesta fatura
                 </p>
               ) : (
-                <div className="space-y-3 max-h-[500px] overflow-y-auto">
-                  {invoiceDetail.transactions.map((t) => (
-                    <div
-                      key={t.id}
-                      className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 group"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-gray-900 dark:text-white text-sm truncate">
-                          {t.description || t.merchant_name || 'Transação'}
-                        </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                          {formatDate(t.date)}
-                          {t.installment_number && t.installment_total && (
-                            <span className="ml-2">
-                              ({t.installment_number}/{t.installment_total})
-                            </span>
-                          )}
-                        </p>
+                <>
+                  {/* Summary of projected vs confirmed */}
+                  {(() => {
+                    const projectedCount = invoiceDetail.transactions.filter(t => !t.is_paid).length
+                    const confirmedCount = invoiceDetail.transactions.filter(t => t.is_paid).length
+                    if (projectedCount > 0) {
+                      return (
+                        <div className="mb-3 p-2 bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-700 rounded-lg">
+                          <div className="flex items-center justify-between text-xs">
+                            <div className="flex items-center gap-1.5 text-purple-700 dark:text-purple-300">
+                              <Clock size={12} />
+                              <span>{projectedCount} projetada(s)</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 text-green-700 dark:text-green-300">
+                              <Check size={12} />
+                              <span>{confirmedCount} confirmada(s)</span>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    }
+                    return null
+                  })()}
+
+                  <div className="space-y-3 max-h-[500px] overflow-y-auto">
+                    {invoiceDetail.transactions.map((t) => (
+                      <div
+                        key={t.id}
+                        className={clsx(
+                          "flex items-center justify-between p-2 rounded-lg group",
+                          t.is_paid
+                            ? "hover:bg-gray-50 dark:hover:bg-slate-700"
+                            : "bg-purple-50/50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 hover:bg-purple-50 dark:hover:bg-purple-900/30"
+                        )}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <p className="font-medium text-gray-900 dark:text-white text-sm truncate">
+                              {t.description || t.merchant_name || 'Transação'}
+                            </p>
+                            {!t.is_paid && (
+                              <span className="flex-shrink-0 px-1.5 py-0.5 text-[10px] font-semibold bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 rounded flex items-center gap-0.5">
+                                <Clock size={10} />
+                                Projetado
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            {formatDate(t.date)}
+                            {t.installment_number && t.installment_total && (
+                              <span className="ml-2">
+                                ({t.installment_number}/{t.installment_total})
+                              </span>
+                            )}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <p className={clsx(
+                            "font-semibold text-sm",
+                            t.is_paid
+                              ? "text-gray-900 dark:text-white"
+                              : "text-purple-700 dark:text-purple-300"
+                          )}>
+                            {formatCurrency(t.amount)}
+                          </p>
+                          <button
+                            onClick={() => {
+                              setTransactionToMove({
+                                id: t.id,
+                                description: t.description || t.merchant_name || 'Transação',
+                              })
+                              setShowMoveModal(true)
+                            }}
+                            className="p-1 opacity-0 group-hover:opacity-100 hover:bg-gray-200 dark:hover:bg-slate-600 rounded transition-opacity"
+                            title="Mover para outra fatura"
+                          >
+                            <ArrowRightLeft size={14} className="text-gray-500" />
+                          </button>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <p className="font-semibold text-gray-900 dark:text-white text-sm">
-                          {formatCurrency(t.amount)}
-                        </p>
-                        <button
-                          onClick={() => {
-                            setTransactionToMove({
-                              id: t.id,
-                              description: t.description || t.merchant_name || 'Transação',
-                            })
-                            setShowMoveModal(true)
-                          }}
-                          className="p-1 opacity-0 group-hover:opacity-100 hover:bg-gray-200 dark:hover:bg-slate-600 rounded transition-opacity"
-                          title="Mover para outra fatura"
-                        >
-                          <ArrowRightLeft size={14} className="text-gray-500" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                </>
               )}
 
               <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">

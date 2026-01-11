@@ -4,6 +4,7 @@ import secrets
 from sqlalchemy import String, DateTime, Integer, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from ..core.database import Base
+from ..core.utils import utc_now
 
 
 def generate_invitation_token() -> str:
@@ -13,7 +14,7 @@ def generate_invitation_token() -> str:
 
 def default_expires_at() -> datetime:
     """Expira em 48 horas"""
-    return datetime.utcnow() + timedelta(hours=48)
+    return utc_now() + timedelta(hours=48)
 
 
 class InvitationStatus(str, Enum):
@@ -42,7 +43,7 @@ class Invitation(Base):
     )
     expires_at: Mapped[datetime] = mapped_column(DateTime, default=default_expires_at)
     accepted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
     # Relationships
     license: Mapped["License"] = relationship(lazy="selectin")
@@ -53,7 +54,7 @@ class Invitation(Base):
         """Verifica se o convite ainda é válido"""
         if self.status != InvitationStatus.PENDING:
             return False
-        if datetime.utcnow() > self.expires_at:
+        if utc_now() > self.expires_at:
             return False
         return True
 

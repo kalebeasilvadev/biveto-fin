@@ -6,6 +6,7 @@ from sqlalchemy import select, func
 from ..core.deps import CurrentUser, DbSession
 from ..core.config import settings
 from ..core.security import get_password_hash
+from ..core.utils import utc_now
 from ..models import User, License, LicenseStatus, Invitation, InvitationStatus
 from ..services.user_setup import setup_new_user
 from ..services.email_service import email_service
@@ -658,7 +659,7 @@ async def send_password_reset(
     # Gerar token de reset com expiração
     reset_token = secrets.token_urlsafe(32)
     user.reset_token = reset_token
-    user.reset_token_expires = datetime.utcnow() + timedelta(hours=RESET_TOKEN_EXPIRE_HOURS)
+    user.reset_token_expires = utc_now() + timedelta(hours=RESET_TOKEN_EXPIRE_HOURS)
 
     await db.commit()
 

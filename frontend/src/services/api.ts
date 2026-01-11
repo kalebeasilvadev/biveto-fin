@@ -224,6 +224,20 @@ export const transactionsApi = {
   confirm: (data: unknown) => api.post('/transactions/confirm', data),
   update: (id: number, data: unknown) => api.patch(`/transactions/${id}`, data),
   delete: (id: number) => api.delete(`/transactions/${id}`),
+  checkProjected: (data: {
+    items: Array<{
+      index: number
+      description: string
+      amount: number
+      date?: string
+      is_installment?: boolean
+      installment_current?: number
+      installment_total?: number
+    }>
+    credit_card_id?: number
+    invoice_month?: number
+    invoice_year?: number
+  }) => api.post('/transactions/check-projected', data),
   exportCSV: async (params?: Record<string, unknown>) => {
     const response = await api.get('/transactions/export/csv', {
       params,

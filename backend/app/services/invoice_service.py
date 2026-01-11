@@ -15,6 +15,7 @@ from ..models.category import Category
 from ..models.user import User
 from ..models.document import Document
 from ..models.recurring import RecurringTransaction
+from ..core.utils import utc_now
 
 
 class InvoiceService:
@@ -310,9 +311,14 @@ class InvoiceService:
 
         # Atualizar fatura
         invoice.paid_amount = (invoice.paid_amount or Decimal('0')) + amount
-        invoice.paid_at = datetime.utcnow()
+        invoice.paid_at = utc_now()
         invoice.payment_account_id = payment_account_id
         invoice.payment_transaction_id = payment_transaction.id
+
+        # Adicionar à lista de transações de pagamento (para múltiplos pagamentos parciais)
+        if invoice.payment_transaction_ids is None:
+            invoice.payment_transaction_ids = []
+        invoice.payment_transaction_ids = invoice.payment_transaction_ids + [payment_transaction.id]
 
         # Atualizar status
         if invoice.paid_amount >= invoice.total_amount:

@@ -11,6 +11,7 @@ from ..models.document import Document, DocumentExtraction, DocumentStatus
 from ..models.transaction import Transaction
 from ..models.user import User
 from ..core.config import settings
+from ..core.utils import utc_now
 
 
 class DocumentService:
@@ -232,7 +233,7 @@ class DocumentService:
                 document.status = DocumentStatus.COMPLETED
                 logger.info(f"Document {document.id} marked as COMPLETED")
 
-            document.processed_at = datetime.utcnow()
+            document.processed_at = utc_now()
             await self.db.flush()
             await self.db.refresh(document)
 
