@@ -50,12 +50,15 @@ class DocumentService:
         existing_document = existing_result.scalar_one_or_none()
 
         if existing_document:
+            print(f"[DOC_SVC] Duplicate document found: id={existing_document.id}, path={existing_document.file_path}")
             # Verificar se o arquivo ainda existe (pode ter sido perdido em redeploy)
             if os.path.exists(existing_document.file_path):
                 with open(existing_document.file_path, "rb") as f:
                     existing_content = f.read()
+                print(f"[DOC_SVC] File exists, content_size={len(existing_content)}")
             else:
                 # Arquivo perdido - restaurar com o conteúdo atual (mesmo hash = mesmo conteúdo)
+                print(f"[DOC_SVC] File lost, restoring from upload")
                 upload_dir = Path(existing_document.file_path).parent
                 upload_dir.mkdir(parents=True, exist_ok=True)
                 with open(existing_document.file_path, "wb") as f:
@@ -63,7 +66,9 @@ class DocumentService:
                 existing_content = content
 
             # Reprocessar o documento para retornar os itens extraídos
+            print(f"[DOC_SVC] Calling _process_document for duplicate, mime_type={existing_document.mime_type}")
             extraction_data = await self._process_document(existing_document, existing_content)
+            print(f"[DOC_SVC] Extraction result: items={len(extraction_data.get('items', [])) if extraction_data else 0}, has_card_info={bool(extraction_data.get('card_info') if extraction_data else False)}")
 
             from ..schemas.document import DocumentResponse, ExtractedItemResponse, CardInfoResponse
 
@@ -213,25 +218,24 @@ class DocumentService:
 
     async def _process_document(self, document: Document, content: bytes) -> dict | None:
         """Processa documento e extrai dados (NÃO salva - retorna para confirmação)"""
-        import logging
-        logger = logging.getLogger(__name__)
-
         try:
-            logger.info(f"Processing document {document.id}, mime_type: {document.mime_type}")
+            print(f"[DOC_SVC] _process_document: id={document.id}, mime_type={document.mime_type}, content_size={len(content)}")
             document.status = DocumentStatus.PROCESSING
             await self.db.flush()
 
             # Extrair dados com LLM
+            print(f"[DOC_SVC] Calling _extract_data...")
             extraction_data = await self._extract_data(document, content)
-            logger.info(f"Extraction result for document {document.id}: items={len(extraction_data.get('items', [])) if extraction_data else 0}, error={document.error_message}")
+            items_count = len(extraction_data.get('items', [])) if extraction_data else 0
+            print(f"[DOC_SVC] _extract_data returned: items={items_count}, error={document.error_message}")
 
             # Se houve erro na extração, marcar como falha
             if extraction_data is None or (not extraction_data.get('items') and document.error_message):
                 document.status = DocumentStatus.FAILED
-                logger.warning(f"Document {document.id} marked as FAILED: {document.error_message}")
+                print(f"[DOC_SVC] Document {document.id} marked as FAILED: {document.error_message}")
             else:
                 document.status = DocumentStatus.COMPLETED
-                logger.info(f"Document {document.id} marked as COMPLETED")
+                print(f"[DOC_SVC] Document {document.id} marked as COMPLETED with {items_count} items")
 
             document.processed_at = utc_now()
             await self.db.flush()
@@ -240,7 +244,9 @@ class DocumentService:
             return extraction_data
 
         except Exception as e:
-            logger.error(f"Exception processing document {document.id}: {e}", exc_info=True)
+            print(f"[DOC_SVC] EXCEPTION in _process_document: {e}")
+            import traceback
+            traceback.print_exc()
             document.status = DocumentStatus.FAILED
             document.error_message = str(e)
             await self.db.flush()
@@ -251,6 +257,7 @@ class DocumentService:
         self, document: Document, content: bytes
     ) -> dict | None:
         """Extrai dados do documento usando LLM com visão ou parser de planilha"""
+        print(f"[DOC_SVC] _extract_data: content_size={len(content)}")
 
         # Verificar se é CSV ou Excel
         mime_type = document.mime_type or ''
@@ -263,6 +270,8 @@ class DocumentService:
             filename.lower().endswith(('.csv', '.xlsx', '.xls'))
         )
 
+        print(f"[DOC_SVC] mime_type={mime_type}, filename={filename}, is_spreadsheet={is_spreadsheet}")
+
         if is_spreadsheet:
             # Usar parser de planilha
             from .spreadsheet_parser_service import SpreadsheetParserService
@@ -270,9 +279,11 @@ class DocumentService:
             result = await parser.parse_file(content, filename, mime_type)
         else:
             # Usar LLM com visão para imagens/PDFs
+            print(f"[DOC_SVC] Using LLM OCR service for extraction")
             from .llm_ocr_service import LLMOCRService
             llm_service = LLMOCRService()
             result = await llm_service.extract_from_image(content, mime_type)
+            print(f"[DOC_SVC] LLM OCR result: items={len(result.get('items', []))}, error={result.get('error')}")
 
         # Se houve erro na extração
         if result.get('error'):

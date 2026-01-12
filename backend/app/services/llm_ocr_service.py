@@ -256,10 +256,6 @@ DEFAULT_MAX_RETRIES = 3
 DEFAULT_RETRY_DELAY = 2.0  # segundos
 
 
-import logging
-logger = logging.getLogger(__name__)
-
-
 class LLMOCRService:
     """Extrai dados de imagens usando LLM com visão (suporta múltiplos providers)"""
 
@@ -269,7 +265,7 @@ class LLMOCRService:
         self.max_retries = DEFAULT_MAX_RETRIES
         self.retry_delay = DEFAULT_RETRY_DELAY
         self._google_client = None
-        logger.info(f"LLMOCRService initialized: provider={self.provider}, model={self.model}")
+        print(f"[LLM_OCR] Initialized: provider={self.provider}, model={self.model}")
 
     def _get_google_client(self):
         """Obtém cliente Google Genai (lazy initialization)"""
@@ -322,27 +318,27 @@ class LLMOCRService:
 
     async def extract_from_image(self, image_content: bytes, mime_type: str = 'image/png') -> dict:
         """Extrai dados da imagem usando o provider configurado"""
-        logger.info(f"extract_from_image called: mime_type={mime_type}, content_size={len(image_content)}")
+        print(f"[LLM_OCR] extract_from_image: mime_type={mime_type}, content_size={len(image_content)}")
         try:
             # Se for PDF, converter para imagens e processar todas as páginas JUNTAS
             if mime_type == 'application/pdf' or mime_type.endswith('/pdf'):
-                logger.info("Processing PDF document")
+                print("[LLM_OCR] Processing PDF document")
                 images, pdf_error = self._convert_pdf_to_images(image_content)
-                logger.info(f"PDF conversion result: {len(images)} pages, error={pdf_error}")
+                print(f"[LLM_OCR] PDF conversion: {len(images)} pages, error={pdf_error}")
                 if pdf_error:
-                    logger.error(f"PDF conversion error: {pdf_error}")
+                    print(f"[LLM_OCR] ERROR: PDF conversion failed: {pdf_error}")
                     return {'items': [], 'error': pdf_error}
                 if not images:
                     return {'items': [], 'error': 'PDF não gerou imagens para processar'}
 
                 # Se temos múltiplas páginas e estamos usando Google, enviar todas juntas
                 if len(images) > 1 and self.provider == 'google':
-                    logger.info(f"Calling Google multi-page with {len(images)} pages")
+                    print(f"[LLM_OCR] Calling Google multi-page with {len(images)} pages")
                     result = await self._call_google_multi_page(images)
-                    logger.info(f"Google multi-page result: {len(result.get('items', []))} items, error={result.get('error')}")
+                    print(f"[LLM_OCR] Google result: {len(result.get('items', []))} items, error={result.get('error')}")
                 else:
                     # Fallback: processar páginas separadamente (single page or non-google)
-                    logger.info(f"Processing {len(images)} page(s) separately")
+                    print(f"[LLM_OCR] Processing {len(images)} page(s) separately")
                     all_items = []
                     document_type = None
                     card_info = None
