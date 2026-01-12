@@ -451,9 +451,11 @@ class LLMOCRService:
             from google.genai import types
         except ImportError:
             # Fallback para httpx
+            print("[LLM_OCR] google.genai not available, using httpx fallback")
             return await self._call_google_multi_page_httpx(images)
 
         client = self._get_google_client()
+        print(f"[LLM_OCR] Using Google SDK, model={self.model}")
 
         # Construir partes da mensagem: prompt + todas as imagens
         parts = [EXTRACTION_PROMPT + "\n\n⚠️ ATENÇÃO: Este documento tem MÚLTIPLAS PÁGINAS. Extraia TODAS as transações de TODAS as páginas!"]
@@ -465,6 +467,7 @@ class LLMOCRService:
         last_error = None
         for attempt in range(self.max_retries):
             try:
+                print(f"[LLM_OCR] Calling Gemini API (attempt {attempt + 1}/{self.max_retries})...")
                 response = client.models.generate_content(
                     model=self.model,
                     contents=parts,
@@ -474,15 +477,25 @@ class LLMOCRService:
                     ),
                 )
 
-                return self._parse_response(response.text)
+                response_text = response.text if response else ""
+                print(f"[LLM_OCR] Gemini response length: {len(response_text)} chars")
+                if len(response_text) < 500:
+                    print(f"[LLM_OCR] Gemini raw response: {response_text[:500]}")
+                else:
+                    print(f"[LLM_OCR] Gemini response preview: {response_text[:200]}...")
+
+                return self._parse_response(response_text)
 
             except Exception as e:
                 last_error = e
+                print(f"[LLM_OCR] Gemini API error (attempt {attempt + 1}): {type(e).__name__}: {e}")
                 if self._is_retryable_error(e) and attempt < self.max_retries - 1:
                     wait_time = self.retry_delay * (2 ** attempt)
+                    print(f"[LLM_OCR] Retrying in {wait_time}s...")
                     await asyncio.sleep(wait_time)
                     continue
                 else:
+                    print(f"[LLM_OCR] Not retrying, raising exception")
                     raise
 
         return {'items': [], 'error': f'Falha após {self.max_retries} tentativas: {last_error}'}
