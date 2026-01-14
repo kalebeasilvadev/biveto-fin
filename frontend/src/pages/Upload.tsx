@@ -560,22 +560,6 @@ export default function Upload() {
     uploadMutation.mutate(file)
   }
 
-  const handleConfirm = () => {
-    if (document) {
-      confirmMutation.mutate({
-        document_id: document.id,
-        amount: parseFloat(formData.amount),
-        date: formData.date,
-        account_id: parseInt(formData.account_id),
-        category_id: formData.category_id ? parseInt(formData.category_id) : null,
-        merchant_name: formData.merchant_name || null,
-        is_installment: formData.is_installment,
-        installment_current: formData.is_installment && formData.installment_current ? parseInt(formData.installment_current) : null,
-        installment_total: formData.is_installment && formData.installment_total ? parseInt(formData.installment_total) : null,
-      })
-    }
-  }
-
   const handleManualSubmit = () => {
     createMutation.mutate({
       type: formData.type,

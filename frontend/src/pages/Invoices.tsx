@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { invoicesApi, creditCardsApi, accountsApi, transactionsApi } from '../services/api'
@@ -191,17 +191,12 @@ export default function Invoices() {
       const key = `${selectedYear}-${month}`
       const isCurrent = month === currentMonth && selectedYear === currentYear
 
-      // Check if this month is in the past
-      const isPastMonth = selectedYear < currentYear ||
-        (selectedYear === currentYear && month < currentMonth)
-
       // Get invoices for this month
       const monthInvoices = invoices.filter(inv =>
         inv.reference_month === month && inv.reference_year === selectedYear
       )
 
       const hasInvoices = monthInvoices.length > 0
-      const hasUnpaidInvoices = monthInvoices.some(inv => inv.status !== 'paid')
       const isOverdue = monthInvoices.some(inv => inv.status === 'overdue')
 
       // Show all months (removed skip logic)
