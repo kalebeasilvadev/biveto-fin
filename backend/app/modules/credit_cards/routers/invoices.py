@@ -206,13 +206,19 @@ async def get_invoice(
     transaction_responses = []
     for tx_row in tx_rows:
         t = tx_row[0]
+        # Aplicar sinal correto: income/creditos sao negativos na fatura
+        # (pagamentos, estornos, cashback reduzem o valor a pagar)
+        amount = float(t.amount)
+        if t.type == 'income':
+            amount = -amount
+
         transaction_responses.append(InvoiceTransactionResponse(
             id=t.id,
             date=t.date,
             description=t.description,
             merchant_name=tx_row.merchant_name,
             category_name=tx_row.category_name,
-            amount=float(t.amount),
+            amount=amount,
             installment_number=t.installment_number,
             installment_total=t.installment_total,
             is_paid=t.is_paid,

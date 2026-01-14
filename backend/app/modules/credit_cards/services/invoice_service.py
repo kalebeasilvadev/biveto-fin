@@ -189,7 +189,15 @@ class InvoiceService:
         - Estornos de compras
         - Reembolsos
         - Creditos promocionais
+
+        NOTA: Se a fatura foi criada a partir de um documento PDF (document_id),
+        o total_amount do PDF e preservado e nao e recalculado.
         """
+        # Se a fatura veio de um documento PDF, nao recalcular o total
+        # O valor extraido do PDF e mais confiavel
+        if invoice.document_id and invoice.total_amount > 0:
+            return
+
         # Buscar todas as transacoes da fatura
         result = await self.db.execute(
             select(Transaction).where(
