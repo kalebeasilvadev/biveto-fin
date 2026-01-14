@@ -1,4 +1,4 @@
-.PHONY: help install dev backend frontend docker-up docker-down docker-clean deploy ssh create-admin admin
+.PHONY: help install dev backend frontend docker-up docker-down docker-clean deploy ssh create-admin admin cleanup-uploads
 
 # Cores
 GREEN  := $(shell tput -Txterm setaf 2)
@@ -88,6 +88,9 @@ clean: ## Remove arquivos temporários
 	find . -type d -name node_modules -exec rm -rf {} + 2>/dev/null || true
 	find . -type d -name dist -exec rm -rf {} + 2>/dev/null || true
 	rm -rf backend/venv 2>/dev/null || true
+
+cleanup-uploads: ## Remove uploads com mais de 30 dias (uso: make cleanup-uploads [DAYS=30] [DRY_RUN=1])
+	cd backend && . .venv/bin/activate && python scripts/cleanup_uploads.py --days $(or $(DAYS),30) $(if $(DRY_RUN),--dry-run,)
 
 # ==================== Deploy ====================
 

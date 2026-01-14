@@ -43,7 +43,7 @@ class Document(Base):
     # Relationships
     user: Mapped["User"] = relationship(back_populates="documents")
     extractions: Mapped[list["DocumentExtraction"]] = relationship(
-        back_populates="document", lazy="selectin", order_by="desc(DocumentExtraction.version)"
+        back_populates="document", lazy="noload", order_by="desc(DocumentExtraction.version)"
     )
     transaction: Mapped["Transaction | None"] = relationship(back_populates="document", uselist=False)
     invoice: Mapped["CreditCardInvoice | None"] = relationship(back_populates="document", uselist=False)

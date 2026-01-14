@@ -39,6 +39,11 @@ jobs:
             NEED_SET=true
           fi
 
+          if [ -n "${{ secrets.MISTRAL_API_KEY }}" ]; then
+            SECRETS_CMD="$SECRETS_CMD MISTRAL_API_KEY=\"${{ secrets.MISTRAL_API_KEY }}\""
+            NEED_SET=true
+          fi
+
           if [ "$NEED_SET" = true ]; then
             eval "$SECRETS_CMD --stage"
             echo "✓ Secrets staged for deployment"

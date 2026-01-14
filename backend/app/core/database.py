@@ -11,14 +11,14 @@ if is_sqlite:
     # SQLite não suporta pool_size
     engine = create_async_engine(
         settings.database_url,
-        echo=settings.debug,
+        echo=settings.sql_echo,
         connect_args={"check_same_thread": False},
     )
 else:
     # PostgreSQL com pool otimizado
     engine = create_async_engine(
         settings.database_url,
-        echo=settings.debug,
+        echo=settings.sql_echo,
         pool_size=5,           # Conexões mantidas no pool
         max_overflow=10,       # Conexões extras sob demanda
         pool_pre_ping=True,    # Verifica conexão antes de usar

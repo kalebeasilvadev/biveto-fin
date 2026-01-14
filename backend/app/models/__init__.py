@@ -16,6 +16,7 @@ from .recurring import RecurringTransaction, RecurrenceFrequency, RecurringStatu
 from .credit_card import CreditCard, PointsProgram
 from .income_source import IncomeSource, IncomeType, IncomeFrequency
 from .credit_card_invoice import CreditCardInvoice, InvoiceStatus
+from app.modules.known_services.models.known_service import KnownRecurringService
 
 __all__ = [
     "License",
@@ -59,4 +60,5 @@ __all__ = [
     "IncomeFrequency",
     "CreditCardInvoice",
     "InvoiceStatus",
+    "KnownRecurringService",
 ]

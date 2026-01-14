@@ -32,6 +32,7 @@ class RecurringTransaction(Base):
     description: Mapped[str | None] = mapped_column(String(500))
     amount: Mapped[float] = mapped_column(Numeric(12, 2))
     type: Mapped[str] = mapped_column(String(10), default="expense")  # expense ou income
+    payment_method: Mapped[str | None] = mapped_column(String(20))  # credit_card, pix, boleto, etc.
 
     # Configuração de recorrência
     frequency: Mapped[str] = mapped_column(String(10))  # RecurrenceFrequency

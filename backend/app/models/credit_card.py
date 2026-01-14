@@ -73,7 +73,7 @@ class CreditCard(Base):
     user: Mapped["User"] = relationship(back_populates="credit_cards")
     invoices: Mapped[list["CreditCardInvoice"]] = relationship(
         back_populates="credit_card",
-        lazy="selectin",
+        lazy="noload",
         order_by="desc(CreditCardInvoice.reference_year), desc(CreditCardInvoice.reference_month)"
     )
 

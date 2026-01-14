@@ -20,6 +20,7 @@ import {
   Tag,
   CreditCard,
   FileText,
+  Clock,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import EmptyState from '../components/EmptyState'
@@ -39,6 +40,7 @@ interface Transaction {
   merchant_name: string | null
   is_fixed: boolean
   is_recurring: boolean
+  is_paid: boolean
   installment_number: number | null
   installment_total: number | null
   tags: string[] | null
@@ -428,6 +430,12 @@ export default function Transactions() {
                           </p>
                           <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
                             <span>{transaction.category_name || 'Sem categoria'}</span>
+                            {!transaction.is_paid && (
+                              <span className="text-xs px-1.5 py-0.5 bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 rounded flex items-center gap-0.5">
+                                <Clock size={10} />
+                                Projetado
+                              </span>
+                            )}
                             {transaction.installment_number && transaction.installment_total && (
                               <span className="text-xs px-1.5 py-0.5 bg-gray-100 dark:bg-slate-600 rounded">
                                 {transaction.installment_number}/{transaction.installment_total}

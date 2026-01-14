@@ -16,7 +16,7 @@ class Merchant(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     # Relationships
-    transactions: Mapped[list["Transaction"]] = relationship(back_populates="merchant", lazy="selectin")
+    transactions: Mapped[list["Transaction"]] = relationship(back_populates="merchant", lazy="noload")
 
 
 from .transaction import Transaction

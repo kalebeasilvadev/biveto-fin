@@ -16,7 +16,8 @@ class Settings(BaseSettings):
     refresh_token_expire_days: int = 7
 
     # App
-    debug: bool = True
+    debug: bool = False  # SQL echo desabilitado por padrao para performance
+    sql_echo: bool = False  # SQL echo separado do debug geral
     environment: str = "development"
     app_name: str = "App Financeiro"
     api_v1_prefix: str = "/api/v1"
@@ -32,12 +33,17 @@ class Settings(BaseSettings):
     upload_dir: str = "./uploads"
 
     # LLM/Vision API (para OCR inteligente)
-    # Providers suportados: openai, google, anthropic
+    # Providers suportados: openai, google, anthropic, mistral
     vision_provider: str = "google"  # google é gratuito!
     openai_api_key: str | None = None
     google_api_key: str | None = None  # Gemini - GRÁTIS
     anthropic_api_key: str | None = None
     vision_model: str = "gemini-2.0-flash"  # Modelo gratuito com visão (atualizado 2025)
+
+    # Mistral AI (melhor custo-benefício para OCR de faturas)
+    mistral_api_key: str | None = None
+    mistral_ocr_model: str = "mistral-ocr-latest"
+    mistral_llm_model: str = "mistral-small-latest"
 
     # SMTP Configuration (Hostinger)
     smtp_host: str = "smtp.hostinger.com"

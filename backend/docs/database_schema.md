@@ -283,6 +283,21 @@ erDiagram
     }
 
     %% ============================================
+    %% SERVICOS CONHECIDOS
+    %% ============================================
+
+    KNOWN_RECURRING_SERVICES {
+        int id PK
+        string name
+        json patterns
+        string default_category
+        string default_frequency
+        string logo_url
+        bool is_active
+        datetime created_at
+    }
+
+    %% ============================================
     %% RELACIONAMENTOS
     %% ============================================
 
@@ -500,8 +515,10 @@ USER
  ├── DEBTS (Dividas)
  │       └── DEBT_PAYMENTS (Pagamentos)
  │
- └── RECURRING_TRANSACTIONS (Recorrencias)
-         └── TRANSACTIONS (Transacoes geradas)
+ ├── RECURRING_TRANSACTIONS (Recorrencias)
+ │       └── TRANSACTIONS (Transacoes geradas)
+ │
+ └── (Global) KNOWN_RECURRING_SERVICES (Catalogo de servicos conhecidos)
 ```
 
 ---

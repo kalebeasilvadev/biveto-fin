@@ -30,17 +30,17 @@ class Account(Base):
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
 
-    # Relationships
+    # Relationships - use noload to avoid N+1 queries
     user: Mapped["User"] = relationship(back_populates="accounts")
-    transactions: Mapped[list["Transaction"]] = relationship(back_populates="account", lazy="selectin")
+    transactions: Mapped[list["Transaction"]] = relationship(back_populates="account", lazy="noload")
     installment_series: Mapped[list["InstallmentSeries"]] = relationship(
-        back_populates="account", lazy="selectin"
+        back_populates="account", lazy="noload"
     )
     credit_card_details: Mapped["CreditCard | None"] = relationship(
-        back_populates="account", uselist=False, lazy="selectin"
+        back_populates="account", uselist=False, lazy="noload"
     )
     income_sources: Mapped[list["IncomeSource"]] = relationship(
-        back_populates="account", lazy="selectin"
+        back_populates="account", lazy="noload"
     )
 
 

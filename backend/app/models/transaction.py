@@ -11,6 +11,17 @@ class TransactionType(str, Enum):
     TRANSFER = "transfer"
 
 
+class PaymentMethod(str, Enum):
+    """Metodo de pagamento utilizado na transacao"""
+    CREDIT_CARD = "credit_card"       # Cartao de credito (vinculado a fatura)
+    DEBIT_CARD = "debit_card"         # Cartao de debito (debito imediato)
+    PIX = "pix"                       # PIX (transferencia instantanea)
+    BANK_TRANSFER = "bank_transfer"   # TED/DOC (transferencia bancaria)
+    BOLETO = "boleto"                 # Boleto bancario
+    CASH = "cash"                     # Dinheiro
+    VOUCHER = "voucher"               # Vale alimentacao/refeicao/transporte
+
+
 class RecurrenceType(str, Enum):
     NONE = "none"
     DAILY = "daily"
@@ -45,6 +56,7 @@ class Transaction(Base):
     )
 
     type: Mapped[str] = mapped_column(String(10))  # TransactionType
+    payment_method: Mapped[str | None] = mapped_column(String(20), index=True)  # PaymentMethod
     amount: Mapped[float] = mapped_column(Numeric(12, 2))
     currency: Mapped[str] = mapped_column(String(3), default="BRL")
     date: Mapped[date] = mapped_column(Date, index=True)
@@ -78,30 +90,31 @@ class Transaction(Base):
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
 
-    # Relationships
+    # Relationships - use noload to avoid N+1 queries
     user: Mapped["User"] = relationship(back_populates="transactions")
-    account: Mapped["Account"] = relationship(back_populates="transactions", lazy="selectin")
-    category: Mapped["Category | None"] = relationship(back_populates="transactions", lazy="selectin")
-    merchant: Mapped["Merchant | None"] = relationship(back_populates="transactions", lazy="selectin")
-    document: Mapped["Document | None"] = relationship(back_populates="transaction")
+    account: Mapped["Account"] = relationship(back_populates="transactions", lazy="noload")
+    category: Mapped["Category | None"] = relationship(back_populates="transactions", lazy="noload")
+    merchant: Mapped["Merchant | None"] = relationship(back_populates="transactions", lazy="noload")
+    document: Mapped["Document | None"] = relationship(back_populates="transaction", lazy="noload")
     installment_series: Mapped["InstallmentSeries | None"] = relationship(
-        back_populates="transactions"
+        back_populates="transactions", lazy="noload"
     )
     recurring_source: Mapped["RecurringTransaction | None"] = relationship(
         back_populates="generated_transactions",
-        foreign_keys=[recurring_id]
+        foreign_keys=[recurring_id],
+        lazy="noload"
     )
     audit_logs: Mapped[list["TransactionAudit"]] = relationship(
-        back_populates="transaction", lazy="selectin"
+        back_populates="transaction", lazy="noload"
     )
-    credit_card: Mapped["CreditCard | None"] = relationship(lazy="selectin")
+    credit_card: Mapped["CreditCard | None"] = relationship(lazy="noload")
     income_source: Mapped["IncomeSource | None"] = relationship(
-        back_populates="transactions", lazy="selectin"
+        back_populates="transactions", lazy="noload"
     )
     invoice: Mapped["CreditCardInvoice | None"] = relationship(
         back_populates="transactions",
         foreign_keys=[invoice_id],
-        lazy="selectin"
+        lazy="noload"
     )
 
     # Computed properties for API responses
@@ -135,6 +148,29 @@ class Transaction(Base):
             month_name = months[self.invoice.reference_month - 1]
             return f"{month_name}/{self.invoice.reference_year}"
         return None
+
+    @property
+    def signed_amount(self) -> float:
+        """Retorna o valor com sinal: negativo para despesas, positivo para receitas"""
+        if self.type == TransactionType.EXPENSE.value:
+            return -float(self.amount)
+        return float(self.amount)
+
+    @property
+    def payment_method_display(self) -> str | None:
+        """Retorna o nome amigavel do metodo de pagamento"""
+        if not self.payment_method:
+            return None
+        display_names = {
+            PaymentMethod.CREDIT_CARD.value: "Cartao de Credito",
+            PaymentMethod.DEBIT_CARD.value: "Cartao de Debito",
+            PaymentMethod.PIX.value: "PIX",
+            PaymentMethod.BANK_TRANSFER.value: "Transferencia",
+            PaymentMethod.BOLETO.value: "Boleto",
+            PaymentMethod.CASH.value: "Dinheiro",
+            PaymentMethod.VOUCHER.value: "Vale",
+        }
+        return display_names.get(self.payment_method, self.payment_method)
 
 
 class TransactionAudit(Base):

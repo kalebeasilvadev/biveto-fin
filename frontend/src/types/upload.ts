@@ -1,3 +1,39 @@
+export interface FutureInstallment {
+  installment: number
+  reference_month: number
+  reference_year: number
+}
+
+// Tipos de duplicidade detectada
+export type DuplicateType = 'none' | 'legitimate' | 'suspicious' | 'error'
+
+export interface DuplicateAnalysis {
+  duplicate_type: DuplicateType
+  reason: string
+  occurrences_count: number
+  other_amounts?: number[]
+}
+
+export interface RecurringSuggestion {
+  name: string
+  amount: number
+  frequency: string
+  default_category?: string
+  day_of_month?: number
+}
+
+export interface RecurringDetection {
+  is_known_service: boolean
+  known_service_id?: number
+  known_service_name?: string
+  is_user_recurring: boolean
+  user_recurring_id?: number
+  user_recurring_name?: string
+  duplicate_analysis?: DuplicateAnalysis
+  suggested_recurring?: RecurringSuggestion
+  confidence: number
+}
+
 export interface ExtractedItem {
   description: string
   amount: number
@@ -7,21 +43,36 @@ export interface ExtractedItem {
   is_installment?: boolean
   installment_current?: number | null
   installment_total?: number | null
+  future_installments?: FutureInstallment[] | null
   is_duplicate?: boolean
   existing_transaction_id?: number | null
+  recurring_detection?: RecurringDetection
+  // Tipo de transacao extraido pelo LLM: compra, estorno, credito, pagamento, anuidade, encargo
+  transaction_type?: string | null
 }
 
 export interface CardInfo {
-  card_issuer?: string
-  card_last_digits?: string
-  card_name?: string
+  // Identificacao do cartao
+  card_issuer?: string  // Codigo do emissor (nubank, itau, bradesco, bradescard)
+  card_bank?: string  // Nome completo do banco (Bradesco, Itau Unibanco)
+  card_brand?: string  // Bandeira (visa, mastercard, elo, hipercard, amex)
+  card_partner?: string  // Parceiro co-branded (amazon, smiles, latam)
+  card_last_digits?: string  // Ultimos 4 digitos
+  card_name?: string  // Nome completo do cartao (ex: Bradesco Amazon Visa)
+
+  // Informacoes da fatura
   invoice_month?: number
   invoice_year?: number
-  due_date?: string
   closing_date?: string
   closing_day?: number
+  due_date?: string
   due_day?: number
   total_amount?: number
+
+  // Limites do cartao
+  credit_limit?: number  // Limite total
+  credit_used?: number  // Limite utilizado
+  credit_available?: number  // Limite disponivel
 }
 
 export interface Document {
@@ -66,6 +117,15 @@ export const CATEGORY_MAP: Record<string, string> = {
   'cartao': 'Contas',
   'servicos': 'Outros',
   'outros': 'Outros',
+  // Categorias de serviços recorrentes
+  'streaming': 'Entretenimento',
+  'software': 'Assinaturas',
+  'tecnologia': 'Assinaturas',
+  'cloud': 'Assinaturas',
+  'jogos': 'Lazer',
+  'viagem': 'Viagem',
+  'assinatura': 'Assinaturas',
+  'entretenimento': 'Entretenimento',
 }
 
 // Helper to get local date in YYYY-MM-DD format

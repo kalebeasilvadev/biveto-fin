@@ -1,0 +1,36 @@
+"""Debts schemas"""
+from app.modules.debts.schemas.debt import (
+    DebtPaymentBase,
+    DebtPaymentCreate,
+    DebtPaymentResponse,
+    DebtBase,
+    DebtCreate,
+    DebtUpdate,
+    DebtResponse,
+    DebtDetailResponse,
+    DebtPayoffProjection,
+    DebtSummary,
+    DebtHighlight,
+    SnowballPlan,
+    AvalanchePlan,
+    SnowballDebtStep,
+    PayoffStrategyComparison,
+)
+
+__all__ = [
+    "DebtPaymentBase",
+    "DebtPaymentCreate",
+    "DebtPaymentResponse",
+    "DebtBase",
+    "DebtCreate",
+    "DebtUpdate",
+    "DebtResponse",
+    "DebtDetailResponse",
+    "DebtPayoffProjection",
+    "DebtSummary",
+    "DebtHighlight",
+    "SnowballPlan",
+    "AvalanchePlan",
+    "SnowballDebtStep",
+    "PayoffStrategyComparison",
+]
