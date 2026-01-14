@@ -1,4 +1,4 @@
-import { CheckSquare, Square, CheckCircle2, AlertCircle, Check, AlertTriangle, Clock } from 'lucide-react'
+import { CheckSquare, Square, CheckCircle2, AlertCircle, Check, AlertTriangle, Clock, CalendarClock, Repeat, Plus } from 'lucide-react'
 import { clsx } from 'clsx'
 import { ExtractedItem, CATEGORY_MAP } from '../../types/upload'
 
@@ -39,6 +39,11 @@ interface ExtractedItemsListProps {
   onSkipDuplicates?: () => void
   projectedInfo?: Record<number, ProjectedInfo>
   isCheckingProjected?: boolean
+  // Props para recorrência
+  onCreateRecurring?: (index: number) => void
+  creatingRecurringIndex?: number | null
+  onCreateAllRecurrences?: () => void
+  isCreatingAllRecurrences?: boolean
 }
 
 export default function ExtractedItemsList({
@@ -63,9 +68,17 @@ export default function ExtractedItemsList({
   onSkipDuplicates,
   projectedInfo = {},
   isCheckingProjected = false,
+  onCreateRecurring,
+  creatingRecurringIndex,
+  onCreateAllRecurrences,
+  isCreatingAllRecurrences = false,
 }: ExtractedItemsListProps) {
   const duplicateCount = items.filter(item => item.is_duplicate).length
   const projectedCount = Object.values(projectedInfo).filter(info => info.has_projected).length
+  const recurringCount = items.filter(item =>
+    item.recurring_detection?.is_known_service &&
+    !item.recurring_detection?.is_user_recurring
+  ).length
 
   return (
     <div className="space-y-4">
@@ -90,6 +103,42 @@ export default function ExtractedItemsList({
               Essas parcelas já existem como projeções de faturas anteriores e serão confirmadas automaticamente.
             </p>
           </div>
+        </div>
+      )}
+
+      {/* Recurring services detected */}
+      {recurringCount > 0 && (
+        <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-3">
+          <div className="flex items-start gap-2">
+            <Repeat className="text-green-600 flex-shrink-0 mt-0.5" size={16} />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-green-800 dark:text-green-200">
+                {recurringCount} serviço(s) recorrente(s) detectado(s)
+              </p>
+              <p className="text-xs text-green-700 dark:text-green-300 mt-0.5">
+                Netflix, Spotify e outros serviços podem ser cadastrados como recorrência.
+              </p>
+            </div>
+          </div>
+          {onCreateAllRecurrences && (
+            <button
+              onClick={onCreateAllRecurrences}
+              disabled={isCreatingAllRecurrences}
+              className="mt-3 w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors disabled:opacity-50"
+            >
+              {isCreatingAllRecurrences ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                  Criando recorrências...
+                </>
+              ) : (
+                <>
+                  <Plus size={16} />
+                  Criar Todas as Recorrências ({recurringCount})
+                </>
+              )}
+            </button>
+          )}
         </div>
       )}
 
@@ -180,9 +229,30 @@ export default function ExtractedItemsList({
                         Duplicado
                       </span>
                     )}
+                    {item.recurring_detection?.is_known_service && !item.recurring_detection?.is_user_recurring && (
+                      <span className="flex-shrink-0 px-1.5 py-0.5 text-[10px] font-semibold bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300 rounded flex items-center gap-1" title="Serviço recorrente detectado">
+                        <Repeat size={10} />
+                        {item.recurring_detection.known_service_name || 'Recorrente'}
+                      </span>
+                    )}
+                    {item.recurring_detection?.is_user_recurring && (
+                      <span className="flex-shrink-0 px-1.5 py-0.5 text-[10px] font-semibold bg-teal-100 dark:bg-teal-900/50 text-teal-700 dark:text-teal-300 rounded flex items-center gap-1" title="Já cadastrado como recorrência">
+                        <Repeat size={10} />
+                        Cadastrado
+                      </span>
+                    )}
                     {item.is_installment && item.installment_current && item.installment_total && (
                       <span className="flex-shrink-0 px-1.5 py-0.5 text-[10px] font-semibold bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded">
                         {item.installment_current}/{item.installment_total}
+                      </span>
+                    )}
+                    {item.future_installments && item.future_installments.length > 0 && (
+                      <span
+                        className="flex-shrink-0 px-1.5 py-0.5 text-[10px] font-semibold bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 rounded flex items-center gap-1"
+                        title={`${item.future_installments.length} parcela(s) futura(s) serão projetadas automaticamente`}
+                      >
+                        <CalendarClock size={10} />
+                        +{item.future_installments.length}
                       </span>
                     )}
                   </div>
@@ -212,9 +282,9 @@ export default function ExtractedItemsList({
                 </div>
               </div>
 
-              {/* Edit button */}
+              {/* Edit button and recurring action */}
               {isSelected && (
-                <div className="px-3 pb-3 pt-0">
+                <div className="px-3 pb-3 pt-0 flex items-center gap-3">
                   <button
                     onClick={(e) => {
                       e.stopPropagation()
@@ -224,6 +294,31 @@ export default function ExtractedItemsList({
                   >
                     {isEditing ? 'Fechar edição' : 'Editar detalhes'}
                   </button>
+                  {item.recurring_detection?.is_known_service &&
+                   !item.recurring_detection?.is_user_recurring &&
+                   item.recurring_detection?.suggested_recurring &&
+                   onCreateRecurring && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onCreateRecurring(index)
+                      }}
+                      disabled={creatingRecurringIndex === index}
+                      className="text-xs text-green-600 hover:text-green-700 font-medium flex items-center gap-1 disabled:opacity-50"
+                    >
+                      {creatingRecurringIndex === index ? (
+                        <>
+                          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-green-600" />
+                          Criando...
+                        </>
+                      ) : (
+                        <>
+                          <Plus size={12} />
+                          Criar Recorrência
+                        </>
+                      )}
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -356,17 +451,54 @@ export default function ExtractedItemsList({
       {!batchAddPending && (
         <div className="space-y-2">
           {/* Selected total */}
-          {selectedItems.length > 0 && (
-            <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-slate-700 rounded-lg p-2">
-              <span>Total selecionado:</span>
-              <span className="font-bold text-gray-900 dark:text-white">
-                R$ {items
-                  .filter((_, i) => selectedItems.includes(i))
-                  .reduce((sum, item) => sum + Math.abs(item.amount), 0)
-                  .toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-              </span>
-            </div>
-          )}
+          {selectedItems.length > 0 && (() => {
+            const selectedItemsList = items.filter((_, i) => selectedItems.includes(i))
+            const totalDespesas = selectedItemsList
+              .filter(item => item.amount > 0)
+              .reduce((sum, item) => sum + item.amount, 0)
+            // Estornos: valores negativos exceto pagamentos
+            const totalEstornos = selectedItemsList
+              .filter(item => item.amount < 0 && item.category !== 'pagamento')
+              .reduce((sum, item) => sum + item.amount, 0)
+            // Pagamentos: categoria 'pagamento'
+            const totalPagamentos = selectedItemsList
+              .filter(item => item.category === 'pagamento')
+              .reduce((sum, item) => sum + item.amount, 0)
+            const totalLiquido = totalDespesas + totalEstornos
+
+            return (
+              <div className="bg-gray-50 dark:bg-slate-700 rounded-lg p-2 space-y-1">
+                <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
+                  <span>Despesas:</span>
+                  <span className="font-medium text-gray-900 dark:text-white">
+                    R$ {totalDespesas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+                {totalEstornos < 0 && (
+                  <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
+                    <span>Estornos/Créditos:</span>
+                    <span className="font-medium text-green-600">
+                      R$ {totalEstornos.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                )}
+                {totalPagamentos < 0 && (
+                  <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
+                    <span>Pagamento fatura:</span>
+                    <span className="font-medium text-blue-600">
+                      R$ {totalPagamentos.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                )}
+                <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400 pt-1 border-t border-gray-200 dark:border-slate-600">
+                  <span className="font-medium">Total fatura:</span>
+                  <span className="font-bold text-gray-900 dark:text-white">
+                    R$ {totalLiquido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+              </div>
+            )
+          })()}
 
           {/* Add buttons */}
           <div className="flex gap-2">

@@ -66,7 +66,7 @@ class InstallmentSeries(Base):
     merchant: Mapped["Merchant | None"] = relationship()
     credit_card: Mapped["CreditCard | None"] = relationship()
     transactions: Mapped[list["Transaction"]] = relationship(
-        back_populates="installment_series", lazy="selectin"
+        back_populates="installment_series", lazy="noload"
     )
 
     @property

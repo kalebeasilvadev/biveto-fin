@@ -46,8 +46,8 @@ class Invitation(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
     # Relationships
-    license: Mapped["License"] = relationship(lazy="selectin")
-    invited_by: Mapped["User"] = relationship(back_populates="invitations_sent", lazy="selectin")
+    license: Mapped["License"] = relationship(lazy="noload")
+    invited_by: Mapped["User"] = relationship(back_populates="invitations_sent", lazy="noload")
 
     @property
     def is_valid(self) -> bool:

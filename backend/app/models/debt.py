@@ -88,7 +88,7 @@ class Debt(Base):
     payments: Mapped[list["DebtPayment"]] = relationship(
         back_populates="debt",
         cascade="all, delete-orphan",
-        lazy="selectin"
+        lazy="noload"
     )
 
     @property

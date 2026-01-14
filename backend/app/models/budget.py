@@ -46,7 +46,7 @@ class Budget(Base):
     items: Mapped[list["BudgetItem"]] = relationship(
         back_populates="budget",
         cascade="all, delete-orphan",
-        lazy="selectin"
+        lazy="noload"
     )
 
 

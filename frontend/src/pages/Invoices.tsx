@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { invoicesApi, creditCardsApi, accountsApi, transactionsApi } from '../services/api'
 import {
   CreditCard,
   Calendar,
-  ChevronRight,
   Check,
   Clock,
   AlertCircle,
@@ -13,6 +13,9 @@ import {
   X,
   Trash2,
   ArrowRightLeft,
+  AlertTriangle,
+  Eye,
+  MoreVertical,
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import EmptyState from '../components/EmptyState'
@@ -66,11 +69,23 @@ const statusConfig = {
   overdue: { label: 'Vencida', color: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200', icon: AlertCircle },
 }
 
+const MONTH_NAMES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+
+// Helper to get current month/year
+const getCurrentPeriod = () => {
+  const now = new Date()
+  return { month: now.getMonth() + 1, year: now.getFullYear() }
+}
+
 export default function Invoices() {
   const queryClient = useQueryClient()
+
+  // State
   const [selectedCardId, setSelectedCardId] = useState<number | null>(null)
-  const [statusFilter, setStatusFilter] = useState<string>('')
-  const [selectedInvoice, setSelectedInvoice] = useState<number | null>(null)
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear())
+  const [selectedTab, setSelectedTab] = useState<string | null>(null)
+  const [showDetailModal, setShowDetailModal] = useState(false)
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState<number | null>(null)
   const [showPayModal, setShowPayModal] = useState(false)
   const [invoiceToPay, setInvoiceToPay] = useState<Invoice | null>(null)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
@@ -78,6 +93,8 @@ export default function Invoices() {
   const [deleteTransactions, setDeleteTransactions] = useState(true)
   const [showMoveModal, setShowMoveModal] = useState(false)
   const [transactionToMove, setTransactionToMove] = useState<{ id: number; description: string } | null>(null)
+  const [openMenuId, setOpenMenuId] = useState<number | null>(null)
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null)
 
   const { data: cardsData } = useQuery({
     queryKey: ['credit-cards'],
@@ -90,18 +107,17 @@ export default function Invoices() {
   })
 
   const { data: invoicesData, isLoading } = useQuery({
-    queryKey: ['invoices', selectedCardId, statusFilter],
+    queryKey: ['invoices', selectedCardId],
     queryFn: () =>
       invoicesApi.list({
         credit_card_id: selectedCardId || undefined,
-        status: statusFilter || undefined,
       }),
   })
 
   const { data: invoiceDetailData } = useQuery({
-    queryKey: ['invoice', selectedInvoice],
-    queryFn: () => invoicesApi.get(selectedInvoice!),
-    enabled: !!selectedInvoice,
+    queryKey: ['invoice', selectedInvoiceId],
+    queryFn: () => invoicesApi.get(selectedInvoiceId!),
+    enabled: !!selectedInvoiceId && showDetailModal,
   })
 
   const payMutation = useMutation({
@@ -129,9 +145,7 @@ export default function Invoices() {
       setShowDeleteModal(false)
       setInvoiceToDelete(null)
       setDeleteTransactions(true)
-      if (selectedInvoice === invoiceToDelete?.id) {
-        setSelectedInvoice(null)
-      }
+      setShowDetailModal(false)
     },
   })
 
@@ -154,20 +168,132 @@ export default function Invoices() {
   const invoices: Invoice[] = invoicesData?.data || []
   const invoiceDetail: InvoiceDetail | null = invoiceDetailData?.data || null
 
+  // Get available years from invoices
+  const availableYears = useMemo(() => {
+    const years = new Set<number>()
+    invoices.forEach(inv => years.add(inv.reference_year))
+    return Array.from(years).sort((a, b) => b - a) // Descending order
+  }, [invoices])
+
+  // Generate month tabs for selected year
+  // Past months only show if they have unpaid invoices
+  const monthTabs = useMemo(() => {
+    const { month: currentMonth, year: currentYear } = getCurrentPeriod()
+    const tabs: { key: string; label: string; month: number; year: number; isOverdue: boolean; isCurrent: boolean; hasInvoices: boolean }[] = []
+
+    // Generate 12 months for the selected year
+    for (let month = 1; month <= 12; month++) {
+      const key = `${selectedYear}-${month}`
+      const isCurrent = month === currentMonth && selectedYear === currentYear
+
+      // Check if this month is in the past
+      const isPastMonth = selectedYear < currentYear ||
+        (selectedYear === currentYear && month < currentMonth)
+
+      // Get invoices for this month
+      const monthInvoices = invoices.filter(inv =>
+        inv.reference_month === month && inv.reference_year === selectedYear
+      )
+
+      const hasInvoices = monthInvoices.length > 0
+      const hasUnpaidInvoices = monthInvoices.some(inv => inv.status !== 'paid')
+      const isOverdue = monthInvoices.some(inv => inv.status === 'overdue')
+
+      // Skip past months without unpaid invoices
+      if (isPastMonth && !hasUnpaidInvoices) {
+        continue
+      }
+
+      tabs.push({
+        key,
+        label: MONTH_NAMES[month - 1],
+        month,
+        year: selectedYear,
+        isOverdue,
+        isCurrent,
+        hasInvoices,
+      })
+    }
+
+    return tabs
+  }, [invoices, selectedYear])
+
+  // Set initial selected tab to current month or first with invoices
+  useEffect(() => {
+    if (monthTabs.length > 0) {
+      const currentTab = monthTabs.find(t => t.isCurrent && t.hasInvoices)
+      const overdueTab = monthTabs.find(t => t.isOverdue)
+      const firstWithInvoices = monthTabs.find(t => t.hasInvoices)
+      const newTab = currentTab?.key || overdueTab?.key || firstWithInvoices?.key || monthTabs[0].key
+
+      // Only update if current tab doesn't match selected year
+      const currentSelected = selectedTab?.split('-')[0]
+      if (!selectedTab || currentSelected !== String(selectedYear)) {
+        setSelectedTab(newTab)
+      }
+    }
+  }, [monthTabs, selectedYear])
+
+  // Filter invoices by selected tab
+  const filteredInvoices = useMemo(() => {
+    if (!selectedTab) return []
+    const [year, month] = selectedTab.split('-').map(Number)
+    return invoices.filter(inv => inv.reference_month === month && inv.reference_year === year)
+  }, [invoices, selectedTab])
+
+  // Calculate summary for selected tab
+  const tabSummary = useMemo(() => {
+    const total = filteredInvoices.reduce((sum, inv) => sum + inv.total_amount, 0)
+    const remaining = filteredInvoices.reduce((sum, inv) => sum + inv.remaining_amount, 0)
+    const overdueCount = filteredInvoices.filter(inv => inv.status === 'overdue').length
+    return { total, remaining, overdueCount, count: filteredInvoices.length }
+  }, [filteredInvoices])
+
+  // Overall summary
+  const overallSummary = useMemo(() => {
+    const overdueInvoices = invoices.filter(inv => inv.status === 'overdue')
+    const overdueTotal = overdueInvoices.reduce((sum, inv) => sum + inv.remaining_amount, 0)
+    const totalPending = invoices
+      .filter(inv => inv.status !== 'paid')
+      .reduce((sum, inv) => sum + inv.remaining_amount, 0)
+    return {
+      overdueTotal,
+      overdueCount: overdueInvoices.length,
+      totalPending,
+      pendingCount: invoices.filter(inv => inv.status !== 'paid').length,
+    }
+  }, [invoices])
+
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL',
     }).format(value)
 
-  const formatDate = (dateStr: string) => {
+  const formatShortDate = (dateStr: string) => {
     const date = new Date(dateStr + 'T00:00:00')
-    return date.toLocaleDateString('pt-BR')
+    return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+  }
+
+  const handleViewDetails = (invoice: Invoice) => {
+    setSelectedInvoiceId(invoice.id)
+    setShowDetailModal(true)
+    setOpenMenuId(null)
+    setMenuPosition(null)
   }
 
   const handlePayClick = (invoice: Invoice) => {
     setInvoiceToPay(invoice)
     setShowPayModal(true)
+    setOpenMenuId(null)
+    setMenuPosition(null)
+  }
+
+  const handleDeleteClick = (invoice: Invoice) => {
+    setInvoiceToDelete(invoice)
+    setShowDeleteModal(true)
+    setOpenMenuId(null)
+    setMenuPosition(null)
   }
 
   const handlePaySubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -184,294 +310,507 @@ export default function Invoices() {
     })
   }
 
+  const pluralize = (count: number, singular: string, plural: string) =>
+    count === 1 ? singular : plural
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => {
+      setOpenMenuId(null)
+      setMenuPosition(null)
+    }
+    if (openMenuId !== null) {
+      document.addEventListener('click', handleClickOutside)
+      return () => document.removeEventListener('click', handleClickOutside)
+    }
+  }, [openMenuId])
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
+      {/* Header with Summary */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Faturas</h1>
-      </div>
-
-      {/* Filtros */}
-      <div className="card">
-        <div className="flex flex-wrap gap-4">
-          <div className="flex-1 min-w-[200px]">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Cartão
-            </label>
-            <select
-              value={selectedCardId || ''}
-              onChange={(e) => setSelectedCardId(e.target.value ? Number(e.target.value) : null)}
-              className="input"
-            >
-              <option value="">Todos os cartões</option>
-              {cards.map((card) => (
-                <option key={card.id} value={card.id}>
-                  {card.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="flex-1 min-w-[200px]">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Status
-            </label>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="input"
-            >
-              <option value="">Todos</option>
-              <option value="open">Abertas</option>
-              <option value="closed">Fechadas</option>
-              <option value="paid">Pagas</option>
-              <option value="partial">Parcialmente pagas</option>
-              <option value="overdue">Vencidas</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Lista de Faturas */}
-        <div className="lg:col-span-2 space-y-4">
-          {isLoading ? (
-            <div className="flex items-center justify-center h-64">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Faturas</h1>
+          {!isLoading && invoices.length > 0 && (
+            <div className="flex items-center gap-4 mt-1 text-sm">
+              {overallSummary.overdueCount > 0 && (
+                <span className="flex items-center gap-1 text-red-600 dark:text-red-400 font-medium">
+                  <AlertTriangle size={14} />
+                  {overallSummary.overdueCount} {pluralize(overallSummary.overdueCount, 'vencida', 'vencidas')} ({formatCurrency(overallSummary.overdueTotal)})
+                </span>
+              )}
+              <span className="text-gray-500 dark:text-gray-400">
+                Total pendente: {formatCurrency(overallSummary.totalPending)}
+              </span>
             </div>
-          ) : invoices.length === 0 ? (
-            <EmptyState
-              icon={Receipt}
-              title="Nenhuma fatura encontrada"
-              description="As faturas aparecerão aqui quando você adicionar transações aos seus cartões de crédito."
-            />
-          ) : (
-            invoices.map((invoice) => {
-              const config = statusConfig[invoice.status]
-              const StatusIcon = config.icon
-
-              return (
-                <div
-                  key={invoice.id}
-                  className={clsx(
-                    'card cursor-pointer transition-all hover:shadow-md',
-                    selectedInvoice === invoice.id && 'ring-2 ring-primary-500'
-                  )}
-                  onClick={() => setSelectedInvoice(invoice.id)}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-gray-100 dark:bg-slate-700 rounded-lg">
-                        <CreditCard size={24} className="text-gray-600 dark:text-gray-300" />
-                      </div>
-                      <div>
-                        <h3 className="font-medium text-gray-900 dark:text-white">
-                          {invoice.credit_card_name || 'Cartão'}
-                        </h3>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
-                          {invoice.period_display}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className={clsx('px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1', config.color)}>
-                        <StatusIcon size={12} />
-                        {config.label}
-                      </span>
-                      <ChevronRight size={20} className="text-gray-400" />
-                    </div>
-                  </div>
-
-                  <div className="mt-4 grid grid-cols-3 gap-4">
-                    <div>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">Total</p>
-                      <p className="font-semibold text-gray-900 dark:text-white">
-                        {formatCurrency(invoice.total_amount)}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">Pago</p>
-                      <p className="font-semibold text-green-600 dark:text-green-400">
-                        {formatCurrency(invoice.paid_amount)}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">Restante</p>
-                      <p className={clsx(
-                        'font-semibold',
-                        invoice.remaining_amount > 0
-                          ? 'text-red-600 dark:text-red-400'
-                          : 'text-gray-900 dark:text-white'
-                      )}>
-                        {formatCurrency(invoice.remaining_amount)}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="mt-3 flex items-center justify-between text-sm">
-                    <span className="text-gray-500 dark:text-gray-400">
-                      Vencimento: {formatDate(invoice.due_date)}
-                    </span>
-                    <span className="text-gray-500 dark:text-gray-400">
-                      {invoice.transaction_count} transações
-                    </span>
-                  </div>
-
-                  <div className="mt-3 flex gap-2">
-                    {invoice.status !== 'paid' && invoice.remaining_amount > 0 && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handlePayClick(invoice)
-                        }}
-                        className="btn-primary flex-1"
-                      >
-                        Pagar Fatura
-                      </button>
-                    )}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setInvoiceToDelete(invoice)
-                        setShowDeleteModal(true)
-                      }}
-                      className="btn-secondary px-3"
-                      title="Excluir fatura"
-                    >
-                      <Trash2 size={18} />
-                    </button>
-                  </div>
-                </div>
-              )
-            })
           )}
         </div>
 
-        {/* Detalhes da Fatura */}
-        <div className="lg:col-span-1">
-          {invoiceDetail ? (
-            <div className="card sticky top-4">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-gray-900 dark:text-white">
-                  Transações da Fatura
-                </h3>
+        {/* Filters */}
+        <div className="flex items-center gap-3">
+          {/* Year Filter */}
+          <select
+            value={selectedYear}
+            onChange={(e) => {
+              setSelectedYear(Number(e.target.value))
+              setSelectedTab(null)
+            }}
+            className="input w-auto"
+          >
+            {availableYears.map((year) => (
+              <option key={year} value={year}>
+                {year}
+              </option>
+            ))}
+          </select>
+
+          {/* Card Filter */}
+          <select
+            value={selectedCardId || ''}
+            onChange={(e) => {
+              setSelectedCardId(e.target.value ? Number(e.target.value) : null)
+              setSelectedTab(null)
+            }}
+            className="input w-auto min-w-[160px]"
+          >
+            <option value="">Todos os cartões</option>
+            {cards.map((card) => (
+              <option key={card.id} value={card.id}>
+                {card.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
+        </div>
+      ) : invoices.length === 0 ? (
+        <EmptyState
+          icon={Receipt}
+          title="Nenhuma fatura encontrada"
+          description="As faturas aparecerão aqui quando você adicionar transações aos seus cartões de crédito."
+        />
+      ) : (
+        <>
+          {/* Month Tabs */}
+          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm overflow-hidden">
+            <div className="flex overflow-x-auto" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+              {monthTabs.map((tab) => (
                 <button
-                  onClick={() => setSelectedInvoice(null)}
-                  className="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded"
+                  key={tab.key}
+                  onClick={() => tab.hasInvoices && setSelectedTab(tab.key)}
+                  disabled={!tab.hasInvoices}
+                  className={clsx(
+                    'flex-1 min-w-[60px] px-3 py-3 text-sm font-medium transition-colors border-b-2 whitespace-nowrap',
+                    selectedTab === tab.key
+                      ? 'border-primary-500 text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/20'
+                      : tab.hasInvoices
+                        ? 'border-transparent text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700'
+                        : 'border-transparent text-gray-300 dark:text-gray-600 cursor-default',
+                    tab.isOverdue && selectedTab !== tab.key && 'text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-900/10'
+                  )}
                 >
-                  <X size={18} className="text-gray-500" />
+                  <span className="flex items-center justify-center gap-1">
+                    {tab.label}
+                    {tab.isOverdue && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                    )}
+                    {tab.isCurrent && !tab.isOverdue && tab.hasInvoices && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-primary-500" />
+                    )}
+                  </span>
                 </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Tab Summary */}
+          {selectedTab && (
+            <div className="flex items-center gap-6 px-4 py-3 bg-gray-50 dark:bg-slate-800/50 rounded-lg">
+              <div>
+                <span className="text-xs text-gray-500 dark:text-gray-400">Total do período</span>
+                <p className="font-semibold text-gray-900 dark:text-white">{formatCurrency(tabSummary.total)}</p>
               </div>
-
-              {invoiceDetail.transactions.length === 0 ? (
-                <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-8">
-                  Nenhuma transação nesta fatura
+              <div>
+                <span className="text-xs text-gray-500 dark:text-gray-400">A pagar</span>
+                <p className={clsx(
+                  'font-semibold',
+                  tabSummary.remaining > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
+                )}>
+                  {formatCurrency(tabSummary.remaining)}
                 </p>
-              ) : (
-                <>
-                  {/* Summary of projected vs confirmed */}
-                  {(() => {
-                    const projectedCount = invoiceDetail.transactions.filter(t => !t.is_paid).length
-                    const confirmedCount = invoiceDetail.transactions.filter(t => t.is_paid).length
-                    if (projectedCount > 0) {
-                      return (
-                        <div className="mb-3 p-2 bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-700 rounded-lg">
-                          <div className="flex items-center justify-between text-xs">
-                            <div className="flex items-center gap-1.5 text-purple-700 dark:text-purple-300">
-                              <Clock size={12} />
-                              <span>{projectedCount} projetada(s)</span>
-                            </div>
-                            <div className="flex items-center gap-1.5 text-green-700 dark:text-green-300">
-                              <Check size={12} />
-                              <span>{confirmedCount} confirmada(s)</span>
-                            </div>
-                          </div>
-                        </div>
-                      )
-                    }
-                    return null
-                  })()}
-
-                  <div className="space-y-3 max-h-[500px] overflow-y-auto">
-                    {invoiceDetail.transactions.map((t) => (
-                      <div
-                        key={t.id}
-                        className={clsx(
-                          "flex items-center justify-between p-2 rounded-lg group",
-                          t.is_paid
-                            ? "hover:bg-gray-50 dark:hover:bg-slate-700"
-                            : "bg-purple-50/50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 hover:bg-purple-50 dark:hover:bg-purple-900/30"
-                        )}
-                      >
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <p className="font-medium text-gray-900 dark:text-white text-sm truncate">
-                              {t.description || t.merchant_name || 'Transação'}
-                            </p>
-                            {!t.is_paid && (
-                              <span className="flex-shrink-0 px-1.5 py-0.5 text-[10px] font-semibold bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 rounded flex items-center gap-0.5">
-                                <Clock size={10} />
-                                Projetado
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">
-                            {formatDate(t.date)}
-                            {t.installment_number && t.installment_total && (
-                              <span className="ml-2">
-                                ({t.installment_number}/{t.installment_total})
-                              </span>
-                            )}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <p className={clsx(
-                            "font-semibold text-sm",
-                            t.is_paid
-                              ? "text-gray-900 dark:text-white"
-                              : "text-purple-700 dark:text-purple-300"
-                          )}>
-                            {formatCurrency(t.amount)}
-                          </p>
-                          <button
-                            onClick={() => {
-                              setTransactionToMove({
-                                id: t.id,
-                                description: t.description || t.merchant_name || 'Transação',
-                              })
-                              setShowMoveModal(true)
-                            }}
-                            className="p-1 opacity-0 group-hover:opacity-100 hover:bg-gray-200 dark:hover:bg-slate-600 rounded transition-opacity"
-                            title="Mover para outra fatura"
-                          >
-                            <ArrowRightLeft size={14} className="text-gray-500" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
-
-              <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                <div className="flex items-center justify-between">
-                  <span className="font-medium text-gray-700 dark:text-gray-300">Total</span>
-                  <span className="font-bold text-gray-900 dark:text-white">
-                    {formatCurrency(invoiceDetail.total_amount)}
+              </div>
+              <div>
+                <span className="text-xs text-gray-500 dark:text-gray-400">Cartões</span>
+                <p className="font-semibold text-gray-900 dark:text-white">{tabSummary.count}</p>
+              </div>
+              {tabSummary.overdueCount > 0 && (
+                <div className="ml-auto flex items-center gap-2 text-red-600 dark:text-red-400">
+                  <AlertTriangle size={16} />
+                  <span className="text-sm font-medium">
+                    {tabSummary.overdueCount} {pluralize(tabSummary.overdueCount, 'vencida', 'vencidas')}
                   </span>
                 </div>
-              </div>
-            </div>
-          ) : (
-            <div className="card text-center py-12">
-              <Receipt size={48} className="mx-auto text-gray-300 dark:text-gray-600 mb-4" />
-              <p className="text-gray-500 dark:text-gray-400">
-                Selecione uma fatura para ver os detalhes
-              </p>
+              )}
             </div>
           )}
-        </div>
-      </div>
 
-      {/* Modal de Pagamento */}
+          {/* Invoice Table */}
+          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm overflow-x-auto">
+            <table className="w-full min-w-[700px]">
+              <thead>
+                <tr className="border-b border-gray-200 dark:border-slate-700">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Cartão
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Total
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Pago
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Restante
+                  </th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Vencimento
+                  </th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Trans.
+                  </th>
+                  <th className="px-4 py-3 w-12"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
+                {filteredInvoices.map((invoice) => {
+                  const config = statusConfig[invoice.status]
+                  const StatusIcon = config.icon
+                  const isOverdue = invoice.status === 'overdue'
+
+                  return (
+                    <tr
+                      key={invoice.id}
+                      className={clsx(
+                        'hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors cursor-pointer',
+                        isOverdue && 'bg-red-50/50 dark:bg-red-900/10'
+                      )}
+                      onClick={() => handleViewDetails(invoice)}
+                    >
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <CreditCard size={16} className={clsx(
+                            isOverdue ? 'text-red-500' : 'text-gray-400'
+                          )} />
+                          <span className={clsx(
+                            'font-medium text-sm',
+                            isOverdue ? 'text-red-900 dark:text-red-100' : 'text-gray-900 dark:text-white'
+                          )}>
+                            {invoice.credit_card_name || 'Cartão'}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={clsx(
+                          'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium',
+                          config.color
+                        )}>
+                          <StatusIcon size={12} />
+                          {config.label}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <span className="text-sm font-medium text-gray-900 dark:text-white">
+                          {formatCurrency(invoice.total_amount)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <span className="text-sm text-green-600 dark:text-green-400">
+                          {formatCurrency(invoice.paid_amount)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <span className={clsx(
+                          'text-sm font-medium',
+                          invoice.remaining_amount > 0
+                            ? 'text-red-600 dark:text-red-400'
+                            : 'text-gray-500 dark:text-gray-400'
+                        )}>
+                          {formatCurrency(invoice.remaining_amount)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className={clsx(
+                          'text-sm',
+                          isOverdue ? 'text-red-600 dark:text-red-400 font-medium' : 'text-gray-500 dark:text-gray-400'
+                        )}>
+                          {formatShortDate(invoice.due_date)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className="text-sm text-gray-500 dark:text-gray-400">
+                          {invoice.transaction_count}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            if (openMenuId === invoice.id) {
+                              setOpenMenuId(null)
+                              setMenuPosition(null)
+                            } else {
+                              const rect = e.currentTarget.getBoundingClientRect()
+                              setMenuPosition({
+                                top: rect.bottom + 4,
+                                left: rect.right - 140, // 140px = min-width do menu
+                              })
+                              setOpenMenuId(invoice.id)
+                            }
+                          }}
+                          className="p-1 rounded hover:bg-gray-100 dark:hover:bg-slate-600"
+                        >
+                          <MoreVertical size={16} className="text-gray-400" />
+                        </button>
+
+                        {openMenuId === invoice.id && menuPosition && createPortal(
+                          <div
+                            className="fixed z-50 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-gray-200 dark:border-slate-700 py-1 min-w-[140px]"
+                            style={{ top: menuPosition.top, left: menuPosition.left }}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleViewDetails(invoice)
+                              }}
+                              className="w-full px-3 py-2 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center gap-2"
+                            >
+                              <Eye size={14} />
+                              Ver detalhes
+                            </button>
+                            {invoice.remaining_amount > 0 && invoice.status !== 'paid' && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handlePayClick(invoice)
+                                }}
+                                className="w-full px-3 py-2 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center gap-2"
+                              >
+                                <DollarSign size={14} />
+                                Pagar fatura
+                              </button>
+                            )}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleDeleteClick(invoice)
+                              }}
+                              className="w-full px-3 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center gap-2"
+                            >
+                              <Trash2 size={14} />
+                              Excluir
+                            </button>
+                          </div>,
+                          document.body
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+
+            {filteredInvoices.length === 0 && (
+              <div className="px-4 py-12 text-center text-gray-500 dark:text-gray-400">
+                Nenhuma fatura neste período
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* Invoice Detail Modal */}
+      {showDetailModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  {invoiceDetail?.period_display || 'Carregando...'}
+                </h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  {invoiceDetail?.credit_card_name}
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowDetailModal(false)
+                  setSelectedInvoiceId(null)
+                }}
+                className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg"
+              >
+                <X size={20} className="text-gray-500" />
+              </button>
+            </div>
+
+            {invoiceDetail ? (
+              <>
+                {/* Summary Cards */}
+                <div className="grid grid-cols-3 gap-4 p-4 bg-gray-50 dark:bg-slate-700/30">
+                  <div className="text-center">
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Total</p>
+                    <p className="text-lg font-bold text-gray-900 dark:text-white">
+                      {formatCurrency(invoiceDetail.total_amount)}
+                    </p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Pago</p>
+                    <p className="text-lg font-bold text-green-600 dark:text-green-400">
+                      {formatCurrency(invoiceDetail.paid_amount)}
+                    </p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Restante</p>
+                    <p className={clsx(
+                      'text-lg font-bold',
+                      invoiceDetail.remaining_amount > 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-600'
+                    )}>
+                      {formatCurrency(invoiceDetail.remaining_amount)}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Info Row */}
+                <div className="flex items-center justify-between px-4 py-2 text-sm border-b border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center gap-4">
+                    <span className="text-gray-500 dark:text-gray-400">
+                      Vencimento: <span className="text-gray-900 dark:text-white font-medium">{formatShortDate(invoiceDetail.due_date)}</span>
+                    </span>
+                    <span className={clsx(
+                      'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium',
+                      statusConfig[invoiceDetail.status].color
+                    )}>
+                      {statusConfig[invoiceDetail.status].label}
+                    </span>
+                  </div>
+                  <span className="text-gray-500 dark:text-gray-400">
+                    {invoiceDetail.transactions.length} {pluralize(invoiceDetail.transactions.length, 'transação', 'transações')}
+                  </span>
+                </div>
+
+                {/* Transactions List */}
+                <div className="flex-1 overflow-y-auto p-4">
+                  {invoiceDetail.transactions.length === 0 ? (
+                    <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+                      Nenhuma transação nesta fatura
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      {invoiceDetail.transactions.map((t) => (
+                        <div
+                          key={t.id}
+                          className={clsx(
+                            'flex items-center justify-between p-3 rounded-lg group',
+                            t.is_paid
+                              ? 'hover:bg-gray-50 dark:hover:bg-slate-700/50'
+                              : 'bg-purple-50/50 dark:bg-purple-900/20'
+                          )}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium text-gray-900 dark:text-white text-sm truncate">
+                                {t.description || t.merchant_name || 'Transação'}
+                              </span>
+                              {!t.is_paid && (
+                                <span className="flex-shrink-0 px-1.5 py-0.5 text-[10px] font-medium bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 rounded">
+                                  Projetada
+                                </span>
+                              )}
+                              {t.installment_number && t.installment_total && (
+                                <span className="text-xs text-gray-500 dark:text-gray-400">
+                                  ({t.installment_number}/{t.installment_total})
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                              <span>{formatShortDate(t.date)}</span>
+                              {t.category_name && (
+                                <>
+                                  <span>•</span>
+                                  <span>{t.category_name}</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className={clsx(
+                              'font-semibold',
+                              t.is_paid ? 'text-gray-900 dark:text-white' : 'text-purple-700 dark:text-purple-300'
+                            )}>
+                              {formatCurrency(t.amount)}
+                            </span>
+                            <button
+                              onClick={() => {
+                                setTransactionToMove({
+                                  id: t.id,
+                                  description: t.description || t.merchant_name || 'Transação',
+                                })
+                                setShowMoveModal(true)
+                              }}
+                              className="p-1.5 opacity-0 group-hover:opacity-100 hover:bg-gray-200 dark:hover:bg-slate-600 rounded transition-opacity"
+                              title="Mover para outra fatura"
+                            >
+                              <ArrowRightLeft size={14} className="text-gray-500" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Modal Footer */}
+                {invoiceDetail.remaining_amount > 0 && invoiceDetail.status !== 'paid' && (
+                  <div className="flex gap-2 p-4 border-t border-gray-200 dark:border-gray-700">
+                    <button
+                      onClick={() => handleDeleteClick(invoiceDetail)}
+                      className="btn-secondary flex-1"
+                    >
+                      <Trash2 size={16} className="mr-2" />
+                      Excluir
+                    </button>
+                    <button
+                      onClick={() => handlePayClick(invoiceDetail)}
+                      className={clsx(
+                        'flex-1',
+                        invoiceDetail.status === 'overdue'
+                          ? 'btn-primary bg-red-600 hover:bg-red-700'
+                          : 'btn-primary'
+                      )}
+                    >
+                      <DollarSign size={16} className="mr-2" />
+                      {invoiceDetail.status === 'overdue' ? 'Pagar Agora' : 'Pagar Fatura'}
+                    </button>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="flex items-center justify-center h-64">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Payment Modal */}
       {showPayModal && invoiceToPay && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
@@ -539,7 +878,7 @@ export default function Invoices() {
         </div>
       )}
 
-      {/* Modal de Exclusão */}
+      {/* Delete Modal */}
       {showDeleteModal && invoiceToDelete && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
@@ -553,7 +892,6 @@ export default function Invoices() {
               {invoiceToDelete.credit_card_name} - {invoiceToDelete.period_display}
             </p>
 
-            {/* Opção para deletar transações */}
             <div className="mb-4 space-y-3">
               <label className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 dark:border-gray-700 cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-700">
                 <input
@@ -568,8 +906,7 @@ export default function Invoices() {
                     Excluir fatura e transações
                   </p>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Remove a fatura e todas as {invoiceToDelete.transaction_count} transações vinculadas.
-                    Use esta opção para relançar a fatura.
+                    Remove a fatura e {invoiceToDelete.transaction_count === 1 ? 'a transação vinculada' : `todas as ${invoiceToDelete.transaction_count} transações vinculadas`}.
                   </p>
                 </div>
               </label>
@@ -587,7 +924,7 @@ export default function Invoices() {
                     Apenas desvincular transações
                   </p>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Remove a fatura mas mantém as transações (elas ficam sem fatura vinculada).
+                    Remove a fatura mas mantém as transações.
                   </p>
                 </div>
               </label>
@@ -596,7 +933,7 @@ export default function Invoices() {
             {deleteTransactions && (
               <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg p-3 mb-4">
                 <p className="text-sm text-red-800 dark:text-red-200">
-                  Atenção: Esta ação não pode ser desfeita. As transações serão permanentemente excluídas.
+                  Atenção: Esta ação não pode ser desfeita.
                 </p>
               </div>
             )}
@@ -628,7 +965,7 @@ export default function Invoices() {
         </div>
       )}
 
-      {/* Modal de Mover Transação */}
+      {/* Move Transaction Modal */}
       {showMoveModal && transactionToMove && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
@@ -657,7 +994,7 @@ export default function Invoices() {
                   <select name="invoice_id" className="input">
                     <option value="">Nenhuma (desvincular)</option>
                     {invoices
-                      .filter((inv) => inv.id !== selectedInvoice)
+                      .filter((inv) => inv.id !== selectedInvoiceId)
                       .map((inv) => (
                         <option key={inv.id} value={inv.id}>
                           {inv.credit_card_name} - {inv.period_display}

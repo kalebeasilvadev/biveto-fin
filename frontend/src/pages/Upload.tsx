@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { documentsApi, transactionsApi, accountsApi, categoriesApi, familyApi, creditCardsApi, invoicesApi, getApiErrorMessage } from '../services/api'
+import { documentsApi, transactionsApi, accountsApi, categoriesApi, familyApi, creditCardsApi, invoicesApi, recurringApi, getApiErrorMessage } from '../services/api'
 import { X, CreditCard, Repeat, Plus, AlertCircle } from 'lucide-react'
 import {
   Document,
@@ -49,6 +49,9 @@ export default function Upload() {
     message?: string
   }>>({})
   const [isCheckingProjected, setIsCheckingProjected] = useState(false)
+
+  // Recurring creation state
+  const [creatingRecurringIndex, setCreatingRecurringIndex] = useState<number | null>(null)
 
   // Prevent accidental page reload
   useEffect(() => {
@@ -192,18 +195,122 @@ export default function Upload() {
       // Auto-detect credit card if this is a credit card invoice
       if (doc.document_type === 'fatura_cartao' && doc.card_info && creditCards.length > 0) {
         const cardInfo = doc.card_info
-        // Try to find a matching card
-        const matchedCard = creditCards.find((card: { id: number; name: string; last_four_digits?: string }) => {
-          // Match by last 4 digits if available
-          if (cardInfo.card_last_digits && card.last_four_digits) {
-            return card.last_four_digits === cardInfo.card_last_digits
+
+        // Helper function to normalize strings for comparison
+        const normalize = (str: string) => str.toLowerCase()
+          .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // Remove accents
+          .replace(/[_-]/g, ' ') // Replace underscores/dashes with spaces
+          .trim()
+
+        // Issuer variants map - maps issuer names to related terms
+        const issuerVariants: Record<string, string[]> = {
+          'bradescard': ['bradesco', 'bradescard', 'amazon'],
+          'bradesco': ['bradesco', 'bradescard'],
+          'itau': ['itau', 'itaucard'],
+          'nubank': ['nubank', 'nu'],
+          'santander': ['santander'],
+          'inter': ['inter', 'banco inter'],
+          'c6': ['c6', 'c6 bank'],
+          'bb': ['banco do brasil', 'bb'],
+          'caixa': ['caixa', 'cef'],
+          'amazon': ['amazon', 'bradesco', 'bradescard'],
+          'carrefour': ['carrefour'],
+          'digio': ['digio'],
+          'pagbank': ['pagbank', 'pagseguro'],
+          'picpay': ['picpay'],
+          'mercadopago': ['mercado pago', 'mercadopago'],
+        }
+
+        // Get variants for an issuer
+        const getIssuerVariants = (issuer: string): string[] => {
+          const normalized = normalize(issuer)
+          for (const [key, variants] of Object.entries(issuerVariants)) {
+            if (normalized.includes(key) || key.includes(normalized)) {
+              return [...variants, normalized]
+            }
           }
-          // Match by issuer name if no digits
-          if (cardInfo.card_issuer) {
-            return card.name.toLowerCase().includes(cardInfo.card_issuer.toLowerCase())
+          // Return the issuer itself and its words
+          return [normalized, ...normalized.split(/\s+/).filter(w => w.length > 2)]
+        }
+
+        // Helper function to check if two strings match (fuzzy)
+        const fuzzyMatch = (str1: string, str2: string): boolean => {
+          const s1 = normalize(str1)
+          const s2 = normalize(str2)
+
+          // Direct includes check both directions
+          if (s1.includes(s2) || s2.includes(s1)) return true
+
+          // Word-by-word matching: check if any significant word matches
+          const words1 = s1.split(/\s+/).filter(w => w.length > 2)
+          const words2 = s2.split(/\s+/).filter(w => w.length > 2)
+
+          // Check if any word from one exists in the other
+          for (const w1 of words1) {
+            for (const w2 of words2) {
+              if (w1.includes(w2) || w2.includes(w1)) return true
+            }
           }
+
           return false
-        })
+        }
+
+        // Try to find a matching card with scoring
+        let bestMatch: { card: typeof creditCards[0]; score: number } | null = null
+
+        for (const card of creditCards as Array<{ id: number; name: string; last_four_digits?: string }>) {
+          let score = 0
+          const cardNameNormalized = normalize(card.name)
+
+          // Match by last 4 digits (highest priority)
+          if (cardInfo.card_last_digits && card.last_four_digits) {
+            if (card.last_four_digits === cardInfo.card_last_digits) {
+              score += 100 // Strong match
+            }
+          }
+
+          // Match by card name (from PDF) vs registered card name
+          if (cardInfo.card_name && fuzzyMatch(card.name, cardInfo.card_name)) {
+            score += 50
+          }
+
+          // Match by partner (amazon, smiles, etc.) - high value because it's specific
+          if (cardInfo.card_partner && cardNameNormalized.includes(normalize(cardInfo.card_partner))) {
+            score += 40
+          }
+
+          // Match by bank name
+          if (cardInfo.card_bank && fuzzyMatch(card.name, cardInfo.card_bank)) {
+            score += 25
+          }
+
+          // Match by issuer name using variants
+          if (cardInfo.card_issuer) {
+            const variants = getIssuerVariants(cardInfo.card_issuer)
+            for (const variant of variants) {
+              if (cardNameNormalized.includes(variant) || variant.includes(cardNameNormalized)) {
+                score += 30
+                break
+              }
+            }
+            // Also try fuzzy match if no variant matched
+            if (score < 55 && fuzzyMatch(card.name, cardInfo.card_issuer)) {
+              score += 30
+            }
+          }
+
+          // Match by brand (visa, mastercard) - lower priority
+          if (cardInfo.card_brand && cardNameNormalized.includes(normalize(cardInfo.card_brand))) {
+            score += 10
+          }
+
+          // Update best match
+          if (score > 0 && (!bestMatch || score > bestMatch.score)) {
+            bestMatch = { card, score }
+          }
+        }
+
+        const matchedCard = bestMatch?.card
 
         if (matchedCard) {
           setSelectedCreditCardId(String(matchedCard.id))
@@ -273,48 +380,170 @@ export default function Upload() {
     },
   })
 
-  const batchAddMutation = useMutation({
-    mutationFn: async (items: { index: number; data: unknown; description: string; force?: boolean }[]) => {
-      const results = []
-      const skipped: string[] = []
-      const duplicates: { index: number; data: unknown; description: string; message: string }[] = []
-
-      for (const item of items) {
-        try {
-          // Se force=true, adiciona flag force_duplicate
-          const dataToSend = item.force
-            ? { ...(item.data as object), force_duplicate: true }
-            : item.data
-          const result = await transactionsApi.confirm(dataToSend)
-          results.push(result)
-          setBatchAddSuccess(prev => prev + 1)
-        } catch (error: unknown) {
-          // Axios error structure
-          const axiosError = error as { response?: { status?: number; data?: { detail?: string } }; status?: number }
-          const status = axiosError.response?.status || axiosError.status
-          const detail = axiosError.response?.data?.detail
-
-          console.log('Batch add error:', { status, detail, error })
-
-          if (status === 409) {
-            // Guardar como duplicado pendente para o usuário decidir
-            const message = detail || item.description
-            duplicates.push({
-              index: item.index,
-              data: item.data,
-              description: item.description,
-              message,
-            })
-          } else {
-            // Para outros erros, adicionar como pulado
-            const errorMessage = detail || item.description
-            skipped.push(`Erro: ${errorMessage}`)
-            setBatchAddSkipped(prev => [...prev, `Erro: ${errorMessage}`])
+  const createRecurringMutation = useMutation({
+    mutationFn: (data: {
+      name: string
+      amount: number
+      account_id: number
+      frequency?: string
+      day_of_month?: number
+      category_name?: string
+      payment_method?: string
+      credit_card_id?: number
+    }) => recurringApi.createFromSuggestion(data),
+    onSuccess: () => {
+      setCreatingRecurringIndex(null)
+      queryClient.invalidateQueries({ queryKey: ['recurring'] })
+      // Update the document to mark this item as user_recurring
+      if (document && creatingRecurringIndex !== null) {
+        const updatedItems = [...document.extracted_items]
+        if (updatedItems[creatingRecurringIndex]?.recurring_detection) {
+          updatedItems[creatingRecurringIndex] = {
+            ...updatedItems[creatingRecurringIndex],
+            recurring_detection: {
+              ...updatedItems[creatingRecurringIndex].recurring_detection!,
+              is_user_recurring: true,
+            }
           }
+          setDocument({ ...document, extracted_items: updatedItems })
         }
       }
+    },
+    onError: () => {
+      setCreatingRecurringIndex(null)
+    },
+  })
 
-      return { results, skipped, duplicates }
+  // Batch create recurring mutation
+  const [isCreatingAllRecurrences, setIsCreatingAllRecurrences] = useState(false)
+  const batchCreateRecurringMutation = useMutation({
+    mutationFn: (items: Array<{
+      name: string
+      amount: number
+      account_id: number
+      frequency?: string
+      day_of_month?: number
+      category_name?: string
+      payment_method?: string
+      credit_card_id?: number
+    }>) => recurringApi.batchCreateFromSuggestion(items),
+    onSuccess: (response) => {
+      setIsCreatingAllRecurrences(false)
+      queryClient.invalidateQueries({ queryKey: ['recurring'] })
+
+      const result = response.data as {
+        total: number
+        success_count: number
+        duplicate_count: number
+        error_count: number
+        results: Array<{ index: number; success: boolean; recurring_name?: string; is_duplicate?: boolean }>
+      }
+
+      // Update document to mark all created items as user_recurring
+      if (document) {
+        const updatedItems = [...document.extracted_items]
+        const detectedIndices = updatedItems
+          .map((item, idx) => ({ item, idx }))
+          .filter(({ item }) =>
+            item.recurring_detection?.is_known_service &&
+            !item.recurring_detection?.is_user_recurring &&
+            item.recurring_detection?.suggested_recurring
+          )
+
+        result.results.forEach((res, i) => {
+          if (res.success && detectedIndices[i]) {
+            const { idx } = detectedIndices[i]
+            if (updatedItems[idx]?.recurring_detection) {
+              updatedItems[idx] = {
+                ...updatedItems[idx],
+                recurring_detection: {
+                  ...updatedItems[idx].recurring_detection!,
+                  is_user_recurring: true,
+                }
+              }
+            }
+          }
+        })
+
+        setDocument({ ...document, extracted_items: updatedItems })
+      }
+
+      // Show success message
+      if (result.success_count > 0) {
+        setBatchAddError(null)
+      }
+      if (result.duplicate_count > 0 || result.error_count > 0) {
+        const messages = []
+        if (result.success_count > 0) messages.push(`${result.success_count} recorrência(s) criada(s)`)
+        if (result.duplicate_count > 0) messages.push(`${result.duplicate_count} já existia(m)`)
+        if (result.error_count > 0) messages.push(`${result.error_count} erro(s)`)
+        // No error - just info
+      }
+    },
+    onError: (error) => {
+      setIsCreatingAllRecurrences(false)
+      setBatchAddError('Erro ao criar recorrências: ' + (error as Error).message)
+    },
+  })
+
+  const batchAddMutation = useMutation({
+    mutationFn: async (items: { index: number; data: unknown; description: string; force?: boolean }[]) => {
+      // Preparar items para o batch endpoint
+      const batchItems = items.map(item => {
+        const dataObj = item.data as Record<string, unknown>
+        return {
+          ...dataObj,
+          force_duplicate: item.force || false,
+        }
+      })
+
+      // Extrair closing_day e due_day do card_info do documento (para atualizar o cartao automaticamente)
+      const cardClosingDay = document?.card_info?.closing_day
+      const cardDueDay = document?.card_info?.due_day
+
+      // Chamar o endpoint de batch (uma única requisição)
+      const response = await transactionsApi.batchConfirm({
+        items: batchItems,
+        card_closing_day: cardClosingDay,
+        card_due_day: cardDueDay,
+      })
+      const batchResult = response.data as {
+        total: number
+        success_count: number
+        duplicate_count: number
+        error_count: number
+        results: Array<{
+          index: number
+          success: boolean
+          transaction_id?: number
+          error?: string
+          is_duplicate: boolean
+        }>
+      }
+
+      // Processar resultados
+      const duplicates: { index: number; data: unknown; description: string; message: string }[] = []
+      const skipped: string[] = []
+
+      batchResult.results.forEach((result, idx) => {
+        const originalItem = items[idx]
+        if (result.success) {
+          setBatchAddSuccess(prev => prev + 1)
+        } else if (result.is_duplicate) {
+          duplicates.push({
+            index: originalItem.index,
+            data: originalItem.data,
+            description: originalItem.description,
+            message: result.error || originalItem.description,
+          })
+        } else {
+          const errorMessage = result.error || originalItem.description
+          skipped.push(`Erro: ${errorMessage}`)
+          setBatchAddSkipped(prev => [...prev, `Erro: ${errorMessage}`])
+        }
+      })
+
+      return { results: batchResult.results, skipped, duplicates }
     },
     onSuccess: (data) => {
       // Atualizar lista de duplicados pendentes APÓS a mutação completar
@@ -412,6 +641,8 @@ export default function Upload() {
             item.installment_current &&
             item.installment_total &&
             item.installment_current < item.installment_total,
+          // Tipo de transacao extraido pelo LLM (pagamento, credito, estorno, compra, etc)
+          extracted_transaction_type: item.transaction_type || null,
         }
       }
     })
@@ -453,6 +684,8 @@ export default function Upload() {
           item.installment_current &&
           item.installment_total &&
           item.installment_current < item.installment_total,
+        // Tipo de transacao extraido pelo LLM (pagamento, credito, estorno, compra, etc)
+        extracted_transaction_type: item.transaction_type || null,
       }
     }))
 
@@ -493,6 +726,120 @@ export default function Upload() {
     })
   }
 
+  // Create recurring from detected service
+  const handleCreateRecurring = (index: number) => {
+    if (!document?.extracted_items) return
+    const item = document.extracted_items[index]
+    if (!item.recurring_detection?.suggested_recurring) return
+
+    // Para faturas de cartão, obter account_id do cartão selecionado
+    let accountId: number | null = null
+    let creditCardId: number | null = null
+
+    if (isCreditCardInvoice) {
+      if (!selectedCreditCardId) {
+        setBatchAddError('Selecione um cartão de crédito antes de criar a recorrência')
+        return
+      }
+      creditCardId = parseInt(selectedCreditCardId)
+      // Obter account_id do cartão
+      const selectedCard = creditCards.find((c: { id: number; account_id?: number }) => c.id === creditCardId)
+      accountId = selectedCard?.account_id || null
+      if (!accountId) {
+        setBatchAddError('O cartão selecionado não possui uma conta vinculada')
+        return
+      }
+    } else {
+      accountId = formData.account_id ? parseInt(formData.account_id) : null
+      if (!accountId) {
+        setBatchAddError('Selecione uma conta antes de criar a recorrência')
+        return
+      }
+    }
+
+    setCreatingRecurringIndex(index)
+    const suggestion = item.recurring_detection.suggested_recurring
+
+    // Extract day from the item date if available
+    let dayOfMonth = suggestion.day_of_month
+    if (!dayOfMonth && item.date) {
+      dayOfMonth = new Date(item.date + 'T12:00:00').getDate()
+    }
+
+    createRecurringMutation.mutate({
+      name: suggestion.name,
+      amount: suggestion.amount,
+      account_id: accountId,
+      frequency: suggestion.frequency || 'monthly',
+      day_of_month: dayOfMonth,
+      category_name: suggestion.default_category || item.category || undefined,
+      payment_method: isCreditCardInvoice ? 'credit_card' : 'debit',
+      credit_card_id: creditCardId || undefined,
+    })
+  }
+
+  // Create all detected recurring services at once
+  const handleCreateAllRecurrences = () => {
+    if (!document?.extracted_items) return
+
+    // Para faturas de cartão, obter account_id do cartão selecionado
+    let accountId: number | null = null
+    let creditCardId: number | null = null
+
+    if (isCreditCardInvoice) {
+      if (!selectedCreditCardId) {
+        setBatchAddError('Selecione um cartão de crédito antes de criar as recorrências')
+        return
+      }
+      creditCardId = parseInt(selectedCreditCardId)
+      const selectedCard = creditCards.find((c: { id: number; account_id?: number }) => c.id === creditCardId)
+      accountId = selectedCard?.account_id || null
+      if (!accountId) {
+        setBatchAddError('O cartão selecionado não possui uma conta vinculada')
+        return
+      }
+    } else {
+      accountId = formData.account_id ? parseInt(formData.account_id) : null
+      if (!accountId) {
+        setBatchAddError('Selecione uma conta antes de criar as recorrências')
+        return
+      }
+    }
+
+    // Filter items that have detected recurring services not yet registered
+    const itemsToCreate = document.extracted_items
+      .filter(item =>
+        item.recurring_detection?.is_known_service &&
+        !item.recurring_detection?.is_user_recurring &&
+        item.recurring_detection?.suggested_recurring
+      )
+      .map(item => {
+        const suggestion = item.recurring_detection!.suggested_recurring!
+        let dayOfMonth = suggestion.day_of_month
+        if (!dayOfMonth && item.date) {
+          dayOfMonth = new Date(item.date + 'T12:00:00').getDate()
+        }
+        return {
+          name: suggestion.name,
+          amount: suggestion.amount,
+          account_id: accountId!,
+          frequency: suggestion.frequency || 'monthly',
+          day_of_month: dayOfMonth,
+          category_name: suggestion.default_category || item.category || undefined,
+          payment_method: isCreditCardInvoice ? 'credit_card' : 'debit',
+          credit_card_id: creditCardId || undefined,
+        }
+      })
+
+    if (itemsToCreate.length === 0) {
+      setBatchAddError('Nenhuma recorrência para criar')
+      return
+    }
+
+    setIsCreatingAllRecurrences(true)
+    batchCreateRecurringMutation.mutate(itemsToCreate)
+  }
+
   // Forçar adição de duplicados pendentes
   const handleForceAddDuplicates = () => {
     if (pendingDuplicates.length === 0) return
@@ -531,6 +878,7 @@ export default function Upload() {
     setSelectedCreditCardId('')
     setShowCreateCardPrompt(false)
     setIsCreatingCard(false)
+    setCreatingRecurringIndex(null)
   }
 
   // Render camera mode
@@ -582,64 +930,106 @@ export default function Upload() {
         )}
 
         {/* Document summary */}
-        {!isManual && document && document.status === 'completed' && document.extracted_items && document.extracted_items.length > 0 && (
-          <div className="bg-gradient-to-r from-primary-50 to-blue-50 dark:from-primary-900/30 dark:to-blue-900/30 rounded-xl p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="p-2 bg-white dark:bg-slate-800 rounded-lg shadow-sm">
-                  <CreditCard className="text-primary-600" size={20} />
+        {!isManual && document && document.status === 'completed' && document.extracted_items && document.extracted_items.length > 0 && (() => {
+          const totalDespesas = document.extracted_items
+            .filter(item => item.amount > 0)
+            .reduce((sum, item) => sum + item.amount, 0)
+          const totalEstornos = document.extracted_items
+            .filter(item => item.amount < 0 && item.category !== 'pagamento')
+            .reduce((sum, item) => sum + item.amount, 0)
+          const totalPagamentos = document.extracted_items
+            .filter(item => item.category === 'pagamento')
+            .reduce((sum, item) => sum + item.amount, 0)
+          const totalFatura = isCreditCardInvoice && document.card_info?.total_amount
+            ? document.card_info.total_amount
+            : totalDespesas + totalEstornos
+
+          return (
+            <div className="bg-gradient-to-r from-primary-50 to-blue-50 dark:from-primary-900/30 dark:to-blue-900/30 rounded-xl p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-white dark:bg-slate-800 rounded-lg shadow-sm">
+                    <CreditCard className="text-primary-600" size={20} />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-gray-900 dark:text-white">
+                      {isCreditCardInvoice ? 'Fatura de Cartão' : 'Documento processado'}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {document.extracted_items.length} transação(ões) encontrada(s)
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="font-semibold text-gray-900 dark:text-white">
-                    {isCreditCardInvoice ? 'Fatura de Cartão' : 'Documento processado'}
+              </div>
+
+              {/* Mini cards com totais */}
+              <div className="grid grid-cols-3 gap-2">
+                <div className="bg-white dark:bg-slate-800 rounded-lg p-2 text-center shadow-sm">
+                  <p className="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wide">Despesas</p>
+                  <p className="font-bold text-sm text-gray-900 dark:text-white">
+                    R$ {totalDespesas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    {document.extracted_items.length} transação(ões) encontrada(s)
+                </div>
+                {totalEstornos < 0 && (
+                  <div className="bg-white dark:bg-slate-800 rounded-lg p-2 text-center shadow-sm">
+                    <p className="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wide">Estornos</p>
+                    <p className="font-bold text-sm text-green-600">
+                      R$ {totalEstornos.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                )}
+                <div className="bg-white dark:bg-slate-800 rounded-lg p-2 text-center shadow-sm">
+                  <p className="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                    {isCreditCardInvoice ? 'Total Fatura' : 'Total'}
+                  </p>
+                  <p className="font-bold text-sm text-primary-600">
+                    R$ {totalFatura.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </p>
                 </div>
               </div>
-              <div className="text-right">
-                <p className="text-xs text-gray-500 dark:text-gray-400">Total despesas</p>
-                <p className="font-bold text-lg text-gray-900 dark:text-white">
-                  R$ {document.extracted_items
-                    .filter(item => item.amount > 0)
-                    .reduce((sum, item) => sum + item.amount, 0)
-                    .toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                </p>
-              </div>
+
+              {/* Pagamentos registrados */}
+              {totalPagamentos < 0 && (
+                <div className="bg-green-50 dark:bg-green-900/30 rounded-lg p-2 text-center">
+                  <p className="text-[10px] text-green-600 dark:text-green-400 uppercase tracking-wide">Pagamento registrado</p>
+                  <p className="font-bold text-sm text-green-700 dark:text-green-300">
+                    R$ {Math.abs(totalPagamentos).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </p>
+                </div>
+              )}
+
+              {/* Card info for credit card invoices */}
+              {isCreditCardInvoice && document.card_info && (
+                <div className="flex items-center gap-2 pt-2 border-t border-primary-100 dark:border-primary-800">
+                  <CreditCard size={14} className="text-primary-600" />
+                  <span className="text-sm text-gray-700 dark:text-gray-300">
+                    {document.card_info.card_issuer?.toUpperCase() || 'Cartão'}
+                    {document.card_info.card_last_digits && ` ****${document.card_info.card_last_digits}`}
+                    {document.card_info.invoice_month && document.card_info.invoice_year && (
+                      <span className="ml-1 text-gray-500 dark:text-gray-400">
+                        • Ref: {document.card_info.invoice_month.toString().padStart(2, '0')}/{document.card_info.invoice_year}
+                      </span>
+                    )}
+                    {document.card_info.due_date && (
+                      <span className="ml-1 text-gray-500 dark:text-gray-400">
+                        • Venc: {new Date(document.card_info.due_date + 'T12:00:00').toLocaleDateString('pt-BR')}
+                      </span>
+                    )}
+                  </span>
+                </div>
+              )}
+
+              {document.extracted_items.some(item => item.is_installment) && (
+                <div className="flex items-center gap-2 pt-2 border-t border-primary-100 dark:border-primary-800">
+                  <Repeat size={14} className="text-blue-600" />
+                  <span className="text-xs text-blue-700 dark:text-blue-400">
+                    {document.extracted_items.filter(item => item.is_installment).length} compra(s) parcelada(s) detectada(s)
+                  </span>
+                </div>
+              )}
             </div>
-
-            {/* Card info for credit card invoices */}
-            {isCreditCardInvoice && document.card_info && (
-              <div className="flex items-center gap-2 pt-2 border-t border-primary-100 dark:border-primary-800">
-                <CreditCard size={14} className="text-primary-600" />
-                <span className="text-sm text-gray-700 dark:text-gray-300">
-                  {document.card_info.card_issuer?.toUpperCase() || 'Cartão'}
-                  {document.card_info.card_last_digits && ` ****${document.card_info.card_last_digits}`}
-                  {document.card_info.invoice_month && document.card_info.invoice_year && (
-                    <span className="ml-1 text-gray-500 dark:text-gray-400">
-                      • Ref: {document.card_info.invoice_month.toString().padStart(2, '0')}/{document.card_info.invoice_year}
-                    </span>
-                  )}
-                  {document.card_info.due_date && (
-                    <span className="ml-1 text-gray-500 dark:text-gray-400">
-                      • Venc: {new Date(document.card_info.due_date + 'T12:00:00').toLocaleDateString('pt-BR')}
-                    </span>
-                  )}
-                </span>
-              </div>
-            )}
-
-            {document.extracted_items.some(item => item.is_installment) && (
-              <div className="flex items-center gap-2 pt-2 border-t border-primary-100 dark:border-primary-800">
-                <Repeat size={14} className="text-blue-600" />
-                <span className="text-xs text-blue-700 dark:text-blue-400">
-                  {document.extracted_items.filter(item => item.is_installment).length} compra(s) parcelada(s) detectada(s)
-                </span>
-              </div>
-            )}
-          </div>
-        )}
+          )
+        })()}
 
         {!isManual && document && document.status === 'failed' && (
           <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg p-3 flex items-center gap-2">
@@ -687,9 +1077,14 @@ export default function Upload() {
               setEditingItemIndex(null)
               setSelectedCreditCardId('')
               setProjectedInfo({})
+              setCreatingRecurringIndex(null)
             }}
             projectedInfo={projectedInfo}
             isCheckingProjected={isCheckingProjected}
+            onCreateRecurring={handleCreateRecurring}
+            creatingRecurringIndex={creatingRecurringIndex}
+            onCreateAllRecurrences={handleCreateAllRecurrences}
+            isCreatingAllRecurrences={isCreatingAllRecurrences}
           />
         )}
 

@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = 'add_payment_txn_ids'
-down_revision = None  # Will be determined by alembic
+down_revision = 'add_cc_installment'
 branch_labels = None
 depends_on = None
 

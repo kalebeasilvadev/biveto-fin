@@ -222,6 +222,11 @@ export const transactionsApi = {
     api.get('/transactions', { params }),
   create: (data: unknown) => api.post('/transactions', data),
   confirm: (data: unknown) => api.post('/transactions/confirm', data),
+  batchConfirm: (data: {
+    items: unknown[]
+    card_closing_day?: number
+    card_due_day?: number
+  }) => api.post('/transactions/batch-confirm', data),
   update: (id: number, data: unknown) => api.patch(`/transactions/${id}`, data),
   delete: (id: number) => api.delete(`/transactions/${id}`),
   checkProjected: (data: {
@@ -355,6 +360,26 @@ export const recurringApi = {
   resume: (id: number) => api.post(`/recurring/${id}/resume`),
   summary: () => api.get('/recurring/summary'),
   generate: () => api.post('/recurring/generate'),
+  createFromSuggestion: (data: {
+    name: string
+    amount: number
+    account_id: number
+    frequency?: string
+    day_of_month?: number
+    category_name?: string
+    payment_method?: string
+    credit_card_id?: number
+  }) => api.post('/recurring/from-suggestion', data),
+  batchCreateFromSuggestion: (items: Array<{
+    name: string
+    amount: number
+    account_id: number
+    frequency?: string
+    day_of_month?: number
+    category_name?: string
+    payment_method?: string
+    credit_card_id?: number
+  }>) => api.post('/recurring/batch-from-suggestion', { items }),
 }
 
 export const adminApi = {

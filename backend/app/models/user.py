@@ -22,58 +22,61 @@ class User(Base):
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
 
-    # License relationship - specify foreign_keys to avoid ambiguity with License.owner_user_id
+    # License relationship - keep selectin for auth checks
     license: Mapped["License | None"] = relationship(
         back_populates="users",
         lazy="selectin",
         foreign_keys="User.license_id"
     )
 
-    # Relationships - cascade delete when user is deleted
-    accounts: Mapped[list["Account"]] = relationship(
-        back_populates="user", lazy="selectin", cascade="all, delete-orphan"
-    )
-    transactions: Mapped[list["Transaction"]] = relationship(
-        back_populates="user", lazy="selectin", cascade="all, delete-orphan"
-    )
-    documents: Mapped[list["Document"]] = relationship(
-        back_populates="user", lazy="selectin", cascade="all, delete-orphan"
-    )
-    merchant_rules: Mapped[list["UserMerchantRule"]] = relationship(
-        back_populates="user", lazy="selectin", cascade="all, delete-orphan"
-    )
-    installment_series: Mapped[list["InstallmentSeries"]] = relationship(
-        back_populates="user", lazy="selectin", cascade="all, delete-orphan"
-    )
-    budgets: Mapped[list["Budget"]] = relationship(
-        back_populates="user", lazy="selectin", cascade="all, delete-orphan"
-    )
-    goals: Mapped[list["Goal"]] = relationship(
-        back_populates="user", lazy="selectin", cascade="all, delete-orphan"
-    )
-    debts: Mapped[list["Debt"]] = relationship(
-        back_populates="user", lazy="selectin", cascade="all, delete-orphan"
-    )
-    invitations_sent: Mapped[list["Invitation"]] = relationship(
-        back_populates="invited_by", lazy="selectin", cascade="all, delete-orphan"
-    )
-    recurring_transactions: Mapped[list["RecurringTransaction"]] = relationship(
-        back_populates="user", lazy="selectin", cascade="all, delete-orphan"
-    )
+    # Household membership - keep selectin for auth/permission checks
     household_membership: Mapped["HouseholdMember | None"] = relationship(
         back_populates="user",
         foreign_keys="HouseholdMember.user_id",
         uselist=False,
         lazy="selectin"
     )
+
+    # All other relationships - use noload to avoid N+1 queries on every request
+    # Load these explicitly with selectinload() when needed
+    accounts: Mapped[list["Account"]] = relationship(
+        back_populates="user", lazy="noload", cascade="all, delete-orphan"
+    )
+    transactions: Mapped[list["Transaction"]] = relationship(
+        back_populates="user", lazy="noload", cascade="all, delete-orphan"
+    )
+    documents: Mapped[list["Document"]] = relationship(
+        back_populates="user", lazy="noload", cascade="all, delete-orphan"
+    )
+    merchant_rules: Mapped[list["UserMerchantRule"]] = relationship(
+        back_populates="user", lazy="noload", cascade="all, delete-orphan"
+    )
+    installment_series: Mapped[list["InstallmentSeries"]] = relationship(
+        back_populates="user", lazy="noload", cascade="all, delete-orphan"
+    )
+    budgets: Mapped[list["Budget"]] = relationship(
+        back_populates="user", lazy="noload", cascade="all, delete-orphan"
+    )
+    goals: Mapped[list["Goal"]] = relationship(
+        back_populates="user", lazy="noload", cascade="all, delete-orphan"
+    )
+    debts: Mapped[list["Debt"]] = relationship(
+        back_populates="user", lazy="noload", cascade="all, delete-orphan"
+    )
+    invitations_sent: Mapped[list["Invitation"]] = relationship(
+        back_populates="invited_by", lazy="noload", cascade="all, delete-orphan"
+    )
+    recurring_transactions: Mapped[list["RecurringTransaction"]] = relationship(
+        back_populates="user", lazy="noload", cascade="all, delete-orphan"
+    )
     credit_cards: Mapped[list["CreditCard"]] = relationship(
-        back_populates="user", lazy="selectin", cascade="all, delete-orphan"
+        back_populates="user", lazy="noload", cascade="all, delete-orphan"
     )
     income_sources: Mapped[list["IncomeSource"]] = relationship(
-        back_populates="user", lazy="selectin", cascade="all, delete-orphan"
+        back_populates="user", lazy="noload", cascade="all, delete-orphan"
     )
     credit_card_invoices: Mapped[list["CreditCardInvoice"]] = relationship(
-        back_populates="user", lazy="selectin", cascade="all, delete-orphan"
+        back_populates="user", lazy="noload", cascade="all, delete-orphan"
     )
 
     @property

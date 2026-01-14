@@ -70,16 +70,16 @@ class License(Base):
     # Relationships
     users: Mapped[list["User"]] = relationship(
         back_populates="license",
-        lazy="selectin",
+        lazy="noload",
         foreign_keys="User.license_id"
     )
     owner: Mapped["User | None"] = relationship(
         foreign_keys=[owner_user_id],
-        lazy="selectin"
+        lazy="noload"
     )
     members: Mapped[list["HouseholdMember"]] = relationship(
         back_populates="license",
-        lazy="selectin"
+        lazy="noload"
     )
 
     @property

@@ -16,7 +16,8 @@ class Settings(BaseSettings):
     refresh_token_expire_days: int = 7
 
     # App
-    debug: bool = True
+    debug: bool = False  # SQL echo desabilitado por padrao para performance
+    sql_echo: bool = False  # SQL echo separado do debug geral
     environment: str = "development"
     app_name: str = "App Financeiro"
     api_v1_prefix: str = "/api/v1"

@@ -77,7 +77,7 @@ class Goal(Base):
     contributions: Mapped[list["GoalContribution"]] = relationship(
         back_populates="goal",
         cascade="all, delete-orphan",
-        lazy="selectin"
+        lazy="noload"
     )
 
     @property
