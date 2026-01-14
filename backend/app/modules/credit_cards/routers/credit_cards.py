@@ -7,7 +7,6 @@ from pydantic import BaseModel
 from app.core.deps import CurrentUser, DbSession
 from app.models.credit_card import CreditCard
 from app.models.account import Account, AccountType
-from app.models.transaction import Transaction
 from app.models.credit_card_invoice import CreditCardInvoice, InvoiceStatus
 from app.models.household import HouseholdMember
 from app.modules.credit_cards.services.invoice_service import InvoiceService
@@ -65,12 +64,13 @@ async def list_credit_cards(current_user: CurrentUser, db: DbSession):
 
     cards = result.all()
 
-    # Calcular saldo em aberto para cada cartao a partir das faturas nao pagas
+    # Calcular saldo em aberto para cada cartao a partir das faturas abertas
     card_ids = [card.id for card, _ in cards]
     used_limits = {}
 
     if card_ids:
-        # 1. Soma o valor restante (total_amount - paid_amount) de faturas nao pagas completamente
+        # Soma o valor restante (total_amount - paid_amount) de faturas com status 'open'
+        # Exclui faturas 'closed' (aparecem separadas) e 'paid' (ja pagas)
         invoice_result = await db.execute(
             select(
                 CreditCardInvoice.credit_card_id,
@@ -81,28 +81,12 @@ async def list_credit_cards(current_user: CurrentUser, db: DbSession):
             )
             .where(
                 CreditCardInvoice.credit_card_id.in_(card_ids),
-                CreditCardInvoice.status != InvoiceStatus.PAID.value
+                CreditCardInvoice.status == InvoiceStatus.OPEN.value
             )
             .group_by(CreditCardInvoice.credit_card_id)
         )
         for row in invoice_result:
             used_limits[row.credit_card_id] = float(row.total_used)
-
-        # 2. Soma transacoes de cartao sem fatura associada (pendentes de faturamento)
-        orphan_result = await db.execute(
-            select(
-                Transaction.credit_card_id,
-                func.coalesce(func.sum(Transaction.amount), 0).label('total_orphan')
-            )
-            .where(
-                Transaction.credit_card_id.in_(card_ids),
-                Transaction.type == 'expense',
-                Transaction.invoice_id.is_(None)
-            )
-            .group_by(Transaction.credit_card_id)
-        )
-        for row in orphan_result:
-            used_limits[row.credit_card_id] = used_limits.get(row.credit_card_id, 0.0) + float(row.total_orphan)
 
     return [
         CreditCardListResponse(
