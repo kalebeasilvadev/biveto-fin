@@ -44,6 +44,11 @@ jobs:
             NEED_SET=true
           fi
 
+          if [ -n "${{ vars.VISION_PROVIDER }}" ]; then
+            SECRETS_CMD="$SECRETS_CMD VISION_PROVIDER=\"${{ vars.VISION_PROVIDER }}\""
+            NEED_SET=true
+          fi
+
           if [ "$NEED_SET" = true ]; then
             eval "$SECRETS_CMD --stage"
             echo "✓ Secrets staged for deployment"
