@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import os
 from datetime import datetime, date
@@ -12,6 +13,18 @@ from app.models.transaction import Transaction
 from app.models.user import User
 from app.core.config import settings
 from app.core.utils import utc_now
+
+
+def _write_file_sync(file_path: Path, content: bytes) -> None:
+    """Escrita sincrona de arquivo - para uso com asyncio.to_thread"""
+    with open(file_path, "wb") as f:
+        f.write(content)
+
+
+def _read_file_sync(file_path: str) -> bytes:
+    """Leitura sincrona de arquivo - para uso com asyncio.to_thread"""
+    with open(file_path, "rb") as f:
+        return f.read()
 
 
 class DocumentService:
@@ -58,8 +71,8 @@ class DocumentService:
         upload_dir.mkdir(parents=True, exist_ok=True)
 
         file_path = upload_dir / f"{file_hash}.{ext}"
-        with open(file_path, "wb") as f:
-            f.write(content)
+        # Escrita em thread separada para nao bloquear o event loop
+        await asyncio.to_thread(_write_file_sync, file_path, content)
 
         # Criar registro
         document = Document(
@@ -209,9 +222,8 @@ class DocumentService:
                 detail="Documento ja esta sendo processado",
             )
 
-        # Ler arquivo e reprocessar
-        with open(document.file_path, "rb") as f:
-            content = f.read()
+        # Ler arquivo em thread separada para nao bloquear o event loop
+        content = await asyncio.to_thread(_read_file_sync, document.file_path)
 
         document.status = DocumentStatus.PENDING
         await self._process_document(document, content)
@@ -297,7 +309,7 @@ class DocumentService:
             print(f"[DOC_SVC] Using LLM OCR service for extraction")
             from app.modules.documents.services.llm_ocr_service import LLMOCRService
             llm_service = LLMOCRService()
-            result = await llm_service.extract_from_image(content, mime_type)
+            result = await llm_service.extract_from_image(content, mime_type, filename=filename)
             print(f"[DOC_SVC] LLM OCR result: items={len(result.get('items', []))}, error={result.get('error')}")
 
         # Se houve erro na extracao

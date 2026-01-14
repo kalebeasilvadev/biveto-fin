@@ -1,6 +1,10 @@
 """Servico de extracao de dados de arquivos CSV e Excel
 Suporta formatos de bancos brasileiros: Nubank, Inter, Itau, Bradesco, Santander, BB, etc.
+
+IMPORTANTE: Operacoes de parsing pesado (Excel, CSV grandes) sao executadas
+em threads separadas via asyncio.to_thread para nao bloquear o event loop.
 """
+import asyncio
 import csv
 import re
 import io
@@ -145,8 +149,8 @@ class SpreadsheetParserService:
         except Exception as e:
             return {'items': [], 'error': str(e)}
 
-    async def _parse_csv(self, content: bytes, filename: str = '') -> dict:
-        """Parse arquivo CSV com deteccao automatica de formato"""
+    def _parse_csv_sync(self, content: bytes, filename: str = '') -> dict:
+        """Parse arquivo CSV com deteccao automatica de formato - SINCRONO"""
         # Tentar diferentes encodings
         text = None
         for encoding in ['utf-8', 'utf-8-sig', 'latin-1', 'cp1252', 'iso-8859-1']:
@@ -211,8 +215,12 @@ class SpreadsheetParserService:
         except csv.Error as e:
             return {'items': [], 'error': f'Erro ao processar CSV: {str(e)}'}
 
-    async def _parse_excel(self, content: bytes, filename: str) -> dict:
-        """Parse arquivo Excel"""
+    async def _parse_csv(self, content: bytes, filename: str = '') -> dict:
+        """Parse arquivo CSV - executa em thread separada para nao bloquear"""
+        return await asyncio.to_thread(self._parse_csv_sync, content, filename)
+
+    def _parse_excel_sync(self, content: bytes, filename: str) -> dict:
+        """Parse arquivo Excel - SINCRONO"""
         try:
             import openpyxl
         except ImportError:
@@ -252,6 +260,10 @@ class SpreadsheetParserService:
             }
         except Exception as e:
             return {'items': [], 'error': f'Erro ao processar Excel: {str(e)}'}
+
+    async def _parse_excel(self, content: bytes, filename: str) -> dict:
+        """Parse arquivo Excel - executa em thread separada para nao bloquear"""
+        return await asyncio.to_thread(self._parse_excel_sync, content, filename)
 
     def _detect_delimiter(self, sample: str) -> str:
         """Detecta o delimitador do CSV"""

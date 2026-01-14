@@ -33,12 +33,17 @@ class Settings(BaseSettings):
     upload_dir: str = "./uploads"
 
     # LLM/Vision API (para OCR inteligente)
-    # Providers suportados: openai, google, anthropic
+    # Providers suportados: openai, google, anthropic, mistral
     vision_provider: str = "google"  # google é gratuito!
     openai_api_key: str | None = None
     google_api_key: str | None = None  # Gemini - GRÁTIS
     anthropic_api_key: str | None = None
     vision_model: str = "gemini-2.0-flash"  # Modelo gratuito com visão (atualizado 2025)
+
+    # Mistral AI (melhor custo-benefício para OCR de faturas)
+    mistral_api_key: str | None = None
+    mistral_ocr_model: str = "mistral-ocr-latest"
+    mistral_llm_model: str = "mistral-small-latest"
 
     # SMTP Configuration (Hostinger)
     smtp_host: str = "smtp.hostinger.com"

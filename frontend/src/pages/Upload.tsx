@@ -9,6 +9,7 @@ import {
   UploadMode,
   CATEGORY_MAP,
   initialFormData,
+  ExtractedItem,
 } from '../types/upload'
 import {
   CameraCapture,
@@ -713,6 +714,22 @@ export default function Upload() {
     }
   }
 
+  // Handler para atualizar item inline
+  const handleUpdateItem = (index: number, updatedFields: Partial<ExtractedItem>) => {
+    if (!document?.extracted_items) return
+
+    const updatedItems = [...document.extracted_items]
+    updatedItems[index] = {
+      ...updatedItems[index],
+      ...updatedFields,
+    }
+
+    setDocument({
+      ...document,
+      extracted_items: updatedItems,
+    })
+  }
+
   const handleCreateCard = () => {
     if (!document?.card_info) return
 
@@ -1054,6 +1071,7 @@ export default function Upload() {
             onToggleItem={toggleItemSelection}
             onToggleAll={toggleSelectAll}
             onEditItem={handleEditItem}
+            onUpdateItem={handleUpdateItem}
             onBatchAdd={handleBatchAdd}
             onAddAll={handleAddAll}
             hasAccount={isCreditCardInvoice ? !!selectedCreditCardId : !!formData.account_id}
@@ -1181,20 +1199,18 @@ export default function Upload() {
           </div>
         )}
 
-        {/* Full form for manual mode or single item edit */}
-        {(isManual || editingItemIndex !== null) && (
+        {/* Full form for manual mode only */}
+        {isManual && (
           <TransactionForm
             formData={formData}
             onChange={(data) => setFormData(prev => ({ ...prev, ...data }))}
             accounts={accounts}
             categories={categories}
-            onSubmit={isManual ? handleManualSubmit : handleConfirm}
+            onSubmit={handleManualSubmit}
             isPending={isPending}
-            isManual={isManual}
+            isManual={true}
             showOwnershipSelector={!!showOwnershipSelector}
-            showInstallmentSection={!isManual}
-            editingItemDescription={editingItemIndex !== null && document?.extracted_items ? document.extracted_items[editingItemIndex]?.description : undefined}
-            onCloseEdit={() => setEditingItemIndex(null)}
+            showInstallmentSection={false}
           />
         )}
       </div>

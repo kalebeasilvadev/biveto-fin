@@ -107,11 +107,16 @@ export default function Invoices() {
   })
 
   const { data: invoicesData, isLoading } = useQuery({
-    queryKey: ['invoices', selectedCardId],
-    queryFn: () =>
-      invoicesApi.list({
+    queryKey: ['invoices', selectedCardId, selectedYear],
+    queryFn: () => {
+      console.log('[Invoices] Fetching with params:', { credit_card_id: selectedCardId, year: selectedYear, limit: 200 })
+      return invoicesApi.list({
         credit_card_id: selectedCardId || undefined,
-      }),
+        year: selectedYear,
+        limit: 200, // Ensure all invoices for the year are fetched
+      })
+    },
+    staleTime: 0, // Always refetch to ensure fresh data
   })
 
   const { data: invoiceDetailData } = useQuery({
@@ -199,10 +204,7 @@ export default function Invoices() {
       const hasUnpaidInvoices = monthInvoices.some(inv => inv.status !== 'paid')
       const isOverdue = monthInvoices.some(inv => inv.status === 'overdue')
 
-      // Skip past months without unpaid invoices
-      if (isPastMonth && !hasUnpaidInvoices) {
-        continue
-      }
+      // Show all months (removed skip logic)
 
       tabs.push({
         key,
@@ -218,13 +220,13 @@ export default function Invoices() {
     return tabs
   }, [invoices, selectedYear])
 
-  // Set initial selected tab to current month or first with invoices
+  // Set initial selected tab to current month (prioritize overdue, then current, then first with invoices)
   useEffect(() => {
     if (monthTabs.length > 0) {
-      const currentTab = monthTabs.find(t => t.isCurrent && t.hasInvoices)
       const overdueTab = monthTabs.find(t => t.isOverdue)
+      const currentTab = monthTabs.find(t => t.isCurrent)
       const firstWithInvoices = monthTabs.find(t => t.hasInvoices)
-      const newTab = currentTab?.key || overdueTab?.key || firstWithInvoices?.key || monthTabs[0].key
+      const newTab = overdueTab?.key || currentTab?.key || firstWithInvoices?.key || monthTabs[0].key
 
       // Only update if current tab doesn't match selected year
       const currentSelected = selectedTab?.split('-')[0]
@@ -401,15 +403,14 @@ export default function Invoices() {
               {monthTabs.map((tab) => (
                 <button
                   key={tab.key}
-                  onClick={() => tab.hasInvoices && setSelectedTab(tab.key)}
-                  disabled={!tab.hasInvoices}
+                  onClick={() => setSelectedTab(tab.key)}
                   className={clsx(
                     'flex-1 min-w-[60px] px-3 py-3 text-sm font-medium transition-colors border-b-2 whitespace-nowrap',
                     selectedTab === tab.key
                       ? 'border-primary-500 text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/20'
                       : tab.hasInvoices
                         ? 'border-transparent text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700'
-                        : 'border-transparent text-gray-300 dark:text-gray-600 cursor-default',
+                        : 'border-transparent text-gray-400 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-slate-700 hover:text-gray-600 dark:hover:text-gray-300',
                     tab.isOverdue && selectedTab !== tab.key && 'text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-900/10'
                   )}
                 >

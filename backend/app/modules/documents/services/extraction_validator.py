@@ -1,0 +1,554 @@
+"""Validacao e limpeza de dados extraidos de faturas"""
+import re
+
+
+# Padroes de descricao que indicam totais/resumos (nao sao transacoes reais)
+INVALID_DESCRIPTIONS = [
+    'despesas do mes',
+    'fatura atual',
+    'total da fatura',
+    'total da fatura em real',
+    'total para ',
+    'valor do documento',
+    'pagamento minimo',
+    'parcelamento fatura',
+    'parcelamento total',
+    'limite disponivel',
+    'limite total',
+    'proxima fatura',
+    'proximas parcelas',
+    'pagamento banco csf',
+    'pag boleto bancario',
+    'inclusao pgto fatura',
+    'saldo anterior',
+    'saldo fatura anterior',
+    'parcela de anuidade',
+    'anuidade parcelada',
+    'total anuidade',
+]
+
+# Padroes que indicam pagamento de fatura (deve ter valor NEGATIVO)
+PAYMENT_PATTERNS = [
+    'pagamento em ',
+    'pagamento de fatura',
+    'pag fatura',
+    'pgto fatura',
+    'pgto cobranca',
+    'pagamento efetuado',
+    'pgto debito automatico',
+    'pagamento recebido',
+    'credito pagamento',
+]
+
+
+class ExtractionValidator:
+    """Valida e corrige dados extraidos de faturas"""
+
+    def validate_and_clean(self, items: list, card_info: dict | None) -> list:
+        """Aplica todas as validacoes e limpezas nos itens extraidos"""
+        if not items:
+            return items
+
+        # Pipeline de validacao
+        items = self.fix_payment_amounts(items)
+        items = self.fix_inverted_sign_convention(items, card_info)
+        items = self.fix_bradesco_installments(items, card_info)
+        items = self.filter_duplicate_installments(items)
+        items = self.filter_consecutive_installments(items)
+        items = self.remove_cancelled_purchases(items, card_info)
+        items = self.remove_total_items(items, card_info)
+        items = self.fix_suspicious_installments(items)
+
+        total_amount = card_info.get('total_amount') if card_info else None
+        items = self.filter_summary_items(items, total_amount)
+
+        return items
+
+    def is_invalid_description(self, description: str) -> bool:
+        """Verifica se a descricao e um total/resumo ao inves de uma transacao real"""
+        desc_lower = description.lower().strip()
+
+        for invalid in INVALID_DESCRIPTIONS:
+            if invalid in desc_lower or desc_lower in invalid:
+                return True
+
+        if re.match(r'^total\s+(para\s+)?[a-z\s]+$', desc_lower):
+            return True
+
+        if 'total' in desc_lower and ('fatura' in desc_lower or 'real' in desc_lower):
+            return True
+
+        return False
+
+    def fix_payment_amounts(self, items: list) -> list:
+        """Corrige pagamentos que vieram com valor positivo."""
+        for item in items:
+            desc_lower = item.get('description', '').lower()
+            amount = item.get('amount', 0)
+
+            is_payment_pattern = any(pattern in desc_lower for pattern in PAYMENT_PATTERNS)
+            is_payment_type = item.get('transaction_type') == 'pagamento'
+
+            if (is_payment_pattern or is_payment_type) and amount > 0:
+                is_likely_merchant = any(word in desc_lower for word in [
+                    'prime', 'global', 'servicos', 'comercio', 'ltda', 'eireli', 'me ', ' sa'
+                ])
+
+                if not is_likely_merchant:
+                    print(f"[Validator] Fixing payment amount: '{item['description']}' {amount} -> {-amount}")
+                    item['amount'] = -amount
+                    item['transaction_type'] = 'pagamento'
+                    item['category'] = 'pagamento'
+
+        return items
+
+    def fix_inverted_sign_convention(self, items: list, card_info: dict | None) -> list:
+        """Corrige emissores que usam convencao invertida de sinais."""
+        if not items:
+            return items
+
+        INVERTED_ISSUERS = ['leroymerlin', 'celebre', 'pefisa']
+        card_issuer = (card_info.get('card_issuer') or '').lower() if card_info else ''
+
+        compras = [i for i in items if i.get('transaction_type') in ('compra', 'anuidade', 'encargo')]
+
+        compras_negativas = sum(1 for c in compras if c.get('amount', 0) < 0)
+
+        is_known_inverted = any(issuer in card_issuer for issuer in INVERTED_ISSUERS)
+
+        auto_detect_inverted = (
+            len(compras) > 0 and
+            compras_negativas / len(compras) > 0.7
+        )
+
+        if auto_detect_inverted:
+            reason = f"emissor conhecido ({card_issuer})" if is_known_inverted else "deteccao automatica"
+            print(f"[Validator] Convencao de sinais invertida detectada ({reason}). Corrigindo...")
+
+            for item in items:
+                amount = item.get('amount', 0)
+                if amount != 0:
+                    item['amount'] = -amount
+                    print(f"[Validator] Invertendo: '{item.get('description', '')[:30]}' {amount} -> {-amount}")
+
+        return items
+
+    def fix_bradesco_installments(self, items: list, card_info: dict | None) -> list:
+        """Corrige parcelamentos em faturas Bradesco/AMEX onde a informacao esta concatenada."""
+        if not items:
+            return items
+
+        card_issuer = (card_info.get('card_issuer') or '').lower() if card_info else ''
+        card_name = (card_info.get('card_name') or '').lower() if card_info else ''
+        card_bank = (card_info.get('card_bank') or '').lower() if card_info else ''
+
+        is_bradesco = (
+            'bradesco' in card_issuer or
+            'bradesco' in card_name or
+            'bradesco' in card_bank or
+            'bradescard' in card_issuer or
+            'bradescard' in card_name
+        )
+
+        if not is_bradesco:
+            return items
+
+        print(f"[Validator] Detectado Bradesco, verificando parcelamentos concatenados...")
+
+        pattern = re.compile(r'(\d{1,2})/(\d{1,2})$')
+
+        fixed_count = 0
+        for item in items:
+            if item.get('is_installment') and item.get('installment_current') and item.get('installment_total'):
+                if item.get('installment_total', 0) > 1:
+                    continue
+
+            if item.get('transaction_type') not in ['compra', None]:
+                continue
+
+            description = item.get('description', '')
+            match = pattern.search(description)
+
+            if match:
+                current = int(match.group(1))
+                total = int(match.group(2))
+
+                if 1 <= current <= total <= 48:
+                    clean_desc = description[:match.start()]
+
+                    clean_desc_strip = clean_desc.rstrip()
+                    letter_suffix = re.search(r' ([A-Z]{1,3})$', clean_desc_strip)
+                    if letter_suffix:
+                        clean_desc = clean_desc_strip[:letter_suffix.start()]
+
+                    clean_desc = clean_desc.rstrip('*- ')
+
+                    if len(clean_desc.strip()) < 3:
+                        clean_desc = description[:match.start()].rstrip('*- ')
+
+                    print(f"[Validator] Parcelamento extraido: '{description}' -> '{clean_desc.strip()}' ({current}/{total})")
+
+                    item['description'] = clean_desc.strip() if clean_desc.strip() else description
+                    item['is_installment'] = True
+                    item['installment_current'] = current
+                    item['installment_total'] = total
+                    fixed_count += 1
+
+        if fixed_count > 0:
+            print(f"[Validator] Total de {fixed_count} parcelamentos corrigidos (Bradesco/AMEX)")
+
+        return items
+
+    def _normalize_description(self, desc: str) -> str:
+        """Normaliza descricao para comparacao"""
+        desc = desc.lower()
+        prefixes = [
+            'mercadolivre*', 'mercadolivre ', 'mercadolivre',
+            'mercado*', 'mercado ', 'mercado',
+            'pag*', 'pag ', 'mp*', 'mp ', 'dl*', 'dl ', 'cp*', 'cp ', 'pg*', 'pg '
+        ]
+        for prefix in prefixes:
+            if desc.startswith(prefix):
+                desc = desc[len(prefix):]
+                break
+        desc = re.sub(r'[^a-z]', '', desc)
+        return desc
+
+    def filter_duplicate_installments(self, items: list) -> list:
+        """Remove parcelas duplicadas, mantendo apenas a de menor numero"""
+        seen_exact = set()
+        unique_items = []
+        for item in items:
+            # Incluir data na chave para nao remover compras diferentes no mesmo valor/parcela
+            exact_key = (
+                self._normalize_description(item['description']),
+                item['amount'],
+                item.get('installment_current'),
+                item.get('installment_total'),
+                item.get('date'),  # Importante: compras em datas diferentes sao distintas
+            )
+            if exact_key not in seen_exact:
+                seen_exact.add(exact_key)
+                unique_items.append(item)
+
+        # Agrupar por (desc, amount, date) para manter compras diferentes em datas diferentes
+        # So agrupa parcelas da MESMA compra (mesmo desc, amount E date)
+        groups = {}
+        for item in unique_items:
+            desc_normalized = self._normalize_description(item['description'])
+            # Incluir data na chave: compras em datas diferentes sao compras distintas
+            key = (desc_normalized, item['amount'], item.get('date'))
+            if key not in groups:
+                groups[key] = []
+            groups[key].append(item)
+
+        filtered = []
+        for key, group in groups.items():
+            if len(group) == 1:
+                filtered.append(group[0])
+            else:
+                # Multiplas parcelas da mesma compra (mesmo desc, amount, date)
+                # Manter apenas a de menor numero
+                installment_items = [i for i in group if i.get('is_installment')]
+                non_installment_items = [i for i in group if not i.get('is_installment')]
+
+                if installment_items:
+                    installment_items.sort(key=lambda x: x.get('installment_current', 999))
+                    filtered.append(installment_items[0])
+                elif non_installment_items:
+                    filtered.append(non_installment_items[0])
+
+        # Nota: A logica de remover creditos/estornos que tem parcelas relacionadas foi removida
+        # pois era muito agressiva e removia creditos legitimos (ex: cashback, devolucoes parciais).
+        # A funcao remove_cancelled_purchases ja faz a remocao de estornos de forma mais inteligente,
+        # verificando se o valor do estorno corresponde ao total das parcelas.
+        return filtered
+
+    def filter_summary_items(self, items: list, total_amount: float | None) -> list:
+        """Remove itens que sao resumos/totais da fatura"""
+        if not total_amount or total_amount <= 0:
+            return items
+
+        filtered = []
+        for item in items:
+            if abs(item['amount'] - total_amount) < 0.01:
+                desc_lower = item['description'].lower()
+                if any(word in desc_lower for word in ['anuidade', 'total', 'fatura', 'valor']):
+                    continue
+
+            desc_lower = item['description'].lower().strip()
+            if desc_lower in ['anuidade', 'parcela anuidade', 'parcela de anuidade']:
+                if item['amount'] > 50:
+                    continue
+
+            filtered.append(item)
+
+        return filtered
+
+    def fix_suspicious_installments(self, items: list) -> list:
+        """Corrige parcelas suspeitas onde installment_total=1"""
+        suspicious = [
+            item for item in items
+            if item.get('is_installment')
+            and item.get('installment_current') == 1
+            and item.get('installment_total') == 1
+        ]
+
+        if suspicious:
+            for item in suspicious:
+                print(f"[Validator] WARNING: Suspicious 1/1 installment: {item.get('description')} R${item.get('amount')}")
+
+        return items
+
+    def filter_consecutive_installments(self, items: list) -> list:
+        """Agrupa parcelas consecutivas do mesmo estabelecimento em um unico item."""
+        if not items:
+            return items
+
+        non_installment_items = [i for i in items if not i.get('is_installment')]
+        installment_items = [i for i in items if i.get('is_installment')]
+
+        if not installment_items:
+            return items
+
+        groups = {}
+        for item in installment_items:
+            desc_norm = self._normalize_description(item.get('description', ''))
+            item_date = item.get('date', '')
+            key = (desc_norm, item_date)
+
+            if key not in groups:
+                groups[key] = []
+            groups[key].append(item)
+
+        result_items = list(non_installment_items)
+
+        for (desc_norm, item_date), group in groups.items():
+            if len(group) == 1:
+                result_items.append(group[0])
+                continue
+
+            sorted_group = sorted(group, key=lambda x: x.get('installment_current', 0))
+
+            parcelas = [g.get('installment_current', 0) for g in sorted_group]
+            totais = [g.get('installment_total', 0) for g in sorted_group]
+            valores = [g.get('amount', 0) for g in sorted_group]
+
+            starts_at_1 = parcelas[0] == 1
+            is_sequential = all(parcelas[i] == parcelas[i-1] + 1 for i in range(1, len(parcelas)))
+            same_total = len(set(totais)) == 1
+            first_val = valores[0]
+            similar_values = all(abs(v - first_val) / first_val < 0.05 if first_val > 0 else True for v in valores)
+
+            if starts_at_1 and is_sequential and same_total and similar_values and len(group) >= 3:
+                first_item = sorted_group[0].copy()
+                print(f"[Validator] Agrupando {len(group)} parcelas consecutivas de '{desc_norm}' em 1 item (parcela 1/{totais[0]})")
+                result_items.append(first_item)
+            else:
+                result_items.extend(group)
+
+        return result_items
+
+    def remove_cancelled_purchases(self, items: list, card_info: dict | None) -> list:
+        """Remove compras que foram canceladas (tem estorno correspondente)."""
+        if not items:
+            return items
+
+        items_to_remove = set()
+
+        # Detectar estornos/creditos que podem ter sido classificados incorretamente
+        # Inclui: transaction_type estorno/credito OU valores negativos grandes (< -100)
+        # que nao sao pagamentos de fatura (esses tem descricoes especificas)
+        payment_keywords = ['pagamento de fatura', 'pag fatura', 'pgto fatura', 'pagamento efetuado',
+                           'pagamento recebido', 'pagamento-internet', 'pag boleto']
+
+        estornos = []
+        for i, item in enumerate(items):
+            amount = item.get('amount', 0)
+            if amount >= -100:
+                continue
+
+            # Sempre incluir se for estorno/credito
+            if item.get('transaction_type') in ['estorno', 'credito']:
+                estornos.append((i, item))
+                continue
+
+            # Verificar se e um pagamento de fatura real (nao deve ser tratado como estorno)
+            desc_lower = item.get('description', '').lower()
+            is_real_payment = any(kw in desc_lower for kw in payment_keywords)
+            if is_real_payment:
+                continue
+
+            # Valores negativos grandes que nao sao pagamentos de fatura sao provaveis estornos
+            estornos.append((i, item))
+
+        if not estornos:
+            return items
+
+        parcela_groups = {}
+        for i, item in enumerate(items):
+            if not item.get('is_installment') or item.get('transaction_type') != 'compra':
+                continue
+
+            desc_norm = self._normalize_description(item['description'])
+            if desc_norm not in parcela_groups:
+                parcela_groups[desc_norm] = []
+            parcela_groups[desc_norm].append((i, item))
+
+        for desc_norm, grupo in parcela_groups.items():
+            grupo_ordenado = sorted(grupo, key=lambda x: x[1].get('installment_current', 0))
+
+            # Calcular valor total da compra parcelada
+            first_item = grupo_ordenado[0][1]
+            installment_total = first_item.get('installment_total', 1)
+
+            if len(grupo) == 1:
+                # Uma parcela: estima o total multiplicando pelo numero de parcelas
+                valor_total_grupo = first_item['amount'] * installment_total
+            else:
+                # Multiplas parcelas: verifica se sao consecutivas comecando em 1
+                parcelas = [g[1].get('installment_current', 0) for g in grupo_ordenado]
+                starts_at_1 = parcelas[0] == 1
+                is_sequential = all(parcelas[i] == parcelas[i-1] + 1 for i in range(1, len(parcelas)))
+
+                if starts_at_1 and is_sequential and installment_total > len(grupo):
+                    # Parcelas consecutivas do inicio: calcula valor total estimado
+                    # usando o valor medio das parcelas extraidas
+                    avg_value = sum(g[1].get('amount', 0) for g in grupo) / len(grupo)
+                    valor_total_grupo = avg_value * installment_total
+                else:
+                    # Parcelas esparsas ou todas presentes: soma os valores
+                    valor_total_grupo = sum(g[1].get('amount', 0) for g in grupo)
+
+            for e_idx, estorno in estornos:
+                if e_idx in items_to_remove:
+                    continue
+
+                estorno_valor = abs(estorno.get('amount', 0))
+                tolerancia = max(valor_total_grupo * 0.02, 10)
+
+                if abs(estorno_valor - valor_total_grupo) <= tolerancia:
+                    estorno_nome = estorno['description'].upper()
+                    is_generic_estorno = estorno_nome in ['ESTORNO', 'CREDITO', 'DEVOLUCAO', 'CANCELAMENTO']
+
+                    desc_compra = grupo[0][1]['description'].upper()
+                    compra_parts = set(desc_compra.replace("*", " ").split())
+                    estorno_parts = set(estorno_nome.replace("*", " ").split())
+                    has_name_overlap = bool(compra_parts & estorno_parts)
+
+                    if is_generic_estorno or has_name_overlap:
+                        print(f"[Validator] Removendo compra cancelada: {desc_norm} ({len(grupo)} item(s), total R${valor_total_grupo:.2f}) + estorno R${estorno_valor:.2f}")
+
+                        for idx, _ in grupo:
+                            items_to_remove.add(idx)
+                        items_to_remove.add(e_idx)
+                        break
+
+        for i, item in enumerate(items):
+            if i in items_to_remove:
+                continue
+            if item.get('is_installment') or item.get('transaction_type') != 'compra':
+                continue
+
+            valor = item.get('amount', 0)
+            if valor <= 0:
+                continue
+
+            for e_idx, estorno in estornos:
+                if e_idx in items_to_remove:
+                    continue
+
+                estorno_valor = abs(estorno.get('amount', 0))
+                tolerancia = max(valor * 0.05, 5)
+
+                if abs(estorno_valor - valor) <= tolerancia:
+                    estorno_nome = estorno['description'].upper()
+                    compra_nome = item['description'].upper()
+                    compra_parts = set(compra_nome.replace("*", " ").split())
+                    estorno_parts = set(estorno_nome.replace("*", " ").split())
+
+                    if bool(compra_parts & estorno_parts):
+                        print(f"[Validator] Removendo compra simples cancelada: {item['description']} R${valor:.2f}")
+                        items_to_remove.add(i)
+                        items_to_remove.add(e_idx)
+                        break
+
+        if items_to_remove:
+            print(f"[Validator] Total: {len(items_to_remove)} itens removidos por cancelamento")
+            return [item for i, item in enumerate(items) if i not in items_to_remove]
+
+        return items
+
+    def remove_total_items(self, items: list, card_info: dict | None) -> list:
+        """Remove itens que sao totais/resumos da fatura."""
+        if not items:
+            return items
+
+        total_amount = card_info.get('total_amount') if card_info else None
+
+        removed = []
+        result = []
+
+        for item in items:
+            desc = item.get('description', '').lower().strip()
+            amount = item.get('amount', 0)
+
+            is_total_desc = (
+                desc.startswith('total ') or
+                desc.startswith('total para ') or
+                'total da fatura' in desc or
+                'total fatura' in desc
+            )
+
+            is_total_value = (
+                total_amount and
+                abs(amount - total_amount) < 0.01 and
+                amount > 100
+            )
+
+            if is_total_desc or is_total_value:
+                removed.append(f"'{item.get('description')}' R${amount:.2f}")
+            else:
+                result.append(item)
+
+        if removed:
+            print(f"[Validator] Removidos itens de total/resumo: {', '.join(removed)}")
+
+        return result
+
+    def validate_extraction(self, items: list, card_info: dict | None) -> dict:
+        """Valida a extracao comparando soma dos itens com total_amount."""
+        if not card_info or not card_info.get('total_amount'):
+            return {"is_valid": True, "difference": 0}
+
+        total_amount = card_info['total_amount']
+
+        soma_debitos = sum(
+            item.get('amount', 0) for item in items
+            if item.get('transaction_type') in ['compra', 'anuidade', 'encargo']
+        )
+
+        soma_creditos = sum(
+            item.get('amount', 0) for item in items
+            if item.get('transaction_type') in ['credito', 'estorno']
+        )
+
+        diff_sem_creditos = soma_debitos - total_amount
+        diff_com_creditos = (soma_debitos + soma_creditos) - total_amount
+
+        if abs(diff_com_creditos) < abs(diff_sem_creditos):
+            difference = diff_com_creditos
+            soma_final = soma_debitos + soma_creditos
+        else:
+            difference = diff_sem_creditos
+            soma_final = soma_debitos
+
+        is_valid = abs(difference) <= 50.0
+
+        return {
+            "is_valid": is_valid,
+            "difference": difference,
+            "total_amount": total_amount,
+            "soma_debitos": soma_final,
+            "num_items": len(items)
+        }

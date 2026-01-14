@@ -72,7 +72,7 @@ async def list_invoices(
     status_filter: str | None = Query(None, alias="status"),
     year: int | None = None,
     month: int | None = None,
-    limit: int = Query(50, le=100),
+    limit: int = Query(50, le=500),
     offset: int = 0,
 ):
     """Lista faturas do usuario"""
