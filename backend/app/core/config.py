@@ -32,12 +32,10 @@ class Settings(BaseSettings):
     # Storage
     upload_dir: str = "./uploads"
 
-    # LLM/Vision API (para OCR inteligente)
-    # Providers suportados: openai, google, anthropic, mistral
+    # LLM/Vision API (para OCR inteligente e Chat)
+    # Providers suportados: google (gratuito), mistral (melhor custo-benefício)
     vision_provider: str = "google"  # google é gratuito!
-    openai_api_key: str | None = None
     google_api_key: str | None = None  # Gemini - GRÁTIS
-    anthropic_api_key: str | None = None
     vision_model: str = "gemini-2.0-flash"  # Modelo gratuito com visão (atualizado 2025)
 
     # Mistral AI (melhor custo-benefício para OCR de faturas)

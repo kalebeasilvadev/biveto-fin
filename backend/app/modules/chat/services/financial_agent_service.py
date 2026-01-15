@@ -1,7 +1,7 @@
 """
 Agente IA Financeiro - Assistente Inteligente de Financas Pessoais
-Suporta multiplos providers: Google Gemini (gratuito), OpenAI, Anthropic
-Com analise detalhada de gastos por categoria, estabelecimento e periodo.
+Suporta: Google Gemini (gratuito) e Mistral AI (melhor custo-beneficio)
+Com analise detalhada de gastos por categoria, estabelecimento, periodo, cartoes e receitas.
 """
 from __future__ import annotations
 import json
@@ -26,6 +26,9 @@ from app.models.goal import Goal
 from app.models.budget import Budget, BudgetItem
 from app.models.account import Account
 from app.models.household import HouseholdMember
+from app.models.credit_card import CreditCard
+from app.models.credit_card_invoice import CreditCardInvoice, InvoiceStatus
+from app.models.income_source import IncomeSource
 from app.modules.chat.schemas.chat import ChatResponse
 
 
@@ -432,6 +435,130 @@ class FinancialAgentService:
             "variacao_receitas": round(((receitas - last_receitas) / max(1, last_receitas)) * 100, 1) if last_receitas > 0 else 0,
         }
 
+        # 12. Cartoes de credito e faturas
+        credit_cards_result = await self.db.execute(
+            select(CreditCard).where(
+                CreditCard.user_id == user.id,
+                CreditCard.is_active == True
+            )
+        )
+        credit_cards_list = credit_cards_result.scalars().all()
+
+        cartoes_info = []
+        for card in credit_cards_list:
+            # Buscar faturas abertas (OPEN) e proximas a vencer (CLOSED)
+            invoices_result = await self.db.execute(
+                select(CreditCardInvoice).where(
+                    CreditCardInvoice.credit_card_id == card.id,
+                    or_(
+                        CreditCardInvoice.status == InvoiceStatus.OPEN.value,
+                        CreditCardInvoice.status == InvoiceStatus.CLOSED.value,
+                        CreditCardInvoice.status == InvoiceStatus.PARTIAL.value,
+                        CreditCardInvoice.status == InvoiceStatus.OVERDUE.value
+                    )
+                ).order_by(
+                    CreditCardInvoice.reference_year.desc(),
+                    CreditCardInvoice.reference_month.desc()
+                )
+            )
+            invoices_list = invoices_result.scalars().all()
+
+            # Calcular saldo em aberto (faturas nao pagas)
+            saldo_em_aberto = sum(
+                float(inv.remaining_amount)
+                for inv in invoices_list
+                if inv.status != InvoiceStatus.PAID.value
+            )
+
+            # Buscar conta vinculada para pegar o nome
+            account_result = await self.db.execute(
+                select(Account).where(Account.id == card.account_id)
+            )
+            account = account_result.scalar_one_or_none()
+
+            faturas_info = []
+            for inv in invoices_list[:3]:  # Mostrar até 3 faturas mais recentes
+                faturas_info.append({
+                    "periodo": inv.period_display,
+                    "mes": inv.reference_month,
+                    "ano": inv.reference_year,
+                    "status": inv.status,
+                    "valor_total": float(inv.total_amount),
+                    "valor_pago": float(inv.paid_amount),
+                    "valor_restante": float(inv.remaining_amount),
+                    "vencimento": inv.due_date.strftime("%d/%m/%Y"),
+                    "fechamento": inv.closing_date.strftime("%d/%m/%Y"),
+                    "vencida": inv.is_overdue
+                })
+
+            cartoes_info.append({
+                "nome": account.name if account else "Cartao",
+                "bandeira": card.card_brand,
+                "variante": card.card_variant,
+                "ultimos_digitos": card.last_four_digits,
+                "limite_total": float(card.credit_limit),
+                "saldo_em_aberto": saldo_em_aberto,
+                "limite_disponivel": float(card.credit_limit) - saldo_em_aberto,
+                "dia_fechamento": card.closing_day,
+                "dia_vencimento": card.due_day,
+                "anuidade": float(card.annual_fee) if card.annual_fee else 0,
+                "anuidade_isenta": card.annual_fee_waived,
+                "faturas": faturas_info
+            })
+
+        context["cartoes_credito"] = cartoes_info
+
+        # 13. Fontes de receita planejadas
+        income_sources_result = await self.db.execute(
+            select(IncomeSource).where(
+                IncomeSource.user_id == user.id,
+                IncomeSource.is_active == True
+            )
+        )
+        income_sources_list = income_sources_result.scalars().all()
+
+        fontes_receita = []
+        for source in income_sources_list:
+            # Buscar conta vinculada
+            source_account = None
+            if source.account_id:
+                acc_result = await self.db.execute(
+                    select(Account).where(Account.id == source.account_id)
+                )
+                source_account = acc_result.scalar_one_or_none()
+
+            # Buscar categoria vinculada
+            source_category = None
+            if source.category_id:
+                cat_result = await self.db.execute(
+                    select(Category).where(Category.id == source.category_id)
+                )
+                source_category = cat_result.scalar_one_or_none()
+
+            receita_info = {
+                "nome": source.name,
+                "tipo": source.type,
+                "empresa": source.source_name,
+                "valor_esperado": float(source.expected_amount) if source.expected_amount else None,
+                "valor_variavel": source.is_variable,
+                "frequencia": source.frequency,
+                "dia_pagamento": source.payment_day,
+                "usa_dia_util": source.use_business_day,
+                "numero_dia_util": source.business_day_number,
+                "conta_destino": source_account.name if source_account else None,
+                "categoria": source_category.name if source_category else None,
+                "tributavel": source.is_taxable
+            }
+
+            # Adicionar info de beneficio se aplicavel
+            if source.type.startswith("benefit_"):
+                receita_info["fornecedor_beneficio"] = source.benefit_provider
+                receita_info["ultimos_digitos_cartao"] = source.benefit_card_number
+
+            fontes_receita.append(receita_info)
+
+        context["fontes_receita"] = fontes_receita
+
         return context
 
     def _build_enhanced_system_prompt(self, context: dict, user_message: str) -> str:
@@ -452,8 +579,16 @@ INSTRUCOES CRITICAS:
    - gastos_por_categoria: gastos agrupados por categoria
    - gastos_por_estabelecimento: gastos por loja/estabelecimento
    - maiores_gastos: lista detalhada das maiores despesas
-3. Cite valores EXATOS dos dados quando disponiveis
-4. Se nao encontrar dados especificos, explique quais dados voce encontrou e sugira como rastrear melhor
+3. Se perguntarem sobre cartoes de credito, faturas ou limites, procure em:
+   - cartoes_credito: informacoes de todos os cartoes (limite, saldo em aberto, faturas)
+   - Para cada cartao: limite_total, saldo_em_aberto, limite_disponivel, dia_vencimento
+   - faturas: status (open/closed/paid/overdue), valores, vencimentos
+4. Se perguntarem sobre receitas esperadas ou salario, procure em:
+   - fontes_receita: todas as fontes de renda configuradas
+   - Inclui: salarios, freelance, beneficios (VA/VR/VT), etc.
+   - Cada fonte tem: valor_esperado, frequencia, dia_pagamento
+5. Cite valores EXATOS dos dados quando disponiveis
+6. Se nao encontrar dados especificos, explique quais dados voce encontrou e sugira como rastrear melhor
 
 FORMATO DE RESPOSTA:
 - Use portugues brasileiro, informal mas profissional
@@ -464,9 +599,21 @@ FORMATO DE RESPOSTA:
 - Nao invente dados - use apenas o que esta no contexto
 
 EXEMPLOS DE COMO RESPONDER:
+
+Sobre gastos:
 - "Segundo seus dados, voce gastou R$ X com [categoria] este mes"
 - "Analisando suas transacoes, identifiquei R$ X em [estabelecimento]"
 - "Comparando com o mes anterior, seus gastos com [categoria] aumentaram X%"
+
+Sobre cartoes:
+- "Seu cartao [nome] tem saldo em aberto de R$ X, com limite disponivel de R$ Y"
+- "A proxima fatura do [nome] vence em [data] no valor de R$ X"
+- "Voce tem uma fatura vencida no cartao [nome] de R$ X"
+
+Sobre receitas:
+- "Voce tem configurado um salario de R$ X que cai no dia [dia] do mes"
+- "Suas fontes de receita somam R$ X mensais entre salario, VA e freelance"
+- "Sua proxima receita esperada e [nome] de R$ X no dia [dia]"
 
 Se a categoria ou estabelecimento especifico nao existir nos dados, responda:
 "Nao encontrei gastos especificos com [termo], mas identifiquei gastos em categorias relacionadas como [listar]. Quer que eu detalhe alguma delas?"
@@ -474,16 +621,14 @@ Se a categoria ou estabelecimento especifico nao existir nos dados, responda:
 Termine com uma pergunta ou sugestao de acao quando apropriado."""
 
     async def _call_llm(self, system_prompt: str, messages: list[dict]) -> str:
-        """Chama o LLM configurado"""
+        """Chama o LLM configurado (Google ou Mistral)"""
         try:
             if self.provider == "google":
                 return await self._call_google(system_prompt, messages)
-            elif self.provider == "openai":
-                return await self._call_openai(system_prompt, messages)
-            elif self.provider == "anthropic":
-                return await self._call_anthropic(system_prompt, messages)
+            elif self.provider == "mistral":
+                return await self._call_mistral(system_prompt, messages)
             else:
-                return "Desculpe, nenhum provider de IA esta configurado. Configure GOOGLE_API_KEY, OPENAI_API_KEY ou ANTHROPIC_API_KEY."
+                return "Desculpe, nenhum provider de IA esta configurado. Configure GOOGLE_API_KEY ou MISTRAL_API_KEY e defina VISION_PROVIDER."
         except Exception as e:
             return f"Desculpe, ocorreu um erro ao processar sua mensagem: {str(e)}"
 
@@ -530,71 +675,39 @@ Termine com uma pergunta ou sugestao de acao quando apropriado."""
             result = response.json()
             return result["candidates"][0]["content"]["parts"][0]["text"]
 
-    async def _call_openai(self, system_prompt: str, messages: list[dict]) -> str:
-        """Chama OpenAI API"""
-        api_key = settings.openai_api_key
+    async def _call_mistral(self, system_prompt: str, messages: list[dict]) -> str:
+        """Chama Mistral AI API"""
+        api_key = settings.mistral_api_key
         if not api_key:
-            return "Configure OPENAI_API_KEY no arquivo .env para usar o assistente."
+            return "Configure MISTRAL_API_KEY no arquivo .env para usar o assistente."
 
-        openai_messages = [{"role": "system", "content": system_prompt}]
+        mistral_messages = [{"role": "system", "content": system_prompt}]
         for msg in messages:
-            openai_messages.append({
+            mistral_messages.append({
                 "role": msg["role"],
                 "content": msg["content"]
             })
 
         async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.post(
-                "https://api.openai.com/v1/chat/completions",
-                headers={"Authorization": f"Bearer {api_key}"},
+                "https://api.mistral.ai/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
                 json={
-                    "model": "gpt-4o-mini",
-                    "messages": openai_messages,
+                    "model": "mistral-small-latest",
+                    "messages": mistral_messages,
                     "max_tokens": 2000,
                     "temperature": 0.4,
                 },
             )
 
             if response.status_code != 200:
-                return f"Erro na API da OpenAI: {response.status_code}"
+                return f"Erro na API da Mistral: {response.status_code} - {response.text}"
 
             result = response.json()
             return result["choices"][0]["message"]["content"]
-
-    async def _call_anthropic(self, system_prompt: str, messages: list[dict]) -> str:
-        """Chama Anthropic Claude API"""
-        api_key = settings.anthropic_api_key
-        if not api_key:
-            return "Configure ANTHROPIC_API_KEY no arquivo .env para usar o assistente."
-
-        anthropic_messages = []
-        for msg in messages:
-            anthropic_messages.append({
-                "role": msg["role"],
-                "content": msg["content"]
-            })
-
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            response = await client.post(
-                "https://api.anthropic.com/v1/messages",
-                headers={
-                    "x-api-key": api_key,
-                    "anthropic-version": "2023-06-01",
-                    "content-type": "application/json",
-                },
-                json={
-                    "model": "claude-3-haiku-20240307",
-                    "max_tokens": 2000,
-                    "system": system_prompt,
-                    "messages": anthropic_messages,
-                },
-            )
-
-            if response.status_code != 200:
-                return f"Erro na API da Anthropic: {response.status_code}"
-
-            result = response.json()
-            return result["content"][0]["text"]
 
     def _generate_smart_suggestions(self, message: str, context: dict) -> list[str]:
         """Gera sugestoes inteligentes baseadas no contexto"""
@@ -607,6 +720,29 @@ Termine com uma pergunta ou sugestao de acao quando apropriado."""
                 top_cat = list(context["gastos_por_categoria"].keys())[0] if context["gastos_por_categoria"] else None
                 if top_cat:
                     suggestions.append(f"Detalhe meus gastos com {top_cat}")
+
+        # Se tem cartoes, sugerir analise
+        if context.get("cartoes_credito"):
+            cartoes = context["cartoes_credito"]
+            # Verificar se tem faturas vencidas
+            has_overdue = any(
+                fatura.get("vencida") for cartao in cartoes
+                for fatura in cartao.get("faturas", [])
+            )
+            if has_overdue and "venc" not in message_lower:
+                suggestions.append("Quais faturas estao vencidas?")
+
+            # Verificar limite baixo (menos de 30% disponível)
+            for cartao in cartoes:
+                if cartao.get("limite_total", 0) > 0:
+                    percentual_usado = (cartao.get("saldo_em_aberto", 0) / cartao["limite_total"]) * 100
+                    if percentual_usado > 70 and "limite" not in message_lower:
+                        suggestions.append("Qual meu limite disponivel nos cartoes?")
+                        break
+
+        # Se tem receitas configuradas, sugerir analise
+        if context.get("fontes_receita") and "receita" not in message_lower and "salario" not in message_lower:
+            suggestions.append("Quando recebo minhas proximas receitas?")
 
         # Se tem dividas, sugerir estrategia
         if context.get("dividas") and "divid" not in message_lower:
