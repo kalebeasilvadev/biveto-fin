@@ -103,9 +103,10 @@ class LLMOCRService:
             # 3. Aplicar validacoes e limpezas
             items = result.get('items', [])
             card_info = result.get('card_info')
+            document_type = result.get('document_type')
 
             if items:
-                items = self.validator.validate_and_clean(items, card_info)
+                items = self.validator.validate_and_clean(items, card_info, document_type)
                 result['items'] = items
 
                 # Validar resultado final

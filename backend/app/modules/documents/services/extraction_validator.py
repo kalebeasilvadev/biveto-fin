@@ -44,18 +44,30 @@ PAYMENT_PATTERNS = [
 class ExtractionValidator:
     """Valida e corrige dados extraidos de faturas"""
 
-    def validate_and_clean(self, items: list, card_info: dict | None) -> list:
-        """Aplica todas as validacoes e limpezas nos itens extraidos"""
+    def validate_and_clean(self, items: list, card_info: dict | None, document_type: str | None = None) -> list:
+        """Aplica todas as validacoes e limpezas nos itens extraidos
+
+        Args:
+            items: Lista de itens extraidos
+            card_info: Informacoes do cartao/documento
+            document_type: Tipo do documento ('fatura_cartao' ou 'cupom_fiscal')
+        """
         if not items:
             return items
 
+        is_cupom_fiscal = document_type == 'cupom_fiscal'
+
         # Pipeline de validacao
         items = self.fix_payment_amounts(items)
-        items = self.fix_inverted_sign_convention(items, card_info)
-        items = self.fix_bradesco_installments(items, card_info)
-        items = self.filter_duplicate_installments(items)
-        items = self.filter_consecutive_installments(items)
-        items = self.remove_cancelled_purchases(items, card_info)
+
+        if not is_cupom_fiscal:
+            # Validacoes especificas de faturas de cartao
+            items = self.fix_inverted_sign_convention(items, card_info)
+            items = self.fix_bradesco_installments(items, card_info)
+            items = self.filter_duplicate_installments(items)
+            items = self.filter_consecutive_installments(items)
+            items = self.remove_cancelled_purchases(items, card_info)
+
         items = self.remove_total_items(items, card_info)
         items = self.fix_suspicious_installments(items)
 
