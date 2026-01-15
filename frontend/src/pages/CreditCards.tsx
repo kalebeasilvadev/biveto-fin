@@ -324,9 +324,14 @@ export default function CreditCards() {
                       style={{ width: `${Math.min(usagePercent, 100)}%` }}
                     />
                   </div>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    Limite: {card.credit_limit.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                  </p>
+                  <div className="flex justify-between text-xs mt-0.5">
+                    <p className="text-gray-400">
+                      Limite: {card.credit_limit.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    </p>
+                    <p className="text-green-600 dark:text-green-400 font-medium">
+                      Disponível: {card.available_limit.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    </p>
+                  </div>
                 </div>
 
                 {/* Info Tags - compacto */}
