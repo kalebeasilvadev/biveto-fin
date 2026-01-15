@@ -151,7 +151,9 @@ async def create_transaction(
 ):
     """Cria uma transacao manual"""
     service = TransactionService(db)
-    return await service.create(current_user, data)
+    transaction = await service.create(current_user, data)
+    await db.commit()  # ← COMMIT para persistir mudanças na fatura!
+    return transaction
 
 
 class ConfirmTransactionResponse(TransactionResponse):
@@ -178,6 +180,7 @@ async def confirm_transaction(
     """
     service = TransactionService(db)
     result = await service.confirm_from_document(current_user, data)
+    await db.commit()  # ← COMMIT para persistir mudanças na fatura!
 
     transaction = result["transaction"]
     series = result.get("series")
@@ -332,6 +335,8 @@ async def batch_confirm_transactions(
             ))
             error_count += 1
 
+    await db.commit()  # ← COMMIT para persistir todas as mudanças nas faturas!
+
     return BatchConfirmResponse(
         total=len(data.items),
         success_count=success_count,
@@ -364,7 +369,9 @@ async def update_transaction(
 ):
     """Atualiza uma transacao"""
     service = TransactionService(db)
-    return await service.update(current_user, transaction_id, data)
+    transaction = await service.update(current_user, transaction_id, data)
+    await db.commit()  # ← COMMIT para persistir mudanças na fatura!
+    return transaction
 
 
 class DeleteTransactionResponse(BaseModel):
