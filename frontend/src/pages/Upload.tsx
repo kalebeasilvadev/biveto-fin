@@ -18,6 +18,13 @@ import {
   TransactionForm,
 } from '../components/upload'
 
+const accountTypeLabels: Record<string, string> = {
+  wallet: 'Carteira',
+  bank: 'Banco',
+  credit_card: 'Cartão',
+  investment: 'Investimento',
+}
+
 export default function Upload() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -1176,8 +1183,10 @@ export default function Upload() {
               className="input"
             >
               <option value="">Selecione</option>
-              {accounts.map((acc: { id: number; name: string }) => (
-                <option key={acc.id} value={acc.id}>{acc.name}</option>
+              {accounts.map((acc: { id: number; name: string; type: 'wallet' | 'bank' | 'credit_card' | 'investment' }) => (
+                <option key={acc.id} value={acc.id}>
+                  {acc.name} ({accountTypeLabels[acc.type]})
+                </option>
               ))}
             </select>
           </div>
