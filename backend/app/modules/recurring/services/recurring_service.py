@@ -10,6 +10,14 @@ from app.models import (
     Transaction, User, Account, Category
 )
 from app.modules.recurring.schemas.recurring import RecurringCreate, RecurringUpdate, RecurringResponse, RecurringSummary
+from app.modules.household.utils import (
+    get_household_user_ids,
+    get_household_member,
+    build_ownership_filter,
+    validate_create_permission,
+    validate_edit_permission,
+    validate_delete_permission,
+)
 
 
 class RecurringTransactionService:
@@ -66,6 +74,9 @@ class RecurringTransactionService:
 
     async def create(self, user: User, data: RecurringCreate) -> RecurringTransaction:
         """Cria uma nova transação recorrente"""
+        # Validate ownership permissions
+        await validate_create_permission(self.db, user, data.ownership_type.value)
+
         # Verificar se a conta pertence ao usuário
         account = await self.db.scalar(
             select(Account).where(
@@ -112,6 +123,7 @@ class RecurringTransactionService:
             end_date=data.end_date,
             next_due_date=next_due,
             status=RecurringStatus.ACTIVE.value,
+            ownership_type=data.ownership_type.value,
         )
 
         self.db.add(recurring)
@@ -121,13 +133,27 @@ class RecurringTransactionService:
 
     async def list(self, user: User, include_inactive: bool = False) -> list[RecurringResponse]:
         """Lista transações recorrentes do usuário"""
+        # Get household context
+        household_user_ids = await get_household_user_ids(self.db, user)
+        member = await get_household_member(self.db, user)
+
+        # Build ownership filter
+        ownership_filter = build_ownership_filter(
+            RecurringTransaction,
+            RecurringTransaction.user_id,
+            RecurringTransaction.ownership_type,
+            user.id,
+            household_user_ids,
+            member
+        )
+
         query = (
             select(RecurringTransaction)
             .options(
                 selectinload(RecurringTransaction.account),
                 selectinload(RecurringTransaction.category)
             )
-            .where(RecurringTransaction.user_id == user.id)
+            .where(ownership_filter)
             .order_by(RecurringTransaction.next_due_date)
         )
 
@@ -155,6 +181,7 @@ class RecurringTransactionService:
                 start_date=r.start_date,
                 end_date=r.end_date,
                 status=r.status,
+                ownership_type=r.ownership_type,
                 last_generated_date=r.last_generated_date,
                 next_due_date=r.next_due_date,
                 created_at=r.created_at,
@@ -185,6 +212,14 @@ class RecurringTransactionService:
         recurring = await self.get_by_id(user, recurring_id)
         if not recurring:
             return None
+
+        # Validate edit permissions
+        await validate_edit_permission(
+            self.db,
+            user,
+            recurring.user_id,
+            recurring.ownership_type
+        )
 
         update_data = data.model_dump(exclude_unset=True)
 
@@ -242,6 +277,14 @@ class RecurringTransactionService:
         recurring = await self.get_by_id(user, recurring_id)
         if not recurring:
             return False
+
+        # Validate delete permissions
+        await validate_delete_permission(
+            self.db,
+            user,
+            recurring.user_id,
+            recurring.ownership_type
+        )
 
         await self.db.delete(recurring)
         await self.db.commit()
@@ -340,7 +383,7 @@ class RecurringTransactionService:
                 recurring.status = RecurringStatus.CANCELLED.value
                 continue
 
-            # Criar transação
+            # Criar transação herdando ownership_type da recorrência
             transaction = Transaction(
                 user_id=user.id,
                 account_id=recurring.account_id,
@@ -354,6 +397,7 @@ class RecurringTransactionService:
                 is_recurring=True,
                 is_fixed=True,
                 recurring_id=recurring.id,
+                ownership_type=recurring.ownership_type,
             )
             self.db.add(transaction)
             generated.append(transaction)

@@ -112,6 +112,7 @@ class RecurringFromSuggestionCreate(BaseModel):
     type: TransactionType = TransactionType.EXPENSE
     known_service_id: Optional[int] = None  # ID do serviço conhecido (opcional, para tracking)
     credit_card_id: Optional[int] = None  # ID do cartão de crédito (para faturas)
+    ownership_type: OwnershipType = OwnershipType.PERSONAL
 
 
 # ============================================
