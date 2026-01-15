@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { documentsApi, transactionsApi, accountsApi, categoriesApi, familyApi, creditCardsApi, invoicesApi, recurringApi, getApiErrorMessage } from '../services/api'
-import { X, CreditCard, Repeat, Plus, AlertCircle } from 'lucide-react'
+import { X, CreditCard, Repeat, Plus, AlertCircle, Check } from 'lucide-react'
 import {
   Document,
   TransactionFormData,
@@ -357,11 +357,32 @@ export default function Upload() {
     },
   })
 
+  const [createSuccess, setCreateSuccess] = useState<{
+    isInstallment: boolean
+    installmentCurrent?: number
+    installmentTotal?: number
+    amount: number
+  } | null>(null)
+
   const createMutation = useMutation({
     mutationFn: (data: unknown) => transactionsApi.create(data),
-    onSuccess: () => {
+    onSuccess: (response, variables) => {
       invalidateTransactionCaches()
-      // Não redirecionar - usuário decide quando sair
+      const vars = variables as {
+        is_installment?: boolean
+        installment_current?: number
+        installment_total?: number
+        amount: number
+      }
+      // Mostrar mensagem de sucesso
+      setCreateSuccess({
+        isInstallment: vars.is_installment || false,
+        installmentCurrent: vars.installment_current,
+        installmentTotal: vars.installment_total,
+        amount: vars.amount,
+      })
+      // Resetar formulário
+      setFormData(initialFormData)
     },
   })
 
@@ -577,6 +598,15 @@ export default function Upload() {
       merchant_name: formData.merchant_name || null,
       description: formData.description || null,
       ownership_type: formData.ownership_type,
+      // Campos de parcelamento
+      is_installment: formData.is_installment,
+      installment_current: formData.is_installment && formData.installment_current ? parseInt(formData.installment_current) : null,
+      installment_total: formData.is_installment && formData.installment_total ? parseInt(formData.installment_total) : null,
+      // Criar parcelas futuras automaticamente se for parcelamento
+      create_future_installments: formData.is_installment &&
+        formData.installment_current &&
+        formData.installment_total &&
+        parseInt(formData.installment_current) < parseInt(formData.installment_total),
       // Campos de recorrência
       create_recurring: formData.create_recurring,
       recurring_frequency: formData.create_recurring ? formData.recurring_frequency : null,
@@ -887,6 +917,7 @@ export default function Upload() {
     setShowCreateCardPrompt(false)
     setIsCreatingCard(false)
     setCreatingRecurringIndex(null)
+    setCreateSuccess(null)
   }
 
   // Render camera mode
@@ -1192,8 +1223,54 @@ export default function Upload() {
           </div>
         )}
 
+        {/* Success message for manual transactions */}
+        {isManual && createSuccess && (
+          <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-green-100 dark:bg-green-800 rounded-full">
+                <Check className="text-green-600" size={20} />
+              </div>
+              <div className="flex-1">
+                <p className="font-medium text-green-800 dark:text-green-300">
+                  Transação criada com sucesso!
+                </p>
+                <p className="text-sm text-green-700 dark:text-green-400 mt-1">
+                  {createSuccess.isInstallment && createSuccess.installmentCurrent && createSuccess.installmentTotal ? (
+                    <>
+                      Parcela {createSuccess.installmentCurrent}/{createSuccess.installmentTotal} de{' '}
+                      {createSuccess.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                      {createSuccess.installmentCurrent < createSuccess.installmentTotal && (
+                        <> • As próximas parcelas serão criadas automaticamente</>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      Valor: {createSuccess.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    </>
+                  )}
+                </p>
+                <div className="flex gap-2 mt-3">
+                  <button
+                    onClick={() => setCreateSuccess(null)}
+                    className="text-sm text-green-700 dark:text-green-300 hover:underline"
+                  >
+                    Criar outra transação
+                  </button>
+                  <span className="text-green-700 dark:text-green-300">•</span>
+                  <button
+                    onClick={() => navigate('/transactions')}
+                    className="text-sm text-green-700 dark:text-green-300 hover:underline"
+                  >
+                    Ver transações
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Full form for manual mode only */}
-        {isManual && (
+        {isManual && !createSuccess && (
           <TransactionForm
             formData={formData}
             onChange={(data) => setFormData(prev => ({ ...prev, ...data }))}
@@ -1203,7 +1280,7 @@ export default function Upload() {
             isPending={isPending}
             isManual={true}
             showOwnershipSelector={!!showOwnershipSelector}
-            showInstallmentSection={false}
+            showInstallmentSection={true}
           />
         )}
       </div>

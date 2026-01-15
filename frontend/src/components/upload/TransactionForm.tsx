@@ -252,7 +252,7 @@ export default function TransactionForm({
       </div>
 
       {/* Installment section */}
-      {!isManual && showInstallmentSection && (
+      {showInstallmentSection && formData.type === 'expense' && (
         <div className="bg-blue-50 dark:bg-blue-900/30 rounded-xl p-4 space-y-3">
           <div className="flex items-center justify-between">
             <label className="flex items-center gap-2 cursor-pointer">
