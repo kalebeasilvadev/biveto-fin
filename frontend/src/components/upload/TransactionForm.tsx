@@ -1,5 +1,6 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Check, AlertCircle, User, Users, Repeat } from 'lucide-react'
+import { Check, AlertCircle, User, Users, Repeat, Wallet, Building, CreditCard } from 'lucide-react'
 import { clsx } from 'clsx'
 import { TransactionFormData } from '../../types/upload'
 
@@ -49,9 +50,16 @@ export default function TransactionForm({
   editingItemDescription,
   onCloseEdit,
 }: TransactionFormProps) {
+  const [accountTypeFilter, setAccountTypeFilter] = useState<'all' | 'wallet' | 'bank' | 'credit_card'>('all')
+
   const filteredCategories = categories.filter(
     (cat) => isManual ? cat.type === formData.type : cat.type === 'expense'
   )
+
+  // Filtrar contas baseado no tipo selecionado
+  const filteredAccounts = accountTypeFilter === 'all'
+    ? accounts
+    : accounts.filter((acc) => acc.type === accountTypeFilter)
 
   return (
     <div className="space-y-4">
@@ -98,7 +106,7 @@ export default function TransactionForm({
 
       {/* Account selector */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Conta *</label>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Conta *</label>
         {accounts.length === 0 ? (
           <div className="bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3 flex items-start gap-2">
             <AlertCircle className="text-yellow-600 flex-shrink-0 mt-0.5" size={18} />
@@ -110,18 +118,96 @@ export default function TransactionForm({
             </div>
           </div>
         ) : (
-          <select
-            value={formData.account_id}
-            onChange={(e) => onChange({ account_id: e.target.value })}
-            className="input"
-          >
-            <option value="">Selecione</option>
-            {accounts.map((acc) => (
-              <option key={acc.id} value={acc.id}>
-                {acc.name} ({accountTypeLabels[acc.type]})
-              </option>
-            ))}
-          </select>
+          <div className="space-y-3">
+            {/* Account type filter buttons */}
+            <div className="grid grid-cols-4 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setAccountTypeFilter('all')
+                  onChange({ account_id: '' })
+                }}
+                className={clsx(
+                  'p-2 rounded-lg border-2 text-xs font-medium transition-all flex flex-col items-center gap-1',
+                  accountTypeFilter === 'all'
+                    ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300'
+                    : 'border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:border-gray-300'
+                )}
+              >
+                <span className="text-lg">💼</span>
+                Todas
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setAccountTypeFilter('wallet')
+                  onChange({ account_id: '' })
+                }}
+                className={clsx(
+                  'p-2 rounded-lg border-2 text-xs font-medium transition-all flex flex-col items-center gap-1',
+                  accountTypeFilter === 'wallet'
+                    ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300'
+                    : 'border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:border-gray-300'
+                )}
+              >
+                <Wallet size={18} />
+                Carteira
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setAccountTypeFilter('bank')
+                  onChange({ account_id: '' })
+                }}
+                className={clsx(
+                  'p-2 rounded-lg border-2 text-xs font-medium transition-all flex flex-col items-center gap-1',
+                  accountTypeFilter === 'bank'
+                    ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300'
+                    : 'border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:border-gray-300'
+                )}
+              >
+                <Building size={18} />
+                Banco
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setAccountTypeFilter('credit_card')
+                  onChange({ account_id: '' })
+                }}
+                className={clsx(
+                  'p-2 rounded-lg border-2 text-xs font-medium transition-all flex flex-col items-center gap-1',
+                  accountTypeFilter === 'credit_card'
+                    ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300'
+                    : 'border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:border-gray-300'
+                )}
+              >
+                <CreditCard size={18} />
+                Cartão
+              </button>
+            </div>
+
+            {/* Account selector dropdown */}
+            <select
+              value={formData.account_id}
+              onChange={(e) => onChange({ account_id: e.target.value })}
+              className="input"
+            >
+              <option value="">Selecione</option>
+              {filteredAccounts.map((acc) => (
+                <option key={acc.id} value={acc.id}>
+                  {acc.name} ({accountTypeLabels[acc.type]})
+                </option>
+              ))}
+            </select>
+
+            {/* Show message if no accounts match filter */}
+            {filteredAccounts.length === 0 && accountTypeFilter !== 'all' && (
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Nenhuma conta do tipo {accountTypeLabels[accountTypeFilter]} cadastrada
+              </p>
+            )}
+          </div>
         )}
       </div>
 
