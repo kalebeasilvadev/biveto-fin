@@ -306,9 +306,22 @@ class DocumentService:
             result = await parser.parse_file(content, filename, mime_type)
         else:
             # Usar LLM com visao para imagens/PDFs
-            print(f"[DOC_SVC] Using LLM OCR service for extraction")
+            # Escolher provider baseado no tipo de arquivo
+            is_pdf = mime_type == 'application/pdf' or mime_type.endswith('/pdf') or filename.lower().endswith('.pdf')
+
+            # Para PDFs: preferir Mistral (melhor OCR estruturado)
+            # Para imagens: usar Google (gratuito e suporta visão direta)
+            if is_pdf and settings.mistral_api_key:
+                selected_provider = 'mistral'
+                selected_model = settings.mistral_llm_model
+                print(f"[DOC_SVC] Using Mistral for PDF extraction")
+            else:
+                selected_provider = 'google'
+                selected_model = settings.vision_model or 'gemini-2.0-flash'
+                print(f"[DOC_SVC] Using Google for image extraction")
+
             from app.modules.documents.services.llm_ocr_service import LLMOCRService
-            llm_service = LLMOCRService()
+            llm_service = LLMOCRService(provider=selected_provider, model=selected_model)
             result = await llm_service.extract_from_image(content, mime_type, filename=filename)
             print(f"[DOC_SVC] LLM OCR result: items={len(result.get('items', []))}, error={result.get('error')}")
 

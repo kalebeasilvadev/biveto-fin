@@ -19,9 +19,9 @@ from .providers import GoogleProvider, MistralProvider, OpenAIProvider, Anthropi
 class LLMOCRService:
     """Extrai dados de imagens usando LLM com visao (suporta multiplos providers)"""
 
-    def __init__(self):
-        self.provider_name = settings.vision_provider
-        self.model = settings.vision_model or 'gemini-2.0-flash'
+    def __init__(self, provider: str | None = None, model: str | None = None):
+        self.provider_name = provider or settings.vision_provider
+        self.model = model or settings.vision_model or 'gemini-2.0-flash'
         self.parser = ResponseParser()
         self.validator = ExtractionValidator()
         self._provider = None
