@@ -71,6 +71,9 @@ class InsightType(str):
     DRIVER = "driver"  # principal driver de aumento
     OPPORTUNITY = "opportunity"  # oportunidade de corte
     ANOMALY = "anomaly"  # gasto fora do padrao
+    CREDIT_ALERT = "credit_alert"  # alertas de limite de credito
+    INTEREST_WARNING = "interest_warning"  # avisos de juros altos
+    CONSOLIDATION = "consolidation"  # oportunidade de consolidacao
 
 
 class InsightResponse(BaseModel):
@@ -82,3 +85,4 @@ class InsightResponse(BaseModel):
     action: str  # acao sugerida
     category_id: int | None = None
     merchant_id: int | None = None
+    credit_card_id: int | None = None

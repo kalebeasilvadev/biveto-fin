@@ -10,6 +10,8 @@ from app.models.merchant import Merchant
 from app.models.user import User
 from app.models.household import HouseholdMember
 from app.models.credit_card_invoice import CreditCardInvoice, InvoiceStatus
+from app.models.credit_card import CreditCard
+from app.models.account import Account
 from app.modules.analytics.schemas.analytics import (
     AnalyticsSummary,
     CategorySummary,
@@ -300,8 +302,14 @@ class AnalyticsService:
             insights = []
 
             transactions = await self._get_transactions(user, start_date, end_date)
+
+            # CRÍTICO: Excluir pagamentos de fatura para evitar contagem dupla
+            payment_transaction_ids = await self._get_invoice_payment_transaction_ids(user)
+
             expense_transactions = [
-                t for t in transactions if t.type == TransactionType.EXPENSE
+                t for t in transactions
+                if t.type == TransactionType.EXPENSE
+                and t.id not in payment_transaction_ids  # Excluir pagamentos de fatura
             ]
 
             if not expense_transactions:
@@ -330,6 +338,13 @@ class AnalyticsService:
                 insights.extend(opportunity_insights)
             except Exception as e:
                 print(f"Error finding opportunities: {e}")
+
+            # 4. Analise de cartoes de credito
+            try:
+                credit_card_insights = await self._analyze_credit_cards(user)
+                insights.extend(credit_card_insights)
+            except Exception as e:
+                print(f"Error analyzing credit cards: {e}")
 
             return insights[:5]  # Top 5 insights
         except Exception as e:
@@ -711,5 +726,124 @@ class AnalyticsService:
                     action="Revise assinaturas e contratos para possivel renegociacao",
                 )
             )
+
+        return insights
+
+    async def _analyze_credit_cards(self, user: User) -> list[InsightResponse]:
+        """Analisa cartoes de credito e gera insights sobre limites, juros e oportunidades"""
+        insights = []
+
+        try:
+            # Buscar cartoes ativos do usuario
+            household_user_ids = await self._get_household_user_ids(user)
+            user_ids = [user.id] + household_user_ids if household_user_ids else [user.id]
+
+            cards_result = await self.db.execute(
+                select(CreditCard).where(
+                    CreditCard.user_id.in_(user_ids),
+                    CreditCard.is_active == True
+                )
+            )
+            cards = cards_result.scalars().all()
+
+            if not cards:
+                return insights
+
+            # Analisar cada cartao
+            cards_with_balance = []
+            total_outstanding = 0.0
+
+            for card in cards:
+                # Buscar conta vinculada para pegar o nome do cartao
+                account_result = await self.db.execute(
+                    select(Account).where(Account.id == card.account_id)
+                )
+                account = account_result.scalar_one_or_none()
+                card_name = account.name if account else "Cartao"
+
+                # Calcular saldo em aberto (faturas nao pagas)
+                invoices_result = await self.db.execute(
+                    select(CreditCardInvoice).where(
+                        CreditCardInvoice.credit_card_id == card.id,
+                        CreditCardInvoice.status.in_(['open', 'closed', 'partial', 'overdue'])
+                    )
+                )
+                invoices = invoices_result.scalars().all()
+
+                outstanding_balance = float(sum(
+                    inv.total_amount - inv.paid_amount
+                    for inv in invoices
+                ) or 0)
+
+                if outstanding_balance > 0:
+                    cards_with_balance.append({
+                        'card': card,
+                        'name': card_name,
+                        'balance': outstanding_balance,
+                        'invoices': invoices
+                    })
+                    total_outstanding += outstanding_balance
+
+                # 1. Alerta de limite de credito (>70% utilizado)
+                if card.credit_limit and card.credit_limit > 0:
+                    utilization = (outstanding_balance / float(card.credit_limit)) * 100
+
+                    if utilization >= 70:
+                        # Calcular quanto precisa pagar para voltar a 50%
+                        target_balance = float(card.credit_limit) * 0.5
+                        amount_to_pay = outstanding_balance - target_balance
+
+                        insights.append(
+                            InsightResponse(
+                                type="credit_alert",
+                                title=f"⚠️ Alerta: {card_name}",
+                                description=f"Cartao com {utilization:.1f}% do limite utilizado (R$ {outstanding_balance:,.2f} de R$ {float(card.credit_limit):,.2f})",
+                                impact_value=amount_to_pay,
+                                calculation=f"Utilizacao: {utilization:.1f}% (ideal: <50%)",
+                                action=f"Pague R$ {amount_to_pay:,.2f} para reduzir utilizacao para 50% e proteger seu score de credito",
+                                credit_card_id=card.id
+                            )
+                        )
+
+            # 2. Aviso de juros projetados para cartoes com saldo
+            if cards_with_balance:
+                # Estimar juros mensais (assumindo taxa media de 12% a.m.)
+                avg_interest_rate = 0.12
+                monthly_interest = total_outstanding * avg_interest_rate
+
+                if monthly_interest > 50:  # Apenas se juros forem significativos
+                    insights.append(
+                        InsightResponse(
+                            type="interest_warning",
+                            title="💰 Atenção aos Juros",
+                            description=f"Voce tem R$ {total_outstanding:,.2f} em saldo devedor em {len(cards_with_balance)} cartao(oes)",
+                            impact_value=float(monthly_interest),
+                            calculation=f"Juros estimados: R$ {monthly_interest:,.2f}/mes (taxa media: {avg_interest_rate*100}% a.m.)",
+                            action=f"Priorize quitar os cartoes com maiores saldos. Se tiver R$ 10.000 disponiveis, use para abater e economizar juros"
+                        )
+                    )
+
+            # 3. Oportunidade de consolidacao (se tiver 2+ cartoes com saldo)
+            if len(cards_with_balance) >= 2:
+                # Ordenar por maior saldo
+                cards_with_balance.sort(key=lambda x: x['balance'], reverse=True)
+                top_2 = cards_with_balance[:2]
+                top_2_total = sum(c['balance'] for c in top_2)
+
+                insights.append(
+                    InsightResponse(
+                        type="consolidation",
+                        title="🔄 Oportunidade de Consolidacao",
+                        description=f"Seus 2 maiores saldos: {top_2[0]['name']} (R$ {top_2[0]['balance']:,.2f}) e {top_2[1]['name']} (R$ {top_2[1]['balance']:,.2f})",
+                        impact_value=float(top_2_total),
+                        calculation=f"Total consolidavel: R$ {top_2_total:,.2f}",
+                        action=f"Priorize pagar estes cartoes primeiro para reduzir juros e simplificar suas financas"
+                    )
+                )
+
+        except Exception as e:
+            print(f"Error in _analyze_credit_cards: {e}")
+            import traceback
+            traceback.print_exc()
 
         return insights
