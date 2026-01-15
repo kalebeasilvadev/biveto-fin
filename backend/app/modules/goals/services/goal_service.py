@@ -19,6 +19,14 @@ from app.modules.goals.schemas.goal import (
     GoalProjection, GoalSummary, GoalMilestone,
     EmergencyFundCalculation, PNIFCalculation
 )
+from app.modules.household.utils import (
+    get_household_user_ids,
+    get_household_member,
+    build_ownership_filter,
+    validate_create_permission,
+    validate_edit_permission,
+    validate_delete_permission,
+)
 
 
 class GoalService:
@@ -26,8 +34,20 @@ class GoalService:
         self.db = db
 
     async def list_goals(self, user: User, status_filter: GoalStatus | None = None) -> list[GoalResponse]:
-        """Lista metas do usuário"""
-        query = select(Goal).where(Goal.user_id == user.id)
+        """Lista metas do usuário (personal + household da família)"""
+        household_user_ids = await get_household_user_ids(self.db, user)
+        member = await get_household_member(self.db, user)
+
+        query = select(Goal).where(
+            build_ownership_filter(
+                Goal,
+                Goal.user_id,
+                Goal.ownership_type,
+                user.id,
+                household_user_ids,
+                member
+            )
+        )
 
         if status_filter:
             query = query.where(Goal.status == status_filter.value)
@@ -74,6 +94,9 @@ class GoalService:
 
     async def create_goal(self, user: User, data: GoalCreate) -> Goal:
         """Cria nova meta"""
+        # Validar permissão para criar household
+        await validate_create_permission(self.db, user, data.ownership_type.value)
+
         goal = Goal(
             user_id=user.id,
             name=data.name,
@@ -86,7 +109,8 @@ class GoalService:
             initial_amount=data.initial_amount,
             target_date=data.target_date,
             priority=data.priority,
-            account_id=data.account_id
+            account_id=data.account_id,
+            ownership_type=data.ownership_type.value
         )
 
         # Calcular contribuição mensal sugerida
@@ -117,6 +141,14 @@ class GoalService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Meta não encontrada"
             )
+
+        # Validar permissão para editar
+        await validate_edit_permission(
+            self.db,
+            user,
+            goal.user_id,
+            goal.ownership_type
+        )
 
         for field, value in data.model_dump(exclude_unset=True).items():
             if field == "status" and value:
@@ -157,6 +189,14 @@ class GoalService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Meta não encontrada"
             )
+
+        # Validar permissão para deletar
+        await validate_delete_permission(
+            self.db,
+            user,
+            goal.user_id,
+            goal.ownership_type
+        )
 
         await self.db.delete(goal)
 
