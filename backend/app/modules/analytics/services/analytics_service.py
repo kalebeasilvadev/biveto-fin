@@ -296,31 +296,47 @@ class AnalyticsService:
         self, user: User, start_date: date, end_date: date
     ) -> list[InsightResponse]:
         """Gera insights explicaveis sobre os gastos do usuario"""
-        insights = []
+        try:
+            insights = []
 
-        transactions = await self._get_transactions(user, start_date, end_date)
-        expense_transactions = [
-            t for t in transactions if t.type == TransactionType.EXPENSE
-        ]
+            transactions = await self._get_transactions(user, start_date, end_date)
+            expense_transactions = [
+                t for t in transactions if t.type == TransactionType.EXPENSE
+            ]
 
-        if not expense_transactions:
-            return insights
+            if not expense_transactions:
+                return insights
 
-        total_expense = sum(t.amount for t in expense_transactions)
+            # Converter Decimal para float para evitar erros
+            total_expense = float(sum(t.amount for t in expense_transactions) or 0)
 
-        # 1. Detectar vazamentos (gastos pequenos e frequentes que somam alto)
-        leak_insights = await self._detect_leaks(expense_transactions, total_expense)
-        insights.extend(leak_insights)
+            # 1. Detectar vazamentos (gastos pequenos e frequentes que somam alto)
+            try:
+                leak_insights = await self._detect_leaks(expense_transactions, total_expense)
+                insights.extend(leak_insights)
+            except Exception as e:
+                print(f"Error detecting leaks: {e}")
 
-        # 2. Identificar principais drivers de gasto
-        driver_insights = await self._identify_drivers(expense_transactions, total_expense)
-        insights.extend(driver_insights)
+            # 2. Identificar principais drivers de gasto
+            try:
+                driver_insights = await self._identify_drivers(expense_transactions, total_expense)
+                insights.extend(driver_insights)
+            except Exception as e:
+                print(f"Error identifying drivers: {e}")
 
-        # 3. Oportunidades de reducao
-        opportunity_insights = await self._find_opportunities(expense_transactions)
-        insights.extend(opportunity_insights)
+            # 3. Oportunidades de reducao
+            try:
+                opportunity_insights = await self._find_opportunities(expense_transactions)
+                insights.extend(opportunity_insights)
+            except Exception as e:
+                print(f"Error finding opportunities: {e}")
 
-        return insights[:5]  # Top 5 insights
+            return insights[:5]  # Top 5 insights
+        except Exception as e:
+            print(f"Fatal error in get_insights: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
 
     async def get_spending_by_payment_method(
         self, user: User, start_date: date, end_date: date
@@ -611,14 +627,14 @@ class AnalyticsService:
         # Agrupar por merchant
         by_merchant: dict[int, list[Transaction]] = defaultdict(list)
         for t in transactions:
-            if t.merchant_id and t.amount < 50:  # Gastos pequenos
+            if t.merchant_id and float(t.amount) < 50:  # Gastos pequenos
                 by_merchant[t.merchant_id].append(t)
 
         # Filtrar merchants que atendem os criterios
         leak_candidates = {}
         for merchant_id, txs in by_merchant.items():
             if len(txs) >= 3:  # Pelo menos 3 ocorrencias
-                leak_total = sum(t.amount for t in txs)
+                leak_total = float(sum(t.amount for t in txs) or 0)
                 if leak_total >= total * 0.05:  # Representa pelo menos 5% do total
                     leak_candidates[merchant_id] = (txs, leak_total)
 
@@ -627,20 +643,23 @@ class AnalyticsService:
 
         # Buscar nomes de todos os merchants de uma vez
         merchant_ids = list(leak_candidates.keys())
-        result = await self.db.execute(
-            select(Merchant.id, Merchant.name).where(Merchant.id.in_(merchant_ids))
-        )
-        merchant_names = {row[0]: row[1] for row in result.all()}
+        merchant_names = {}
+        if merchant_ids:  # Proteger contra lista vazia
+            result = await self.db.execute(
+                select(Merchant.id, Merchant.name).where(Merchant.id.in_(merchant_ids))
+            )
+            merchant_names = {row[0]: row[1] for row in result.all()}
 
         for merchant_id, (txs, leak_total) in leak_candidates.items():
             name = merchant_names.get(merchant_id, "Estabelecimento")
+            avg_value = leak_total / len(txs) if len(txs) > 0 else 0
             insights.append(
                 InsightResponse(
                     type="leak",
                     title=f"Vazamento: {name}",
                     description=f"{len(txs)} gastos pequenos em {name} somaram R$ {leak_total:.2f}",
-                    impact_value=leak_total,
-                    calculation=f"{len(txs)} transacoes x media de R$ {leak_total/len(txs):.2f}",
+                    impact_value=float(leak_total),
+                    calculation=f"{len(txs)} transacoes x media de R$ {avg_value:.2f}",
                     action=f"Reduza visitas a {name} pela metade para economizar R$ {leak_total/2:.2f}/mes",
                     merchant_id=merchant_id,
                 )
@@ -662,9 +681,9 @@ class AnalyticsService:
                         type="driver",
                         title=f"Principal gasto: {cat.category_name}",
                         description=f"{cat.category_name} representa {cat.percentage:.1f}% dos seus gastos",
-                        impact_value=cat.total,
-                        calculation=f"R$ {cat.total:.2f} de R$ {total:.2f} total",
-                        action=f"Defina um teto de R$ {cat.total * 0.8:.2f} para {cat.category_name}",
+                        impact_value=float(cat.total),
+                        calculation=f"R$ {float(cat.total):.2f} de R$ {total:.2f} total",
+                        action=f"Defina um teto de R$ {float(cat.total) * 0.8:.2f} para {cat.category_name}",
                         category_id=cat.category_id,
                     )
                 )
@@ -679,7 +698,7 @@ class AnalyticsService:
 
         # Verificar assinaturas/recorrencias
         recurring = [t for t in transactions if t.is_recurring or t.is_fixed]
-        recurring_total = sum(t.amount for t in recurring)
+        recurring_total = float(sum(t.amount for t in recurring) or 0)
 
         if recurring_total > 0:
             insights.append(
@@ -687,7 +706,7 @@ class AnalyticsService:
                     type="opportunity",
                     title="Revise gastos fixos",
                     description=f"Voce tem R$ {recurring_total:.2f} em gastos fixos/recorrentes",
-                    impact_value=recurring_total * 0.1,
+                    impact_value=float(recurring_total * 0.1),
                     calculation=f"Reducao de 10% em R$ {recurring_total:.2f}",
                     action="Revise assinaturas e contratos para possivel renegociacao",
                 )
