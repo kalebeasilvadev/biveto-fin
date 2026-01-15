@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { debtsApi } from '../services/api'
+import { debtsApi, familyApi } from '../services/api'
 import { Plus, CreditCard, AlertCircle, CheckCircle, Calculator } from 'lucide-react'
 import { clsx } from 'clsx'
 import EmptyState from '../components/EmptyState'
+import OwnershipSelector from '../components/shared/OwnershipSelector'
 
 interface DebtPayment {
   id: number
@@ -95,6 +96,12 @@ interface StrategyComparison {
   recommendation: string
 }
 
+interface FamilyContext {
+  license_id: number
+  member_count: number
+  max_members: number
+}
+
 const debtTypeLabels: Record<string, string> = {
   credit_card: 'Cartão de Crédito',
   personal_loan: 'Empréstimo Pessoal',
@@ -113,6 +120,7 @@ export default function Debts() {
   const [showStrategyModal, setShowStrategyModal] = useState(false)
   const [monthlyPayment, setMonthlyPayment] = useState('')
   const [strategyData, setStrategyData] = useState<StrategyComparison | null>(null)
+  const [ownershipType, setOwnershipType] = useState<'personal' | 'household'>('personal')
 
   const { data: debtsData, isLoading } = useQuery({
     queryKey: ['debts'],
@@ -123,6 +131,20 @@ export default function Debts() {
     queryKey: ['debts-summary'],
     queryFn: () => debtsApi.summary(),
   })
+
+  const { data: familyData } = useQuery({
+    queryKey: ['family-context'],
+    queryFn: async () => {
+      try {
+        const response = await familyApi.getContext()
+        return response.data as FamilyContext
+      } catch {
+        return null
+      }
+    },
+  })
+
+  const showOwnershipSelector = familyData && familyData.member_count >= 2
 
   const debts: Debt[] = debtsData?.data || []
 
@@ -409,6 +431,7 @@ export default function Debts() {
                   interest_type: formData.get('interest_type'),
                   start_date: formData.get('start_date'),
                   due_day: Number(formData.get('due_day')) || null,
+                  ownership_type: ownershipType,
                 })
               }}
             >
@@ -523,6 +546,13 @@ export default function Debts() {
                     />
                   </div>
                 </div>
+                {showOwnershipSelector && (
+                  <OwnershipSelector
+                    value={ownershipType}
+                    onChange={setOwnershipType}
+                    description="Dívidas familiares são compartilhadas com todos os membros"
+                  />
+                )}
               </div>
               <div className="flex gap-2 mt-6">
                 <button

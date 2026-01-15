@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { recurringApi, accountsApi, categoriesApi } from '../services/api'
+import { recurringApi, accountsApi, categoriesApi, familyApi } from '../services/api'
 import { Plus, Repeat, Pause, Play, Trash2, Edit2, Calendar, DollarSign } from 'lucide-react'
 import { clsx } from 'clsx'
 import EmptyState from '../components/EmptyState'
+import OwnershipSelector from '../components/shared/OwnershipSelector'
 
 interface RecurringTransaction {
   id: number
@@ -50,6 +51,12 @@ interface Category {
   name: string
 }
 
+interface FamilyContext {
+  license_id: number
+  member_count: number
+  max_members: number
+}
+
 const frequencyLabels: Record<string, string> = {
   daily: 'Diário',
   weekly: 'Semanal',
@@ -86,6 +93,7 @@ export default function Recurring() {
   const queryClient = useQueryClient()
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
+  const [ownershipType, setOwnershipType] = useState<'personal' | 'household'>('personal')
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -128,6 +136,20 @@ export default function Recurring() {
     queryFn: categoriesApi.list,
   })
   const categories: Category[] = categoriesData?.data || []
+
+  const { data: familyData } = useQuery({
+    queryKey: ['family-context'],
+    queryFn: async () => {
+      try {
+        const response = await familyApi.getContext()
+        return response.data as FamilyContext
+      } catch {
+        return null
+      }
+    },
+  })
+
+  const showOwnershipSelector = familyData && familyData.member_count >= 2
 
   // Função para invalidar caches relacionados a recorrências
   const invalidateRecurringCaches = () => {
@@ -256,6 +278,7 @@ export default function Recurring() {
       day_of_week: formData.frequency === 'weekly' ? parseInt(formData.day_of_week) : null,
       start_date: formData.start_date,
       end_date: formData.end_date || null,
+      ownership_type: ownershipType,
     }
 
     if (editingId) {
@@ -583,6 +606,14 @@ export default function Recurring() {
                   placeholder="Observações..."
                 />
               </div>
+
+              {showOwnershipSelector && (
+                <OwnershipSelector
+                  value={ownershipType}
+                  onChange={setOwnershipType}
+                  description="Recorrências familiares são compartilhadas com todos os membros"
+                />
+              )}
 
               <div className="flex justify-end gap-3 pt-4">
                 <button type="button" onClick={resetForm} className="btn-secondary">

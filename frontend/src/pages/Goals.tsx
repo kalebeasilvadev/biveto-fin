@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { goalsApi } from '../services/api'
+import { goalsApi, familyApi } from '../services/api'
 import { Plus, Target, Wallet, TrendingUp, PiggyBank, Calculator } from 'lucide-react'
 import { clsx } from 'clsx'
 import EmptyState from '../components/EmptyState'
+import OwnershipSelector from '../components/shared/OwnershipSelector'
 
 interface GoalContribution {
   id: number
@@ -49,6 +50,12 @@ interface PnifResult {
   is_on_track: boolean
 }
 
+interface FamilyContext {
+  license_id: number
+  member_count: number
+  max_members: number
+}
+
 const goalTypeLabels: Record<string, string> = {
   savings: 'Poupança',
   emergency_fund: 'Reserva de Emergência',
@@ -74,11 +81,26 @@ export default function Goals() {
   const [showPnifModal, setShowPnifModal] = useState(false)
   const [emergencyData, setEmergencyData] = useState<EmergencyFund | null>(null)
   const [pnifData, setPnifData] = useState<PnifResult | null>(null)
+  const [ownershipType, setOwnershipType] = useState<'personal' | 'household'>('personal')
 
   const { data: goalsData, isLoading } = useQuery({
     queryKey: ['goals'],
     queryFn: () => goalsApi.list(),
   })
+
+  const { data: familyData } = useQuery({
+    queryKey: ['family-context'],
+    queryFn: async () => {
+      try {
+        const response = await familyApi.getContext()
+        return response.data as FamilyContext
+      } catch {
+        return null
+      }
+    },
+  })
+
+  const showOwnershipSelector = familyData && familyData.member_count >= 2
 
   const goals: Goal[] = goalsData?.data || []
 
@@ -285,6 +307,7 @@ export default function Goals() {
                   initial_amount: Number(formData.get('initial_amount')) || 0,
                   target_date: formData.get('target_date') || null,
                   description: formData.get('description') || null,
+                  ownership_type: ownershipType,
                 })
               }}
             >
@@ -343,6 +366,13 @@ export default function Goals() {
                   </label>
                   <textarea name="description" className="input" rows={2} />
                 </div>
+                {showOwnershipSelector && (
+                  <OwnershipSelector
+                    value={ownershipType}
+                    onChange={setOwnershipType}
+                    description="Metas familiares são compartilhadas com todos os membros"
+                  />
+                )}
               </div>
               <div className="flex gap-2 mt-6">
                 <button
