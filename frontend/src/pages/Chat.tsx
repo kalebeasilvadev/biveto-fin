@@ -389,15 +389,6 @@ export default function Chat() {
                 ) : (
                   <p>{message.content}</p>
                 )}
-
-                {/* Data indicators */}
-                {message.dataUsed && message.dataUsed.length > 0 && (
-                  <div className="mt-2 pt-2 border-t border-gray-100 dark:border-slate-600">
-                    <p className="text-xs text-gray-400 dark:text-gray-500">
-                      Dados analisados: {message.dataUsed.join(', ')}
-                    </p>
-                  </div>
-                )}
               </div>
 
               {message.role === 'user' && (
