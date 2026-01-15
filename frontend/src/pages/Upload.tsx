@@ -17,6 +17,7 @@ import {
   ExtractedItemsList,
   TransactionForm,
 } from '../components/upload'
+import OwnershipSelector from '../components/shared/OwnershipSelector'
 
 const accountTypeLabels: Record<string, string> = {
   wallet: 'Carteira',
@@ -41,6 +42,8 @@ export default function Upload() {
   const [batchAddError, setBatchAddError] = useState<string | null>(null)
   // Duplicados pendentes que o usuário pode forçar
   const [pendingDuplicates, setPendingDuplicates] = useState<{ index: number; data: unknown; description: string; message: string }[]>([])
+  // Ownership type for batch operations
+  const [batchOwnershipType, setBatchOwnershipType] = useState<'personal' | 'household'>('household')
 
   // Credit card invoice state
   const [selectedCreditCardId, setSelectedCreditCardId] = useState<string>('')
@@ -665,6 +668,7 @@ export default function Upload() {
           category_id: findCategoryId(item.category) ? parseInt(findCategoryId(item.category)) : null,
           merchant_name: item.description || null,
           description: item.description || null,
+          ownership_type: batchOwnershipType,
           is_installment: item.is_installment || false,
           installment_current: item.is_installment && item.installment_current ? item.installment_current : null,
           installment_total: item.is_installment && item.installment_total ? item.installment_total : null,
@@ -708,6 +712,7 @@ export default function Upload() {
         category_id: findCategoryId(item.category) ? parseInt(findCategoryId(item.category)) : null,
         merchant_name: item.description || null,
         description: item.description || null,
+        ownership_type: batchOwnershipType,
         is_installment: item.is_installment || false,
         installment_current: item.is_installment && item.installment_current ? item.installment_current : null,
         installment_total: item.is_installment && item.installment_total ? item.installment_total : null,
@@ -932,6 +937,7 @@ export default function Upload() {
     setIsCreatingCard(false)
     setCreatingRecurringIndex(null)
     setCreateSuccess(null)
+    setBatchOwnershipType('household')
   }
 
   // Render camera mode
@@ -1098,6 +1104,15 @@ export default function Upload() {
           </div>
         )}
 
+        {/* Ownership selector - shown when family has multiple members and not editing an item */}
+        {(!isManual && document?.extracted_items && document.extracted_items.length > 0 && editingItemIndex === null && showOwnershipSelector) && (
+          <OwnershipSelector
+            value={batchOwnershipType}
+            onChange={setBatchOwnershipType}
+            description="Define se as transações serão pessoais ou compartilhadas com a família"
+          />
+        )}
+
         {/* Extracted items list */}
         {!isManual && document?.extracted_items && document.extracted_items.length > 0 && (
           <ExtractedItemsList
@@ -1132,6 +1147,7 @@ export default function Upload() {
               setSelectedCreditCardId('')
               setProjectedInfo({})
               setCreatingRecurringIndex(null)
+              setBatchOwnershipType('household')
             }}
             projectedInfo={projectedInfo}
             isCheckingProjected={isCheckingProjected}
