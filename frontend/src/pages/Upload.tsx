@@ -108,6 +108,14 @@ export default function Upload() {
   const creditCards = creditCardsData?.data || []
   const showOwnershipSelector = familyData && familyData.member_count >= 2
 
+  // Criar mapa de account_id -> credit_card_id para vincular transacoes a faturas
+  const accountToCreditCardMap = new Map<number, number>()
+  creditCards.forEach((card: { account_id: number; id: number }) => {
+    if (card.account_id) {
+      accountToCreditCardMap.set(card.account_id, card.id)
+    }
+  })
+
   // Check if document is a credit card invoice
   const isCreditCardInvoice = document?.document_type === 'fatura_cartao'
 
@@ -589,15 +597,21 @@ export default function Upload() {
   }
 
   const handleManualSubmit = () => {
+    const accountId = parseInt(formData.account_id)
+    // Verificar se a conta é de cartão de crédito e obter o credit_card_id
+    const creditCardId = accountToCreditCardMap.get(accountId) || null
+
     createMutation.mutate({
       type: formData.type,
       amount: parseFloat(formData.amount),
       date: formData.date,
-      account_id: parseInt(formData.account_id),
+      account_id: accountId,
       category_id: formData.category_id ? parseInt(formData.category_id) : null,
       merchant_name: formData.merchant_name || null,
       description: formData.description || null,
       ownership_type: formData.ownership_type,
+      // Vincula ao cartão de crédito se a conta for de cartão
+      credit_card_id: creditCardId,
       // Campos de parcelamento
       is_installment: formData.is_installment,
       installment_current: formData.is_installment && formData.installment_current ? parseInt(formData.installment_current) : null,
