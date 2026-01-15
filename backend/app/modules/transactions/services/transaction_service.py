@@ -913,7 +913,19 @@ class TransactionService:
             return PaymentMethod.CREDIT_CARD.value
 
         income_source_id = getattr(data, 'income_source_id', None)
-        transaction_type = data.type.value if hasattr(data.type, 'value') else data.type
+
+        # Obter o tipo de transacao
+        # TransactionCreate tem 'type', TransactionConfirm tem 'extracted_transaction_type'
+        transaction_type = None
+        if hasattr(data, 'type') and data.type:
+            transaction_type = data.type.value if hasattr(data.type, 'value') else data.type
+        elif hasattr(data, 'extracted_transaction_type') and data.extracted_transaction_type:
+            # Converter extracted_transaction_type para TransactionType
+            extracted = data.extracted_transaction_type.lower()
+            if extracted in ['compra', 'anuidade', 'encargo']:
+                transaction_type = TransactionType.EXPENSE.value
+            elif extracted in ['pagamento', 'credito', 'estorno']:
+                transaction_type = TransactionType.INCOME.value
 
         if transaction_type == TransactionType.INCOME.value:
             if income_source_id:
