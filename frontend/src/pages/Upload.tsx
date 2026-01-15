@@ -366,7 +366,7 @@ export default function Upload() {
 
   const createMutation = useMutation({
     mutationFn: (data: unknown) => transactionsApi.create(data),
-    onSuccess: (response, variables) => {
+    onSuccess: (_response, variables) => {
       invalidateTransactionCaches()
       const vars = variables as {
         is_installment?: boolean
