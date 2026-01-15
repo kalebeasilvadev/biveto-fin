@@ -6,7 +6,7 @@ from datetime import date
 from decimal import Decimal
 from calendar import monthrange
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, func
+from sqlalchemy import select, and_, func, or_
 from fastapi import HTTPException, status
 
 from app.models.budget import Budget, BudgetItem
@@ -17,11 +17,42 @@ from app.modules.budgets.schemas.budget import (
     BudgetCreate, BudgetUpdate, BudgetItemCreate, BudgetItemUpdate,
     BudgetResponse, BudgetItemResponse, BudgetSummary, BudgetComparisonResponse
 )
+from app.modules.household.utils import (
+    get_household_user_ids,
+    get_household_member,
+    build_ownership_filter,
+    validate_create_permission,
+    validate_edit_permission,
+    validate_delete_permission,
+)
 
 
 class BudgetService:
     def __init__(self, db: AsyncSession):
         self.db = db
+
+    async def list_budgets(self, user: User, year: int | None = None) -> list[Budget]:
+        """Lista orçamentos do usuário (personal + household da família)"""
+        household_user_ids = await get_household_user_ids(self.db, user)
+        member = await get_household_member(self.db, user)
+
+        query = select(Budget).where(
+            build_ownership_filter(
+                Budget,
+                Budget.user_id,
+                Budget.ownership_type,
+                user.id,
+                household_user_ids,
+                member
+            )
+        )
+
+        if year is not None:
+            query = query.where(Budget.year == year)
+
+        query = query.order_by(Budget.year.desc(), Budget.month.desc())
+        result = await self.db.execute(query)
+        return list(result.scalars().all())
 
     async def get_or_create_budget(self, user: User, year: int, month: int) -> Budget:
         """Obtém ou cria orçamento para o mês"""
@@ -123,6 +154,9 @@ class BudgetService:
 
     async def create_budget(self, user: User, data: BudgetCreate) -> Budget:
         """Cria orçamento com itens"""
+        # Validar permissão para criar household
+        await validate_create_permission(self.db, user, data.ownership_type.value)
+
         # Verificar se já existe
         existing = await self.db.execute(
             select(Budget).where(
@@ -143,7 +177,8 @@ class BudgetService:
             month=data.month,
             total_income_planned=data.total_income_planned,
             allow_rollover=data.allow_rollover,
-            notes=data.notes
+            notes=data.notes,
+            ownership_type=data.ownership_type.value
         )
         self.db.add(budget)
         await self.db.flush()
@@ -171,6 +206,14 @@ class BudgetService:
     async def update_budget(self, user: User, year: int, month: int, data: BudgetUpdate) -> Budget:
         """Atualiza orçamento"""
         budget = await self.get_or_create_budget(user, year, month)
+
+        # Validar permissão para editar
+        await validate_edit_permission(
+            self.db,
+            user,
+            budget.user_id,
+            budget.ownership_type
+        )
 
         for field, value in data.model_dump(exclude_unset=True).items():
             setattr(budget, field, value)
@@ -430,30 +473,50 @@ class BudgetService:
         return sorted(comparisons, key=lambda x: x.actual, reverse=True)
 
     async def _get_expenses_by_category(self, user: User, start_date: date, end_date: date) -> dict[int, Decimal]:
-        """Retorna gastos por categoria no período"""
+        """Retorna gastos por categoria no período (considera household)"""
+        household_user_ids = await get_household_user_ids(self.db, user)
+        member = await get_household_member(self.db, user)
+
         result = await self.db.execute(
             select(
                 Transaction.category_id,
                 func.sum(Transaction.amount).label('total')
             ).where(
-                Transaction.user_id == user.id,
                 Transaction.type == TransactionType.EXPENSE.value,
                 Transaction.date >= start_date,
                 Transaction.date <= end_date,
-                Transaction.category_id.isnot(None)
+                Transaction.category_id.isnot(None),
+                build_ownership_filter(
+                    Transaction,
+                    Transaction.user_id,
+                    Transaction.ownership_type,
+                    user.id,
+                    household_user_ids,
+                    member
+                )
             ).group_by(Transaction.category_id)
         )
 
         return {row.category_id: row.total for row in result.all()}
 
     async def _get_total_income(self, user: User, start_date: date, end_date: date) -> Decimal:
-        """Retorna total de receitas no período"""
+        """Retorna total de receitas no período (considera household)"""
+        household_user_ids = await get_household_user_ids(self.db, user)
+        member = await get_household_member(self.db, user)
+
         result = await self.db.execute(
             select(func.sum(Transaction.amount)).where(
-                Transaction.user_id == user.id,
                 Transaction.type == TransactionType.INCOME.value,
                 Transaction.date >= start_date,
-                Transaction.date <= end_date
+                Transaction.date <= end_date,
+                build_ownership_filter(
+                    Transaction,
+                    Transaction.user_id,
+                    Transaction.ownership_type,
+                    user.id,
+                    household_user_ids,
+                    member
+                )
             )
         )
         return result.scalar() or Decimal(0)
