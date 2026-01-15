@@ -62,6 +62,13 @@ interface PaginatedResponse {
 
 const ITEMS_PER_PAGE = 20
 
+const accountTypeLabels: Record<string, string> = {
+  wallet: 'Carteira',
+  bank: 'Banco',
+  credit_card: 'Cartão',
+  investment: 'Investimento',
+}
+
 export default function Transactions() {
   const [categoryFilter, setCategoryFilter] = useState<string>('')
   const [showFilters, setShowFilters] = useState(false)
@@ -74,6 +81,7 @@ export default function Transactions() {
   const [editForm, setEditForm] = useState({
     amount: '',
     date: '',
+    account_id: '',
     category_id: '',
     description: '',
     notes: '',
@@ -109,10 +117,12 @@ export default function Transactions() {
   })
 
   // Pre-fetch accounts for query invalidation when transactions change
-  useQuery({
+  const { data: accountsData } = useQuery({
     queryKey: ['accounts'],
     queryFn: accountsApi.list,
   })
+
+  const accounts = accountsData?.data || []
 
   // Função para invalidar todos os caches relacionados a transações
   const invalidateTransactionCaches = () => {
@@ -182,6 +192,7 @@ export default function Transactions() {
     setEditForm({
       amount: transaction.amount.toString(),
       date: transaction.date,
+      account_id: transaction.account_id.toString(),
       category_id: transaction.category_id?.toString() || '',
       description: transaction.description || '',
       notes: transaction.notes || '',
@@ -195,6 +206,7 @@ export default function Transactions() {
     setEditForm({
       amount: '',
       date: '',
+      account_id: '',
       category_id: '',
       description: '',
       notes: '',
@@ -207,6 +219,7 @@ export default function Transactions() {
     const data: Record<string, unknown> = {}
     if (editForm.amount) data.amount = parseFloat(editForm.amount)
     if (editForm.date) data.date = editForm.date
+    if (editForm.account_id) data.account_id = parseInt(editForm.account_id)
     if (editForm.category_id) data.category_id = parseInt(editForm.category_id)
     if (editForm.description !== selectedTransaction.description) {
       data.description = editForm.description || null
@@ -569,6 +582,27 @@ export default function Transactions() {
                   }
                   className="input"
                 />
+              </div>
+
+              {/* Account */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Conta
+                </label>
+                <select
+                  value={editForm.account_id}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, account_id: e.target.value })
+                  }
+                  className="input"
+                >
+                  <option value="">Selecione</option>
+                  {accounts.map((acc: { id: number; name: string; type: string }) => (
+                    <option key={acc.id} value={acc.id}>
+                      {acc.name} ({accountTypeLabels[acc.type]})
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {/* Category */}

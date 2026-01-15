@@ -2,6 +2,7 @@ from __future__ import annotations
 from datetime import date, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_, func
+from sqlalchemy.orm import selectinload
 from fastapi import HTTPException, status
 
 from app.models.transaction import Transaction, TransactionAudit, TransactionType, PaymentMethod
@@ -525,6 +526,16 @@ class TransactionService:
                     func.lower(Category.name).like(search_term),
                 )
             )
+
+        # Eager load relationships to avoid N+1 queries
+        query = query.options(
+            selectinload(Transaction.account),
+            selectinload(Transaction.category),
+            selectinload(Transaction.merchant),
+            selectinload(Transaction.credit_card),
+            selectinload(Transaction.income_source),
+            selectinload(Transaction.invoice),
+        )
 
         query = query.order_by(Transaction.date.desc()).limit(limit).offset(offset)
         result = await self.db.execute(query)
