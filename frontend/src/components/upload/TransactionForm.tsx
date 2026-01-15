@@ -6,6 +6,14 @@ import { TransactionFormData } from '../../types/upload'
 interface Account {
   id: number
   name: string
+  type: 'wallet' | 'bank' | 'credit_card' | 'investment'
+}
+
+const accountTypeLabels: Record<string, string> = {
+  wallet: 'Carteira',
+  bank: 'Banco',
+  credit_card: 'Cartão',
+  investment: 'Investimento',
 }
 
 interface Category {
@@ -109,7 +117,9 @@ export default function TransactionForm({
           >
             <option value="">Selecione</option>
             {accounts.map((acc) => (
-              <option key={acc.id} value={acc.id}>{acc.name}</option>
+              <option key={acc.id} value={acc.id}>
+                {acc.name} ({accountTypeLabels[acc.type]})
+              </option>
             ))}
           </select>
         )}
