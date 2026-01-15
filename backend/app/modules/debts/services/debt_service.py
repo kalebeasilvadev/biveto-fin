@@ -17,6 +17,14 @@ from app.modules.debts.schemas.debt import (
     DebtPayoffProjection, DebtSummary, DebtHighlight,
     SnowballPlan, AvalanchePlan, SnowballDebtStep, PayoffStrategyComparison
 )
+from app.modules.household.utils import (
+    get_household_user_ids,
+    get_household_member,
+    build_ownership_filter,
+    validate_create_permission,
+    validate_edit_permission,
+    validate_delete_permission,
+)
 
 
 class DebtService:
@@ -24,8 +32,20 @@ class DebtService:
         self.db = db
 
     async def list_debts(self, user: User, status_filter: DebtStatus | None = None) -> list[DebtResponse]:
-        """Lista dívidas do usuário"""
-        query = select(Debt).where(Debt.user_id == user.id)
+        """Lista dívidas do usuário (personal + household da família)"""
+        household_user_ids = await get_household_user_ids(self.db, user)
+        member = await get_household_member(self.db, user)
+
+        query = select(Debt).where(
+            build_ownership_filter(
+                Debt,
+                Debt.user_id,
+                Debt.ownership_type,
+                user.id,
+                household_user_ids,
+                member
+            )
+        )
 
         if status_filter:
             query = query.where(Debt.status == status_filter.value)
@@ -74,6 +94,9 @@ class DebtService:
 
     async def create_debt(self, user: User, data: DebtCreate) -> Debt:
         """Cria nova dívida"""
+        # Validar permissão para criar household
+        await validate_create_permission(self.db, user, data.ownership_type.value)
+
         debt = Debt(
             user_id=user.id,
             name=data.name,
@@ -89,7 +112,8 @@ class DebtService:
             due_day=data.due_day,
             priority=data.priority,
             account_id=data.account_id,
-            installment_series_id=data.installment_series_id
+            installment_series_id=data.installment_series_id,
+            ownership_type=data.ownership_type.value
         )
 
         # Calcular data prevista de quitação
@@ -118,6 +142,14 @@ class DebtService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Dívida não encontrada"
             )
+
+        # Validar permissão para editar
+        await validate_edit_permission(
+            self.db,
+            user,
+            debt.user_id,
+            debt.ownership_type
+        )
 
         for field, value in data.model_dump(exclude_unset=True).items():
             if field == "status" and value:
@@ -151,6 +183,14 @@ class DebtService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Dívida não encontrada"
             )
+
+        # Validar permissão para deletar
+        await validate_delete_permission(
+            self.db,
+            user,
+            debt.user_id,
+            debt.ownership_type
+        )
 
         await self.db.delete(debt)
 
@@ -269,10 +309,20 @@ class DebtService:
         Gera plano de quitação pelo método Snowball (Dave Ramsey)
         Ordena dívidas do menor para maior saldo
         """
+        household_user_ids = await get_household_user_ids(self.db, user)
+        member = await get_household_member(self.db, user)
+
         result = await self.db.execute(
             select(Debt).where(
-                Debt.user_id == user.id,
-                Debt.status == DebtStatus.ACTIVE.value
+                Debt.status == DebtStatus.ACTIVE.value,
+                build_ownership_filter(
+                    Debt,
+                    Debt.user_id,
+                    Debt.ownership_type,
+                    user.id,
+                    household_user_ids,
+                    member
+                )
             ).order_by(Debt.current_balance.asc())
         )
         debts = list(result.scalars().all())
@@ -284,10 +334,20 @@ class DebtService:
         Gera plano de quitação pelo método Avalanche
         Ordena dívidas da maior para menor taxa de juros
         """
+        household_user_ids = await get_household_user_ids(self.db, user)
+        member = await get_household_member(self.db, user)
+
         result = await self.db.execute(
             select(Debt).where(
-                Debt.user_id == user.id,
-                Debt.status == DebtStatus.ACTIVE.value
+                Debt.status == DebtStatus.ACTIVE.value,
+                build_ownership_filter(
+                    Debt,
+                    Debt.user_id,
+                    Debt.ownership_type,
+                    user.id,
+                    household_user_ids,
+                    member
+                )
             ).order_by(Debt.interest_rate.desc())
         )
         debts = list(result.scalars().all())
