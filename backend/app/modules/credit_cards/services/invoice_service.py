@@ -173,6 +173,8 @@ class InvoiceService:
         'pgto debito automatico',
         'pagamento recebido',
         'credito pagamento',
+        'pagto boleto',       # PAN: "Pagto Boleto Recebido"
+        'pagamento boleto',
     ]
 
     async def update_invoice_total(self, invoice: CreditCardInvoice) -> None:
