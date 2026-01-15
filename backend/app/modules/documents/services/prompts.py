@@ -1,11 +1,15 @@
 """Prompts para extracao de documentos financeiros"""
 
-EXTRACTION_PROMPT = """# Extracao de Fatura de Cartao de Credito (Brasil)
+EXTRACTION_PROMPT = """# Extracao de Documentos Financeiros (Brasil)
 
-Voce e um especialista em extrair dados de faturas de cartao de credito brasileiras.
+Voce e um especialista em extrair dados de documentos financeiros brasileiros (faturas de cartao de credito e cupons fiscais).
 
 ## Sua Tarefa
-Extraia TODOS os lancamentos da fatura e retorne no formato JSON especificado.
+**Primeiro, identifique o tipo de documento:**
+- **fatura_cartao**: Fatura de cartão de crédito (bancos, fintechs)
+- **cupom_fiscal**: Nota fiscal de consumidor (supermercados, lojas)
+
+**Depois, extraia TODOS os itens/lançamentos e retorne no formato JSON especificado.**
 
 ## Regras Criticas
 
@@ -80,8 +84,57 @@ Se encontrar MESMO estabelecimento, MESMA data, valores IGUAIS, parcelas SEQUENC
 ### 5. Validacao
 A soma dos itens (compra, anuidade, encargo) DEVE ≈ total_amount.
 
-## Exemplo de Saida
+---
 
+## INSTRUÇÕES ESPECÍFICAS PARA CUPONS FISCAIS
+
+Se o documento for um **cupom_fiscal** (nota fiscal de consumidor):
+
+### 1. Extração de TODOS os Produtos
+**OBRIGATÓRIO: Extraia TODOS os produtos listados no cupom!**
+
+Para cada produto:
+- **description**: nome EXATO do produto
+  - **CUIDADO com OCR**: "SACOLA" ≠ "COLA", "PÃO" ≠ "PAO", preserve acentos quando possível
+  - Mantenha abreviações: "REFR" (refrigerante), "IMP" (impermeável)
+- **amount**: valor total do item (positivo)
+- **date**: data da compra (YYYY-MM-DD)
+- **category**: alimentacao, mercado, bebidas, casa, higiene, outros
+- **transaction_type**: sempre "compra"
+
+### 2. Data do Cupom
+Cupons fiscais mostram data/hora no formato DD/MM/YYYY HH:MM:SS
+
+**ATENÇÃO COM O ANO:**
+- "15/01/26" → 2026 (século XXI, não 1926!)
+- "15/01/20" → 2020 (se aparecer, use 2020)
+- Sempre use a data COMPLETA do cupom, não invente
+
+### 3. Card Info para Cupons
+Para cupons fiscais, **não preencha card_info** (deixe null ou omita).
+Opcionalmente, você pode extrair:
+- estabelecimento: nome da loja
+- cnpj: CNPJ da loja
+
+### 4. Validação CRÍTICA para Cupons
+**A soma dos amounts de TODOS os items DEVE ser igual a total_amount!**
+
+Se não bater:
+1. Você esqueceu algum produto - VOLTE e extraia todos
+2. Verifique itens pequenos ou no final da lista
+3. Só retorne quando tiver CERTEZA que extraiu TUDO
+
+### 5. Exemplos de Produtos Comuns (OCR)
+- SACOLA IMP → "SACOLA IMP" (não "COLA IMP")
+- PAO FRANCES → "PAO FRANCES" (não "PAD FRANCES")
+- REFR 2L → "REFR 2L" (refrigerante 2 litros)
+- LEITE INTEGR → "LEITE INTEGR" (leite integral)
+
+---
+
+## Exemplos de Saída
+
+### Exemplo 1: Fatura de Cartão
 ```json
 {
   "document_type": "fatura_cartao",
@@ -116,5 +169,64 @@ A soma dos itens (compra, anuidade, encargo) DEVE ≈ total_amount.
 }
 ```
 
-## Extraia agora os dados desta fatura:
+### Exemplo 2: Cupom Fiscal
+```json
+{
+  "document_type": "cupom_fiscal",
+  "card_info": {
+    "total_amount": 39.25,
+    "invoice_month": 1,
+    "invoice_year": 2026,
+    "closing_date": "2026-01-15"
+  },
+  "items": [
+    {
+      "description": "REFR 2L S A",
+      "amount": 8.99,
+      "date": "2026-01-15",
+      "category": "bebidas",
+      "transaction_type": "compra"
+    },
+    {
+      "description": "PAO FRANCES",
+      "amount": 2.72,
+      "date": "2026-01-15",
+      "category": "alimentacao",
+      "transaction_type": "compra"
+    },
+    {
+      "description": "SACOLA IMP",
+      "amount": 0.57,
+      "date": "2026-01-15",
+      "category": "outros",
+      "transaction_type": "compra"
+    },
+    {
+      "description": "LEITE INTEGRA",
+      "amount": 11.00,
+      "date": "2026-01-15",
+      "category": "mercado",
+      "transaction_type": "compra"
+    },
+    {
+      "description": "CAFE 500G",
+      "amount": 12.90,
+      "date": "2026-01-15",
+      "category": "mercado",
+      "transaction_type": "compra"
+    },
+    {
+      "description": "ACUCAR 1KG",
+      "amount": 3.07,
+      "date": "2026-01-15",
+      "category": "mercado",
+      "transaction_type": "compra"
+    }
+  ]
+}
+```
+
+**Validação:** 8.99 + 2.72 + 0.57 + 11.00 + 12.90 + 3.07 = 39.25 ✓
+
+## Extraia agora os dados deste documento:
 """
