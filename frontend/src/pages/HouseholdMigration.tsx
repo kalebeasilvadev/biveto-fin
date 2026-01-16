@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Users, AlertTriangle, CheckCircle, Database, ArrowRight } from 'lucide-react'
+import { Users, AlertTriangle, CheckCircle, ArrowRight } from 'lucide-react'
 import { clsx } from 'clsx'
 import api from '../services/api'
 
@@ -55,7 +55,7 @@ export default function HouseholdMigration() {
   const { data: previewData, isLoading } = useQuery({
     queryKey: ['migration-preview'],
     queryFn: migrationApi.getPreview,
-    enabled: familyData?.data?.is_owner === true
+    enabled: familyData?.is_owner === true
   })
 
   const migrateMutation = useMutation({
