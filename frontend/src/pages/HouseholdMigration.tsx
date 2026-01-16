@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Users, AlertTriangle, CheckCircle, Database, ArrowRight } from 'lucide-react'
 import { clsx } from 'clsx'
+import api from '../services/api'
 
 interface MigrationPreview {
   accounts: number
@@ -23,28 +24,21 @@ interface FamilyContext {
   max_members: number
 }
 
-// API calls
-const api = {
+// API calls using configured axios instance
+const migrationApi = {
   getPreview: async (): Promise<{ data: MigrationPreview }> => {
-    const response = await fetch('/api/v1/household/migration/preview')
-    if (!response.ok) throw new Error('Failed to fetch preview')
-    return response.json()
+    const response = await api.get('/household/migration/preview')
+    return response.data
   },
 
   migrate: async (): Promise<{ data: { success: boolean; migrated: MigrationPreview; message: string } }> => {
-    const response = await fetch('/api/v1/household/migration/migrate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ migrate_all: true })
-    })
-    if (!response.ok) throw new Error('Failed to migrate')
-    return response.json()
+    const response = await api.post('/household/migration/migrate', { migrate_all: true })
+    return response.data
   },
 
   getFamilyContext: async (): Promise<{ data: FamilyContext }> => {
-    const response = await fetch('/api/v1/family/context')
-    if (!response.ok) throw new Error('Failed to fetch family context')
-    return response.json()
+    const response = await api.get('/family/context')
+    return response.data
   }
 }
 
@@ -55,17 +49,17 @@ export default function HouseholdMigration() {
 
   const { data: familyData } = useQuery({
     queryKey: ['family-context'],
-    queryFn: api.getFamilyContext
+    queryFn: migrationApi.getFamilyContext
   })
 
   const { data: previewData, isLoading } = useQuery({
     queryKey: ['migration-preview'],
-    queryFn: api.getPreview,
+    queryFn: migrationApi.getPreview,
     enabled: familyData?.data?.is_owner === true
   })
 
   const migrateMutation = useMutation({
-    mutationFn: api.migrate,
+    mutationFn: migrationApi.migrate,
     onSuccess: () => {
       setMigrationComplete(true)
       setShowConfirmation(false)
