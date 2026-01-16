@@ -29,6 +29,7 @@ import { clsx } from 'clsx'
 import api from '../services/api'
 import FloatingAssistant from './FloatingAssistant'
 import QuickTransactionModal from './QuickTransactionModal'
+import ToastContainer from './shared/ToastContainer'
 
 // Main navigation items
 const mainNavItems = [
@@ -345,6 +346,9 @@ export default function Layout() {
         isOpen={showQuickTransaction}
         onClose={() => setShowQuickTransaction(false)}
       />
+
+      {/* Toast Notifications */}
+      <ToastContainer />
 
       {/* Mobile Bottom Navigation */}
       <nav className="bottom-nav" role="navigation" aria-label="Navegação principal mobile">

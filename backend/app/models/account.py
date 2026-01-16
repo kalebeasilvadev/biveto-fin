@@ -19,6 +19,7 @@ class Account(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     name: Mapped[str] = mapped_column(String(100))
     type: Mapped[str] = mapped_column(String(20))  # AccountType
+    bank_id: Mapped[str | None] = mapped_column(String(50))  # Bank ID: 'nubank', 'itau', etc.
     balance: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
     currency: Mapped[str] = mapped_column(String(3), default="BRL")
     color: Mapped[str | None] = mapped_column(String(7))  # hex color

@@ -1,40 +1,26 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { creditCardsApi, familyApi } from '../services/api'
+import { creditCardsApi, familyApi, getApiErrorMessage } from '../services/api'
 import {
   CreditCard as CreditCardIcon,
   Plus,
   Pencil,
   Trash2,
-  X,
   Star,
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import EmptyState from '../components/EmptyState'
-import OwnershipSelector from '../components/shared/OwnershipSelector'
-
-interface CreditCard {
-  id: number
-  account_id: number
-  name: string
-  credit_limit: number
-  current_balance: number
-  available_limit: number
-  closing_day: number
-  due_day: number
-  has_points: boolean
-  points_program: string | null
-  points_factor?: number
-  card_brand: string | null
-  card_variant: string | null
-  last_four_digits: string | null
-  color: string | null
-  icon: string | null
-  is_active: boolean
-  annual_fee: number | null
-  annual_fee_frequency: 'monthly' | 'yearly'
-  annual_fee_waived: boolean
-}
+import CreditCardModal from '../components/credit-cards/CreditCardModal'
+import ConfirmDialog from '../components/shared/ConfirmDialog'
+import { useToastStore } from '../stores/toastStore'
+import {
+  CreditCard,
+  CreditCardFormData,
+  CreditCardPayload,
+  pointsPrograms,
+} from '../schemas/creditCard.schema'
+import BankLogo from '../components/shared/BankLogo'
+import CardBrandLogo from '../components/shared/CardBrandLogo'
 
 interface FamilyContext {
   license_id: number
@@ -42,55 +28,13 @@ interface FamilyContext {
   max_members: number
 }
 
-const pointsPrograms = [
-  { value: 'livelo', label: 'Livelo' },
-  { value: 'esfera', label: 'Esfera' },
-  { value: 'smiles', label: 'Smiles' },
-  { value: 'tudoazul', label: 'TudoAzul' },
-  { value: 'latam_pass', label: 'LATAM Pass' },
-  { value: 'multiplus', label: 'Multiplus' },
-  { value: 'dotz', label: 'Dotz' },
-  { value: 'cashback', label: 'Cashback' },
-  { value: 'other', label: 'Outro' },
-]
-
-const cardBrands = [
-  'Visa',
-  'Mastercard',
-  'Elo',
-  'American Express',
-  'Hipercard',
-  'Diners Club',
-]
-
-const defaultColors = [
-  '#1e1e1e', '#3b82f6', '#8b5cf6', '#ec4899',
-  '#f97316', '#eab308', '#14b8a6', '#22c55e',
-]
-
 export default function CreditCards() {
   const queryClient = useQueryClient()
+  const toast = useToastStore()
   const [showModal, setShowModal] = useState(false)
   const [editingCard, setEditingCard] = useState<CreditCard | null>(null)
-  const [ownershipType, setOwnershipType] = useState<'personal' | 'household'>('personal')
-  const [formData, setFormData] = useState({
-    name: '',
-    credit_limit: '',
-    initial_balance: '0',
-    closing_day: '1',
-    due_day: '10',
-    has_points: false,
-    points_program: '',
-    points_factor: '1',
-    card_brand: '',
-    card_variant: '',
-    last_four_digits: '',
-    annual_fee: '',
-    annual_fee_frequency: 'monthly' as 'monthly' | 'yearly',
-    annual_fee_waived: false,
-    benefits_notes: '',
-    color: '#1e1e1e',
-  })
+  const [deleteConfirm, setDeleteConfirm] = useState<CreditCard | null>(null)
+  const [apiError, setApiError] = useState<string | null>(null)
 
   const { data, isLoading } = useQuery({
     queryKey: ['credit-cards'],
@@ -113,7 +57,6 @@ export default function CreditCards() {
 
   const cards: CreditCard[] = data?.data || []
 
-  // Função para invalidar caches relacionados a cartões
   const invalidateCreditCardCaches = () => {
     queryClient.invalidateQueries({ queryKey: ['credit-cards'] })
     queryClient.invalidateQueries({ queryKey: ['accounts'] })
@@ -121,19 +64,35 @@ export default function CreditCards() {
   }
 
   const createMutation = useMutation({
-    mutationFn: (data: unknown) => creditCardsApi.create(data),
+    mutationFn: (data: CreditCardPayload) => creditCardsApi.create(data),
     onSuccess: () => {
       invalidateCreditCardCaches()
-      closeModal()
+      setShowModal(false)
+      setEditingCard(null)
+      setApiError(null)
+      toast.success('Cartão criado com sucesso!')
+    },
+    onError: (error) => {
+      const message = getApiErrorMessage(error, 'Erro ao criar cartão')
+      setApiError(message)
+      toast.error(message)
     },
   })
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: unknown }) =>
+    mutationFn: ({ id, data }: { id: number; data: CreditCardPayload }) =>
       creditCardsApi.update(id, data),
     onSuccess: () => {
       invalidateCreditCardCaches()
-      closeModal()
+      setShowModal(false)
+      setEditingCard(null)
+      setApiError(null)
+      toast.success('Cartão atualizado com sucesso!')
+    },
+    onError: (error) => {
+      const message = getApiErrorMessage(error, 'Erro ao atualizar cartão')
+      setApiError(message)
+      toast.error(message)
     },
   })
 
@@ -141,79 +100,54 @@ export default function CreditCards() {
     mutationFn: (id: number) => creditCardsApi.delete(id),
     onSuccess: () => {
       invalidateCreditCardCaches()
+      setDeleteConfirm(null)
+      toast.success('Cartão excluído com sucesso!')
+    },
+    onError: (error) => {
+      const message = getApiErrorMessage(error, 'Erro ao excluir cartão')
+      toast.error(message)
     },
   })
 
   const openCreateModal = () => {
     setEditingCard(null)
-    setFormData({
-      name: '',
-      credit_limit: '',
-      initial_balance: '0',
-      closing_day: '1',
-      due_day: '10',
-      has_points: false,
-      points_program: '',
-      points_factor: '1',
-      card_brand: '',
-      card_variant: '',
-      last_four_digits: '',
-      annual_fee: '',
-      annual_fee_frequency: 'monthly' as 'monthly' | 'yearly',
-      annual_fee_waived: false,
-      benefits_notes: '',
-      color: '#1e1e1e',
-    })
+    setApiError(null)
     setShowModal(true)
   }
 
   const openEditModal = (card: CreditCard) => {
     setEditingCard(card)
-    setFormData({
-      name: card.name,
-      credit_limit: card.credit_limit.toString(),
-      initial_balance: '0',
-      closing_day: card.closing_day.toString(),
-      due_day: card.due_day.toString(),
-      has_points: card.has_points,
-      points_program: card.points_program || '',
-      points_factor: card.points_factor?.toString() || '1',
-      card_brand: card.card_brand || '',
-      card_variant: card.card_variant || '',
-      last_four_digits: card.last_four_digits || '',
-      annual_fee: card.annual_fee?.toString() || '',
-      annual_fee_frequency: card.annual_fee_frequency || 'monthly',
-      annual_fee_waived: card.annual_fee_waived || false,
-      benefits_notes: '',
-      color: card.color || '#1e1e1e',
-    })
+    setApiError(null)
     setShowModal(true)
   }
 
   const closeModal = () => {
     setShowModal(false)
     setEditingCard(null)
+    setApiError(null)
   }
 
-  const handleSubmit = () => {
-    const payload = {
+  const handleSubmit = (formData: CreditCardFormData) => {
+    const payload: CreditCardPayload = {
       name: formData.name,
-      credit_limit: parseFloat(formData.credit_limit) || 0,
-      initial_balance: parseFloat(formData.initial_balance) || 0,
-      closing_day: parseInt(formData.closing_day) || 1,
-      due_day: parseInt(formData.due_day) || 10,
+      nickname: formData.nickname || null,
+      bank_id: formData.bank_id || null,
+      credit_limit: formData.credit_limit,
+      initial_balance: formData.initial_balance,
+      closing_day: formData.closing_day,
+      due_day: formData.due_day,
       has_points: formData.has_points,
       points_program: formData.has_points ? formData.points_program : null,
-      points_factor: formData.has_points ? parseFloat(formData.points_factor) || 1 : 1,
+      points_factor: formData.has_points ? formData.points_factor : 1,
       card_brand: formData.card_brand || null,
       card_variant: formData.card_variant || null,
       last_four_digits: formData.last_four_digits || null,
-      annual_fee: formData.annual_fee ? parseFloat(formData.annual_fee) : null,
+      annual_fee: formData.annual_fee,
       annual_fee_frequency: formData.annual_fee_frequency,
       annual_fee_waived: formData.annual_fee_waived,
       benefits_notes: formData.benefits_notes || null,
       color: formData.color,
-      ownership_type: ownershipType,
+      ownership_type: formData.ownership_type,
     }
 
     if (editingCard) {
@@ -223,9 +157,13 @@ export default function CreditCards() {
     }
   }
 
-  const handleDelete = (card: CreditCard) => {
-    if (confirm(`Deseja excluir o cartão "${card.name}"?`)) {
-      deleteMutation.mutate(card.id)
+  const handleDeleteClick = (card: CreditCard) => {
+    setDeleteConfirm(card)
+  }
+
+  const handleDeleteConfirm = () => {
+    if (deleteConfirm) {
+      deleteMutation.mutate(deleteConfirm.id)
     }
   }
 
@@ -294,20 +232,27 @@ export default function CreditCards() {
                 key={card.id}
                 className="card p-3 hover:shadow-md transition-all"
               >
-                {/* Card Header - mais compacto */}
+                {/* Card Header */}
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
-                    <div
-                      className="w-8 h-8 rounded-md flex items-center justify-center"
-                      style={{ backgroundColor: card.color || '#1e1e1e' }}
-                    >
-                      <CreditCardIcon size={16} className="text-white" />
-                    </div>
+                    {card.bank_id ? (
+                      <BankLogo bankId={card.bank_id} size="md" />
+                    ) : (
+                      <div
+                        className="w-8 h-8 rounded-md flex items-center justify-center"
+                        style={{ backgroundColor: card.color || '#1e1e1e' }}
+                      >
+                        <CreditCardIcon size={16} className="text-white" />
+                      </div>
+                    )}
                     <div>
-                      <p className="font-medium text-sm text-gray-900 dark:text-white truncate max-w-[120px]">{card.name}</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                        {card.card_brand} {card.last_four_digits && `•••• ${card.last_four_digits}`}
+                      <p className="font-medium text-sm text-gray-900 dark:text-white truncate max-w-[120px]">
+                        {card.nickname || card.name}
                       </p>
+                      <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+                        {card.card_brand && <CardBrandLogo brandId={card.card_brand} size="sm" className="h-3 w-auto" />}
+                        {card.last_four_digits && <span>•••• {card.last_four_digits}</span>}
+                      </div>
                     </div>
                   </div>
                   <div className="flex gap-1">
@@ -318,7 +263,7 @@ export default function CreditCards() {
                       <Pencil size={16} />
                     </button>
                     <button
-                      onClick={() => handleDelete(card)}
+                      onClick={() => handleDeleteClick(card)}
                       className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
                     >
                       <Trash2 size={16} />
@@ -326,7 +271,7 @@ export default function CreditCards() {
                   </div>
                 </div>
 
-                {/* Usage Bar - compacto */}
+                {/* Usage Bar */}
                 <div className="mb-2">
                   <div className="flex justify-between text-xs mb-1">
                     <span className="text-gray-500 dark:text-gray-400">
@@ -358,7 +303,7 @@ export default function CreditCards() {
                   </div>
                 </div>
 
-                {/* Info Tags - compacto */}
+                {/* Info Tags */}
                 <div className="flex flex-wrap gap-1 text-xs">
                   <span className="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 px-1.5 py-0.5 rounded">
                     Fecha: {card.closing_day}
@@ -391,274 +336,29 @@ export default function CreditCards() {
         </div>
       )}
 
-      {/* Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-lg my-8">
-            <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                {editingCard ? 'Editar Cartão' : 'Novo Cartão'}
-              </h2>
-              <button onClick={closeModal} className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
-                <X size={20} />
-              </button>
-            </div>
+      {/* Modal de Criação/Edição */}
+      <CreditCardModal
+        isOpen={showModal}
+        onClose={closeModal}
+        onSubmit={handleSubmit}
+        editingCard={editingCard}
+        isLoading={createMutation.isPending || updateMutation.isPending}
+        error={apiError}
+        showOwnershipSelector={showOwnershipSelector || false}
+      />
 
-            <div className="p-4 space-y-4 max-h-[70vh] overflow-y-auto">
-              {/* Basic Info */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Nome do Cartão *
-                </label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="input"
-                  placeholder="Ex: Nubank Ultravioleta"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Bandeira
-                  </label>
-                  <select
-                    value={formData.card_brand}
-                    onChange={(e) => setFormData({ ...formData, card_brand: e.target.value })}
-                    className="input"
-                  >
-                    <option value="">Selecione</option>
-                    {cardBrands.map((brand) => (
-                      <option key={brand} value={brand}>{brand}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Variante
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.card_variant}
-                    onChange={(e) => setFormData({ ...formData, card_variant: e.target.value })}
-                    className="input"
-                    placeholder="Platinum, Black..."
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Limite *
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={formData.credit_limit}
-                    onChange={(e) => setFormData({ ...formData, credit_limit: e.target.value })}
-                    className="input"
-                    placeholder="10000.00"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Final (4 dígitos)
-                  </label>
-                  <input
-                    type="text"
-                    maxLength={4}
-                    value={formData.last_four_digits}
-                    onChange={(e) => setFormData({ ...formData, last_four_digits: e.target.value.replace(/\D/g, '') })}
-                    className="input"
-                    placeholder="1234"
-                  />
-                </div>
-              </div>
-
-              {/* Billing Cycle */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Dia de Fechamento
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="31"
-                    value={formData.closing_day}
-                    onChange={(e) => setFormData({ ...formData, closing_day: e.target.value })}
-                    className="input"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Dia de Vencimento
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="31"
-                    value={formData.due_day}
-                    onChange={(e) => setFormData({ ...formData, due_day: e.target.value })}
-                    className="input"
-                  />
-                </div>
-              </div>
-
-              {/* Points Program */}
-              <div className="space-y-3">
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={formData.has_points}
-                    onChange={(e) => setFormData({ ...formData, has_points: e.target.checked })}
-                    className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                  />
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Acumula pontos
-                  </span>
-                </label>
-
-                {formData.has_points && (
-                  <div className="grid grid-cols-2 gap-4 pl-6">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Programa
-                      </label>
-                      <select
-                        value={formData.points_program}
-                        onChange={(e) => setFormData({ ...formData, points_program: e.target.value })}
-                        className="input"
-                      >
-                        <option value="">Selecione</option>
-                        {pointsPrograms.map((program) => (
-                          <option key={program.value} value={program.value}>{program.label}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Fator (pts/R$)
-                      </label>
-                      <input
-                        type="number"
-                        step="0.1"
-                        min="0"
-                        value={formData.points_factor}
-                        onChange={(e) => setFormData({ ...formData, points_factor: e.target.value })}
-                        className="input"
-                        placeholder="1.0"
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Color */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Cor do Cartão
-                </label>
-                <div className="flex gap-2">
-                  {defaultColors.map((color) => (
-                    <button
-                      key={color}
-                      type="button"
-                      onClick={() => setFormData({ ...formData, color })}
-                      className={clsx(
-                        'w-8 h-8 rounded-full transition-transform',
-                        formData.color === color && 'ring-2 ring-offset-2 ring-primary-500 scale-110'
-                      )}
-                      style={{ backgroundColor: color }}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              {/* Annual Fee */}
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Anuidade
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={formData.annual_fee}
-                      onChange={(e) => setFormData({ ...formData, annual_fee: e.target.value })}
-                      className="input"
-                      placeholder="0.00"
-                      disabled={formData.annual_fee_waived}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Cobrança
-                    </label>
-                    <select
-                      value={formData.annual_fee_frequency}
-                      onChange={(e) => setFormData({ ...formData, annual_fee_frequency: e.target.value as 'monthly' | 'yearly' })}
-                      className="input"
-                      disabled={formData.annual_fee_waived}
-                    >
-                      <option value="monthly">Mensal</option>
-                      <option value="yearly">Anual</option>
-                    </select>
-                  </div>
-                </div>
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={formData.annual_fee_waived}
-                    onChange={(e) => setFormData({ ...formData, annual_fee_waived: e.target.checked })}
-                    className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                  />
-                  <span className="text-sm text-gray-700 dark:text-gray-300">Anuidade isenta</span>
-                </label>
-              </div>
-
-              {/* Benefits Notes */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Benefícios/Observações
-                </label>
-                <textarea
-                  value={formData.benefits_notes}
-                  onChange={(e) => setFormData({ ...formData, benefits_notes: e.target.value })}
-                  className="input"
-                  rows={2}
-                  placeholder="Sala VIP, seguro viagem..."
-                />
-              </div>
-
-              {showOwnershipSelector && (
-                <OwnershipSelector
-                  value={ownershipType}
-                  onChange={setOwnershipType}
-                  description="Cartões familiares são compartilhados com todos os membros"
-                />
-              )}
-
-              <div className="flex gap-2 pt-4">
-                <button onClick={closeModal} className="btn-secondary flex-1">
-                  Cancelar
-                </button>
-                <button
-                  onClick={handleSubmit}
-                  disabled={!formData.name || !formData.credit_limit || createMutation.isPending || updateMutation.isPending}
-                  className="btn-primary flex-1"
-                >
-                  {createMutation.isPending || updateMutation.isPending ? 'Salvando...' : 'Salvar'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Modal de Confirmação de Exclusão */}
+      <ConfirmDialog
+        isOpen={!!deleteConfirm}
+        onClose={() => setDeleteConfirm(null)}
+        onConfirm={handleDeleteConfirm}
+        title="Excluir Cartão"
+        message={`Deseja excluir o cartão "${deleteConfirm?.name}"? Esta ação não pode ser desfeita e todas as transações associadas serão perdidas.`}
+        confirmLabel="Excluir"
+        cancelLabel="Cancelar"
+        variant="danger"
+        isLoading={deleteMutation.isPending}
+      />
     </div>
   )
 }

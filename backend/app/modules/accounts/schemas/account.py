@@ -7,6 +7,7 @@ from app.models.household import OwnershipType
 class AccountBase(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     type: AccountType
+    bank_id: str | None = Field(None, max_length=50)
     currency: str = "BRL"
     color: str | None = None
     icon: str | None = None
@@ -20,6 +21,7 @@ class AccountCreate(AccountBase):
 class AccountUpdate(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=100)
     type: AccountType | None = None
+    bank_id: str | None = Field(None, max_length=50)
     balance: float | None = None
     currency: str | None = None
     color: str | None = None

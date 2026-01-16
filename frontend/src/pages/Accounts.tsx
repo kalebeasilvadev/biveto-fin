@@ -14,11 +14,15 @@ import {
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import EmptyState from '../components/EmptyState'
+import BankSelector from '../components/shared/BankSelector'
+import BankLogo from '../components/shared/BankLogo'
+import { getBankById, getBankColor } from '../data/banks'
 
 interface Account {
   id: number
   name: string
   type: 'wallet' | 'bank' | 'credit_card' | 'investment'
+  bank_id: string | null
   balance: number
   currency: string
   color: string | null
@@ -61,6 +65,7 @@ export default function Accounts() {
   const [formData, setFormData] = useState({
     name: '',
     type: 'bank',
+    bank_id: null as string | null,
     balance: '',
     color: '#3b82f6',
     ownership_type: 'personal' as 'personal' | 'household',
@@ -126,6 +131,7 @@ export default function Accounts() {
     setFormData({
       name: '',
       type: 'bank',
+      bank_id: null,
       balance: '',
       color: '#3b82f6',
       ownership_type: 'personal',
@@ -138,6 +144,7 @@ export default function Accounts() {
     setFormData({
       name: account.name,
       type: account.type,
+      bank_id: account.bank_id,
       balance: account.balance.toString(),
       color: account.color || '#3b82f6',
       ownership_type: account.ownership_type || 'personal',
@@ -150,10 +157,25 @@ export default function Accounts() {
     setEditingAccount(null)
   }
 
+  const handleBankSelect = (bankId: string | null) => {
+    const bank = bankId ? getBankById(bankId) : null
+    setFormData({
+      ...formData,
+      bank_id: bankId,
+      // Auto-fill name if it's empty or matches the previous bank name
+      name: formData.name === '' || (formData.bank_id && formData.name === getBankById(formData.bank_id)?.name)
+        ? bank?.name || ''
+        : formData.name,
+      // Auto-set color from bank
+      color: bank?.color || formData.color,
+    })
+  }
+
   const handleSubmit = () => {
     const payload = {
       name: formData.name,
       type: formData.type,
+      bank_id: formData.type === 'bank' ? formData.bank_id : null,
       balance: parseFloat(formData.balance) || 0,
       color: formData.color,
       ownership_type: formData.ownership_type,
@@ -221,6 +243,7 @@ export default function Accounts() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {accounts.map((account) => {
             const Icon = getAccountIcon(account.type)
+            const displayColor = account.bank_id ? getBankColor(account.bank_id) : (account.color || '#3b82f6')
             return (
               <div
                 key={account.id}
@@ -228,12 +251,16 @@ export default function Accounts() {
               >
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
-                    <div
-                      className="p-3 rounded-lg"
-                      style={{ backgroundColor: `${account.color}20` }}
-                    >
-                      <Icon size={24} style={{ color: account.color || '#3b82f6' }} />
-                    </div>
+                    {account.bank_id && account.type === 'bank' ? (
+                      <BankLogo bankId={account.bank_id} size="lg" />
+                    ) : (
+                      <div
+                        className="p-3 rounded-lg"
+                        style={{ backgroundColor: `${displayColor}20` }}
+                      >
+                        <Icon size={24} style={{ color: displayColor }} />
+                      </div>
+                    )}
                     <div>
                       <h3 className="font-medium text-gray-900 dark:text-white">{account.name}</h3>
                       <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -297,24 +324,11 @@ export default function Accounts() {
             <div className="p-4 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Nome
-                </label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="input"
-                  placeholder="Ex: Nubank"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Tipo
                 </label>
                 <select
                   value={formData.type}
-                  onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                  onChange={(e) => setFormData({ ...formData, type: e.target.value, bank_id: e.target.value !== 'bank' ? null : formData.bank_id })}
                   className="input"
                 >
                   {accountTypes.map((type) => (
@@ -323,6 +337,32 @@ export default function Accounts() {
                     </option>
                   ))}
                 </select>
+              </div>
+
+              {formData.type === 'bank' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Banco
+                  </label>
+                  <BankSelector
+                    value={formData.bank_id}
+                    onChange={handleBankSelect}
+                    placeholder="Selecione o banco"
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Nome
+                </label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="input"
+                  placeholder="Ex: Nubank Corrente"
+                />
               </div>
 
               <div>

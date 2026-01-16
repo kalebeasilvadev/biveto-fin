@@ -13,6 +13,8 @@ class CreditCardBase(BaseModel):
     points_program_name: str | None = None
     points_factor: float = Field(ge=0, default=1.0)
     points_factor_international: float | None = None
+    nickname: str | None = Field(None, max_length=50)
+    bank_id: str | None = Field(None, max_length=50)
     card_brand: str | None = None
     card_variant: str | None = None
     last_four_digits: str | None = Field(None, max_length=4)
@@ -40,6 +42,8 @@ class CreditCardUpdate(BaseModel):
     points_program_name: str | None = None
     points_factor: float | None = Field(None, ge=0)
     points_factor_international: float | None = None
+    nickname: str | None = Field(None, max_length=50)
+    bank_id: str | None = Field(None, max_length=50)
     card_brand: str | None = None
     card_variant: str | None = None
     last_four_digits: str | None = Field(None, max_length=4)
@@ -77,6 +81,8 @@ class CreditCardListResponse(BaseModel):
     id: int
     account_id: int
     name: str  # from account
+    nickname: str | None
+    bank_id: str | None
     credit_limit: float
     current_balance: float  # from account
     available_limit: float  # computed: limit - balance

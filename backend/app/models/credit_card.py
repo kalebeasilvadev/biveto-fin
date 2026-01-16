@@ -48,6 +48,8 @@ class CreditCard(Base):
     points_factor_international: Mapped[float | None] = mapped_column(Numeric(6, 2))  # Points for international purchases
 
     # Card details
+    nickname: Mapped[str | None] = mapped_column(String(50))  # User-friendly nickname: "Roxinho", "Cartão do trabalho"
+    bank_id: Mapped[str | None] = mapped_column(String(50))  # Bank ID: 'nubank', 'itau', etc.
     card_brand: Mapped[str | None] = mapped_column(String(50))  # Visa, Mastercard, Elo, Amex, etc.
     card_variant: Mapped[str | None] = mapped_column(String(100))  # Platinum, Black, Infinite, etc.
     last_four_digits: Mapped[str | None] = mapped_column(String(4))
