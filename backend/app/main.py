@@ -228,14 +228,33 @@ async def health_check():
 # Servir frontend em produção
 STATIC_DIR = Path(__file__).parent.parent / "static"
 
+print(f"STATIC_DIR: {STATIC_DIR}, exists: {STATIC_DIR.exists()}")
+
 if STATIC_DIR.exists():
+    # Listar conteúdo do diretório estático para debug
+    print(f"Static directory contents: {list(STATIC_DIR.iterdir())}")
+
     # Servir assets estáticos (JS, CSS, imagens)
     if (STATIC_DIR / "assets").exists():
         app.mount("/assets", StaticFiles(directory=STATIC_DIR / "assets"), name="assets")
+        print("Mounted /assets")
 
     # Servir icons
     if (STATIC_DIR / "icons").exists():
         app.mount("/icons", StaticFiles(directory=STATIC_DIR / "icons"), name="icons")
+        print(f"Mounted /icons with files: {list((STATIC_DIR / 'icons').iterdir())}")
+    else:
+        print("WARNING: /icons directory not found!")
+
+    # Servir logos
+    if (STATIC_DIR / "logos").exists():
+        app.mount("/logos", StaticFiles(directory=STATIC_DIR / "logos"), name="logos")
+        print("Mounted /logos")
+
+    # Servir screenshots (para PWA)
+    if (STATIC_DIR / "screenshots").exists():
+        app.mount("/screenshots", StaticFiles(directory=STATIC_DIR / "screenshots"), name="screenshots")
+        print("Mounted /screenshots")
 
     # Rotas específicas para arquivos PWA
     @app.get("/manifest.json")
