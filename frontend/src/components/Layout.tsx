@@ -106,7 +106,7 @@ export default function Layout() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-900 transition-colors">
       {/* Mobile header */}
-      <header className="lg:hidden fixed top-0 left-0 right-0 z-30 glass border-b border-gray-200/50 dark:bg-slate-900/80 dark:border-slate-700">
+      <header className="lg:hidden fixed top-0 left-0 right-0 z-30 glass border-b border-gray-200/50 dark:bg-slate-900/80 dark:border-slate-700 mobile-header">
         <div className="flex items-center justify-between px-4 h-14">
           <img src={isDark ? "/logo-white.svg" : "/logo.svg"} alt="Biveto" className="h-8" />
           <button
@@ -227,8 +227,8 @@ export default function Layout() {
           aria-modal="true"
           aria-hidden={!mobileMenuOpen}
         >
-          {/* Header */}
-          <div className="flex items-center justify-between h-14 px-4 border-b border-gray-100 dark:border-slate-700">
+          {/* Header with safe area */}
+          <div className="flex items-center justify-between h-14 px-4 border-b border-gray-100 dark:border-slate-700 mobile-header">
             <img src={isDark ? "/logo-white.svg" : "/logo.svg"} alt="Biveto" className="h-8" />
             <button
               onClick={() => setMobileMenuOpen(false)}
@@ -325,8 +325,8 @@ export default function Layout() {
 
         {/* Main content */}
         <main className="flex-1 lg:ml-64 overflow-x-hidden" role="main" aria-label="Conteúdo principal">
-          {/* Spacer for mobile header */}
-          <div className="h-14 lg:hidden" aria-hidden="true" />
+          {/* Spacer for mobile header (h-14 = 56px + safe area top) */}
+          <div className="lg:hidden safe-area-top" style={{ height: 'calc(3.5rem + env(safe-area-inset-top, 0px))' }} aria-hidden="true" />
 
           {/* Content */}
           <div className="p-4 lg:p-8 pb-32 lg:pb-8">
