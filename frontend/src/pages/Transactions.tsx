@@ -1,26 +1,24 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { transactionsApi, categoriesApi, accountsApi } from '../services/api'
-import { format } from 'date-fns'
-import { ptBR } from 'date-fns/locale'
 import {
   Plus,
   Filter,
   ArrowUpRight,
   ArrowDownRight,
-  Receipt,
   Download,
   ChevronLeft,
   ChevronRight,
   Search,
   X,
-  Edit2,
   Trash2,
   Calendar,
   Tag,
   CreditCard,
   FileText,
   Clock,
+  TrendingUp,
+  TrendingDown,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import EmptyState from '../components/EmptyState'
@@ -69,6 +67,20 @@ const accountTypeLabels: Record<string, string> = {
   investment: 'Investimento',
 }
 
+const MONTH_NAMES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+
+// Helper to get current month/year
+const getCurrentPeriod = () => {
+  const now = new Date()
+  return { month: now.getMonth() + 1, year: now.getFullYear() }
+}
+
+// Format date string (YYYY-MM-DD) to DD/MM/YYYY without timezone issues
+const formatDateBR = (dateStr: string): string => {
+  const [year, month, day] = dateStr.split('-')
+  return `${day}/${month}/${year}`
+}
+
 export default function Transactions() {
   const [categoryFilter, setCategoryFilter] = useState<string>('')
   const [showFilters, setShowFilters] = useState(false)
@@ -76,6 +88,10 @@ export default function Transactions() {
   const [page, setPage] = useState(0)
   const [searchInput, setSearchInput] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear())
+  const [selectedMonth, setSelectedMonth] = useState<number | null>(null)
+  const [selectedTab, setSelectedTab] = useState<string | null>(null)
+  const [selectedDay, setSelectedDay] = useState<number | null>(null)
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null)
   const [showEditModal, setShowEditModal] = useState(false)
   const [editForm, setEditForm] = useState({
@@ -101,14 +117,32 @@ export default function Transactions() {
   }, [searchInput])
 
   const { data: transactionsData, isLoading } = useQuery({
-    queryKey: ['transactions', categoryFilter, searchQuery, page],
-    queryFn: () =>
-      transactionsApi.list({
+    queryKey: ['transactions', categoryFilter, searchQuery, selectedYear, selectedMonth],
+    queryFn: () => {
+      const params: Record<string, unknown> = {
         category_id: categoryFilter || undefined,
         search: searchQuery || undefined,
-        limit: ITEMS_PER_PAGE,
-        offset: page * ITEMS_PER_PAGE,
-      }),
+        limit: 100, // Backend limit
+        offset: 0,
+      }
+
+      // Add date range filter if month/year are selected
+      if (selectedMonth && selectedYear) {
+        const paddedMonth = String(selectedMonth).padStart(2, '0')
+        const startDate = `${selectedYear}-${paddedMonth}-01`
+
+        // Calculate last day of month
+        const nextMonth = selectedMonth === 12 ? 1 : selectedMonth + 1
+        const nextYear = selectedMonth === 12 ? selectedYear + 1 : selectedYear
+        const paddedNextMonth = String(nextMonth).padStart(2, '0')
+        const endDate = `${nextYear}-${paddedNextMonth}-01`
+
+        params.start_date = startDate
+        params.end_date = endDate
+      }
+
+      return transactionsApi.list(params)
+    },
   })
 
   const { data: categoriesData } = useQuery({
@@ -158,10 +192,148 @@ export default function Transactions() {
     offset: 0,
     has_more: false,
   }
-  const transactions: Transaction[] = paginatedData.items || []
-  const totalPages = Math.ceil(paginatedData.total / ITEMS_PER_PAGE)
+  const allTransactions: Transaction[] = paginatedData.items || []
   const categories: Category[] = categoriesData?.data || []
-  // accountsData is used for query invalidation but not displayed directly
+
+  // Debug: log transaction count (uncomment for debugging)
+  // console.log('[Transactions] Total loaded:', allTransactions.length, 'Total in DB:', paginatedData.total)
+
+  // Generate available years from transactions or default range
+  const availableYears = useMemo(() => {
+    const years = new Set<number>()
+    allTransactions.forEach(t => {
+      // Parse date as YYYY-MM-DD string to avoid timezone issues
+      const yearStr = t.date.split('-')[0]
+      years.add(parseInt(yearStr))
+    })
+
+    const currentYear = new Date().getFullYear()
+    // Add current year and next year if not present
+    years.add(currentYear)
+    years.add(currentYear + 1)
+    years.add(currentYear - 1)
+
+    return Array.from(years).sort((a, b) => b - a)
+  }, [allTransactions])
+
+  // Generate month tabs for selected year (all 12 months)
+  const monthTabs = useMemo(() => {
+    const { month: currentMonth, year: currentYear } = getCurrentPeriod()
+    const tabs: { key: string; label: string; month: number; year: number; isCurrent: boolean }[] = []
+
+    for (let month = 1; month <= 12; month++) {
+      const key = `${selectedYear}-${month}`
+      const isCurrent = month === currentMonth && selectedYear === currentYear
+
+      tabs.push({
+        key,
+        label: MONTH_NAMES[month - 1],
+        month,
+        year: selectedYear,
+        isCurrent,
+      })
+    }
+
+    return tabs
+  }, [selectedYear])
+
+  // Set initial selected tab to current month
+  useEffect(() => {
+    if (monthTabs.length > 0 && !selectedTab) {
+      const currentTab = monthTabs.find(t => t.isCurrent)
+      const newTab = currentTab?.key || monthTabs[0].key
+
+      setSelectedTab(newTab)
+      const [, monthStr] = newTab.split('-')
+      setSelectedMonth(Number(monthStr))
+    }
+  }, [monthTabs, selectedTab])
+
+  // Update selectedMonth when tab changes
+  useEffect(() => {
+    if (selectedTab) {
+      const [yearStr, monthStr] = selectedTab.split('-')
+      const tabYear = Number(yearStr)
+      const tabMonth = Number(monthStr)
+
+      // Only update if the tab's year matches selected year
+      if (tabYear === selectedYear) {
+        setSelectedMonth(tabMonth)
+      }
+    }
+  }, [selectedTab, selectedYear])
+
+  // Generate day tabs based on transactions in the selected month
+  const dayTabs = useMemo(() => {
+    if (!selectedMonth || !selectedYear) return []
+
+    // Get unique days with transactions
+    const daysMap = new Map<number, number>()
+
+    allTransactions.forEach(t => {
+      // Parse date: YYYY-MM-DD format from backend
+      const [year, month, day] = t.date.split('-')
+      const transYear = parseInt(year, 10)
+      const transMonth = parseInt(month, 10)
+      const dayNum = parseInt(day, 10)
+
+      // Only count transactions from the selected month/year
+      if (transYear === selectedYear && transMonth === selectedMonth) {
+        daysMap.set(dayNum, (daysMap.get(dayNum) || 0) + 1)
+      }
+    })
+
+    return Array.from(daysMap.entries())
+      .sort((a, b) => a[0] - b[0])
+      .map(([day, count]) => ({
+        day,
+        label: String(day),
+        count,
+      }))
+  }, [allTransactions, selectedMonth, selectedYear])
+
+  // Reset selected day when month changes
+  useEffect(() => {
+    setSelectedDay(null)
+  }, [selectedMonth, selectedYear])
+
+  // Filter transactions by selected day
+  const filteredTransactions = useMemo(() => {
+    if (!selectedDay || !selectedMonth || !selectedYear) return allTransactions
+
+    return allTransactions.filter(t => {
+      const [year, month, day] = t.date.split('-')
+      const transYear = parseInt(year, 10)
+      const transMonth = parseInt(month, 10)
+      const transDay = parseInt(day, 10)
+
+      return transDay === selectedDay && transMonth === selectedMonth && transYear === selectedYear
+    })
+  }, [allTransactions, selectedDay, selectedMonth, selectedYear])
+
+  // Calculate summary for selected period
+  const periodSummary = useMemo(() => {
+    const income = filteredTransactions
+      .filter(t => t.type === 'income')
+      .reduce((sum, t) => sum + t.amount, 0)
+    const expenses = filteredTransactions
+      .filter(t => t.type === 'expense')
+      .reduce((sum, t) => sum + t.amount, 0)
+    const balance = income - expenses
+    const projected = filteredTransactions.filter(t => !t.is_paid).length
+
+    return { income, expenses, balance, projected, count: filteredTransactions.length }
+  }, [filteredTransactions])
+
+  // Pagination for table view
+  const paginatedTransactions = useMemo(() => {
+    const start = page * ITEMS_PER_PAGE
+    const end = start + ITEMS_PER_PAGE
+    return filteredTransactions.slice(start, end)
+  }, [filteredTransactions, page])
+
+  const totalPages = Math.ceil(filteredTransactions.length / ITEMS_PER_PAGE)
+  const transactions = paginatedTransactions
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat('pt-BR', {
@@ -238,19 +410,6 @@ export default function Transactions() {
     }
   }
 
-  // Group by date
-  const groupedTransactions = transactions.reduce(
-    (groups: Record<string, Transaction[]>, transaction) => {
-      const date = transaction.date
-      if (!groups[date]) {
-        groups[date] = []
-      }
-      groups[date].push(transaction)
-      return groups
-    },
-    {}
-  )
-
   const clearSearch = () => {
     setSearchInput('')
     setSearchQuery('')
@@ -265,20 +424,60 @@ export default function Transactions() {
     : categories
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            Transações
-          </h1>
-          {paginatedData.total > 0 && (
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              {paginatedData.total} transação(ões)
-              {searchQuery && ` para "${searchQuery}"`}
-            </p>
+    <div className="space-y-4">
+      {/* Header with Summary */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Transações</h1>
+          {!isLoading && filteredTransactions.length > 0 && selectedMonth && (
+            <div className="flex flex-wrap items-center gap-3 mt-1 text-sm">
+              <span className="text-gray-500 dark:text-gray-400">
+                {selectedDay ? `${selectedDay} de ` : ''}{MONTH_NAMES[selectedMonth - 1]} {selectedYear}
+                {selectedDay && ` - ${filteredTransactions.length} transação${filteredTransactions.length > 1 ? 'ões' : ''}`}
+              </span>
+              {selectedDay && (
+                <>
+                  <span className="flex items-center gap-1 text-green-600 dark:text-green-400 font-medium whitespace-nowrap">
+                    <TrendingUp size={14} />
+                    {formatCurrency(periodSummary.income)}
+                  </span>
+                  <span className="flex items-center gap-1 text-red-600 dark:text-red-400 font-medium whitespace-nowrap">
+                    <TrendingDown size={14} />
+                    {formatCurrency(periodSummary.expenses)}
+                  </span>
+                  <span className={clsx(
+                    'font-medium whitespace-nowrap',
+                    periodSummary.balance >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+                  )}>
+                    Balanço: {formatCurrency(periodSummary.balance)}
+                  </span>
+                </>
+              )}
+            </div>
           )}
         </div>
-        <div className="flex gap-2">
+
+        {/* Filters and Actions */}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {/* Year Filter */}
+          <select
+            value={selectedYear}
+            onChange={(e) => {
+              const newYear = Number(e.target.value)
+              setSelectedYear(newYear)
+              setSelectedTab(null)
+              setSelectedMonth(null)
+              setPage(0)
+            }}
+            className="input w-auto"
+          >
+            {availableYears.map((year) => (
+              <option key={year} value={year}>
+                {year}
+              </option>
+            ))}
+          </select>
+
           <button
             onClick={handleExport}
             disabled={isExporting || transactions.length === 0}
@@ -286,33 +485,28 @@ export default function Transactions() {
             title="Exportar CSV"
           >
             <Download size={18} className={isExporting ? 'animate-pulse' : ''} />
-            <span className="hidden sm:inline">
-              {isExporting ? 'Exportando...' : 'Exportar'}
-            </span>
           </button>
+
           <div className="relative">
             <button
               onClick={() => setShowFilters(!showFilters)}
               className={clsx(
                 'btn-secondary flex items-center gap-2',
-                categoryFilter && 'ring-2 ring-biveto ring-offset-1'
+                categoryFilter && 'ring-2 ring-primary-500 ring-offset-1'
               )}
             >
               <Filter size={18} />
-              <span className="hidden sm:inline">Filtros</span>
               {categoryFilter && (
-                <span className="w-2 h-2 bg-biveto rounded-full" />
+                <span className="w-2 h-2 bg-primary-500 rounded-full" />
               )}
             </button>
-            {/* Filter Popover */}
             {showFilters && (
               <>
-                {/* Backdrop to close on outside click */}
                 <div
                   className="fixed inset-0 z-40"
                   onClick={() => setShowFilters(false)}
                 />
-                <div className="absolute right-0 top-full mt-2 z-50 w-72 bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-gray-200 dark:border-slate-700 p-4 animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="absolute right-0 top-full mt-2 z-50 w-72 bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-gray-200 dark:border-slate-700 p-4">
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="font-medium dark:text-white">Filtros</h3>
                     {categoryFilter && (
@@ -321,7 +515,7 @@ export default function Transactions() {
                           setCategoryFilter('')
                           setShowFilters(false)
                         }}
-                        className="text-xs text-biveto hover:underline"
+                        className="text-xs text-primary-600 hover:underline"
                       >
                         Limpar
                       </button>
@@ -351,158 +545,323 @@ export default function Transactions() {
               </>
             )}
           </div>
+
           <Link to="/upload" className="btn-primary flex items-center gap-2">
             <Plus size={18} />
-            <span className="hidden sm:inline">Adicionar</span>
           </Link>
         </div>
-      </div>
-
-      {/* Search bar */}
-      <div className="relative">
-        <Search
-          className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500"
-          size={20}
-        />
-        <input
-          type="text"
-          value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-          placeholder="Buscar por descrição, estabelecimento ou categoria..."
-          className="input pl-10 pr-10"
-        />
-        {searchInput && (
-          <button
-            onClick={clearSearch}
-            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
-          >
-            <X size={18} />
-          </button>
-        )}
       </div>
 
       {isLoading ? (
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
         </div>
-      ) : transactions.length === 0 ? (
-        searchQuery || categoryFilter ? (
-          <EmptyState
-            icon={Search}
-            title="Nenhum resultado encontrado"
-            description={`Não encontramos transações${searchQuery ? ` para "${searchQuery}"` : ''}${categoryFilter ? ' na categoria selecionada' : ''}. Tente ajustar os filtros.`}
-            actionLabel="Limpar filtros"
-            actionOnClick={() => {
-              clearSearch()
-              setCategoryFilter('')
-            }}
-          />
-        ) : (
-          <EmptyState
-            icon={Receipt}
-            title="Nenhuma transação encontrada"
-            description="Comece a registrar suas receitas e despesas para ter controle total das suas finanças."
-            actionLabel="Adicionar transação"
-            actionTo="/upload"
-          />
-        )
       ) : (
         <>
-          <div className="space-y-6">
-            {Object.entries(groupedTransactions).map(([date, dayTransactions]) => (
-              <div key={date}>
-                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
-                  {format(new Date(date), "EEEE, d 'de' MMMM", { locale: ptBR })}
-                </h3>
-                <div className="card divide-y dark:divide-slate-700">
-                  {dayTransactions.map((transaction) => (
-                    <div
-                      key={transaction.id}
-                      onClick={() => openEditModal(transaction)}
-                      className="flex items-center justify-between py-3 first:pt-0 last:pb-0 cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-700/50 -mx-4 px-4 transition-colors"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div
-                          className={`p-2 rounded-full ${
-                            transaction.type === 'income'
-                              ? 'bg-green-100 dark:bg-green-900/30'
-                              : 'bg-red-100 dark:bg-red-900/30'
-                          }`}
-                        >
-                          {transaction.type === 'income' ? (
-                            <ArrowUpRight className="text-income" size={18} />
-                          ) : (
-                            <ArrowDownRight className="text-expense" size={18} />
-                          )}
-                        </div>
-                        <div>
-                          <p className="font-medium dark:text-white">
-                            {transaction.merchant_name ||
-                              transaction.description ||
-                              'Transação'}
-                          </p>
-                          <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-                            <span>{transaction.category_name || 'Sem categoria'}</span>
-                            {!transaction.is_paid && (
-                              <span className="text-xs px-1.5 py-0.5 bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 rounded flex items-center gap-0.5">
-                                <Clock size={10} />
-                                Projetado
-                              </span>
-                            )}
-                            {transaction.installment_number && transaction.installment_total && (
-                              <span className="text-xs px-1.5 py-0.5 bg-gray-100 dark:bg-slate-600 rounded">
-                                {transaction.installment_number}/{transaction.installment_total}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span
-                          className={`font-semibold ${
-                            transaction.type === 'income'
-                              ? 'text-income'
-                              : 'text-expense'
-                          }`}
-                        >
-                          {transaction.type === 'income' ? '+' : '-'}
-                          {formatCurrency(transaction.amount)}
-                        </span>
-                        <Edit2
-                          size={16}
-                          className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
+          {/* Month Tabs */}
+          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm overflow-hidden">
+            <div className="flex overflow-x-auto" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+              {monthTabs.map((tab) => (
+                <button
+                  key={tab.key}
+                  onClick={() => {
+                    setSelectedTab(tab.key)
+                    setPage(0)
+                  }}
+                  className={clsx(
+                    'flex-1 min-w-[60px] px-3 py-3 text-sm font-medium transition-colors border-b-2 whitespace-nowrap',
+                    selectedTab === tab.key
+                      ? 'border-primary-500 text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/20'
+                      : 'border-transparent text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700'
+                  )}
+                >
+                  <span className="flex items-center justify-center gap-1">
+                    {tab.label}
+                    {tab.isCurrent && selectedTab === tab.key && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-primary-500" />
+                    )}
+                  </span>
+                </button>
+              ))}
+            </div>
           </div>
 
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-slate-700">
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                Página {page + 1} de {totalPages}
-              </p>
-              <div className="flex gap-2">
+          {/* Day Tabs */}
+          {dayTabs.length > 0 && (
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm overflow-hidden">
+              <div className="flex items-center gap-2 p-2 overflow-x-auto" style={{ scrollbarWidth: 'thin' }}>
                 <button
-                  onClick={() => setPage((p) => Math.max(0, p - 1))}
-                  disabled={page === 0}
-                  className="btn-secondary p-2 disabled:opacity-50"
+                  onClick={() => {
+                    setSelectedDay(null)
+                    setPage(0)
+                  }}
+                  className={clsx(
+                    'flex-shrink-0 px-3 sm:px-4 py-2 rounded-md text-xs sm:text-sm font-medium transition-colors',
+                    selectedDay === null
+                      ? 'bg-primary-600 text-white dark:bg-primary-500'
+                      : 'bg-gray-100 text-gray-700 dark:bg-slate-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-600'
+                  )}
                 >
-                  <ChevronLeft size={20} />
+                  Todos
                 </button>
-                <button
-                  onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-                  disabled={!paginatedData.has_more}
-                  className="btn-secondary p-2 disabled:opacity-50"
-                >
-                  <ChevronRight size={20} />
-                </button>
+                {dayTabs.map((tab) => (
+                  <button
+                    key={tab.day}
+                    onClick={() => {
+                      setSelectedDay(tab.day)
+                      setPage(0)
+                    }}
+                    className={clsx(
+                      'flex-shrink-0 px-3 sm:px-4 py-2 rounded-md text-xs sm:text-sm font-medium transition-colors',
+                      selectedDay === tab.day
+                        ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
+                        : 'bg-gray-100 text-gray-700 dark:bg-slate-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-600'
+                    )}
+                  >
+                    <div className="flex flex-col items-center gap-0.5">
+                      <span className="font-semibold whitespace-nowrap">Dia {tab.label}</span>
+                      <span className="text-[10px] sm:text-xs opacity-75">{tab.count}</span>
+                    </div>
+                  </button>
+                ))}
               </div>
             </div>
+          )}
+
+          {/* Period Summary */}
+          {selectedTab && filteredTransactions.length > 0 && (
+            <div className="bg-gray-50 dark:bg-slate-800/50 rounded-lg p-4">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <Calendar size={16} className="text-gray-500 dark:text-gray-400" />
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {selectedDay ? `${selectedDay} de ` : ''}{MONTH_NAMES[selectedMonth! - 1]} de {selectedYear}
+                  </span>
+                </div>
+
+                <div className="hidden sm:block h-4 w-px bg-gray-300 dark:bg-gray-600" />
+
+                <div className="grid grid-cols-2 sm:flex sm:items-center gap-4 sm:gap-6 flex-1">
+                  <div>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">Receitas</span>
+                    <p className="font-semibold text-green-600 dark:text-green-400 text-sm sm:text-base">{formatCurrency(periodSummary.income)}</p>
+                  </div>
+                  <div>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">Despesas</span>
+                    <p className="font-semibold text-red-600 dark:text-red-400 text-sm sm:text-base">{formatCurrency(periodSummary.expenses)}</p>
+                  </div>
+                  <div>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">Balanço</span>
+                    <p className={clsx(
+                      'font-semibold text-sm sm:text-base',
+                      periodSummary.balance >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+                    )}>
+                      {formatCurrency(periodSummary.balance)}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">Transações</span>
+                    <p className="font-semibold text-gray-900 dark:text-white text-sm sm:text-base">{periodSummary.count}</p>
+                  </div>
+                </div>
+
+                {periodSummary.projected > 0 && (
+                  <div className="flex items-center gap-2 text-purple-600 dark:text-purple-400 pt-3 sm:pt-0 border-t sm:border-t-0 sm:border-l border-gray-300 dark:border-gray-600 sm:pl-6">
+                    <Clock size={16} />
+                    <span className="text-sm font-medium">
+                      {periodSummary.projected} projetada{periodSummary.projected > 1 ? 's' : ''}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Search bar */}
+          <div className="relative">
+            <Search
+              className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500"
+              size={20}
+            />
+            <input
+              type="text"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Buscar por descrição, estabelecimento ou categoria..."
+              className="input pl-10 pr-10"
+            />
+            {searchInput && (
+              <button
+                onClick={clearSearch}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+              >
+                <X size={18} />
+              </button>
+            )}
+          </div>
+
+          {filteredTransactions.length === 0 ? (
+            searchQuery || categoryFilter ? (
+              <EmptyState
+                icon={Search}
+                title="Nenhum resultado encontrado"
+                description={`Não encontramos transações${searchQuery ? ` para "${searchQuery}"` : ''}${categoryFilter ? ' na categoria selecionada' : ''}. Tente ajustar os filtros.`}
+                actionLabel="Limpar filtros"
+                actionOnClick={() => {
+                  clearSearch()
+                  setCategoryFilter('')
+                }}
+              />
+            ) : (
+              <div className="px-4 py-12 text-center text-gray-500 dark:text-gray-400">
+                Nenhuma transação neste período
+              </div>
+            )
+          ) : (
+            <>
+              {/* Table View */}
+              <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm overflow-x-auto">
+                <table className="w-full min-w-[700px]">
+                  <thead>
+                    <tr className="border-b border-gray-200 dark:border-slate-700">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        Data
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        Descrição
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        Categoria
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        Conta
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        Valor
+                      </th>
+                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        Status
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
+                    {transactions.map((transaction) => (
+                      <tr
+                        key={transaction.id}
+                        onClick={() => openEditModal(transaction)}
+                        className={clsx(
+                          'hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors cursor-pointer',
+                          !transaction.is_paid && 'bg-purple-50/50 dark:bg-purple-900/10'
+                        )}
+                      >
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <Calendar size={14} className="text-gray-400" />
+                            <span className="text-sm text-gray-900 dark:text-white">
+                              {formatDateBR(transaction.date)}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <div
+                              className={clsx(
+                                'p-1.5 rounded-full',
+                                transaction.type === 'income'
+                                  ? 'bg-green-100 dark:bg-green-900/30'
+                                  : 'bg-red-100 dark:bg-red-900/30'
+                              )}
+                            >
+                              {transaction.type === 'income' ? (
+                                <ArrowUpRight className="text-income" size={14} />
+                              ) : (
+                                <ArrowDownRight className="text-expense" size={14} />
+                              )}
+                            </div>
+                            <div>
+                              <p className="font-medium text-sm text-gray-900 dark:text-white">
+                                {transaction.merchant_name || transaction.description || 'Transação'}
+                              </p>
+                              {(transaction.installment_number || transaction.is_recurring) && (
+                                <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+                                  {transaction.installment_number && transaction.installment_total && (
+                                    <span className="px-1.5 py-0.5 bg-gray-100 dark:bg-slate-600 rounded">
+                                      {transaction.installment_number}/{transaction.installment_total}
+                                    </span>
+                                  )}
+                                  {transaction.is_recurring && (
+                                    <span>• Recorrente</span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="text-sm text-gray-600 dark:text-gray-300">
+                            {transaction.category_name || 'Sem categoria'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-1">
+                            <CreditCard size={14} className="text-gray-400" />
+                            <span className="text-sm text-gray-600 dark:text-gray-300">
+                              {transaction.account_name || 'N/A'}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <span
+                            className={clsx(
+                              'font-semibold text-sm',
+                              transaction.type === 'income'
+                                ? 'text-green-600 dark:text-green-400'
+                                : 'text-red-600 dark:text-red-400'
+                            )}
+                          >
+                            {transaction.type === 'income' ? '+' : '-'}
+                            {formatCurrency(transaction.amount)}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          {!transaction.is_paid && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 rounded-full">
+                              <Clock size={10} />
+                              Projetado
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between pt-4">
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    Página {page + 1} de {totalPages} ({filteredTransactions.length} transações)
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setPage((p) => Math.max(0, p - 1))}
+                      disabled={page === 0}
+                      className="btn-secondary p-2 disabled:opacity-50"
+                    >
+                      <ChevronLeft size={20} />
+                    </button>
+                    <button
+                      onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                      disabled={page >= totalPages - 1}
+                      className="btn-secondary p-2 disabled:opacity-50"
+                    >
+                      <ChevronRight size={20} />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </>
       )}
@@ -510,9 +869,9 @@ export default function Transactions() {
       {/* Edit/Detail Modal */}
       {showEditModal && selectedTransaction && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-lg w-full max-w-lg max-h-[90vh] overflow-y-auto">
+          <div className="bg-white dark:bg-slate-800 rounded-lg w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
             {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b dark:border-slate-700">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
               <div className="flex items-center gap-3">
                 <div
                   className={clsx(
@@ -529,24 +888,82 @@ export default function Transactions() {
                   )}
                 </div>
                 <div>
-                  <h2 className="text-lg font-semibold dark:text-white">
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                     {selectedTransaction.type === 'income' ? 'Receita' : 'Despesa'}
                   </h2>
                   <p className="text-sm text-gray-500 dark:text-gray-400">
-                    {selectedTransaction.merchant_name || 'Editar transação'}
+                    {selectedTransaction.merchant_name || selectedTransaction.description || 'Editar transação'}
                   </p>
                 </div>
               </div>
               <button
                 onClick={closeEditModal}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg"
               >
-                <X size={24} />
+                <X size={20} className="text-gray-500" />
               </button>
             </div>
 
-            {/* Content */}
-            <div className="p-4 space-y-4">
+            {/* Summary Cards */}
+            <div className="grid grid-cols-3 gap-4 p-4 bg-gray-50 dark:bg-slate-700/30">
+              <div className="text-center">
+                <p className="text-xs text-gray-500 dark:text-gray-400">Valor</p>
+                <p className={clsx(
+                  'text-lg font-bold',
+                  selectedTransaction.type === 'income'
+                    ? 'text-green-600 dark:text-green-400'
+                    : 'text-red-600 dark:text-red-400'
+                )}>
+                  {formatCurrency(selectedTransaction.amount)}
+                </p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-gray-500 dark:text-gray-400">Data</p>
+                <p className="text-lg font-bold text-gray-900 dark:text-white">
+                  {formatDateBR(selectedTransaction.date)}
+                </p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-gray-500 dark:text-gray-400">Status</p>
+                <p className={clsx(
+                  'text-lg font-bold',
+                  selectedTransaction.is_paid
+                    ? 'text-green-600 dark:text-green-400'
+                    : 'text-purple-600 dark:text-purple-400'
+                )}>
+                  {selectedTransaction.is_paid ? 'Pago' : 'Projetado'}
+                </p>
+              </div>
+            </div>
+
+            {/* Info Row */}
+            <div className="flex items-center justify-between px-4 py-2 text-sm border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-slate-800">
+              <div className="flex items-center gap-4">
+                <span className="text-gray-500 dark:text-gray-400">
+                  Categoria: <span className="text-gray-900 dark:text-white font-medium">{selectedTransaction.category_name || 'Sem categoria'}</span>
+                </span>
+                <span className="text-gray-500 dark:text-gray-400">
+                  Conta: <span className="text-gray-900 dark:text-white font-medium">{selectedTransaction.account_name || 'N/A'}</span>
+                </span>
+              </div>
+              {(selectedTransaction.installment_number || selectedTransaction.is_recurring) && (
+                <div className="flex items-center gap-2">
+                  {selectedTransaction.installment_number && (
+                    <span className="text-xs px-2 py-1 bg-gray-100 dark:bg-slate-600 text-gray-700 dark:text-gray-300 rounded">
+                      Parcela {selectedTransaction.installment_number}/{selectedTransaction.installment_total}
+                    </span>
+                  )}
+                  {selectedTransaction.is_recurring && (
+                    <span className="text-xs px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded">
+                      Recorrente
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Content - Scrollable */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
               {/* Amount */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -660,45 +1077,14 @@ export default function Transactions() {
                 />
               </div>
 
-              {/* Info section */}
-              <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-3 space-y-2 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-500 dark:text-gray-400">
-                    <CreditCard size={14} className="inline mr-1" />
-                    Conta
-                  </span>
-                  <span className="dark:text-white">
-                    {selectedTransaction.account_name || 'N/A'}
-                  </span>
-                </div>
-                {selectedTransaction.installment_number && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-500 dark:text-gray-400">
-                      Parcela
-                    </span>
-                    <span className="dark:text-white">
-                      {selectedTransaction.installment_number} de{' '}
-                      {selectedTransaction.installment_total}
-                    </span>
-                  </div>
-                )}
-                {selectedTransaction.is_recurring && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-500 dark:text-gray-400">
-                      Recorrente
-                    </span>
-                    <span className="text-green-600 dark:text-green-400">Sim</span>
-                  </div>
-                )}
-              </div>
             </div>
 
             {/* Footer */}
-            <div className="flex items-center justify-between p-4 border-t dark:border-slate-700">
+            <div className="flex items-center justify-between p-4 border-t border-gray-200 dark:border-gray-700">
               <button
                 onClick={handleDelete}
                 disabled={deleteMutation.isPending}
-                className="text-red-600 hover:text-red-700 flex items-center gap-1"
+                className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 flex items-center gap-2 font-medium"
               >
                 <Trash2 size={18} />
                 Excluir
