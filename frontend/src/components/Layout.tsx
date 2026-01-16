@@ -69,7 +69,7 @@ export default function Layout() {
   const user = useAuthStore((state) => state.user)
   const setUser = useAuthStore((state) => state.setUser)
   const { theme, toggleTheme } = useThemeStore()
-  const { canInstall, isIOS, isSafari, promptInstall } = usePWAInstall()
+  const { canInstall, isIOS, promptInstall } = usePWAInstall()
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -380,7 +380,6 @@ export default function Layout() {
       <IOSInstallModal
         isOpen={showIOSInstallModal}
         onClose={() => setShowIOSInstallModal(false)}
-        isSafari={isSafari}
       />
 
       {/* Mobile Bottom Navigation */}

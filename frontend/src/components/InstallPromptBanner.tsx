@@ -4,7 +4,7 @@ import { usePWAInstall } from '../hooks/usePWAInstall'
 import IOSInstallModal from './IOSInstallModal'
 
 export default function InstallPromptBanner() {
-  const { shouldShowBanner, isIOS, isSafari, promptInstall, dismissBanner } = usePWAInstall()
+  const { shouldShowBanner, isIOS, promptInstall, dismissBanner } = usePWAInstall()
   const [showIOSModal, setShowIOSModal] = useState(false)
 
   if (!shouldShowBanner) return null
@@ -58,7 +58,6 @@ export default function InstallPromptBanner() {
       <IOSInstallModal
         isOpen={showIOSModal}
         onClose={() => setShowIOSModal(false)}
-        isSafari={isSafari}
       />
     </>
   )
