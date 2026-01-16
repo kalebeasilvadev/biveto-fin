@@ -26,17 +26,17 @@ interface FamilyContext {
 
 // API calls using configured axios instance
 const migrationApi = {
-  getPreview: async (): Promise<{ data: MigrationPreview }> => {
+  getPreview: async (): Promise<MigrationPreview> => {
     const response = await api.get('/household/migration/preview')
     return response.data
   },
 
-  migrate: async (): Promise<{ data: { success: boolean; migrated: MigrationPreview; message: string } }> => {
+  migrate: async (): Promise<{ success: boolean; migrated: MigrationPreview; message: string }> => {
     const response = await api.post('/household/migration/migrate', { migrate_all: true })
     return response.data
   },
 
-  getFamilyContext: async (): Promise<{ data: FamilyContext }> => {
+  getFamilyContext: async (): Promise<FamilyContext> => {
     const response = await api.get('/family/context')
     return response.data
   }
@@ -74,8 +74,8 @@ export default function HouseholdMigration() {
     }
   })
 
-  const preview = previewData?.data
-  const family = familyData?.data
+  const preview = previewData
+  const family = familyData
   const isOwner = family?.is_owner === true
   const hasResources = preview && preview.total > 0
 
