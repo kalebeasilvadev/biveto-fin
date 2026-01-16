@@ -430,6 +430,7 @@ export default function Upload() {
       category_name?: string
       payment_method?: string
       credit_card_id?: number
+      start_date?: string
     }) => recurringApi.createFromSuggestion(data),
     onSuccess: () => {
       setCreatingRecurringIndex(null)
@@ -466,6 +467,7 @@ export default function Upload() {
       category_name?: string
       payment_method?: string
       credit_card_id?: number
+      start_date?: string
     }>) => recurringApi.batchCreateFromSuggestion(items),
     onSuccess: (response) => {
       setIsCreatingAllRecurrences(false)
@@ -832,6 +834,7 @@ export default function Upload() {
       category_name: suggestion.default_category || item.category || undefined,
       payment_method: isCreditCardInvoice ? 'credit_card' : 'debit',
       credit_card_id: creditCardId || undefined,
+      start_date: item.date || undefined, // Usar a data da transação na fatura
     })
   }
 
@@ -885,6 +888,7 @@ export default function Upload() {
           category_name: suggestion.default_category || item.category || undefined,
           payment_method: isCreditCardInvoice ? 'credit_card' : 'debit',
           credit_card_id: creditCardId || undefined,
+          start_date: item.date || undefined, // Usar a data da transação na fatura
         }
       })
 
@@ -919,6 +923,19 @@ export default function Upload() {
       setBatchAddSkipped(prev => [...prev, dup.message])
     })
     setPendingDuplicates([])
+  }
+
+  // Descartar detecção de recorrência (não é recorrente)
+  const handleDismissRecurring = (index: number) => {
+    if (!document?.extracted_items) return
+    const updatedItems = [...document.extracted_items]
+    if (updatedItems[index]?.recurring_detection) {
+      updatedItems[index] = {
+        ...updatedItems[index],
+        recurring_detection: undefined, // Remove a detecção de recorrência
+      }
+      setDocument({ ...document, extracted_items: updatedItems })
+    }
   }
 
   const resetForm = () => {
@@ -1155,6 +1172,7 @@ export default function Upload() {
             creatingRecurringIndex={creatingRecurringIndex}
             onCreateAllRecurrences={handleCreateAllRecurrences}
             isCreatingAllRecurrences={isCreatingAllRecurrences}
+            onDismissRecurring={handleDismissRecurring}
           />
         )}
 

@@ -62,6 +62,7 @@ interface ExtractedItemsListProps {
   creatingRecurringIndex?: number | null
   onCreateAllRecurrences?: () => void
   isCreatingAllRecurrences?: boolean
+  onDismissRecurring?: (index: number) => void
 }
 
 export default function ExtractedItemsList({
@@ -91,6 +92,7 @@ export default function ExtractedItemsList({
   creatingRecurringIndex,
   onCreateAllRecurrences,
   isCreatingAllRecurrences = false,
+  onDismissRecurring,
 }: ExtractedItemsListProps) {
   // Estado para alertas colapsáveis
   const [alertsExpanded, setAlertsExpanded] = useState(true)
@@ -385,14 +387,14 @@ export default function ExtractedItemsList({
 
               {/* Ação de criar recorrência (se aplicável e selecionado) */}
               {isSelected && isRecurring && item.recurring_detection?.suggested_recurring && onCreateRecurring && (
-                <div className="px-3 pb-3 pt-0">
+                <div className="px-3 pb-3 pt-0 flex gap-2">
                   <button
                     onClick={(e) => {
                       e.stopPropagation()
                       onCreateRecurring(index)
                     }}
                     disabled={creatingRecurringIndex === index}
-                    className="w-full flex items-center justify-center gap-2 px-3 py-1.5 text-xs font-medium text-green-400 bg-green-500/10 hover:bg-green-500/20 rounded-lg transition-colors disabled:opacity-50"
+                    className="flex-1 flex items-center justify-center gap-2 px-3 py-1.5 text-xs font-medium text-green-400 bg-green-500/10 hover:bg-green-500/20 rounded-lg transition-colors disabled:opacity-50"
                   >
                     {creatingRecurringIndex === index ? (
                       <>
@@ -406,6 +408,18 @@ export default function ExtractedItemsList({
                       </>
                     )}
                   </button>
+                  {onDismissRecurring && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onDismissRecurring(index)
+                      }}
+                      className="px-3 py-1.5 text-xs font-medium text-gray-400 bg-slate-700/50 hover:bg-slate-700 rounded-lg transition-colors"
+                      title="Não é recorrente"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -664,23 +678,37 @@ export default function ExtractedItemsList({
              !editingItem.recurring_detection?.is_user_recurring &&
              editingItem.recurring_detection?.suggested_recurring &&
              onCreateRecurring && (
-              <button
-                onClick={() => onCreateRecurring(editingItemIndex)}
-                disabled={creatingRecurringIndex === editingItemIndex}
-                className="w-full mb-4 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-green-400 bg-green-500/10 hover:bg-green-500/20 rounded-xl transition-colors disabled:opacity-50"
-              >
-                {creatingRecurringIndex === editingItemIndex ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-green-400 border-t-transparent" />
-                    Criando...
-                  </>
-                ) : (
-                  <>
-                    <Plus size={16} />
-                    Criar Recorrência
-                  </>
+              <div className="flex gap-2 mb-4">
+                <button
+                  onClick={() => onCreateRecurring(editingItemIndex)}
+                  disabled={creatingRecurringIndex === editingItemIndex}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-green-400 bg-green-500/10 hover:bg-green-500/20 rounded-xl transition-colors disabled:opacity-50"
+                >
+                  {creatingRecurringIndex === editingItemIndex ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-green-400 border-t-transparent" />
+                      Criando...
+                    </>
+                  ) : (
+                    <>
+                      <Plus size={16} />
+                      Criar Recorrência
+                    </>
+                  )}
+                </button>
+                {onDismissRecurring && (
+                  <button
+                    onClick={() => {
+                      onDismissRecurring(editingItemIndex)
+                      cancelEdit()
+                    }}
+                    className="px-4 py-2.5 text-sm font-medium text-gray-400 bg-slate-700/50 hover:bg-slate-700 rounded-xl transition-colors"
+                    title="Não é recorrente"
+                  >
+                    <X size={16} />
+                  </button>
                 )}
-              </button>
+              </div>
             )}
 
             {/* Botões de ação */}

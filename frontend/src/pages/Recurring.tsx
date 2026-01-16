@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { recurringApi, accountsApi, categoriesApi, familyApi } from '../services/api'
-import { Plus, Repeat, Pause, Play, Trash2, Edit2, Calendar, DollarSign } from 'lucide-react'
+import { Plus, Repeat, Pause, Play, Trash2, Edit2, Calendar, Search, X, ChevronLeft, ChevronRight } from 'lucide-react'
 import { clsx } from 'clsx'
 import EmptyState from '../components/EmptyState'
 import OwnershipSelector from '../components/shared/OwnershipSelector'
@@ -80,6 +80,8 @@ const statusLabels: Record<string, string> = {
   cancelled: 'Cancelado',
 }
 
+const ITEMS_PER_PAGE = 20
+
 // Helper to get local date in YYYY-MM-DD format (avoid timezone issues)
 const getLocalDateString = () => {
   const today = new Date()
@@ -94,6 +96,9 @@ export default function Recurring() {
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [ownershipType, setOwnershipType] = useState<'personal' | 'household'>('personal')
+  const [searchInput, setSearchInput] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [page, setPage] = useState(0)
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -150,6 +155,44 @@ export default function Recurring() {
   })
 
   const showOwnershipSelector = familyData && familyData.member_count >= 2
+
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (searchInput.length >= 2 || searchInput.length === 0) {
+        setSearchQuery(searchInput)
+        setPage(0)
+      }
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchInput])
+
+  // Filter and paginate recurring transactions
+  const filteredRecurring = useMemo(() => {
+    if (!searchQuery) return recurring
+    const query = searchQuery.toLowerCase()
+    return recurring.filter(
+      (item) =>
+        item.name.toLowerCase().includes(query) ||
+        (item.description && item.description.toLowerCase().includes(query)) ||
+        (item.account_name && item.account_name.toLowerCase().includes(query)) ||
+        (item.category_name && item.category_name.toLowerCase().includes(query))
+    )
+  }, [recurring, searchQuery])
+
+  const paginatedRecurring = useMemo(() => {
+    const start = page * ITEMS_PER_PAGE
+    const end = start + ITEMS_PER_PAGE
+    return filteredRecurring.slice(start, end)
+  }, [filteredRecurring, page])
+
+  const totalPages = Math.ceil(filteredRecurring.length / ITEMS_PER_PAGE)
+
+  const clearSearch = () => {
+    setSearchInput('')
+    setSearchQuery('')
+    setPage(0)
+  }
 
   // Função para invalidar caches relacionados a recorrências
   const invalidateRecurringCaches = () => {
@@ -309,87 +352,105 @@ export default function Recurring() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 overflow-x-hidden">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div className="min-w-0">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Despesas Recorrentes</h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">
-            Gerencie seus gastos fixos como aluguel, assinaturas e contas
-          </p>
+          {!isLoading && filteredRecurring.length > 0 && (
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              {filteredRecurring.length} recorrência{filteredRecurring.length > 1 ? 's' : ''} cadastrada{filteredRecurring.length > 1 ? 's' : ''}
+            </p>
+          )}
         </div>
-        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+
+        {/* Actions */}
+        <div className="flex items-center gap-2 flex-shrink-0">
           <button
             onClick={() => generateMutation.mutate()}
             disabled={generateMutation.isPending}
-            className="btn-secondary flex items-center justify-center gap-2 w-full sm:w-auto"
+            className="btn-secondary flex items-center gap-2"
+            title="Gerar Pendentes"
           >
             <Calendar className="w-4 h-4" />
-            Gerar Pendentes
+            <span className="hidden sm:inline">Gerar Pendentes</span>
           </button>
           <button
             onClick={() => setShowForm(true)}
-            className="btn-primary flex items-center justify-center gap-2 w-full sm:w-auto"
+            className="btn-primary flex items-center gap-2"
           >
             <Plus className="w-4 h-4" />
-            Nova Recorrência
+            <span className="hidden sm:inline">Nova Recorrência</span>
           </button>
         </div>
       </div>
 
-      {/* Summary Cards */}
+      {/* Summary Cards - Inline Style */}
       {summary && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-gray-200 dark:border-slate-700">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-lg">
-                <DollarSign className="w-5 h-5 text-red-600" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Despesas Mensais</p>
-                <p className="text-lg font-semibold text-red-600">
-                  {formatCurrency(summary.total_monthly_expenses)}
-                </p>
-              </div>
+        <div className="bg-gray-50 dark:bg-slate-800/50 rounded-lg p-4">
+          <div className="grid grid-cols-2 sm:flex sm:items-center gap-4 sm:gap-6">
+            <div>
+              <span className="text-xs text-gray-500 dark:text-gray-400">Despesas Mensais</span>
+              <p className="font-semibold text-red-600 dark:text-red-400 text-sm sm:text-base">
+                {formatCurrency(summary.total_monthly_expenses)}
+              </p>
             </div>
-          </div>
-          <div className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-gray-200 dark:border-slate-700">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
-                <DollarSign className="w-5 h-5 text-green-600" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Receitas Mensais</p>
-                <p className="text-lg font-semibold text-green-600">
-                  {formatCurrency(summary.total_monthly_income)}
-                </p>
-              </div>
+            <div>
+              <span className="text-xs text-gray-500 dark:text-gray-400">Receitas Mensais</span>
+              <p className="font-semibold text-green-600 dark:text-green-400 text-sm sm:text-base">
+                {formatCurrency(summary.total_monthly_income)}
+              </p>
             </div>
-          </div>
-          <div className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-gray-200 dark:border-slate-700">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary-100 dark:bg-primary-900/30 rounded-lg">
-                <Repeat className="w-5 h-5 text-primary-600" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Ativos</p>
-                <p className="text-lg font-semibold dark:text-white">{summary.active_count}</p>
-              </div>
+            <div>
+              <span className="text-xs text-gray-500 dark:text-gray-400">Balanço</span>
+              <p className={clsx(
+                'font-semibold text-sm sm:text-base',
+                (summary.total_monthly_income - summary.total_monthly_expenses) >= 0
+                  ? 'text-green-600 dark:text-green-400'
+                  : 'text-red-600 dark:text-red-400'
+              )}>
+                {formatCurrency(summary.total_monthly_income - summary.total_monthly_expenses)}
+              </p>
             </div>
-          </div>
-          <div className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-gray-200 dark:border-slate-700">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg">
-                <Pause className="w-5 h-5 text-yellow-600" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Pausados</p>
-                <p className="text-lg font-semibold dark:text-white">{summary.paused_count}</p>
-              </div>
+            <div className="hidden sm:block h-4 w-px bg-gray-300 dark:bg-gray-600" />
+            <div>
+              <span className="text-xs text-gray-500 dark:text-gray-400">Ativos</span>
+              <p className="font-semibold text-gray-900 dark:text-white text-sm sm:text-base">{summary.active_count}</p>
             </div>
+            {summary.paused_count > 0 && (
+              <div className="flex items-center gap-2 text-yellow-600 dark:text-yellow-400">
+                <Pause size={16} />
+                <span className="text-sm font-medium">
+                  {summary.paused_count} pausado{summary.paused_count > 1 ? 's' : ''}
+                </span>
+              </div>
+            )}
           </div>
         </div>
       )}
+
+      {/* Search bar */}
+      <div className="relative">
+        <Search
+          className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500"
+          size={20}
+        />
+        <input
+          type="text"
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          placeholder="Buscar recorrência..."
+          className="input pl-10 pr-10"
+        />
+        {searchInput && (
+          <button
+            onClick={clearSearch}
+            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+          >
+            <X size={18} />
+          </button>
+        )}
+      </div>
 
       {/* Form Modal */}
       {showForm && (
@@ -632,9 +693,17 @@ export default function Recurring() {
         </div>
       )}
 
-      {/* List */}
-      <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 overflow-hidden">
-        {recurring.length === 0 ? (
+      {/* Table */}
+      {filteredRecurring.length === 0 ? (
+        searchQuery ? (
+          <EmptyState
+            icon={Search}
+            title="Nenhum resultado encontrado"
+            description={`Não encontramos recorrências para "${searchQuery}". Tente ajustar a busca.`}
+            actionLabel="Limpar busca"
+            actionOnClick={clearSearch}
+          />
+        ) : (
           <EmptyState
             icon={Repeat}
             title="Nenhuma recorrência cadastrada"
@@ -642,134 +711,192 @@ export default function Recurring() {
             actionLabel="Nova Recorrência"
             actionOnClick={() => setShowForm(true)}
           />
-        ) : (
-          <div className="divide-y divide-gray-200 dark:divide-slate-700">
-            {recurring.map((item) => (
-              <div
-                key={item.id}
-                className={clsx(
-                  'p-4',
-                  item.status === 'paused' && 'bg-gray-50 dark:bg-slate-700/50'
-                )}
-              >
-                {/* Mobile: Stack layout / Desktop: Row layout */}
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  {/* Left: Icon + Info */}
-                  <div className="flex items-start gap-3 flex-1 min-w-0">
-                    <div
-                      className={clsx(
-                        'p-2.5 rounded-xl flex-shrink-0',
-                        item.type === 'expense' ? 'bg-red-100 dark:bg-red-900/30' : 'bg-green-100 dark:bg-green-900/30'
-                      )}
-                    >
-                      <Repeat
-                        className={clsx(
-                          'w-5 h-5',
-                          item.type === 'expense' ? 'text-red-600' : 'text-green-600'
-                        )}
-                      />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      {/* Name + Badge + Value (mobile) */}
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                          <p className="font-semibold text-gray-900 dark:text-white truncate">{item.name}</p>
-                          <span
-                            className={clsx(
-                              'text-xs px-2 py-0.5 rounded-full flex-shrink-0',
-                              item.status === 'active' && 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-400',
-                              item.status === 'paused' && 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-400',
-                              item.status === 'cancelled' && 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-400'
-                            )}
-                          >
-                            {statusLabels[item.status]}
-                          </span>
-                        </div>
-                        {/* Value - visible on mobile */}
-                        <span
+        )
+      ) : (
+        <>
+          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm overflow-x-auto max-w-full">
+            <table className="w-full min-w-[700px] table-auto">
+              <thead>
+                <tr className="border-b border-gray-200 dark:border-slate-700">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Nome
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Frequência
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Categoria
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Conta
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Valor
+                  </th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Ações
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
+                {paginatedRecurring.map((item) => (
+                  <tr
+                    key={item.id}
+                    className={clsx(
+                      'hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors',
+                      item.status === 'paused' && 'bg-yellow-50/50 dark:bg-yellow-900/10'
+                    )}
+                  >
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <div
                           className={clsx(
-                            'font-bold text-lg sm:hidden flex-shrink-0',
-                            item.type === 'expense' ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
+                            'p-1.5 rounded-full',
+                            item.type === 'income'
+                              ? 'bg-green-100 dark:bg-green-900/30'
+                              : 'bg-red-100 dark:bg-red-900/30'
                           )}
                         >
-                          {item.type === 'expense' ? '-' : '+'}
-                          {formatCurrency(item.amount)}
-                        </span>
+                          <Repeat
+                            className={clsx(
+                              'w-4 h-4',
+                              item.type === 'income' ? 'text-green-600' : 'text-red-600'
+                            )}
+                          />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-sm text-gray-900 dark:text-white truncate max-w-[200px]">
+                            {item.name}
+                          </p>
+                          {item.next_due_date && (
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                              Próximo: {formatDate(item.next_due_date)}
+                            </p>
+                          )}
+                        </div>
                       </div>
-                      {/* Metadata - simplified for mobile */}
-                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1 text-sm text-gray-500 dark:text-gray-400">
-                        <span className="bg-gray-100 dark:bg-slate-700 px-2 py-0.5 rounded text-xs">
-                          {frequencyLabels[item.frequency]}
-                          {item.frequency === 'monthly' && item.day_of_month && ` · Dia ${item.day_of_month}`}
-                          {item.frequency === 'weekly' && item.day_of_week !== null && ` · ${dayOfWeekLabels[item.day_of_week]}`}
-                        </span>
-                        <span className="truncate max-w-[120px] sm:max-w-none">{item.account_name}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="text-sm text-gray-600 dark:text-gray-300">
+                        {frequencyLabels[item.frequency]}
+                        {item.frequency === 'monthly' && item.day_of_month && (
+                          <span className="text-gray-400 dark:text-gray-500"> · Dia {item.day_of_month}</span>
+                        )}
+                        {item.frequency === 'weekly' && item.day_of_week !== null && (
+                          <span className="text-gray-400 dark:text-gray-500"> · {dayOfWeekLabels[item.day_of_week]}</span>
+                        )}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="text-sm text-gray-600 dark:text-gray-300">
+                        {item.category_name || 'Sem categoria'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="text-sm text-gray-600 dark:text-gray-300">
+                        {item.account_name || 'N/A'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <span
+                        className={clsx(
+                          'font-semibold text-sm',
+                          item.type === 'income'
+                            ? 'text-green-600 dark:text-green-400'
+                            : 'text-red-600 dark:text-red-400'
+                        )}
+                      >
+                        {item.type === 'income' ? '+' : '-'}
+                        {formatCurrency(item.amount)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <span
+                        className={clsx(
+                          'inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full',
+                          item.status === 'active' && 'bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-400',
+                          item.status === 'paused' && 'bg-yellow-100 dark:bg-yellow-900/50 text-yellow-700 dark:text-yellow-400',
+                          item.status === 'cancelled' && 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-400'
+                        )}
+                      >
+                        {item.status === 'paused' && <Pause size={10} />}
+                        {statusLabels[item.status]}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-center gap-1">
+                        {item.status === 'active' ? (
+                          <button
+                            onClick={() => pauseMutation.mutate(item.id)}
+                            className="p-1.5 text-gray-400 hover:text-yellow-600 hover:bg-yellow-50 dark:hover:bg-yellow-900/30 rounded-lg transition-colors"
+                            title="Pausar"
+                          >
+                            <Pause size={16} />
+                          </button>
+                        ) : item.status === 'paused' ? (
+                          <button
+                            onClick={() => resumeMutation.mutate(item.id)}
+                            className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/30 rounded-lg transition-colors"
+                            title="Retomar"
+                          >
+                            <Play size={16} />
+                          </button>
+                        ) : null}
+                        <button
+                          onClick={() => handleEdit(item)}
+                          className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/30 rounded-lg transition-colors"
+                          title="Editar"
+                        >
+                          <Edit2 size={16} />
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (confirm('Tem certeza que deseja excluir esta recorrência?')) {
+                              deleteMutation.mutate(item.id)
+                            }
+                          }}
+                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+                          title="Excluir"
+                        >
+                          <Trash2 size={16} />
+                        </button>
                       </div>
-                      {item.next_due_date && (
-                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                          Próximo: {formatDate(item.next_due_date)}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Right: Value (desktop) + Actions */}
-                  <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-4 pl-10 sm:pl-0">
-                    {/* Value - visible on desktop */}
-                    <span
-                      className={clsx(
-                        'font-bold text-lg hidden sm:block',
-                        item.type === 'expense' ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
-                      )}
-                    >
-                      {item.type === 'expense' ? '-' : '+'}
-                      {formatCurrency(item.amount)}
-                    </span>
-                    {/* Action buttons */}
-                    <div className="flex items-center gap-1">
-                      {item.status === 'active' ? (
-                        <button
-                          onClick={() => pauseMutation.mutate(item.id)}
-                          className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-400 hover:text-yellow-600 hover:bg-yellow-50 dark:hover:bg-yellow-900/30 rounded-xl transition-colors"
-                          title="Pausar"
-                        >
-                          <Pause className="w-5 h-5" />
-                        </button>
-                      ) : item.status === 'paused' ? (
-                        <button
-                          onClick={() => resumeMutation.mutate(item.id)}
-                          className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-400 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/30 rounded-xl transition-colors"
-                          title="Retomar"
-                        >
-                          <Play className="w-5 h-5" />
-                        </button>
-                      ) : null}
-                      <button
-                        onClick={() => handleEdit(item)}
-                        className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-400 hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/30 rounded-xl transition-colors"
-                        title="Editar"
-                      >
-                        <Edit2 className="w-5 h-5" />
-                      </button>
-                      <button
-                        onClick={() => {
-                          if (confirm('Tem certeza que deseja excluir esta recorrência?')) {
-                            deleteMutation.mutate(item.id)
-                          }
-                        }}
-                        className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-xl transition-colors"
-                        title="Excluir"
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        )}
-      </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between pt-4">
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Página {page + 1} de {totalPages} ({filteredRecurring.length} recorrências)
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setPage((p) => Math.max(0, p - 1))}
+                  disabled={page === 0}
+                  className="btn-secondary p-2 disabled:opacity-50"
+                >
+                  <ChevronLeft size={20} />
+                </button>
+                <button
+                  onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                  disabled={page >= totalPages - 1}
+                  className="btn-secondary p-2 disabled:opacity-50"
+                >
+                  <ChevronRight size={20} />
+                </button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </div>
   )
 }

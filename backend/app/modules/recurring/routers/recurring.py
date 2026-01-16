@@ -262,8 +262,24 @@ async def create_from_suggestion(
     from datetime import date as date_type
     from sqlalchemy import select
     from app.models.category import Category
+    from app.models.recurring import RecurringTransaction
 
     service = RecurringTransactionService(db)
+
+    # Verificar se já existe recorrência com mesmo nome e valor (evitar duplicados)
+    existing = await db.execute(
+        select(RecurringTransaction).where(
+            RecurringTransaction.user_id == current_user.id,
+            RecurringTransaction.name.ilike(data.name),
+            RecurringTransaction.amount == data.amount,
+            RecurringTransaction.status != "cancelled",
+        )
+    )
+    if existing.scalar_one_or_none():
+        raise HTTPException(
+            status_code=400,
+            detail=f"Recorrência '{data.name}' já existe com mesmo valor"
+        )
 
     # Resolver category_id se category_name foi fornecido
     category_id = data.category_id

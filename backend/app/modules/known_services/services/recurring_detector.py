@@ -88,7 +88,9 @@ class RecurringDetectorService:
         known_service = self._match_known_service(description, known_services)
 
         # 2. Verificar se o usuário já tem esta recorrência cadastrada
-        user_recurring = self._match_user_recurring(description, amount, user_recurrings)
+        user_recurring = self._match_user_recurring(
+            description, amount, user_recurrings, known_service
+        )
 
         # 3. Analisar duplicidade
         duplicate_analysis = self._analyze_duplicates(
@@ -165,14 +167,31 @@ class RecurringDetectorService:
         description: str,
         amount: float,
         user_recurrings: list[RecurringTransaction],
+        known_service: KnownRecurringService | None = None,
     ) -> RecurringTransaction | None:
-        """Verifica se o usuário já tem esta recorrência cadastrada"""
+        """Verifica se o usuário já tem esta recorrência cadastrada.
+
+        Verifica em ordem:
+        1. Se é um serviço conhecido, verifica se existe recorrência com mesmo nome do serviço
+        2. Match por descrição similar ao nome da recorrência
+        3. Match por descrição similar à descrição da recorrência
+        """
         description_normalized = self._normalize_description(description)
 
         for recurring in user_recurrings:
             recurring_name_normalized = self._normalize_description(recurring.name)
 
-            # Match por nome similar
+            # Match por serviço conhecido: se detectamos "OPENAI" como ChatGPT Plus,
+            # e usuário já tem uma recorrência chamada "ChatGPT Plus", é match!
+            if known_service:
+                known_service_name_normalized = self._normalize_description(known_service.name)
+                if recurring_name_normalized == known_service_name_normalized:
+                    return recurring
+                # Também verifica se o nome da recorrência contém o nome do serviço conhecido
+                if self._descriptions_match(recurring_name_normalized, known_service_name_normalized):
+                    return recurring
+
+            # Match por nome similar (descrição da fatura vs nome da recorrência)
             if self._descriptions_match(description_normalized, recurring_name_normalized):
                 return recurring
 
