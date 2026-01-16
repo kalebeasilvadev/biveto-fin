@@ -23,6 +23,7 @@ import Family from './pages/Family'
 import HouseholdMigration from './pages/HouseholdMigration'
 import Invite from './pages/Invite'
 import ResetPassword from './pages/ResetPassword'
+import ShareTarget from './pages/ShareTarget'
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
@@ -84,6 +85,7 @@ function App() {
         <Route path="settings" element={<Settings />} />
         <Route path="family" element={<Family />} />
         <Route path="household-migration" element={<HouseholdMigration />} />
+        <Route path="share-target" element={<ShareTarget />} />
         {/* Admin routes - protegidas por AdminRoute */}
         <Route path="admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
         <Route path="admin/users" element={<AdminRoute><AdminUsers /></AdminRoute>} />
