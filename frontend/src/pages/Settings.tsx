@@ -86,8 +86,8 @@ export default function Settings() {
             <Database size={20} className="text-blue-600 dark:text-blue-400" />
           </div>
           <div>
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Migração Household</h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Converter recursos pessoais para compartilhados</p>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Tornar Familiar</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Compartilhar recursos com toda a família</p>
           </div>
         </div>
         <ChevronRight size={20} className="text-gray-400" />

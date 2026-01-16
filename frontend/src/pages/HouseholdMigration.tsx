@@ -15,13 +15,12 @@ interface MigrationPreview {
 }
 
 interface FamilyContext {
-  license_id: number | null
-  role: string | null
+  license_id: number
+  license_type: string
+  is_owner: boolean
+  can_invite: boolean
   member_count: number
-  can_create_transactions: boolean
-  can_edit_shared: boolean
-  can_invite_members: boolean
-  can_see_all: boolean
+  max_members: number
 }
 
 // API calls
@@ -62,7 +61,7 @@ export default function HouseholdMigration() {
   const { data: previewData, isLoading } = useQuery({
     queryKey: ['migration-preview'],
     queryFn: api.getPreview,
-    enabled: familyData?.data?.role === 'owner'
+    enabled: familyData?.data?.is_owner === true
   })
 
   const migrateMutation = useMutation({
@@ -83,7 +82,7 @@ export default function HouseholdMigration() {
 
   const preview = previewData?.data
   const family = familyData?.data
-  const isOwner = family?.role === 'owner'
+  const isOwner = family?.is_owner === true
   const hasResources = preview && preview.total > 0
 
   if (!isOwner) {
@@ -111,11 +110,11 @@ export default function HouseholdMigration() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-          <Database size={28} />
-          Migração para Household
+          <Users size={28} />
+          Tornar Familiar
         </h1>
         <p className="text-gray-600 dark:text-gray-400 mt-1">
-          Converta seus recursos pessoais para compartilhados com a família
+          Compartilhe seus recursos com todos os membros da família
         </p>
       </div>
 
@@ -126,11 +125,11 @@ export default function HouseholdMigration() {
             <CheckCircle className="text-green-600 dark:text-green-400 flex-shrink-0" size={24} />
             <div>
               <h3 className="font-semibold text-green-900 dark:text-green-100 text-lg mb-2">
-                Migração Concluída!
+                Recursos Compartilhados!
               </h3>
               <p className="text-green-800 dark:text-green-200 mb-4">
-                Todos os recursos foram convertidos para "Household" com sucesso.
-                Os membros da sua família agora podem visualizá-los.
+                Todos os recursos agora são visíveis para sua família.
+                Os membros podem visualizar contas, faturas, orçamentos e muito mais.
               </p>
               <button
                 onClick={() => {
@@ -212,7 +211,7 @@ export default function HouseholdMigration() {
                       disabled={migrateMutation.isPending}
                     >
                       <ArrowRight size={20} />
-                      Converter para Household
+                      Compartilhar com Família
                     </button>
                   </div>
                 </>
@@ -230,11 +229,10 @@ export default function HouseholdMigration() {
               <AlertTriangle className="text-red-500 flex-shrink-0 mt-0.5" size={24} />
               <div>
                 <h3 className="font-semibold text-gray-900 dark:text-white text-lg mb-2">
-                  Confirmar Migração
+                  Confirmar Compartilhamento
                 </h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                  Você está prestes a converter <strong>{preview?.total} recursos</strong> de
-                  "Personal" para "Household".
+                  Você está prestes a compartilhar <strong>{preview?.total} recursos</strong> com sua família.
                 </p>
                 <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded p-3 mb-4">
                   <p className="text-sm text-red-800 dark:text-red-200 font-medium">
@@ -263,7 +261,7 @@ export default function HouseholdMigration() {
                 className="btn-primary flex-1 bg-red-600 hover:bg-red-700"
                 disabled={migrateMutation.isPending}
               >
-                {migrateMutation.isPending ? 'Migrando...' : 'Sim, Migrar'}
+                {migrateMutation.isPending ? 'Compartilhando...' : 'Sim, Compartilhar'}
               </button>
             </div>
           </div>
