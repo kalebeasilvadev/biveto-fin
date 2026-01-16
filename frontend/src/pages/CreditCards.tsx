@@ -22,6 +22,28 @@ import {
 import BankLogo from '../components/shared/BankLogo'
 import CardBrandLogo from '../components/shared/CardBrandLogo'
 
+// Format currency in compact form for mobile (e.g., R$ 237,1k)
+function formatCompactCurrency(value: number): string {
+  const absValue = Math.abs(value)
+  if (absValue >= 1_000_000) {
+    return value.toLocaleString('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+      maximumFractionDigits: 1,
+      notation: 'compact',
+      compactDisplay: 'short'
+    })
+  }
+  if (absValue >= 10_000) {
+    return value.toLocaleString('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+      maximumFractionDigits: 0
+    })
+  }
+  return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+}
+
 interface FamilyContext {
   license_id: number
   member_count: number
@@ -196,20 +218,23 @@ export default function CreditCards() {
       <div className="grid grid-cols-3 gap-2 sm:gap-4">
         <div className="card bg-gradient-to-r from-gray-800 to-gray-900 text-white p-3 sm:p-4">
           <p className="text-xs sm:text-sm opacity-90">Limite</p>
-          <p className="text-base sm:text-2xl font-bold mt-1 truncate">
-            {totalLimit.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+          <p className="text-sm sm:text-2xl font-bold mt-1" title={totalLimit.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}>
+            <span className="sm:hidden">{formatCompactCurrency(totalLimit)}</span>
+            <span className="hidden sm:inline">{totalLimit.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
           </p>
         </div>
         <div className="card bg-gradient-to-r from-red-500 to-red-600 text-white p-3 sm:p-4">
           <p className="text-xs sm:text-sm opacity-90">Utilizado</p>
-          <p className="text-base sm:text-2xl font-bold mt-1 truncate">
-            {totalUsed.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+          <p className="text-sm sm:text-2xl font-bold mt-1" title={totalUsed.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}>
+            <span className="sm:hidden">{formatCompactCurrency(totalUsed)}</span>
+            <span className="hidden sm:inline">{totalUsed.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
           </p>
         </div>
         <div className="card bg-gradient-to-r from-green-500 to-green-600 text-white p-3 sm:p-4">
           <p className="text-xs sm:text-sm opacity-90">Disponível</p>
-          <p className="text-base sm:text-2xl font-bold mt-1 truncate">
-            {(totalLimit - totalUsed).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+          <p className="text-sm sm:text-2xl font-bold mt-1" title={(totalLimit - totalUsed).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}>
+            <span className="sm:hidden">{formatCompactCurrency(totalLimit - totalUsed)}</span>
+            <span className="hidden sm:inline">{(totalLimit - totalUsed).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
           </p>
         </div>
       </div>
