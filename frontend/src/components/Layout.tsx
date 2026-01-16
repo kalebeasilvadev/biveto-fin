@@ -23,6 +23,8 @@ import {
   Briefcase,
   BadgeDollarSign,
   FileText,
+  Download,
+  Share,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { clsx } from 'clsx'
@@ -31,6 +33,7 @@ import FloatingAssistant from './FloatingAssistant'
 import QuickTransactionModal from './QuickTransactionModal'
 import ToastContainer from './shared/ToastContainer'
 import InstallPromptBanner from './InstallPromptBanner'
+import { usePWAInstall } from '../hooks/usePWAInstall'
 
 // Main navigation items
 const mainNavItems = [
@@ -65,6 +68,7 @@ export default function Layout() {
   const user = useAuthStore((state) => state.user)
   const setUser = useAuthStore((state) => state.setUser)
   const { theme, toggleTheme } = useThemeStore()
+  const { canInstall, isIOS, promptInstall } = usePWAInstall()
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -307,6 +311,26 @@ export default function Layout() {
 
           {/* Settings & Logout - with extra padding for bottom nav + safe area */}
           <div className="p-4 border-t border-gray-100 dark:border-slate-700 space-y-2 pb-safe" style={{ paddingBottom: 'max(1rem, calc(env(safe-area-inset-bottom) + 5rem))' }}>
+            {/* Install App Option */}
+            {canInstall && (
+              <button
+                onClick={() => {
+                  if (!isIOS) {
+                    promptInstall()
+                  }
+                  setMobileMenuOpen(false)
+                }}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 text-white gradient-biveto rounded-xl font-medium transition-all active:scale-[0.98]"
+              >
+                <Download size={20} />
+                <span>Instalar App</span>
+                {isIOS && (
+                  <span className="text-xs opacity-80 ml-1">
+                    (use <Share size={12} className="inline" /> Safari)
+                  </span>
+                )}
+              </button>
+            )}
             <NavLink
               to="/settings"
               className="w-full flex items-center justify-center gap-2 px-4 py-3 text-gray-700 bg-gray-50 hover:bg-gray-100 dark:text-gray-300 dark:bg-slate-700 dark:hover:bg-slate-600 rounded-xl font-medium transition-colors"

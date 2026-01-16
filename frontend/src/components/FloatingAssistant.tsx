@@ -226,12 +226,12 @@ export default function FloatingAssistant() {
 
   return (
     <>
-      {/* Floating Button */}
+      {/* Floating Button - Hidden on mobile (already in bottom nav) */}
       <button
         onClick={() => setIsOpen(true)}
         className={clsx(
-          'fixed z-50 w-14 h-14 rounded-full gradient-biveto shadow-lg shadow-primary-500/30 flex items-center justify-center text-white transition-all duration-300 hover:scale-105 active:scale-95',
-          'bottom-24 right-4 lg:bottom-6 lg:right-6',
+          'fixed z-50 w-14 h-14 rounded-full gradient-biveto shadow-lg shadow-primary-500/30 hidden lg:flex items-center justify-center text-white transition-all duration-300 hover:scale-105 active:scale-95',
+          'lg:bottom-6 lg:right-6',
           isOpen && 'scale-0 opacity-0'
         )}
         aria-label="Abrir assistente"
