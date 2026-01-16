@@ -22,6 +22,7 @@ from app.modules.chat.routers.chat import router as chat_router
 from app.modules.admin.routers.admin import router as admin_router
 from app.modules.recurring.routers.recurring import router as recurring_router
 from app.modules.household.routers.family import router as family_router
+from app.modules.household.routers.migration import router as migration_router
 from app.modules.credit_cards.routers.credit_cards import router as credit_cards_router
 from app.modules.income.routers.income_sources import router as income_sources_router
 from app.modules.credit_cards.routers.invoices import router as invoices_router
@@ -64,6 +65,7 @@ api_router.include_router(recurring_router, prefix="/recurring", tags=["Recorren
 
 # Household module
 api_router.include_router(family_router, prefix="/family", tags=["Familia"])
+api_router.include_router(migration_router, prefix="/household/migration", tags=["Migração Household"])
 
 # Chat module
 api_router.include_router(chat_router, prefix="/chat", tags=["Chat - Agente IA"])

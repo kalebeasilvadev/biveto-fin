@@ -20,6 +20,7 @@ import AdminUsers from './pages/admin/AdminUsers'
 import AdminLicenses from './pages/admin/AdminLicenses'
 import Settings from './pages/Settings'
 import Family from './pages/Family'
+import HouseholdMigration from './pages/HouseholdMigration'
 import Invite from './pages/Invite'
 import ResetPassword from './pages/ResetPassword'
 
@@ -82,6 +83,7 @@ function App() {
         <Route path="invoices" element={<Invoices />} />
         <Route path="settings" element={<Settings />} />
         <Route path="family" element={<Family />} />
+        <Route path="household-migration" element={<HouseholdMigration />} />
         {/* Admin routes - protegidas por AdminRoute */}
         <Route path="admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
         <Route path="admin/users" element={<AdminRoute><AdminUsers /></AdminRoute>} />
