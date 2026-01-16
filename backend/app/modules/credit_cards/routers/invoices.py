@@ -3,7 +3,7 @@ from datetime import date
 from decimal import Decimal
 from fastapi import APIRouter, HTTPException, status, Query
 from pydantic import BaseModel
-from sqlalchemy import select, func, and_
+from sqlalchemy import select, func, and_, or_
 from sqlalchemy.orm import aliased
 
 from app.core.deps import CurrentUser, DbSession
@@ -76,10 +76,19 @@ async def list_invoices(
     offset: int = 0,
 ):
     """Lista faturas do usuario"""
+    from app.modules.household.utils.household_helpers import (
+        get_household_user_ids,
+        get_household_member,
+    )
+
     service = InvoiceService(db)
 
     # Lazy update: atualiza status das faturas baseado em datas
     await service.update_invoice_statuses()
+
+    # Get household user IDs for filtering
+    household_user_ids = await get_household_user_ids(db, current_user)
+    member = await get_household_member(db, current_user)
 
     # Aliases para os JOINs
     CardAccount = aliased(Account)
@@ -108,8 +117,23 @@ async def list_invoices(
         .join(CardAccount, CardAccount.id == CreditCard.account_id)
         .outerjoin(PaymentAccount, PaymentAccount.id == CreditCardInvoice.payment_account_id)
         .outerjoin(tx_count_subq, tx_count_subq.c.invoice_id == CreditCardInvoice.id)
-        .where(CreditCardInvoice.user_id == current_user.id)
     )
+
+    # Apply household filter based on Account ownership
+    if member and member.can_see_all:
+        # Can see all household invoices
+        query = query.where(CreditCardInvoice.user_id.in_(household_user_ids))
+    elif household_user_ids:
+        # See personal invoices + household invoices from family
+        query = query.where(
+            or_(
+                and_(CreditCardInvoice.user_id == current_user.id, CardAccount.ownership_type == "personal"),
+                and_(CreditCardInvoice.user_id.in_(household_user_ids), CardAccount.ownership_type == "household")
+            )
+        )
+    else:
+        # No household - only user's own invoices
+        query = query.where(CreditCardInvoice.user_id == current_user.id)
 
     # Aplicar filtros
     if credit_card_id:
@@ -153,6 +177,14 @@ async def get_invoice(
     """Retorna detalhes de uma fatura com suas transacoes"""
     from app.models.merchant import Merchant
     from app.models.category import Category
+    from app.modules.household.utils.household_helpers import (
+        get_household_user_ids,
+        get_household_member,
+    )
+
+    # Get household user IDs for filtering
+    household_user_ids = await get_household_user_ids(db, current_user)
+    member = await get_household_member(db, current_user)
 
     # Aliases para os JOINs
     CardAccount = aliased(Account)
@@ -168,11 +200,24 @@ async def get_invoice(
         .join(CreditCard, CreditCard.id == CreditCardInvoice.credit_card_id)
         .join(CardAccount, CardAccount.id == CreditCard.account_id)
         .outerjoin(PaymentAccount, PaymentAccount.id == CreditCardInvoice.payment_account_id)
-        .where(
-            CreditCardInvoice.id == invoice_id,
-            CreditCardInvoice.user_id == current_user.id,
-        )
+        .where(CreditCardInvoice.id == invoice_id)
     )
+
+    # Apply household filter based on Account ownership
+    if member and member.can_see_all:
+        # Can see all household invoices
+        invoice_query = invoice_query.where(CreditCardInvoice.user_id.in_(household_user_ids))
+    elif household_user_ids:
+        # See personal invoices + household invoices from family
+        invoice_query = invoice_query.where(
+            or_(
+                and_(CreditCardInvoice.user_id == current_user.id, CardAccount.ownership_type == "personal"),
+                and_(CreditCardInvoice.user_id.in_(household_user_ids), CardAccount.ownership_type == "household")
+            )
+        )
+    else:
+        # No household - only user's own invoices
+        invoice_query = invoice_query.where(CreditCardInvoice.user_id == current_user.id)
 
     result = await db.execute(invoice_query)
     row = result.first()
