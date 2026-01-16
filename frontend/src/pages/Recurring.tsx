@@ -648,108 +648,121 @@ export default function Recurring() {
               <div
                 key={item.id}
                 className={clsx(
-                  'p-4 flex items-center justify-between',
+                  'p-4',
                   item.status === 'paused' && 'bg-gray-50 dark:bg-slate-700/50'
                 )}
               >
-                <div className="flex items-center gap-4">
-                  <div
-                    className={clsx(
-                      'p-2 rounded-lg',
-                      item.type === 'expense' ? 'bg-red-100 dark:bg-red-900/30' : 'bg-green-100 dark:bg-green-900/30'
-                    )}
-                  >
-                    <Repeat
+                {/* Mobile: Stack layout / Desktop: Row layout */}
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  {/* Left: Icon + Info */}
+                  <div className="flex items-start gap-3 flex-1 min-w-0">
+                    <div
                       className={clsx(
-                        'w-5 h-5',
-                        item.type === 'expense' ? 'text-red-600' : 'text-green-600'
+                        'p-2.5 rounded-xl flex-shrink-0',
+                        item.type === 'expense' ? 'bg-red-100 dark:bg-red-900/30' : 'bg-green-100 dark:bg-green-900/30'
                       )}
-                    />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium dark:text-white">{item.name}</p>
-                      <span
+                    >
+                      <Repeat
                         className={clsx(
-                          'text-xs px-2 py-0.5 rounded-full',
-                          item.status === 'active' && 'bg-green-100 text-green-700',
-                          item.status === 'paused' && 'bg-yellow-100 text-yellow-700',
-                          item.status === 'cancelled' && 'bg-gray-100 text-gray-700'
+                          'w-5 h-5',
+                          item.type === 'expense' ? 'text-red-600' : 'text-green-600'
                         )}
-                      >
-                        {statusLabels[item.status]}
-                      </span>
+                      />
                     </div>
-                    <div className="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
-                      <span>{frequencyLabels[item.frequency]}</span>
-                      {item.frequency === 'monthly' && item.day_of_month && (
-                        <span>Dia {item.day_of_month}</span>
-                      )}
-                      {item.frequency === 'weekly' && item.day_of_week !== null && (
-                        <span>{dayOfWeekLabels[item.day_of_week]}</span>
-                      )}
-                      <span className="text-gray-300 dark:text-gray-600">|</span>
-                      <span>{item.account_name}</span>
-                      {item.category_name && (
-                        <>
-                          <span className="text-gray-300 dark:text-gray-600">|</span>
-                          <span>{item.category_name}</span>
-                        </>
+                    <div className="flex-1 min-w-0">
+                      {/* Name + Badge + Value (mobile) */}
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <p className="font-semibold text-gray-900 dark:text-white truncate">{item.name}</p>
+                          <span
+                            className={clsx(
+                              'text-xs px-2 py-0.5 rounded-full flex-shrink-0',
+                              item.status === 'active' && 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-400',
+                              item.status === 'paused' && 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-400',
+                              item.status === 'cancelled' && 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-400'
+                            )}
+                          >
+                            {statusLabels[item.status]}
+                          </span>
+                        </div>
+                        {/* Value - visible on mobile */}
+                        <span
+                          className={clsx(
+                            'font-bold text-lg sm:hidden flex-shrink-0',
+                            item.type === 'expense' ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
+                          )}
+                        >
+                          {item.type === 'expense' ? '-' : '+'}
+                          {formatCurrency(item.amount)}
+                        </span>
+                      </div>
+                      {/* Metadata - simplified for mobile */}
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1 text-sm text-gray-500 dark:text-gray-400">
+                        <span className="bg-gray-100 dark:bg-slate-700 px-2 py-0.5 rounded text-xs">
+                          {frequencyLabels[item.frequency]}
+                          {item.frequency === 'monthly' && item.day_of_month && ` · Dia ${item.day_of_month}`}
+                          {item.frequency === 'weekly' && item.day_of_week !== null && ` · ${dayOfWeekLabels[item.day_of_week]}`}
+                        </span>
+                        <span className="truncate max-w-[120px] sm:max-w-none">{item.account_name}</span>
+                      </div>
+                      {item.next_due_date && (
+                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                          Próximo: {formatDate(item.next_due_date)}
+                        </p>
                       )}
                     </div>
-                    {item.next_due_date && (
-                      <p className="text-xs text-gray-400 mt-1">
-                        Próximo: {formatDate(item.next_due_date)}
-                      </p>
-                    )}
                   </div>
-                </div>
-                <div className="flex items-center gap-4">
-                  <span
-                    className={clsx(
-                      'font-semibold',
-                      item.type === 'expense' ? 'text-red-600' : 'text-green-600'
-                    )}
-                  >
-                    {item.type === 'expense' ? '-' : '+'}
-                    {formatCurrency(item.amount)}
-                  </span>
-                  <div className="flex items-center gap-1">
-                    {item.status === 'active' ? (
-                      <button
-                        onClick={() => pauseMutation.mutate(item.id)}
-                        className="p-2 text-gray-400 hover:text-yellow-600 hover:bg-yellow-50 rounded-lg"
-                        title="Pausar"
-                      >
-                        <Pause className="w-4 h-4" />
-                      </button>
-                    ) : item.status === 'paused' ? (
-                      <button
-                        onClick={() => resumeMutation.mutate(item.id)}
-                        className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg"
-                        title="Retomar"
-                      >
-                        <Play className="w-4 h-4" />
-                      </button>
-                    ) : null}
-                    <button
-                      onClick={() => handleEdit(item)}
-                      className="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg"
-                      title="Editar"
+
+                  {/* Right: Value (desktop) + Actions */}
+                  <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-4 pl-10 sm:pl-0">
+                    {/* Value - visible on desktop */}
+                    <span
+                      className={clsx(
+                        'font-bold text-lg hidden sm:block',
+                        item.type === 'expense' ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
+                      )}
                     >
-                      <Edit2 className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => {
-                        if (confirm('Tem certeza que deseja excluir esta recorrência?')) {
-                          deleteMutation.mutate(item.id)
-                        }
-                      }}
-                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
-                      title="Excluir"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                      {item.type === 'expense' ? '-' : '+'}
+                      {formatCurrency(item.amount)}
+                    </span>
+                    {/* Action buttons */}
+                    <div className="flex items-center gap-1">
+                      {item.status === 'active' ? (
+                        <button
+                          onClick={() => pauseMutation.mutate(item.id)}
+                          className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-400 hover:text-yellow-600 hover:bg-yellow-50 dark:hover:bg-yellow-900/30 rounded-xl transition-colors"
+                          title="Pausar"
+                        >
+                          <Pause className="w-5 h-5" />
+                        </button>
+                      ) : item.status === 'paused' ? (
+                        <button
+                          onClick={() => resumeMutation.mutate(item.id)}
+                          className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-400 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/30 rounded-xl transition-colors"
+                          title="Retomar"
+                        >
+                          <Play className="w-5 h-5" />
+                        </button>
+                      ) : null}
+                      <button
+                        onClick={() => handleEdit(item)}
+                        className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-400 hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/30 rounded-xl transition-colors"
+                        title="Editar"
+                      >
+                        <Edit2 className="w-5 h-5" />
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (confirm('Tem certeza que deseja excluir esta recorrência?')) {
+                            deleteMutation.mutate(item.id)
+                          }
+                        }}
+                        className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-xl transition-colors"
+                        title="Excluir"
+                      >
+                        <Trash2 className="w-5 h-5" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>

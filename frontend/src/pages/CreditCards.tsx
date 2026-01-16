@@ -242,34 +242,35 @@ export default function CreditCards() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="min-w-0">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Cartões de Crédito</h1>
-          <p className="text-gray-500 dark:text-gray-400">Gerencie seus cartões e programas de pontos</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">Gerencie seus cartões e pontos</p>
         </div>
-        <button onClick={openCreateModal} className="btn-primary flex items-center gap-2">
+        <button onClick={openCreateModal} className="btn-primary flex items-center gap-2 whitespace-nowrap flex-shrink-0">
           <Plus size={18} />
-          Novo Cartão
+          <span className="hidden sm:inline">Novo Cartão</span>
+          <span className="sm:hidden">Novo</span>
         </button>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="card bg-gradient-to-r from-gray-800 to-gray-900 text-white">
-          <p className="text-sm opacity-90">Limite Total</p>
-          <p className="text-2xl font-bold mt-1">
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
+        <div className="card bg-gradient-to-r from-gray-800 to-gray-900 text-white p-3 sm:p-4">
+          <p className="text-xs sm:text-sm opacity-90">Limite</p>
+          <p className="text-base sm:text-2xl font-bold mt-1 truncate">
             {totalLimit.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
           </p>
         </div>
-        <div className="card bg-gradient-to-r from-red-500 to-red-600 text-white">
-          <p className="text-sm opacity-90">Total Utilizado</p>
-          <p className="text-2xl font-bold mt-1">
+        <div className="card bg-gradient-to-r from-red-500 to-red-600 text-white p-3 sm:p-4">
+          <p className="text-xs sm:text-sm opacity-90">Utilizado</p>
+          <p className="text-base sm:text-2xl font-bold mt-1 truncate">
             {totalUsed.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
           </p>
         </div>
-        <div className="card bg-gradient-to-r from-green-500 to-green-600 text-white">
-          <p className="text-sm opacity-90">Limite Disponível</p>
-          <p className="text-2xl font-bold mt-1">
+        <div className="card bg-gradient-to-r from-green-500 to-green-600 text-white p-3 sm:p-4">
+          <p className="text-xs sm:text-sm opacity-90">Disponível</p>
+          <p className="text-base sm:text-2xl font-bold mt-1 truncate">
             {(totalLimit - totalUsed).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
           </p>
         </div>
@@ -303,24 +304,24 @@ export default function CreditCards() {
                       <CreditCardIcon size={16} className="text-white" />
                     </div>
                     <div>
-                      <p className="font-medium text-sm text-gray-900 dark:text-white">{card.name}</p>
+                      <p className="font-medium text-sm text-gray-900 dark:text-white truncate max-w-[120px]">{card.name}</p>
                       <p className="text-xs text-gray-500 dark:text-gray-400">
                         {card.card_brand} {card.last_four_digits && `•••• ${card.last_four_digits}`}
                       </p>
                     </div>
                   </div>
-                  <div className="flex gap-0.5">
+                  <div className="flex gap-1">
                     <button
                       onClick={() => openEditModal(card)}
-                      className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                      className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
                     >
-                      <Pencil size={14} />
+                      <Pencil size={16} />
                     </button>
                     <button
                       onClick={() => handleDelete(card)}
-                      className="p-1.5 text-gray-400 hover:text-red-500"
+                      className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
                     >
-                      <Trash2 size={14} />
+                      <Trash2 size={16} />
                     </button>
                   </div>
                 </div>

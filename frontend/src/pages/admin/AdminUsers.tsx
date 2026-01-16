@@ -297,8 +297,8 @@ export default function AdminUsers() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 overflow-x-hidden">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Usuários</h1>
           <p className="text-gray-500 dark:text-gray-400">Gerencie os usuários e convites</p>
@@ -351,7 +351,7 @@ export default function AdminUsers() {
 
       {/* Users Tab */}
       {activeTab === 'users' && (
-        <div className="card overflow-hidden">
+        <div className="card overflow-x-auto max-w-full">
           <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
             <thead className="bg-gray-50 dark:bg-slate-700/50">
               <tr>
@@ -453,7 +453,7 @@ export default function AdminUsers() {
 
       {/* Invitations Tab */}
       {activeTab === 'invitations' && (
-        <div className="card overflow-hidden">
+        <div className="card overflow-x-auto max-w-full">
           {isLoadingInvitations ? (
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>

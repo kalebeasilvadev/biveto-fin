@@ -424,7 +424,7 @@ export default function Transactions() {
     : categories
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 overflow-x-hidden">
       {/* Header with Summary */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div className="min-w-0">
@@ -559,8 +559,9 @@ export default function Transactions() {
       ) : (
         <>
           {/* Month Tabs */}
-          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm overflow-hidden">
-            <div className="flex overflow-x-auto" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm overflow-hidden relative">
+            <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white dark:from-slate-800 to-transparent pointer-events-none z-10 sm:hidden" />
+            <div className="flex overflow-x-auto scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
               {monthTabs.map((tab) => (
                 <button
                   key={tab.key}
@@ -569,7 +570,7 @@ export default function Transactions() {
                     setPage(0)
                   }}
                   className={clsx(
-                    'flex-1 min-w-[60px] px-3 py-3 text-sm font-medium transition-colors border-b-2 whitespace-nowrap',
+                    'flex-1 min-w-[48px] px-2 sm:px-3 py-3 text-xs sm:text-sm font-medium transition-colors border-b-2 whitespace-nowrap',
                     selectedTab === tab.key
                       ? 'border-primary-500 text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/20'
                       : 'border-transparent text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700'
@@ -687,7 +688,7 @@ export default function Transactions() {
               type="text"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="Buscar por descrição, estabelecimento ou categoria..."
+              placeholder="Buscar transação..."
               className="input pl-10 pr-10"
             />
             {searchInput && (
@@ -720,8 +721,8 @@ export default function Transactions() {
           ) : (
             <>
               {/* Table View */}
-              <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm overflow-x-auto">
-                <table className="w-full min-w-[700px]">
+              <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm overflow-x-auto max-w-full">
+                <table className="w-full min-w-[700px] table-auto">
                   <thead>
                     <tr className="border-b border-gray-200 dark:border-slate-700">
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
@@ -778,8 +779,8 @@ export default function Transactions() {
                                 <ArrowDownRight className="text-expense" size={14} />
                               )}
                             </div>
-                            <div>
-                              <p className="font-medium text-sm text-gray-900 dark:text-white">
+                            <div className="min-w-0 flex-1">
+                              <p className="font-medium text-sm text-gray-900 dark:text-white truncate max-w-[200px] md:max-w-[300px]">
                                 {transaction.merchant_name || transaction.description || 'Transação'}
                               </p>
                               {(transaction.installment_number || transaction.is_recurring) && (

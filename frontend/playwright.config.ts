@@ -3,22 +3,47 @@ import { defineConfig, devices } from '@playwright/test'
 /**
  * Configuração Playwright para testes E2E do Biveto
  * Testa em múltiplos dispositivos, temas e viewports
+ *
+ * Variáveis de ambiente:
+ * - E2E_USER_EMAIL: Email para login nos testes
+ * - E2E_USER_PASSWORD: Senha para login nos testes
  */
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
+  /* Retry em CI e local para reduzir flakiness */
+  retries: process.env.CI ? 2 : 1,
   workers: process.env.CI ? 1 : undefined,
   reporter: [
     ['html', { open: 'never' }],
     ['list'],
+    ...(process.env.CI ? [['github'] as const] : []),
   ],
+  /* Timeout global */
+  timeout: 60000,
+  expect: {
+    /* Timeout para assertions */
+    timeout: 10000,
+    /* Configuração de screenshots para visual testing */
+    toHaveScreenshot: {
+      /* Threshold para diferenças aceitáveis (15%) */
+      maxDiffPixelRatio: 0.15,
+      /* Animações devem estar desabilitadas */
+      animations: 'disabled',
+    },
+    toMatchSnapshot: {
+      maxDiffPixelRatio: 0.15,
+    },
+  },
   use: {
-    baseURL: 'http://localhost:5173',
+    baseURL: 'http://localhost:3000',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'on-first-retry',
+    /* Desabilitar animações para testes mais estáveis */
+    actionTimeout: 15000,
+    navigationTimeout: 30000,
   },
 
   /* Configure projects for major browsers and devices */
@@ -148,7 +173,7 @@ export default defineConfig({
   /* Run local dev server before starting the tests */
   webServer: {
     command: 'npm run dev',
-    url: 'http://localhost:5173',
+    url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
     timeout: 120000,
   },

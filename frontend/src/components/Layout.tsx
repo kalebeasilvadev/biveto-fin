@@ -105,7 +105,7 @@ export default function Layout() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-900 transition-colors">
       {/* Mobile header */}
-      <header className="lg:hidden fixed top-0 left-0 right-0 z-40 glass border-b border-gray-200/50 dark:bg-slate-900/80 dark:border-slate-700">
+      <header className="lg:hidden fixed top-0 left-0 right-0 z-30 glass border-b border-gray-200/50 dark:bg-slate-900/80 dark:border-slate-700">
         <div className="flex items-center justify-between px-4 h-14">
           <img src={isDark ? "/logo-white.svg" : "/logo.svg"} alt="Biveto" className="h-8" />
           <button
@@ -120,14 +120,14 @@ export default function Layout() {
 
       <div className="flex">
         {/* Desktop Sidebar */}
-        <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:fixed lg:inset-y-0 bg-white border-r border-gray-100 dark:bg-slate-800 dark:border-slate-700">
+        <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:fixed lg:inset-y-0 bg-white border-r border-gray-100 dark:bg-slate-800 dark:border-slate-700" role="complementary" aria-label="Menu lateral">
           {/* Logo */}
           <div className="flex items-center h-16 px-6 border-b border-gray-100 dark:border-slate-700">
             <img src={isDark ? "/logo-white.svg" : "/logo.svg"} alt="Biveto" className="h-9" />
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+          <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto" role="navigation" aria-label="Navegação principal">
             {mainNavItems.map((item) => (
               <NavLink
                 key={item.to}
@@ -221,6 +221,10 @@ export default function Layout() {
             'fixed inset-y-0 left-0 z-50 w-72 bg-white dark:bg-slate-800 shadow-xl transform transition-transform duration-300 ease-out lg:hidden flex flex-col',
             mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
           )}
+          role="dialog"
+          aria-label="Menu de navegação"
+          aria-modal="true"
+          aria-hidden={!mobileMenuOpen}
         >
           {/* Header */}
           <div className="flex items-center justify-between h-14 px-4 border-b border-gray-100 dark:border-slate-700">
@@ -228,8 +232,9 @@ export default function Layout() {
             <button
               onClick={() => setMobileMenuOpen(false)}
               className="btn-icon"
+              aria-label="Fechar menu"
             >
-              <X size={22} />
+              <X size={22} aria-hidden="true" />
             </button>
           </div>
 
@@ -251,7 +256,7 @@ export default function Layout() {
           </div>
 
           {/* Navigation - scrollable area */}
-          <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto min-h-0">
+          <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto min-h-0" role="navigation" aria-label="Navegação do menu">
             {mainNavItems.map((item) => (
               <NavLink
                 key={item.to}
@@ -318,17 +323,17 @@ export default function Layout() {
         </aside>
 
         {/* Main content */}
-        <main className="flex-1 lg:ml-64">
+        <main className="flex-1 lg:ml-64 overflow-x-hidden" role="main" aria-label="Conteúdo principal">
           {/* Spacer for mobile header */}
-          <div className="h-14 lg:hidden" />
+          <div className="h-14 lg:hidden" aria-hidden="true" />
 
           {/* Content */}
-          <div className="p-4 lg:p-8 pb-24 lg:pb-8">
+          <div className="p-4 lg:p-8 pb-32 lg:pb-8">
             <Outlet />
           </div>
 
-          {/* Spacer for mobile bottom nav - extra padding for iOS safe area */}
-          <div className="h-24 lg:hidden" />
+          {/* Spacer for mobile bottom nav + FAB - extra padding for iOS safe area */}
+          <div className="h-28 lg:hidden" />
         </main>
       </div>
 
@@ -342,16 +347,17 @@ export default function Layout() {
       />
 
       {/* Mobile Bottom Navigation */}
-      <nav className="bottom-nav">
+      <nav className="bottom-nav" role="navigation" aria-label="Navegação principal mobile">
         {bottomNavItems.map((item) =>
           item.primary ? (
             <button
               key={item.to}
               onClick={() => setShowQuickTransaction(true)}
               className="relative -mt-5"
+              aria-label="Adicionar nova transação"
             >
               <div className="w-14 h-14 rounded-2xl gradient-biveto shadow-lg shadow-biveto flex items-center justify-center text-white active:scale-95 transition-transform">
-                <item.icon size={26} strokeWidth={2.5} />
+                <item.icon size={26} strokeWidth={2.5} aria-hidden="true" />
               </div>
             </button>
           ) : (

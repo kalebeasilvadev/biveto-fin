@@ -65,35 +65,35 @@ export default function Dashboard() {
       </div>
 
       {/* Cards de resumo */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="card">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Receitas</p>
-              <p className="text-2xl font-bold text-income">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <div className="card p-3 sm:p-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Receitas</p>
+              <p className="text-lg sm:text-2xl font-bold text-income truncate">
                 {formatCurrency(summary?.total_income || 0)}
               </p>
             </div>
-            <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-full">
-              <TrendingUp className="text-income" size={24} />
+            <div className="p-2 sm:p-3 bg-green-100 dark:bg-green-900/30 rounded-full flex-shrink-0">
+              <TrendingUp className="text-income w-5 h-5 sm:w-6 sm:h-6" />
             </div>
           </div>
         </div>
 
-        <div className="card">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Despesas</p>
-              <p className="text-2xl font-bold text-expense">
+        <div className="card p-3 sm:p-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Despesas</p>
+              <p className="text-lg sm:text-2xl font-bold text-expense truncate">
                 {formatCurrency(summary?.total_expense || 0)}
               </p>
             </div>
-            <div className="p-3 bg-red-100 dark:bg-red-900/30 rounded-full">
-              <TrendingDown className="text-expense" size={24} />
+            <div className="p-2 sm:p-3 bg-red-100 dark:bg-red-900/30 rounded-full flex-shrink-0">
+              <TrendingDown className="text-expense w-5 h-5 sm:w-6 sm:h-6" />
             </div>
           </div>
-          {/* Breakdown por tipo */}
-          <div className="mt-2 space-y-1 text-xs text-gray-500 dark:text-gray-400">
+          {/* Breakdown por tipo - hidden on mobile */}
+          <div className="mt-2 space-y-1 text-xs text-gray-500 dark:text-gray-400 hidden sm:block">
             {(summary?.credit_card_expenses || 0) > 0 && (
               <div className="flex justify-between">
                 <span>Cartão:</span>
@@ -102,7 +102,7 @@ export default function Dashboard() {
             )}
             {(summary?.debit_cash_expenses || 0) > 0 && (
               <div className="flex justify-between">
-                <span>Débito/Dinheiro:</span>
+                <span>Débito:</span>
                 <span>{formatCurrency(summary?.debit_cash_expenses || 0)}</span>
               </div>
             )}
@@ -114,19 +114,19 @@ export default function Dashboard() {
             )}
           </div>
           {summary?.expense_variation != null && (
-            <div className="mt-2 flex items-center text-sm">
+            <div className="mt-2 flex items-center text-xs sm:text-sm">
               {summary.expense_variation > 0 ? (
                 <>
-                  <ArrowUpRight className="text-red-500" size={16} />
+                  <ArrowUpRight className="text-red-500 w-3 h-3 sm:w-4 sm:h-4" />
                   <span className="text-red-500">
-                    +{summary.expense_variation.toFixed(1)}% vs mês anterior
+                    +{summary.expense_variation.toFixed(0)}%
                   </span>
                 </>
               ) : (
                 <>
-                  <ArrowDownRight className="text-green-500" size={16} />
+                  <ArrowDownRight className="text-green-500 w-3 h-3 sm:w-4 sm:h-4" />
                   <span className="text-green-500">
-                    {summary.expense_variation.toFixed(1)}% vs mês anterior
+                    {summary.expense_variation.toFixed(0)}%
                   </span>
                 </>
               )}
@@ -134,54 +134,54 @@ export default function Dashboard() {
           )}
         </div>
 
-        <div className="card">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">A pagar</p>
-              <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">
+        <div className="card p-3 sm:p-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">A pagar</p>
+              <p className="text-lg sm:text-2xl font-bold text-amber-600 dark:text-amber-400 truncate">
                 {formatCurrency(summary?.pending_invoices || 0)}
               </p>
             </div>
-            <div className="p-3 bg-amber-100 dark:bg-amber-900/30 rounded-full">
-              <CreditCard className="text-amber-600" size={24} />
+            <div className="p-2 sm:p-3 bg-amber-100 dark:bg-amber-900/30 rounded-full flex-shrink-0">
+              <CreditCard className="text-amber-600 w-5 h-5 sm:w-6 sm:h-6" />
             </div>
           </div>
           {(summary?.pending_invoices || 0) > 0 && (
-            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 hidden sm:block">
               Faturas pendentes
             </p>
           )}
         </div>
 
-        <div className="card">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Saldo disponível</p>
+        <div className="card p-3 sm:p-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Saldo</p>
               <p
-                className={`text-2xl font-bold ${
+                className={`text-lg sm:text-2xl font-bold truncate ${
                   (summary?.available_balance || 0) >= 0 ? 'text-income' : 'text-expense'
                 }`}
               >
                 {formatCurrency(summary?.available_balance || 0)}
               </p>
             </div>
-            <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-full">
-              <PiggyBank className="text-blue-600" size={24} />
+            <div className="p-2 sm:p-3 bg-blue-100 dark:bg-blue-900/30 rounded-full flex-shrink-0">
+              <PiggyBank className="text-blue-600 w-5 h-5 sm:w-6 sm:h-6" />
             </div>
           </div>
-          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-            Receitas - Despesas - Pendentes
+          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 hidden sm:block">
+            Receitas - Despesas
           </p>
         </div>
       </div>
 
       {/* Gastos por categoria */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         <div className="card">
-          <h2 className="text-lg font-semibold mb-4 dark:text-white">Gastos por Categoria</h2>
+          <h2 className="text-base sm:text-lg font-semibold mb-4 dark:text-white">Gastos por Categoria</h2>
           {summary?.categories && summary.categories.length > 0 ? (
-            <div className="flex items-center gap-6">
-              <div className="w-48 h-48">
+            <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
+              <div className="w-36 h-36 sm:w-48 sm:h-48 flex-shrink-0">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
@@ -190,8 +190,8 @@ export default function Dashboard() {
                       nameKey="category_name"
                       cx="50%"
                       cy="50%"
-                      innerRadius={40}
-                      outerRadius={70}
+                      innerRadius={30}
+                      outerRadius={55}
                     >
                       {summary.categories.map((_: unknown, index: number) => (
                         <Cell
@@ -206,17 +206,17 @@ export default function Dashboard() {
                   </PieChart>
                 </ResponsiveContainer>
               </div>
-              <div className="flex-1 space-y-2">
+              <div className="flex-1 space-y-2 w-full">
                 {summary.categories.slice(0, 5).map((cat: { category_id: number; category_name: string; percentage: number }, index: number) => (
                   <div key={cat.category_id} className="flex items-center gap-2">
                     <div
-                      className="w-3 h-3 rounded-full"
+                      className="w-3 h-3 rounded-full flex-shrink-0"
                       style={{ backgroundColor: COLORS[index % COLORS.length] }}
                     />
-                    <span className="text-sm flex-1 truncate dark:text-gray-300">
+                    <span className="text-xs sm:text-sm flex-1 truncate dark:text-gray-300">
                       {cat.category_name}
                     </span>
-                    <span className="text-sm font-medium dark:text-gray-300">
+                    <span className="text-xs sm:text-sm font-medium dark:text-gray-300">
                       {cat.percentage.toFixed(0)}%
                     </span>
                   </div>
@@ -224,35 +224,35 @@ export default function Dashboard() {
               </div>
             </div>
           ) : (
-            <p className="text-gray-500 dark:text-gray-400 text-center py-8">
+            <p className="text-gray-500 dark:text-gray-400 text-center py-8 text-sm">
               Nenhuma transação registrada
             </p>
           )}
         </div>
 
         <div className="card">
-          <h2 className="text-lg font-semibold mb-4 dark:text-white">Maiores Gastos</h2>
+          <h2 className="text-base sm:text-lg font-semibold mb-4 dark:text-white">Maiores Gastos</h2>
           {summary?.categories && summary.categories.length > 0 ? (
             <div className="space-y-3">
               {summary.categories.slice(0, 5).map((cat: { category_id: number; category_name: string; total: number; count: number; percentage: number }, index: number) => (
                 <div
                   key={cat.category_id}
-                  className="flex items-center justify-between"
+                  className="flex items-center justify-between gap-2"
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
                     <div
                       className="w-3 h-3 rounded-full flex-shrink-0"
                       style={{ backgroundColor: COLORS[index % COLORS.length] }}
                     />
-                    <div>
-                      <p className="font-medium dark:text-white">{cat.category_name}</p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
-                        {cat.count} transações
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-sm sm:text-base dark:text-white truncate">{cat.category_name}</p>
+                      <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+                        {cat.count} trans.
                       </p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <span className="font-semibold text-expense">
+                  <div className="text-right flex-shrink-0">
+                    <span className="font-semibold text-sm sm:text-base text-expense">
                       {formatCurrency(cat.total)}
                     </span>
                     <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -263,7 +263,7 @@ export default function Dashboard() {
               ))}
             </div>
           ) : (
-            <p className="text-gray-500 dark:text-gray-400 text-center py-8">
+            <p className="text-gray-500 dark:text-gray-400 text-center py-8 text-sm">
               Nenhuma despesa registrada
             </p>
           )}

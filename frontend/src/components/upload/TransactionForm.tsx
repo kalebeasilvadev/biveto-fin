@@ -355,7 +355,7 @@ export default function TransactionForm({
             >
               <Users size={20} className={formData.ownership_type === 'household' ? 'text-primary-600' : 'text-gray-400'} />
               <span className={clsx('text-sm font-medium', formData.ownership_type === 'household' ? 'text-primary-700 dark:text-primary-300' : 'text-gray-600 dark:text-gray-300')}>
-                Familia
+                Família
               </span>
             </button>
           </div>

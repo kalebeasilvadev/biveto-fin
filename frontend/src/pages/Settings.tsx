@@ -69,7 +69,7 @@ export default function Settings() {
             <Users size={20} className="text-biveto dark:text-primary-400" />
           </div>
           <div>
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Familia</h2>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Família</h2>
             <p className="text-sm text-gray-500 dark:text-gray-400">Gerencie membros do plano familiar</p>
           </div>
         </div>
@@ -95,7 +95,7 @@ export default function Settings() {
 
       {/* User Info Card */}
       <div className="card">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Informacoes da Conta</h2>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Informações da Conta</h2>
         <div className="space-y-4">
           <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-slate-700/50 rounded-lg">
             <div className="p-2 bg-white dark:bg-slate-600 rounded-lg shadow-sm">
@@ -107,13 +107,13 @@ export default function Settings() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-slate-700/50 rounded-lg">
-            <div className="p-2 bg-white dark:bg-slate-600 rounded-lg shadow-sm">
+          <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-slate-700/50 rounded-lg overflow-hidden">
+            <div className="p-2 bg-white dark:bg-slate-600 rounded-lg shadow-sm flex-shrink-0">
               <Mail size={20} className="text-gray-600 dark:text-gray-300" />
             </div>
-            <div>
+            <div className="min-w-0 flex-1">
               <p className="text-sm text-gray-500 dark:text-gray-400">Email</p>
-              <p className="font-medium text-gray-900 dark:text-white">{user?.email || '-'}</p>
+              <p className="font-medium text-gray-900 dark:text-white truncate">{user?.email || '-'}</p>
             </div>
           </div>
         </div>

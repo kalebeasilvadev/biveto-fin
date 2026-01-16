@@ -41,6 +41,21 @@ export default function QuickTransactionModal({ isOpen, onClose }: QuickTransact
     ownership_type: 'personal' as 'personal' | 'household',
   })
 
+  // Lock body scroll and notify FAB when modal is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden'
+      window.dispatchEvent(new CustomEvent('modalStateChange', { detail: { isOpen: true } }))
+    } else {
+      document.body.style.overflow = ''
+      window.dispatchEvent(new CustomEvent('modalStateChange', { detail: { isOpen: false } }))
+    }
+    return () => {
+      document.body.style.overflow = ''
+      window.dispatchEvent(new CustomEvent('modalStateChange', { detail: { isOpen: false } }))
+    }
+  }, [isOpen])
+
   // Queries
   const { data: accountsData } = useQuery({
     queryKey: ['accounts'],
@@ -121,14 +136,14 @@ export default function QuickTransactionModal({ isOpen, onClose }: QuickTransact
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+    <div className="fixed inset-0 bg-black/70 flex items-end sm:items-center justify-center z-[60] p-0 sm:p-4" onClick={resetAndClose}>
       <div
-        className="bg-white dark:bg-slate-800 w-full sm:max-w-md sm:rounded-xl rounded-t-3xl max-h-[90vh] overflow-y-auto animate-slide-up"
+        className="bg-white dark:bg-slate-800 w-full sm:max-w-md sm:rounded-xl rounded-t-3xl max-h-[90vh] overflow-y-auto animate-slide-up z-[70]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="sticky top-0 bg-white dark:bg-slate-800 px-4 py-3 border-b border-gray-100 dark:border-slate-700 flex items-center justify-between">
-          <h2 className="text-lg font-semibold dark:text-white">Nova Transacao</h2>
+          <h2 className="text-lg font-semibold dark:text-white">Nova Transação</h2>
           <button
             onClick={resetAndClose}
             className="p-2 -mr-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
@@ -231,14 +246,14 @@ export default function QuickTransactionModal({ isOpen, onClose }: QuickTransact
           {/* Description */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Descricao
+              Descrição
             </label>
             <input
               type="text"
               value={formData.description}
               onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
               className="input"
-              placeholder="Ex: Almoco, Salario..."
+              placeholder="Ex: Almoço, Salário..."
             />
           </div>
 
@@ -276,7 +291,7 @@ export default function QuickTransactionModal({ isOpen, onClose }: QuickTransact
                 >
                   <Users size={20} className={formData.ownership_type === 'household' ? 'text-primary-600' : 'text-gray-400'} />
                   <span className={clsx('text-sm font-medium', formData.ownership_type === 'household' ? 'text-primary-700 dark:text-primary-300' : 'text-gray-600 dark:text-gray-300')}>
-                    Familia
+                    Família
                   </span>
                 </button>
               </div>
@@ -286,7 +301,7 @@ export default function QuickTransactionModal({ isOpen, onClose }: QuickTransact
           {/* Error message */}
           {createMutation.isError && (
             <div className="bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 p-3 rounded-lg text-sm">
-              Erro ao criar transacao. Tente novamente.
+              Erro ao criar transação. Tente novamente.
             </div>
           )}
 

@@ -231,56 +231,57 @@ export default function Debts() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Gestão de Dívidas</h1>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Dívidas</h1>
         <button
           onClick={() => setShowCreateModal(true)}
-          className="btn-primary flex items-center gap-2"
+          className="btn-primary flex items-center gap-2 whitespace-nowrap flex-shrink-0"
         >
           <Plus size={18} />
-          Nova Dívida
+          <span className="hidden sm:inline">Nova Dívida</span>
+          <span className="sm:hidden">Nova</span>
         </button>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="card">
-            <p className="text-sm text-gray-500 dark:text-gray-400">Dívida Total</p>
-            <p className="text-2xl font-bold text-expense">{formatCurrency(summary.total_debt)}</p>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4">
+          <div className="card p-3 sm:p-4">
+            <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Total</p>
+            <p className="text-base sm:text-2xl font-bold text-expense truncate">{formatCurrency(summary.total_debt)}</p>
           </div>
-          <div className="card">
-            <p className="text-sm text-gray-500 dark:text-gray-400">Pagamento Mínimo</p>
-            <p className="text-xl font-bold text-gray-900 dark:text-white">
+          <div className="card p-3 sm:p-4">
+            <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">Pag. Mínimo</p>
+            <p className="text-base sm:text-xl font-bold text-gray-900 dark:text-white truncate">
               {formatCurrency(summary.total_minimum_payment)}
             </p>
           </div>
-          <div className="card">
-            <p className="text-sm text-gray-500 dark:text-gray-400">Juros Mensais</p>
-            <p className="text-xl font-bold text-yellow-600">
+          <div className="card p-3 sm:p-4">
+            <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Juros/mês</p>
+            <p className="text-base sm:text-xl font-bold text-yellow-600 truncate">
               {formatCurrency(summary.total_monthly_interest)}
             </p>
           </div>
-          <div className="card">
-            <p className="text-sm text-gray-500 dark:text-gray-400">Qtd. Dívidas</p>
-            <p className="text-xl font-bold text-gray-900 dark:text-white">{summary.debt_count}</p>
+          <div className="card p-3 sm:p-4">
+            <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Qtd.</p>
+            <p className="text-base sm:text-xl font-bold text-gray-900 dark:text-white">{summary.debt_count}</p>
           </div>
         </div>
 
       {/* Strategy Calculator */}
       <div className="card">
         <div className="flex items-center gap-3 mb-4">
-          <div className="p-3 bg-primary-100 dark:bg-primary-900/30 rounded-lg">
-            <Calculator className="text-primary-600" size={24} />
+          <div className="p-2 sm:p-3 bg-primary-100 dark:bg-primary-900/30 rounded-lg flex-shrink-0">
+            <Calculator className="text-primary-600 w-5 h-5 sm:w-6 sm:h-6" />
           </div>
-          <div>
-            <h3 className="font-semibold dark:text-white">Comparar Estratégias de Quitação</h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Snowball (Dave Ramsey) vs Avalanche</p>
+          <div className="min-w-0">
+            <h3 className="font-semibold dark:text-white text-sm sm:text-base">Comparar Estratégias</h3>
+            <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Snowball vs Avalanche</p>
           </div>
         </div>
-        <div className="flex gap-4">
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
           <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Quanto você pode pagar por mês?
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Valor mensal disponível
             </label>
             <input
               type="number"
@@ -295,7 +296,7 @@ export default function Debts() {
               fetchStrategy()
               setShowStrategyModal(true)
             }}
-            className="btn-primary self-end"
+            className="btn-primary self-stretch sm:self-end whitespace-nowrap"
             disabled={!monthlyPayment}
           >
             Comparar
@@ -340,22 +341,22 @@ export default function Debts() {
                 </button>
               </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 text-sm">
                 <div>
-                  <p className="text-gray-500 dark:text-gray-400">Saldo Atual</p>
-                  <p className="font-bold text-expense">{formatCurrency(debt.current_balance)}</p>
+                  <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Saldo Atual</p>
+                  <p className="font-bold text-expense text-sm sm:text-base truncate">{formatCurrency(debt.current_balance)}</p>
                 </div>
                 <div>
-                  <p className="text-gray-500 dark:text-gray-400">Valor Original</p>
-                  <p className="font-medium dark:text-white">{formatCurrency(debt.original_amount)}</p>
+                  <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Original</p>
+                  <p className="font-medium dark:text-white text-sm sm:text-base truncate">{formatCurrency(debt.original_amount)}</p>
                 </div>
                 <div>
-                  <p className="text-gray-500 dark:text-gray-400">Pagamento Mínimo</p>
-                  <p className="font-medium dark:text-white">{formatCurrency(debt.minimum_payment)}</p>
+                  <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">Pag. Mínimo</p>
+                  <p className="font-medium dark:text-white text-sm sm:text-base truncate">{formatCurrency(debt.minimum_payment)}</p>
                 </div>
                 <div>
-                  <p className="text-gray-500 dark:text-gray-400">Taxa de Juros</p>
-                  <p className="font-medium text-yellow-600">
+                  <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Juros</p>
+                  <p className="font-medium text-yellow-600 text-sm sm:text-base">
                     {formatPercent(debt.interest_rate)} {debt.interest_type === 'monthly' ? 'a.m.' : 'a.a.'}
                   </p>
                 </div>

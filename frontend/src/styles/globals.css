@@ -242,7 +242,7 @@
   .bottom-nav {
     @apply fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100
            flex items-center justify-around px-2 py-2
-           lg:hidden z-50
+           lg:hidden z-40
            dark:bg-slate-900 dark:border-slate-700;
     padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
     padding-bottom: max(0.75rem, constant(safe-area-inset-bottom)); /* iOS < 11.2 */

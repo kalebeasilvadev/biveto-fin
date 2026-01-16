@@ -148,7 +148,7 @@ export default function Family() {
   const getRoleLabel = (role: string) => {
     switch (role) {
       case 'owner':
-        return 'Proprietario'
+        return 'Proprietário'
       case 'admin':
         return 'Administrador'
       default:
@@ -174,7 +174,7 @@ export default function Family() {
             Sem Plano Familiar
           </h2>
           <p className="text-gray-500 dark:text-gray-400">
-            Voce ainda nao possui uma licenca vinculada.
+            Você ainda não possui uma licença vinculada.
             <br />
             Entre em contato com o administrador.
           </p>
@@ -188,7 +188,7 @@ export default function Family() {
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Familia</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Família</h1>
         <p className="text-gray-500 dark:text-gray-400">Gerencie os membros do seu plano familiar</p>
       </div>
 
@@ -233,7 +233,7 @@ export default function Family() {
             <div className="flex items-center gap-2 mt-1">
               {getRoleIcon(familyContext.is_owner ? 'owner' : 'member')}
               <span className="text-lg font-semibold text-gray-900 dark:text-white">
-                {familyContext.is_owner ? 'Proprietario' : 'Membro'}
+                {familyContext.is_owner ? 'Proprietário' : 'Membro'}
               </span>
             </div>
           </div>

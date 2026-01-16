@@ -87,11 +87,21 @@ export default function FloatingAssistant() {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [conversationId, setConversationId] = useState<string | null>(null)
+  const [isAnyModalOpen, setIsAnyModalOpen] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const location = useLocation()
 
   // Check if we're on chat page (for conditional rendering later)
   const isOnChatPage = location.pathname === '/chat'
+
+  // Listen for modal state changes to hide FAB when modals are open
+  useEffect(() => {
+    const handleModalChange = (e: CustomEvent<{ isOpen: boolean }>) => {
+      setIsAnyModalOpen(e.detail.isOpen)
+    }
+    window.addEventListener('modalStateChange', handleModalChange as EventListener)
+    return () => window.removeEventListener('modalStateChange', handleModalChange as EventListener)
+  }, [])
 
   const { data: suggestionsData } = useQuery({
     queryKey: ['chat-suggestions'],
@@ -209,8 +219,8 @@ export default function FloatingAssistant() {
     }
   }
 
-  // Don't show on chat page
-  if (isOnChatPage) {
+  // Don't show on chat page or when modals are open
+  if (isOnChatPage || isAnyModalOpen) {
     return null
   }
 

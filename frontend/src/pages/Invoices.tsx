@@ -323,61 +323,63 @@ export default function Invoices() {
   }, [openMenuId])
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 overflow-x-hidden">
       {/* Header with Summary */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Faturas</h1>
-          {!isLoading && invoices.length > 0 && (
-            <div className="flex items-center gap-4 mt-1 text-sm">
-              {overallSummary.overdueCount > 0 && (
-                <span className="flex items-center gap-1 text-red-600 dark:text-red-400 font-medium">
-                  <AlertTriangle size={14} />
-                  {overallSummary.overdueCount} {pluralize(overallSummary.overdueCount, 'vencida', 'vencidas')} ({formatCurrency(overallSummary.overdueTotal)})
-                </span>
-              )}
-              <span className="text-gray-500 dark:text-gray-400">
-                Total pendente: {formatCurrency(overallSummary.totalPending)}
-              </span>
-            </div>
-          )}
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="min-w-0">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Faturas</h1>
+            {!isLoading && invoices.length > 0 && overallSummary.overdueCount > 0 && (
+              <div className="flex items-center gap-1 mt-1 text-sm text-red-600 dark:text-red-400 font-medium">
+                <AlertTriangle size={14} />
+                <span>{overallSummary.overdueCount} {pluralize(overallSummary.overdueCount, 'vencida', 'vencidas')}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Filters */}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {/* Year Filter */}
+            <select
+              value={selectedYear}
+              onChange={(e) => {
+                setSelectedYear(Number(e.target.value))
+                setSelectedTab(null)
+              }}
+              className="input w-auto text-sm"
+            >
+              {availableYears.map((year) => (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              ))}
+            </select>
+
+            {/* Card Filter */}
+            <select
+              value={selectedCardId || ''}
+              onChange={(e) => {
+                setSelectedCardId(e.target.value ? Number(e.target.value) : null)
+                setSelectedTab(null)
+              }}
+              className="input w-auto min-w-[100px] sm:min-w-[140px] text-sm"
+            >
+              <option value="">Todos</option>
+              {cards.map((card) => (
+                <option key={card.id} value={card.id}>
+                  {card.name}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
-        {/* Filters */}
-        <div className="flex items-center gap-3">
-          {/* Year Filter */}
-          <select
-            value={selectedYear}
-            onChange={(e) => {
-              setSelectedYear(Number(e.target.value))
-              setSelectedTab(null)
-            }}
-            className="input w-auto"
-          >
-            {availableYears.map((year) => (
-              <option key={year} value={year}>
-                {year}
-              </option>
-            ))}
-          </select>
-
-          {/* Card Filter */}
-          <select
-            value={selectedCardId || ''}
-            onChange={(e) => {
-              setSelectedCardId(e.target.value ? Number(e.target.value) : null)
-              setSelectedTab(null)
-            }}
-            className="input w-auto min-w-[160px]"
-          >
-            <option value="">Todos os cartões</option>
-            {cards.map((card) => (
-              <option key={card.id} value={card.id}>
-                {card.name}
-              </option>
-            ))}
-          </select>
-        </div>
+        {/* Pending summary - separate line on mobile */}
+        {!isLoading && invoices.length > 0 && (
+          <div className="text-sm text-gray-500 dark:text-gray-400">
+            Pendente: <span className="font-medium text-gray-900 dark:text-white">{formatCurrency(overallSummary.totalPending)}</span>
+          </div>
+        )}
       </div>
 
       {isLoading ? (
@@ -393,14 +395,15 @@ export default function Invoices() {
       ) : (
         <>
           {/* Month Tabs */}
-          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm overflow-hidden">
-            <div className="flex overflow-x-auto" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm overflow-hidden relative">
+            <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white dark:from-slate-800 to-transparent pointer-events-none z-10 sm:hidden" />
+            <div className="flex overflow-x-auto scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
               {monthTabs.map((tab) => (
                 <button
                   key={tab.key}
                   onClick={() => setSelectedTab(tab.key)}
                   className={clsx(
-                    'flex-1 min-w-[60px] px-3 py-3 text-sm font-medium transition-colors border-b-2 whitespace-nowrap',
+                    'flex-1 min-w-[48px] px-2 sm:px-3 py-3 text-xs sm:text-sm font-medium transition-colors border-b-2 whitespace-nowrap',
                     selectedTab === tab.key
                       ? 'border-primary-500 text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/20'
                       : tab.hasInvoices
@@ -425,28 +428,28 @@ export default function Invoices() {
 
           {/* Tab Summary */}
           {selectedTab && (
-            <div className="flex items-center gap-6 px-4 py-3 bg-gray-50 dark:bg-slate-800/50 rounded-lg">
+            <div className="flex flex-wrap items-center gap-4 sm:gap-6 px-3 sm:px-4 py-3 bg-gray-50 dark:bg-slate-800/50 rounded-lg">
               <div>
-                <span className="text-xs text-gray-500 dark:text-gray-400">Total do período</span>
-                <p className="font-semibold text-gray-900 dark:text-white">{formatCurrency(tabSummary.total)}</p>
+                <span className="text-xs text-gray-500 dark:text-gray-400">Total</span>
+                <p className="font-semibold text-sm sm:text-base text-gray-900 dark:text-white">{formatCurrency(tabSummary.total)}</p>
               </div>
               <div>
                 <span className="text-xs text-gray-500 dark:text-gray-400">A pagar</span>
                 <p className={clsx(
-                  'font-semibold',
+                  'font-semibold text-sm sm:text-base',
                   tabSummary.remaining > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
                 )}>
                   {formatCurrency(tabSummary.remaining)}
                 </p>
               </div>
-              <div>
+              <div className="hidden sm:block">
                 <span className="text-xs text-gray-500 dark:text-gray-400">Cartões</span>
                 <p className="font-semibold text-gray-900 dark:text-white">{tabSummary.count}</p>
               </div>
               {tabSummary.overdueCount > 0 && (
-                <div className="ml-auto flex items-center gap-2 text-red-600 dark:text-red-400">
-                  <AlertTriangle size={16} />
-                  <span className="text-sm font-medium">
+                <div className="ml-auto flex items-center gap-1 sm:gap-2 text-red-600 dark:text-red-400">
+                  <AlertTriangle size={14} className="sm:w-4 sm:h-4" />
+                  <span className="text-xs sm:text-sm font-medium">
                     {tabSummary.overdueCount} {pluralize(tabSummary.overdueCount, 'vencida', 'vencidas')}
                   </span>
                 </div>
@@ -455,8 +458,8 @@ export default function Invoices() {
           )}
 
           {/* Invoice Table */}
-          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm overflow-x-auto">
-            <table className="w-full min-w-[700px]">
+          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm overflow-x-auto max-w-full">
+            <table className="w-full min-w-[700px] table-auto">
               <thead>
                 <tr className="border-b border-gray-200 dark:border-slate-700">
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
@@ -569,9 +572,9 @@ export default function Invoices() {
                               setOpenMenuId(invoice.id)
                             }
                           }}
-                          className="p-1 rounded hover:bg-gray-100 dark:hover:bg-slate-600"
+                          className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors"
                         >
-                          <MoreVertical size={16} className="text-gray-400" />
+                          <MoreVertical size={18} className="text-gray-400" />
                         </button>
 
                         {openMenuId === invoice.id && menuPosition && createPortal(

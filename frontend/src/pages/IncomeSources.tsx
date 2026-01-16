@@ -351,21 +351,21 @@ export default function IncomeSources() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Fontes de Receita</h1>
-          <p className="text-gray-500 dark:text-gray-400">Gerencie suas fontes de renda e benefícios</p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Receitas</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400">Gerencie suas fontes de renda</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-shrink-0">
           {sources.length > 0 && (
-            <button onClick={openGenerateModal} className="btn-secondary flex items-center gap-2">
+            <button onClick={openGenerateModal} className="btn-secondary flex items-center gap-2 whitespace-nowrap">
               <PlayCircle size={18} />
-              Registrar Receitas
+              <span className="hidden sm:inline">Registrar</span>
             </button>
           )}
-          <button onClick={openCreateModal} className="btn-primary flex items-center gap-2">
+          <button onClick={openCreateModal} className="btn-primary flex items-center gap-2 whitespace-nowrap">
             <Plus size={18} />
-            Nova Fonte
+            <span className="hidden sm:inline">Nova Fonte</span>
           </button>
         </div>
       </div>
@@ -413,13 +413,13 @@ export default function IncomeSources() {
                   <div className="flex gap-1">
                     <button
                       onClick={() => openEditModal(source)}
-                      className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                      className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
                     >
                       <Pencil size={16} />
                     </button>
                     <button
                       onClick={() => handleDelete(source)}
-                      className="p-2 text-gray-400 hover:text-red-500"
+                      className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
                     >
                       <Trash2 size={16} />
                     </button>
@@ -717,7 +717,7 @@ export default function IncomeSources() {
                   >
                     <Users size={20} className={formData.ownership_type === 'household' ? 'text-biveto' : 'text-gray-400'} />
                     <span className={clsx('text-sm font-medium', formData.ownership_type === 'household' ? 'text-biveto' : 'text-gray-600 dark:text-gray-400')}>
-                      Familia
+                      Família
                     </span>
                   </button>
                 </div>
