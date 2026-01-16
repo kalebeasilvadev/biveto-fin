@@ -30,6 +30,7 @@ import api from '../services/api'
 import FloatingAssistant from './FloatingAssistant'
 import QuickTransactionModal from './QuickTransactionModal'
 import ToastContainer from './shared/ToastContainer'
+import InstallPromptBanner from './InstallPromptBanner'
 
 // Main navigation items
 const mainNavItems = [
@@ -349,6 +350,9 @@ export default function Layout() {
 
       {/* Toast Notifications */}
       <ToastContainer />
+
+      {/* PWA Install Prompt */}
+      <InstallPromptBanner />
 
       {/* Mobile Bottom Navigation */}
       <nav className="bottom-nav" role="navigation" aria-label="Navegação principal mobile">
