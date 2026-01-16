@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { budgetsApi, categoriesApi } from '../services/api'
+import { budgetsApi, categoriesApi, familyApi } from '../services/api'
 import { ChevronLeft, ChevronRight, Plus, Trash2, Copy, Wallet } from 'lucide-react'
 import { clsx } from 'clsx'
 import EmptyState from '../components/EmptyState'
+import OwnershipSelector from '../components/shared/OwnershipSelector'
 
 interface BudgetItem {
   id: number
@@ -35,6 +36,12 @@ interface Category {
   icon: string | null
 }
 
+interface FamilyContext {
+  license_id: number
+  member_count: number
+  max_members: number
+}
+
 export default function Budget() {
   const queryClient = useQueryClient()
   const now = new Date()
@@ -42,6 +49,7 @@ export default function Budget() {
   const [month, setMonth] = useState(now.getMonth() + 1)
   const [showAddModal, setShowAddModal] = useState(false)
   const [showCopyModal, setShowCopyModal] = useState(false)
+  const [ownershipType, setOwnershipType] = useState<'personal' | 'household'>('personal')
 
   const { data: budgetData, isLoading } = useQuery({
     queryKey: ['budget', year, month],
@@ -52,6 +60,20 @@ export default function Budget() {
     queryKey: ['categories'],
     queryFn: categoriesApi.list,
   })
+
+  const { data: familyData } = useQuery({
+    queryKey: ['family-context'],
+    queryFn: async () => {
+      try {
+        const response = await familyApi.getContext()
+        return response.data as FamilyContext
+      } catch {
+        return null
+      }
+    },
+  })
+
+  const showOwnershipSelector = familyData && familyData.member_count >= 2
 
   const budget: Budget | null = budgetData?.data || null
   const categories: Category[] = categoriesData?.data || []
@@ -252,6 +274,7 @@ export default function Budget() {
                   category_id: Number(formData.get('category_id')),
                   planned_amount: Number(formData.get('planned_amount')),
                   is_fixed: formData.get('is_fixed') === 'on',
+                  ownership_type: ownershipType,
                 })
               }}
             >
@@ -288,6 +311,13 @@ export default function Budget() {
                     Gasto fixo (não varia mensalmente)
                   </label>
                 </div>
+                {showOwnershipSelector && (
+                  <OwnershipSelector
+                    value={ownershipType}
+                    onChange={setOwnershipType}
+                    description="Limites familiares são compartilhados com todos os membros"
+                  />
+                )}
               </div>
               <div className="flex gap-2 mt-6">
                 <button

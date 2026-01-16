@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { creditCardsApi } from '../services/api'
+import { creditCardsApi, familyApi } from '../services/api'
 import {
   CreditCard as CreditCardIcon,
   Plus,
@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import EmptyState from '../components/EmptyState'
+import OwnershipSelector from '../components/shared/OwnershipSelector'
 
 interface CreditCard {
   id: number
@@ -33,6 +34,12 @@ interface CreditCard {
   annual_fee: number | null
   annual_fee_frequency: 'monthly' | 'yearly'
   annual_fee_waived: boolean
+}
+
+interface FamilyContext {
+  license_id: number
+  member_count: number
+  max_members: number
 }
 
 const pointsPrograms = [
@@ -65,6 +72,7 @@ export default function CreditCards() {
   const queryClient = useQueryClient()
   const [showModal, setShowModal] = useState(false)
   const [editingCard, setEditingCard] = useState<CreditCard | null>(null)
+  const [ownershipType, setOwnershipType] = useState<'personal' | 'household'>('personal')
   const [formData, setFormData] = useState({
     name: '',
     credit_limit: '',
@@ -88,6 +96,20 @@ export default function CreditCards() {
     queryKey: ['credit-cards'],
     queryFn: creditCardsApi.list,
   })
+
+  const { data: familyData } = useQuery({
+    queryKey: ['family-context'],
+    queryFn: async () => {
+      try {
+        const response = await familyApi.getContext()
+        return response.data as FamilyContext
+      } catch {
+        return null
+      }
+    },
+  })
+
+  const showOwnershipSelector = familyData && familyData.member_count >= 2
 
   const cards: CreditCard[] = data?.data || []
 
@@ -191,6 +213,7 @@ export default function CreditCards() {
       annual_fee_waived: formData.annual_fee_waived,
       benefits_notes: formData.benefits_notes || null,
       color: formData.color,
+      ownership_type: ownershipType,
     }
 
     if (editingCard) {
@@ -610,6 +633,14 @@ export default function CreditCards() {
                   placeholder="Sala VIP, seguro viagem..."
                 />
               </div>
+
+              {showOwnershipSelector && (
+                <OwnershipSelector
+                  value={ownershipType}
+                  onChange={setOwnershipType}
+                  description="Cartões familiares são compartilhados com todos os membros"
+                />
+              )}
 
               <div className="flex gap-2 pt-4">
                 <button onClick={closeModal} className="btn-secondary flex-1">

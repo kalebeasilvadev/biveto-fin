@@ -16,6 +16,7 @@ from app.modules.credit_cards.schemas.credit_card import (
     CreditCardResponse,
     CreditCardListResponse,
 )
+from app.modules.household.utils.household_helpers import validate_create_permission
 
 router = APIRouter()
 
@@ -122,6 +123,9 @@ async def create_credit_card(
     db: DbSession,
 ):
     """Cria um novo cartao de credito (cria conta associada automaticamente)"""
+    # Validate permission to create with specified ownership_type
+    await validate_create_permission(db, current_user, data.ownership_type.value)
+
     # Create the linked account
     account = Account(
         user_id=current_user.id,
@@ -131,7 +135,7 @@ async def create_credit_card(
         currency="BRL",
         color=data.color,
         icon=data.icon,
-        ownership_type="personal",
+        ownership_type=data.ownership_type.value,
     )
     db.add(account)
     await db.flush()  # Get account.id

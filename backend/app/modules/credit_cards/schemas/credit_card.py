@@ -1,6 +1,7 @@
 from datetime import datetime
 from pydantic import BaseModel, Field
 from app.models.credit_card import PointsProgram
+from app.models.household import OwnershipType
 
 
 class CreditCardBase(BaseModel):
@@ -27,6 +28,7 @@ class CreditCardCreate(CreditCardBase):
     color: str | None = None
     icon: str | None = None
     initial_balance: float = 0  # Current credit card bill
+    ownership_type: OwnershipType = OwnershipType.PERSONAL
 
 
 class CreditCardUpdate(BaseModel):
