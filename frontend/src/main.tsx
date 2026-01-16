@@ -4,6 +4,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import './styles/globals.css'
+// Initialize PWA store (registers beforeinstallprompt listener)
+import './stores/pwaStore'
 
 const queryClient = new QueryClient({
   defaultOptions: {
