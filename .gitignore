@@ -67,6 +67,7 @@ e2e/.auth/
 # Screenshots/prints (temp files)
 *.png
 !frontend/public/*.png
+!frontend/public/icons/*.png
 prints/
 
 # MCP config (may contain sensitive info)
