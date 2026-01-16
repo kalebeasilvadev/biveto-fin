@@ -24,7 +24,6 @@ import {
   BadgeDollarSign,
   FileText,
   Download,
-  Share,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { clsx } from 'clsx'
@@ -33,6 +32,7 @@ import FloatingAssistant from './FloatingAssistant'
 import QuickTransactionModal from './QuickTransactionModal'
 import ToastContainer from './shared/ToastContainer'
 import InstallPromptBanner from './InstallPromptBanner'
+import IOSInstallModal from './IOSInstallModal'
 import { usePWAInstall } from '../hooks/usePWAInstall'
 
 // Main navigation items
@@ -64,11 +64,12 @@ const bottomNavItems = [
 export default function Layout() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [showQuickTransaction, setShowQuickTransaction] = useState(false)
+  const [showIOSInstallModal, setShowIOSInstallModal] = useState(false)
   const logout = useAuthStore((state) => state.logout)
   const user = useAuthStore((state) => state.user)
   const setUser = useAuthStore((state) => state.setUser)
   const { theme, toggleTheme } = useThemeStore()
-  const { canInstall, isIOS, promptInstall } = usePWAInstall()
+  const { canInstall, isIOS, isSafari, promptInstall } = usePWAInstall()
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -315,7 +316,9 @@ export default function Layout() {
             {canInstall && (
               <button
                 onClick={() => {
-                  if (!isIOS) {
+                  if (isIOS) {
+                    setShowIOSInstallModal(true)
+                  } else {
                     promptInstall()
                   }
                   setMobileMenuOpen(false)
@@ -324,11 +327,6 @@ export default function Layout() {
               >
                 <Download size={20} />
                 <span>Instalar App</span>
-                {isIOS && (
-                  <span className="text-xs opacity-80 ml-1">
-                    (use <Share size={12} className="inline" /> Safari)
-                  </span>
-                )}
               </button>
             )}
             <NavLink
@@ -377,6 +375,13 @@ export default function Layout() {
 
       {/* PWA Install Prompt */}
       <InstallPromptBanner />
+
+      {/* iOS Install Modal (from sidebar menu) */}
+      <IOSInstallModal
+        isOpen={showIOSInstallModal}
+        onClose={() => setShowIOSInstallModal(false)}
+        isSafari={isSafari}
+      />
 
       {/* Mobile Bottom Navigation */}
       <nav className="bottom-nav" role="navigation" aria-label="Navegação principal mobile">

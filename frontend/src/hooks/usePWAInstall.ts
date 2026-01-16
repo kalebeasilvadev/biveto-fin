@@ -6,6 +6,20 @@ const FIRST_VISIT_KEY = 'biveto-first-visit'
 const MIN_VISITS_FOR_BANNER = 2 // Show banner after 2nd visit
 const MIN_TIME_ON_SITE = 60 * 1000 // Or after 60 seconds on first visit
 
+// Detect iOS
+const getIsIOS = () => {
+  if (typeof navigator === 'undefined') return false
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as unknown as { MSStream?: unknown }).MSStream
+}
+
+// Detect Safari (works on iOS and macOS)
+const getIsSafari = () => {
+  if (typeof navigator === 'undefined') return false
+  const ua = navigator.userAgent
+  // Safari but not Chrome/Firefox/Edge (which include "Safari" in their UA)
+  return /Safari/.test(ua) && !/Chrome|CriOS|FxiOS|EdgiOS|OPiOS/.test(ua)
+}
+
 export function usePWAInstall() {
   const {
     installPromptEvent,
@@ -17,10 +31,8 @@ export function usePWAInstall() {
     dismissBanner,
   } = usePWAStore()
 
-  // Check if running on iOS
-  const isIOS = typeof navigator !== 'undefined'
-    && /iPad|iPhone|iPod/.test(navigator.userAgent)
-    && !(window as unknown as { MSStream?: unknown }).MSStream
+  const isIOS = getIsIOS()
+  const isSafari = getIsSafari()
 
   // Track visits and check engagement criteria
   useEffect(() => {
@@ -60,8 +72,13 @@ export function usePWAInstall() {
     }
   }, [setHasEngagement])
 
-  // Can install: event available OR iOS (for instructions)
-  const canInstall = !isInstalled && (!!installPromptEvent || isIOS)
+  // Can install logic:
+  // - Android/Chrome: needs beforeinstallprompt event
+  // - iOS Safari: always possible (manual process)
+  // - iOS Chrome: NOT possible (show message to use Safari)
+  const canInstallAndroid = !isIOS && !!installPromptEvent
+  const canInstallIOS = isIOS // Always show on iOS (with different UI based on browser)
+  const canInstall = !isInstalled && (canInstallAndroid || canInstallIOS)
 
   // Should show banner: can install + not dismissed + has engagement
   const shouldShowBanner = canInstall && !isDismissed && hasEngagement
@@ -71,6 +88,7 @@ export function usePWAInstall() {
     shouldShowBanner,
     isInstalled,
     isIOS,
+    isSafari,
     promptInstall,
     dismissBanner,
   }
