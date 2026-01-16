@@ -114,5 +114,111 @@
       ]
     }
   },
-  "screenshots": []
+  "screenshots": [
+    {
+      "src": "/screenshots/screenshot-mobile-dashboard.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Dashboard - Visão geral das suas finanças"
+    },
+    {
+      "src": "/screenshots/screenshot-mobile-transactions.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Transações - Histórico detalhado"
+    },
+    {
+      "src": "/screenshots/screenshot-mobile-insights.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Insights - Recomendações inteligentes"
+    },
+    {
+      "src": "/screenshots/screenshot-mobile-menu.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Menu - Navegação completa"
+    },
+    {
+      "src": "/screenshots/screenshot-mobile-accounts.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Contas - Gerencie suas contas bancárias"
+    },
+    {
+      "src": "/screenshots/screenshot-mobile-credit-cards.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Cartões - Controle seus cartões de crédito"
+    },
+    {
+      "src": "/screenshots/screenshot-mobile-invoices.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Faturas - Acompanhe suas faturas"
+    },
+    {
+      "src": "/screenshots/screenshot-mobile-income-sources.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Receitas - Gerencie suas fontes de renda"
+    },
+    {
+      "src": "/screenshots/screenshot-mobile-budget.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Orçamento - Planeje seus gastos"
+    },
+    {
+      "src": "/screenshots/screenshot-mobile-goals.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Metas - Defina objetivos financeiros"
+    },
+    {
+      "src": "/screenshots/screenshot-mobile-debts.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Dívidas - Controle suas dívidas"
+    },
+    {
+      "src": "/screenshots/screenshot-mobile-recurring.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Recorrentes - Despesas fixas"
+    },
+    {
+      "src": "/screenshots/screenshot-mobile-upload.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Adicionar - Cadastre transações"
+    },
+    {
+      "src": "/screenshots/screenshot-mobile-chat.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Assistente - IA financeira pessoal"
+    },
+    {
+      "src": "/screenshots/screenshot-mobile-settings.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Configurações - Personalize o app"
+    }
+  ]
 }
