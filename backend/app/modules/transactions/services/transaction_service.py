@@ -780,8 +780,60 @@ class TransactionService:
                 if new_invoice:
                     await invoice_service.update_invoice_total(new_invoice)
 
-        elif amount_changed or date_changed:
-            # Mudou valor ou data, atualizar a fatura atual
+        elif date_changed and transaction.credit_card_id and transaction.invoice_id:
+            # Data mudou - verificar se a transação deveria estar em outra fatura
+            card_result = await self.db.execute(
+                select(CreditCard).where(CreditCard.id == transaction.credit_card_id)
+            )
+            credit_card = card_result.scalar_one_or_none()
+
+            if credit_card:
+                # Calcular qual fatura a transação deveria estar com a nova data
+                new_tx_date = update_data.get("date", transaction.date)
+                period = invoice_service.calculate_invoice_period(credit_card, new_tx_date)
+
+                # Verificar se é a mesma fatura
+                current_invoice_result = await self.db.execute(
+                    select(CreditCardInvoice).where(CreditCardInvoice.id == transaction.invoice_id)
+                )
+                current_invoice = current_invoice_result.scalar_one_or_none()
+
+                needs_move = False
+                if current_invoice:
+                    # Verificar se a transação deveria estar em outra fatura
+                    if (current_invoice.reference_month != period['reference_month'] or
+                        current_invoice.reference_year != period['reference_year']):
+                        needs_move = True
+
+                if needs_move:
+                    # Obter ou criar a fatura correta
+                    correct_invoice = await invoice_service.get_or_create_invoice(
+                        user=user,
+                        credit_card=credit_card,
+                        reference_month=period['reference_month'],
+                        reference_year=period['reference_year'],
+                        closing_date=period['closing_date'],
+                        due_date=period['due_date'],
+                    )
+
+                    # Guardar invoice antiga para atualizar total depois
+                    old_invoice = current_invoice
+
+                    # Mover transação para a fatura correta
+                    transaction.invoice_id = correct_invoice.id
+                    await self.db.flush()
+
+                    # Atualizar totais de ambas as faturas
+                    if old_invoice:
+                        await invoice_service.update_invoice_total(old_invoice)
+                    await invoice_service.update_invoice_total(correct_invoice)
+                elif current_invoice:
+                    # Mesma fatura, apenas atualizar total se valor mudou
+                    if amount_changed:
+                        await invoice_service.update_invoice_total(current_invoice)
+
+        elif amount_changed:
+            # Apenas valor mudou, atualizar a fatura atual
             if transaction.invoice_id:
                 result = await self.db.execute(
                     select(CreditCardInvoice).where(CreditCardInvoice.id == transaction.invoice_id)
