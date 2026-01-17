@@ -78,6 +78,9 @@ class User(Base):
     credit_card_invoices: Mapped[list["CreditCardInvoice"]] = relationship(
         back_populates="user", lazy="noload", cascade="all, delete-orphan"
     )
+    api_keys: Mapped[list["APIKey"]] = relationship(
+        back_populates="user", lazy="noload", cascade="all, delete-orphan"
+    )
 
     @property
     def household_role(self) -> str | None:
@@ -114,3 +117,4 @@ from .household import HouseholdMember
 from .credit_card import CreditCard
 from .income_source import IncomeSource
 from .credit_card_invoice import CreditCardInvoice
+from .api_key import APIKey

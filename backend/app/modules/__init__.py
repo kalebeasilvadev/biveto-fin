@@ -23,6 +23,8 @@ Módulos disponíveis:
 - installments: Parcelas
 - chat: Assistente financeiro IA
 - admin: Administração do sistema
+- api_keys: Gerenciamento de API Keys para integrações
+- mcp: Endpoints para Model Context Protocol (Claude Code)
 
 Estrutura de cada módulo:
 /module_name/
@@ -54,4 +56,6 @@ __all__ = [
     "installments",
     "chat",
     "admin",
+    "api_keys",
+    "mcp",
 ]

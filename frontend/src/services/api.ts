@@ -483,3 +483,12 @@ export const invoicesApi = {
     include_recurring?: boolean
   }) => api.post('/invoices/project-future', data),
 }
+
+export const apiKeysApi = {
+  list: () => api.get('/api-keys'),
+  create: (data: { name: string; notes?: string; expires_in_days?: number }) =>
+    api.post('/api-keys', data),
+  get: (id: number) => api.get(`/api-keys/${id}`),
+  revoke: (id: number) => api.post(`/api-keys/${id}/revoke`),
+  delete: (id: number) => api.delete(`/api-keys/${id}`),
+}

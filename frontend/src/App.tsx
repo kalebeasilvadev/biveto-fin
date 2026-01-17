@@ -21,6 +21,7 @@ import AdminLicenses from './pages/admin/AdminLicenses'
 import Settings from './pages/Settings'
 import Family from './pages/Family'
 import HouseholdMigration from './pages/HouseholdMigration'
+import ApiKeys from './pages/ApiKeys'
 import Invite from './pages/Invite'
 import ResetPassword from './pages/ResetPassword'
 import ShareTarget from './pages/ShareTarget'
@@ -85,6 +86,7 @@ function App() {
         <Route path="settings" element={<Settings />} />
         <Route path="family" element={<Family />} />
         <Route path="household-migration" element={<HouseholdMigration />} />
+        <Route path="api-keys" element={<ApiKeys />} />
         <Route path="share-target" element={<ShareTarget />} />
         {/* Admin routes - protegidas por AdminRoute */}
         <Route path="admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />

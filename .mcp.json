@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "biveto-db": {
+      "command": "python",
+      "args": [
+        "/Users/kalebeandrade/Dev/geral/biveto-app/mcp-biveto-db/server.py"
+      ],
+      "env": {
+        "BIVETO_API_URL": "http://localhost:8000/api/v1",
+        "BIVETO_API_KEY": ""
+      }
+    }
+  }
+}

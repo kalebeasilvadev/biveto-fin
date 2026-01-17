@@ -1,4 +1,6 @@
 import re
+import secrets
+import hashlib
 from datetime import datetime, timedelta, timezone
 from typing import Any
 from jose import jwt
@@ -134,3 +136,50 @@ def decode_token(token: str) -> dict | None:
         return payload
     except jwt.JWTError:
         return None
+
+
+# ============== API Key Functions ==============
+
+def generate_api_key() -> tuple[str, str, str]:
+    """
+    Gera uma nova API Key.
+    Retorna: (key_completa, key_prefix, key_hash)
+
+    Formato: biv_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx (36 chars total)
+    - Prefixo: biv_ (4 chars)
+    - Random: 32 chars hex
+
+    A chave completa só é mostrada uma vez ao usuário.
+    Armazenamos apenas o hash e o prefixo.
+    """
+    random_part = secrets.token_hex(16)  # 32 chars hex
+    full_key = f"biv_{random_part}"
+    key_prefix = full_key[:12]  # biv_xxxxxxxx
+    key_hash = hash_api_key(full_key)
+
+    return full_key, key_prefix, key_hash
+
+
+def hash_api_key(api_key: str) -> str:
+    """
+    Cria hash SHA-256 da API key para armazenamento seguro.
+    """
+    return hashlib.sha256(api_key.encode()).hexdigest()
+
+
+def verify_api_key_format(api_key: str) -> bool:
+    """
+    Verifica se a API key está no formato correto.
+    Formato esperado: biv_[32 chars hex]
+    """
+    if not api_key.startswith("biv_"):
+        return False
+    if len(api_key) != 36:
+        return False
+    # Verifica se a parte após biv_ é hexadecimal
+    hex_part = api_key[4:]
+    try:
+        int(hex_part, 16)
+        return True
+    except ValueError:
+        return False

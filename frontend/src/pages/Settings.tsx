@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { useAuthStore } from '../stores/authStore'
-import api, { getApiErrorMessage } from '../services/api'
-import { Lock, User, Mail, Check, AlertCircle, Users, ChevronRight, Database } from 'lucide-react'
+import api, { getApiErrorMessage, familyApi } from '../services/api'
+import { Lock, User, Mail, Check, AlertCircle, Users, ChevronRight, Database, Key } from 'lucide-react'
 
 export default function Settings() {
   const user = useAuthStore((state) => state.user)
@@ -12,6 +12,15 @@ export default function Settings() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState('')
+
+  // Verifica se é owner para mostrar opção de API Keys
+  const { data: familyContext } = useQuery({
+    queryKey: ['family-context'],
+    queryFn: async () => {
+      const response = await familyApi.getContext()
+      return response.data as { is_owner: boolean }
+    },
+  })
 
   const changePasswordMutation = useMutation({
     mutationFn: async (data: { current_password: string; new_password: string }) => {
@@ -92,6 +101,25 @@ export default function Settings() {
         </div>
         <ChevronRight size={20} className="text-gray-400" />
       </Link>
+
+      {/* API Keys Link Card - apenas para owner */}
+      {familyContext?.is_owner && (
+        <Link
+          to="/api-keys"
+          className="card flex items-center justify-between hover:shadow-md transition-shadow"
+        >
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+              <Key size={20} className="text-purple-600 dark:text-purple-400" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">API Keys</h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Integração com Claude Code e outras ferramentas</p>
+            </div>
+          </div>
+          <ChevronRight size={20} className="text-gray-400" />
+        </Link>
+      )}
 
       {/* User Info Card */}
       <div className="card">

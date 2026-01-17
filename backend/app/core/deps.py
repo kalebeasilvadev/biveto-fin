@@ -1,14 +1,17 @@
+from datetime import datetime
 from typing import Annotated
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Header, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from .database import get_db
-from .security import decode_token
+from .security import decode_token, hash_api_key, verify_api_key_format
 from ..models.user import User
+from ..models.api_key import APIKey
 
 security = HTTPBearer()
+security_optional = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(
@@ -58,3 +61,109 @@ async def get_current_user(
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
 DbSession = Annotated[AsyncSession, Depends(get_db)]
+
+
+async def get_user_from_api_key(
+    request: Request,
+    x_api_key: Annotated[str | None, Header()] = None,
+    db: AsyncSession = Depends(get_db),
+) -> User:
+    """
+    Autentica usuário via API Key (header X-API-Key).
+    Usado para acesso externo via MCP e integrações.
+    """
+    if not x_api_key:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="API Key não fornecida. Use o header X-API-Key.",
+        )
+
+    # Valida formato
+    if not verify_api_key_format(x_api_key):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Formato de API Key inválido",
+        )
+
+    # Busca a API Key pelo hash
+    key_hash = hash_api_key(x_api_key)
+    result = await db.execute(
+        select(APIKey).where(APIKey.key_hash == key_hash)
+    )
+    api_key = result.scalar_one_or_none()
+
+    if api_key is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="API Key inválida",
+        )
+
+    # Verifica se está ativa
+    if not api_key.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="API Key expirada ou revogada",
+        )
+
+    # Verifica se o usuário existe e está ativo
+    if not api_key.user or not api_key.user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Usuário associado inativo",
+        )
+
+    # Atualiza estatísticas de uso
+    api_key.last_used_at = datetime.utcnow()
+    api_key.usage_count += 1
+    api_key.last_ip = request.client.host if request.client else None
+    await db.commit()
+
+    return api_key.user
+
+
+ApiKeyUser = Annotated[User, Depends(get_user_from_api_key)]
+
+
+async def get_api_key_object(
+    request: Request,
+    x_api_key: Annotated[str | None, Header()] = None,
+    db: AsyncSession = Depends(get_db),
+) -> APIKey:
+    """
+    Retorna o objeto APIKey (não apenas o usuário).
+    Útil para verificar permissões específicas da key.
+    """
+    if not x_api_key:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="API Key não fornecida",
+        )
+
+    if not verify_api_key_format(x_api_key):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Formato de API Key inválido",
+        )
+
+    key_hash = hash_api_key(x_api_key)
+    result = await db.execute(
+        select(APIKey).where(APIKey.key_hash == key_hash)
+    )
+    api_key = result.scalar_one_or_none()
+
+    if api_key is None or not api_key.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="API Key inválida ou expirada",
+        )
+
+    # Atualiza estatísticas
+    api_key.last_used_at = datetime.utcnow()
+    api_key.usage_count += 1
+    api_key.last_ip = request.client.host if request.client else None
+    await db.commit()
+
+    return api_key
+
+
+CurrentApiKey = Annotated[APIKey, Depends(get_api_key_object)]

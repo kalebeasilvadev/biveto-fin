@@ -26,6 +26,8 @@ from app.modules.household.routers.migration import router as migration_router
 from app.modules.credit_cards.routers.credit_cards import router as credit_cards_router
 from app.modules.income.routers.income_sources import router as income_sources_router
 from app.modules.credit_cards.routers.invoices import router as invoices_router
+from app.modules.api_keys.routers.api_keys import router as api_keys_router
+from app.modules.mcp.routers.mcp import router as mcp_router
 
 api_router = APIRouter()
 
@@ -79,3 +81,9 @@ api_router.include_router(invoices_router, prefix="/invoices", tags=["Faturas"])
 
 # Income module
 api_router.include_router(income_sources_router, prefix="/income-sources", tags=["Fontes de Receita"])
+
+# API Keys module (para integrações externas)
+api_router.include_router(api_keys_router, tags=["API Keys"])
+
+# MCP module (consultas via Claude Code)
+api_router.include_router(mcp_router, tags=["MCP"])
