@@ -462,12 +462,39 @@ class TransactionService:
         return result
 
     async def get_by_id(self, user: User, transaction_id: int) -> Transaction | None:
-        result = await self.db.execute(
-            select(Transaction).where(
-                Transaction.id == transaction_id,
-                Transaction.user_id == user.id,
+        """
+        Busca transação por ID, considerando permissões de household.
+
+        Retorna a transação se:
+        - É do próprio usuário (qualquer ownership_type)
+        - É de outro membro do household com ownership_type='household'
+        """
+        household_user_ids = await self._get_household_user_ids(user)
+
+        if household_user_ids:
+            # Usuário faz parte de um household
+            result = await self.db.execute(
+                select(Transaction).where(
+                    Transaction.id == transaction_id,
+                    or_(
+                        # Transações pessoais do usuário
+                        Transaction.user_id == user.id,
+                        # Transações household de qualquer membro da família
+                        and_(
+                            Transaction.user_id.in_(household_user_ids),
+                            Transaction.ownership_type == "household"
+                        )
+                    )
+                )
             )
-        )
+        else:
+            # Usuário não faz parte de household - apenas suas próprias transações
+            result = await self.db.execute(
+                select(Transaction).where(
+                    Transaction.id == transaction_id,
+                    Transaction.user_id == user.id,
+                )
+            )
         return result.scalar_one_or_none()
 
     async def list(
