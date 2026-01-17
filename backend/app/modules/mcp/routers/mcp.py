@@ -36,13 +36,7 @@ OPENAPI_SCHEMA = {
                         "description": "Lista de tabelas",
                         "content": {
                             "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "tables": {"type": "array", "items": {"type": "object"}},
-                                        "total": {"type": "integer"}
-                                    }
-                                }
+                                "schema": {"$ref": "#/components/schemas/TableListResponse"}
                             }
                         }
                     }
@@ -58,18 +52,7 @@ OPENAPI_SCHEMA = {
                     "required": True,
                     "content": {
                         "application/json": {
-                            "schema": {
-                                "type": "object",
-                                "required": ["table"],
-                                "properties": {
-                                    "table": {"type": "string", "description": "Nome da tabela (ex: transactions, accounts, credit_cards)"},
-                                    "filters": {"type": "object", "description": "Filtros no formato {coluna: valor}"},
-                                    "order_by": {"type": "string", "description": "Coluna para ordenação"},
-                                    "order_desc": {"type": "boolean", "description": "Se true, ordena descendente"},
-                                    "limit": {"type": "integer", "description": "Máximo de resultados (1-1000)", "default": 100},
-                                    "offset": {"type": "integer", "description": "Offset para paginação", "default": 0}
-                                }
-                            }
+                            "schema": {"$ref": "#/components/schemas/QueryRequest"}
                         }
                     }
                 },
@@ -78,15 +61,7 @@ OPENAPI_SCHEMA = {
                         "description": "Dados da consulta",
                         "content": {
                             "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {"type": "array", "items": {"type": "object"}},
-                                        "total": {"type": "integer"},
-                                        "limit": {"type": "integer"},
-                                        "offset": {"type": "integer"}
-                                    }
-                                }
+                                "schema": {"$ref": "#/components/schemas/QueryResponse"}
                             }
                         }
                     }
@@ -103,9 +78,7 @@ OPENAPI_SCHEMA = {
                         "description": "Resumo financeiro",
                         "content": {
                             "application/json": {
-                                "schema": {
-                                    "type": "object"
-                                }
+                                "schema": {"$ref": "#/components/schemas/SummaryResponse"}
                             }
                         }
                     }
@@ -131,9 +104,7 @@ OPENAPI_SCHEMA = {
                         "description": "Estatísticas da tabela",
                         "content": {
                             "application/json": {
-                                "schema": {
-                                    "type": "object"
-                                }
+                                "schema": {"$ref": "#/components/schemas/TableStatsResponse"}
                             }
                         }
                     }
@@ -142,6 +113,127 @@ OPENAPI_SCHEMA = {
         }
     },
     "components": {
+        "schemas": {
+            "TableListResponse": {
+                "type": "object",
+                "properties": {
+                    "tables": {
+                        "type": "array",
+                        "description": "Lista de tabelas disponíveis",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "name": {"type": "string", "description": "Nome da tabela"},
+                                "description": {"type": "string", "description": "Descrição da tabela"},
+                                "columns": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "name": {"type": "string"},
+                                            "description": {"type": "string"}
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "total": {"type": "integer", "description": "Total de tabelas"}
+                }
+            },
+            "QueryRequest": {
+                "type": "object",
+                "required": ["table"],
+                "properties": {
+                    "table": {"type": "string", "description": "Nome da tabela (ex: transactions, accounts, credit_cards)"},
+                    "filters": {
+                        "type": "object",
+                        "description": "Filtros no formato {coluna: valor}",
+                        "additionalProperties": True
+                    },
+                    "order_by": {"type": "string", "description": "Coluna para ordenação"},
+                    "order_desc": {"type": "boolean", "description": "Se true, ordena descendente", "default": False},
+                    "limit": {"type": "integer", "description": "Máximo de resultados (1-1000)", "default": 100},
+                    "offset": {"type": "integer", "description": "Offset para paginação", "default": 0}
+                }
+            },
+            "QueryResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "description": "Registros retornados",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": True
+                        }
+                    },
+                    "total": {"type": "integer", "description": "Total de registros encontrados"},
+                    "limit": {"type": "integer", "description": "Limite usado na consulta"},
+                    "offset": {"type": "integer", "description": "Offset usado na consulta"}
+                }
+            },
+            "SummaryResponse": {
+                "type": "object",
+                "properties": {
+                    "accounts": {
+                        "type": "object",
+                        "properties": {
+                            "count": {"type": "integer", "description": "Número de contas"},
+                            "total_balance": {"type": "number", "description": "Saldo total"}
+                        }
+                    },
+                    "transactions_this_month": {
+                        "type": "object",
+                        "properties": {
+                            "count": {"type": "integer", "description": "Número de transações"},
+                            "total_expenses": {"type": "number", "description": "Total de despesas"},
+                            "total_income": {"type": "number", "description": "Total de receitas"}
+                        }
+                    },
+                    "credit_cards": {
+                        "type": "object",
+                        "properties": {
+                            "count": {"type": "integer", "description": "Número de cartões ativos"}
+                        }
+                    },
+                    "open_invoices": {
+                        "type": "object",
+                        "properties": {
+                            "count": {"type": "integer", "description": "Número de faturas abertas"},
+                            "total_amount": {"type": "number", "description": "Valor total das faturas"}
+                        }
+                    },
+                    "active_goals": {
+                        "type": "object",
+                        "properties": {
+                            "count": {"type": "integer", "description": "Número de metas ativas"},
+                            "current_total": {"type": "number", "description": "Valor atual acumulado"},
+                            "target_total": {"type": "number", "description": "Valor alvo total"}
+                        }
+                    },
+                    "active_debts": {
+                        "type": "object",
+                        "properties": {
+                            "count": {"type": "integer", "description": "Número de dívidas ativas"},
+                            "total_balance": {"type": "number", "description": "Saldo total das dívidas"}
+                        }
+                    }
+                }
+            },
+            "TableStatsResponse": {
+                "type": "object",
+                "properties": {
+                    "table_name": {"type": "string", "description": "Nome da tabela"},
+                    "total_records": {"type": "integer", "description": "Total de registros"},
+                    "columns": {
+                        "type": "object",
+                        "description": "Colunas da tabela com descrições",
+                        "additionalProperties": {"type": "string"}
+                    }
+                }
+            }
+        },
         "securitySchemes": {
             "ApiKeyAuth": {
                 "type": "apiKey",
