@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useSearchParams } from 'react-router-dom'
 import { invoicesApi, creditCardsApi, accountsApi, transactionsApi } from '../services/api'
 import {
   CreditCard,
@@ -79,9 +80,15 @@ const getCurrentPeriod = () => {
 
 export default function Invoices() {
   const queryClient = useQueryClient()
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  // Read card filter from URL query parameter
+  const cardFromUrl = searchParams.get('card')
 
   // State
-  const [selectedCardId, setSelectedCardId] = useState<number | null>(null)
+  const [selectedCardId, setSelectedCardId] = useState<number | null>(
+    cardFromUrl ? Number(cardFromUrl) : null
+  )
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear())
   const [selectedTab, setSelectedTab] = useState<string | null>(null)
   const [showDetailModal, setShowDetailModal] = useState(false)
@@ -214,6 +221,21 @@ export default function Invoices() {
 
     return tabs
   }, [invoices, selectedYear])
+
+  // Sync URL with selected card
+  useEffect(() => {
+    const currentCardInUrl = searchParams.get('card')
+    const currentCardValue = selectedCardId ? String(selectedCardId) : null
+
+    if (currentCardInUrl !== currentCardValue) {
+      if (selectedCardId) {
+        searchParams.set('card', String(selectedCardId))
+      } else {
+        searchParams.delete('card')
+      }
+      setSearchParams(searchParams, { replace: true })
+    }
+  }, [selectedCardId, searchParams, setSearchParams])
 
   // Set initial selected tab to current month (prioritize overdue, then current, then first with invoices)
   useEffect(() => {

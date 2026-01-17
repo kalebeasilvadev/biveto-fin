@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
 import { creditCardsApi, familyApi, getApiErrorMessage } from '../services/api'
 import {
   CreditCard as CreditCardIcon,
@@ -9,6 +10,7 @@ import {
   Star,
   RefreshCw,
   MoreVertical,
+  FileText,
 } from 'lucide-react'
 import { useRef, useEffect } from 'react'
 import { clsx } from 'clsx'
@@ -55,6 +57,7 @@ interface FamilyContext {
 
 export default function CreditCards() {
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const toast = useToastStore()
   const [showModal, setShowModal] = useState(false)
   const [editingCard, setEditingCard] = useState<CreditCard | null>(null)
@@ -335,6 +338,16 @@ export default function CreditCards() {
                     </button>
                     {openMenuId === card.id && (
                       <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-gray-200 dark:border-slate-700 py-1 z-50">
+                        <button
+                          onClick={() => {
+                            navigate(`/invoices?card=${card.id}`)
+                            setOpenMenuId(null)
+                          }}
+                          className="w-full px-4 py-2.5 text-left text-sm flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700"
+                        >
+                          <FileText size={16} />
+                          Ver faturas
+                        </button>
                         <button
                           onClick={() => {
                             handleRecalculate(card)
