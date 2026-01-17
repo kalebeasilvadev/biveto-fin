@@ -526,7 +526,7 @@ pip install -r requirements.txt`}
       "command": "python",
       "args": ["/caminho/para/mcp-biveto-db/server.py"],
       "env": {
-        "BIVETO_API_URL": "https://app.biveto.com/api/v1",
+        "BIVETO_API_URL": "https://biveto.com/api/v1",
         "BIVETO_API_KEY": "biv_sua_chave_aqui"
       }
     }
@@ -577,7 +577,7 @@ pip install -r requirements.txt`}
                     <strong>3.</strong> Importe o schema OpenAPI:
                   </p>
                   <pre className="bg-gray-100 dark:bg-slate-700 p-3 rounded-lg overflow-x-auto text-xs">
-{`https://app.biveto.com/api/v1/mcp/openapi.json`}
+{`https://biveto.com/api/v1/mcp/openapi.json`}
                   </pre>
                   <p className="text-gray-700 dark:text-gray-300">
                     <strong>4.</strong> Em "Authentication", selecione "API Key" e configure:
@@ -649,7 +649,7 @@ Header Name: X-API-Key`}
                   </p>
                   <pre className="bg-gray-100 dark:bg-slate-700 p-3 rounded-lg overflow-x-auto text-xs">
 {`curl -H "X-API-Key: biv_sua_chave_aqui" \\
-  https://app.biveto.com/api/v1/mcp/summary`}
+  https://biveto.com/api/v1/mcp/summary`}
                   </pre>
                 </div>
               )}

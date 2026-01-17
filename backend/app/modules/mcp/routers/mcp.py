@@ -23,7 +23,7 @@ OPENAPI_SCHEMA = {
         "version": "1.0.0",
     },
     "servers": [
-        {"url": "https://app.biveto.com/api/v1"}
+        {"url": "https://biveto.com/api/v1"}
     ],
     "paths": {
         "/mcp/tables": {
