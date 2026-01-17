@@ -7,6 +7,7 @@ import {
   Pencil,
   Trash2,
   Star,
+  RefreshCw,
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import EmptyState from '../components/EmptyState'
@@ -57,6 +58,7 @@ export default function CreditCards() {
   const [editingCard, setEditingCard] = useState<CreditCard | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<CreditCard | null>(null)
   const [apiError, setApiError] = useState<string | null>(null)
+  const [recalculatingCardId, setRecalculatingCardId] = useState<number | null>(null)
 
   const { data, isLoading } = useQuery({
     queryKey: ['credit-cards'],
@@ -130,6 +132,29 @@ export default function CreditCards() {
       toast.error(message)
     },
   })
+
+  const recalculateMutation = useMutation({
+    mutationFn: (id: number) => creditCardsApi.recalculateInvoices(id),
+    onSuccess: (response) => {
+      invalidateCreditCardCaches()
+      queryClient.invalidateQueries({ queryKey: ['invoices'] })
+      setRecalculatingCardId(null)
+      const data = response.data
+      toast.success(
+        `Recálculo concluído: ${data.transactions_linked} transações vinculadas, ${data.invoices_updated} faturas atualizadas`
+      )
+    },
+    onError: (error) => {
+      setRecalculatingCardId(null)
+      const message = getApiErrorMessage(error, 'Erro ao recalcular faturas')
+      toast.error(message)
+    },
+  })
+
+  const handleRecalculate = (card: CreditCard) => {
+    setRecalculatingCardId(card.id)
+    recalculateMutation.mutate(card.id)
+  }
 
   const openCreateModal = () => {
     setEditingCard(null)
@@ -281,6 +306,14 @@ export default function CreditCards() {
                     </div>
                   </div>
                   <div className="flex gap-1">
+                    <button
+                      onClick={() => handleRecalculate(card)}
+                      disabled={recalculatingCardId === card.id}
+                      title="Recalcular faturas"
+                      className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      <RefreshCw size={16} className={recalculatingCardId === card.id ? 'animate-spin' : ''} />
+                    </button>
                     <button
                       onClick={() => openEditModal(card)}
                       className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"

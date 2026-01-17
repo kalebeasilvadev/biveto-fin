@@ -70,8 +70,9 @@ async def list_credit_cards(current_user: CurrentUser, db: DbSession):
     used_limits = {}
 
     if card_ids:
-        # Soma o valor restante (total_amount - paid_amount) de faturas com status 'open'
-        # Exclui faturas 'closed' (aparecem separadas) e 'paid' (ja pagas)
+        # Soma o valor restante (total_amount - paid_amount) de faturas NÃO pagas completamente
+        # Inclui: open, closed, overdue, partial
+        # Exclui apenas: paid (já pagas)
         invoice_result = await db.execute(
             select(
                 CreditCardInvoice.credit_card_id,
@@ -82,7 +83,7 @@ async def list_credit_cards(current_user: CurrentUser, db: DbSession):
             )
             .where(
                 CreditCardInvoice.credit_card_id.in_(card_ids),
-                CreditCardInvoice.status == InvoiceStatus.OPEN.value
+                CreditCardInvoice.status != InvoiceStatus.PAID.value
             )
             .group_by(CreditCardInvoice.credit_card_id)
         )
@@ -404,4 +405,127 @@ async def project_recurring_transactions(
         message=f"Projecao concluida com sucesso",
         transactions_created=len(created_transactions),
         months_projected=months_ahead,
+    )
+
+
+class RecalculateInvoicesResponse(BaseModel):
+    """Resposta do recalculo de faturas"""
+    message: str
+    transactions_linked: int
+    invoices_created: int
+    invoices_updated: int
+
+
+@router.post("/{card_id}/recalculate-invoices", response_model=RecalculateInvoicesResponse)
+async def recalculate_card_invoices(
+    card_id: int,
+    current_user: CurrentUser,
+    db: DbSession,
+):
+    """
+    Recalcula e vincula transações antigas do cartão às faturas corretas.
+
+    Este endpoint:
+    1. Busca todas as transações do cartão sem invoice_id
+    2. Calcula a fatura correta para cada transação baseado na data
+    3. Cria as faturas se não existirem
+    4. Vincula as transações às faturas
+    5. Recalcula os totais de todas as faturas afetadas
+
+    Útil para corrigir transações que foram criadas antes do sistema de faturas
+    ou que por algum motivo não foram vinculadas corretamente.
+    """
+    from app.models.transaction import Transaction
+
+    # Verificar se o cartao pertence ao usuario
+    result = await db.execute(
+        select(CreditCard).where(
+            CreditCard.id == card_id,
+            CreditCard.user_id == current_user.id,
+        )
+    )
+    card = result.scalar_one_or_none()
+    if not card:
+        raise HTTPException(status_code=404, detail="Cartao nao encontrado")
+
+    # Buscar transações do cartão sem invoice_id
+    tx_result = await db.execute(
+        select(Transaction).where(
+            Transaction.credit_card_id == card_id,
+            Transaction.user_id == current_user.id,
+            Transaction.invoice_id.is_(None),
+        )
+    )
+    transactions_without_invoice = list(tx_result.scalars().all())
+
+    if not transactions_without_invoice:
+        # Mesmo sem transações para vincular, recalcular todas as faturas do cartão
+        inv_result = await db.execute(
+            select(CreditCardInvoice).where(
+                CreditCardInvoice.credit_card_id == card_id,
+                CreditCardInvoice.user_id == current_user.id,
+            )
+        )
+        invoices = list(inv_result.scalars().all())
+
+        service = InvoiceService(db)
+        invoices_updated = 0
+        for invoice in invoices:
+            await service.update_invoice_total(invoice)
+            invoices_updated += 1
+
+        await db.commit()
+
+        return RecalculateInvoicesResponse(
+            message="Nenhuma transacao pendente. Faturas recalculadas.",
+            transactions_linked=0,
+            invoices_created=0,
+            invoices_updated=invoices_updated,
+        )
+
+    service = InvoiceService(db)
+    affected_invoices = set()
+    invoices_created = 0
+
+    # Para cada transação, vincular à fatura correta
+    for transaction in transactions_without_invoice:
+        # Calcular período da fatura baseado na data da transação
+        period = service.calculate_invoice_period(card, transaction.date)
+
+        # Obter ou criar fatura
+        invoice = await service.get_or_create_invoice(
+            user=current_user,
+            credit_card=card,
+            reference_month=period['reference_month'],
+            reference_year=period['reference_year'],
+            closing_date=period['closing_date'],
+            due_date=period['due_date'],
+        )
+
+        # Verificar se é uma fatura nova
+        if invoice.total_amount == 0 and invoice.id not in affected_invoices:
+            invoices_created += 1
+
+        # Vincular transação à fatura
+        transaction.invoice_id = invoice.id
+        affected_invoices.add(invoice.id)
+
+    await db.flush()
+
+    # Recalcular totais de todas as faturas afetadas
+    for invoice_id in affected_invoices:
+        inv_result = await db.execute(
+            select(CreditCardInvoice).where(CreditCardInvoice.id == invoice_id)
+        )
+        invoice = inv_result.scalar_one_or_none()
+        if invoice:
+            await service.update_invoice_total(invoice)
+
+    await db.commit()
+
+    return RecalculateInvoicesResponse(
+        message=f"Recalculo concluido com sucesso",
+        transactions_linked=len(transactions_without_invoice),
+        invoices_created=invoices_created,
+        invoices_updated=len(affected_invoices),
     )

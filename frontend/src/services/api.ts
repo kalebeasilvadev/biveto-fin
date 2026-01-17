@@ -422,6 +422,11 @@ export const creditCardsApi = {
   create: (data: unknown) => api.post('/credit-cards', data),
   update: (id: number, data: unknown) => api.patch(`/credit-cards/${id}`, data),
   delete: (id: number) => api.delete(`/credit-cards/${id}`),
+  recalculateInvoices: (id: number) => api.post(`/credit-cards/${id}/recalculate-invoices`),
+  projectRecurring: (id: number, monthsAhead?: number) =>
+    api.post(`/credit-cards/${id}/project-recurring`, null, {
+      params: monthsAhead ? { months_ahead: monthsAhead } : {}
+    }),
 }
 
 export const incomeSourcesApi = {

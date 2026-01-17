@@ -192,9 +192,15 @@ class InvoiceService:
         - Reembolsos
         - Creditos promocionais
 
-        NOTA: Se a fatura foi criada a partir de um documento PDF (document_id),
-        o total_amount do PDF e preservado e nao e recalculado.
+        NOTA: Nao recalcula faturas:
+        - Já pagas (status='paid') - valor histórico preservado
+        - Criadas a partir de documento PDF (document_id) - valor do PDF é mais confiável
         """
+        # Se a fatura ja foi paga, nao recalcular o total
+        # O valor historico deve ser preservado
+        if invoice.status == InvoiceStatus.PAID.value:
+            return
+
         # Se a fatura veio de um documento PDF, nao recalcular o total
         # O valor extraido do PDF e mais confiavel
         if invoice.document_id and invoice.total_amount > 0:
