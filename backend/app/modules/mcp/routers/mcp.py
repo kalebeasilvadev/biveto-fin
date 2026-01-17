@@ -31,6 +31,7 @@ OPENAPI_SCHEMA = {
                 "operationId": "listTables",
                 "summary": "Lista todas as tabelas disponíveis",
                 "description": "Retorna a lista de tabelas que podem ser consultadas, incluindo nome, descrição e colunas de cada uma.",
+                "security": [{"ApiKeyAuth": []}],
                 "responses": {
                     "200": {
                         "description": "Lista de tabelas",
@@ -48,6 +49,7 @@ OPENAPI_SCHEMA = {
                 "operationId": "queryTable",
                 "summary": "Consulta dados de uma tabela",
                 "description": "Executa uma consulta em uma tabela específica com filtros opcionais. Os dados são automaticamente filtrados pelo usuário autenticado.",
+                "security": [{"ApiKeyAuth": []}],
                 "requestBody": {
                     "required": True,
                     "content": {
@@ -73,6 +75,7 @@ OPENAPI_SCHEMA = {
                 "operationId": "getSummary",
                 "summary": "Resumo financeiro do usuário",
                 "description": "Retorna um resumo geral incluindo: total de contas e saldo, transações do mês, cartões de crédito ativos, faturas em aberto, metas e dívidas.",
+                "security": [{"ApiKeyAuth": []}],
                 "responses": {
                     "200": {
                         "description": "Resumo financeiro",
@@ -90,6 +93,7 @@ OPENAPI_SCHEMA = {
                 "operationId": "getTableStats",
                 "summary": "Estatísticas de uma tabela",
                 "description": "Retorna contagem de registros e informações sobre uma tabela específica.",
+                "security": [{"ApiKeyAuth": []}],
                 "parameters": [
                     {
                         "name": "table_name",
