@@ -8,7 +8,9 @@ import {
   Trash2,
   Star,
   RefreshCw,
+  MoreVertical,
 } from 'lucide-react'
+import { useRef, useEffect } from 'react'
 import { clsx } from 'clsx'
 import EmptyState from '../components/EmptyState'
 import CreditCardModal from '../components/credit-cards/CreditCardModal'
@@ -59,6 +61,21 @@ export default function CreditCards() {
   const [deleteConfirm, setDeleteConfirm] = useState<CreditCard | null>(null)
   const [apiError, setApiError] = useState<string | null>(null)
   const [recalculatingCardId, setRecalculatingCardId] = useState<number | null>(null)
+  const [openMenuId, setOpenMenuId] = useState<number | null>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  // Fechar menu ao clicar fora
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setOpenMenuId(null)
+      }
+    }
+    if (openMenuId !== null) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [openMenuId])
 
   const { data, isLoading } = useQuery({
     queryKey: ['credit-cards'],
@@ -305,27 +322,52 @@ export default function CreditCards() {
                       </div>
                     </div>
                   </div>
-                  <div className="flex gap-1">
+                  <div className="relative" ref={openMenuId === card.id ? menuRef : null}>
                     <button
-                      onClick={() => handleRecalculate(card)}
-                      disabled={recalculatingCardId === card.id}
-                      title="Recalcular faturas"
-                      className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors disabled:opacity-50"
+                      onClick={() => setOpenMenuId(openMenuId === card.id ? null : card.id)}
+                      className="p-2 min-w-[40px] min-h-[40px] flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
                     >
-                      <RefreshCw size={16} className={recalculatingCardId === card.id ? 'animate-spin' : ''} />
+                      {recalculatingCardId === card.id ? (
+                        <RefreshCw size={18} className="animate-spin text-blue-500" />
+                      ) : (
+                        <MoreVertical size={18} />
+                      )}
                     </button>
-                    <button
-                      onClick={() => openEditModal(card)}
-                      className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
-                    >
-                      <Pencil size={16} />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteClick(card)}
-                      className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                    {openMenuId === card.id && (
+                      <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-gray-200 dark:border-slate-700 py-1 z-50">
+                        <button
+                          onClick={() => {
+                            handleRecalculate(card)
+                            setOpenMenuId(null)
+                          }}
+                          disabled={recalculatingCardId === card.id}
+                          className="w-full px-4 py-2.5 text-left text-sm flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 disabled:opacity-50"
+                        >
+                          <RefreshCw size={16} />
+                          Recalcular faturas
+                        </button>
+                        <button
+                          onClick={() => {
+                            openEditModal(card)
+                            setOpenMenuId(null)
+                          }}
+                          className="w-full px-4 py-2.5 text-left text-sm flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700"
+                        >
+                          <Pencil size={16} />
+                          Editar cartão
+                        </button>
+                        <button
+                          onClick={() => {
+                            handleDeleteClick(card)
+                            setOpenMenuId(null)
+                          }}
+                          className="w-full px-4 py-2.5 text-left text-sm flex items-center gap-3 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30"
+                        >
+                          <Trash2 size={16} />
+                          Excluir cartão
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
 
