@@ -567,28 +567,34 @@ pip install -r requirements.txt`}
               </button>
               {openTutorial === 'chatgpt' && (
                 <div className="p-4 border-t border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm space-y-3">
+                  <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3 mb-2">
+                    <p className="text-amber-800 dark:text-amber-200 text-xs">
+                      <strong>Requisito:</strong> Necessário ter ChatGPT Plus ou Enterprise para criar GPTs com Actions.
+                    </p>
+                  </div>
                   <p className="text-gray-700 dark:text-gray-300">
-                    <strong>1.</strong> No ChatGPT, crie um novo GPT ou edite um existente
+                    <strong>1.</strong> Acesse <code className="bg-gray-100 dark:bg-slate-700 px-1 rounded">chatgpt.com/gpts/editor</code> ou clique no seu nome → "Meus GPTs" → "Criar um GPT"
                   </p>
                   <p className="text-gray-700 dark:text-gray-300">
-                    <strong>2.</strong> Vá em "Configure" → "Actions" → "Create new action"
+                    <strong>2.</strong> Vá na aba "Configurar" e role até "Ações"
                   </p>
                   <p className="text-gray-700 dark:text-gray-300">
-                    <strong>3.</strong> Importe o schema OpenAPI:
+                    <strong>3.</strong> Clique em "Criar nova ação" e depois em "Importar de URL":
                   </p>
                   <pre className="bg-gray-100 dark:bg-slate-700 p-3 rounded-lg overflow-x-auto text-xs">
 {`https://biveto.com/api/v1/mcp/openapi.json`}
                   </pre>
                   <p className="text-gray-700 dark:text-gray-300">
-                    <strong>4.</strong> Em "Authentication", selecione "API Key" e configure:
+                    <strong>4.</strong> Em "Autenticação", selecione "Chave de API" e configure:
                   </p>
                   <pre className="bg-gray-100 dark:bg-slate-700 p-3 rounded-lg overflow-x-auto text-xs">
-{`Auth Type: API Key
-API Key: biv_sua_chave_aqui
-Header Name: X-API-Key`}
+{`Tipo de autenticação: Chave de API
+Chave de API: biv_sua_chave_aqui
+Tipo de autorização: Personalizado
+Nome do cabeçalho personalizado: X-API-Key`}
                   </pre>
                   <p className="text-gray-700 dark:text-gray-300">
-                    <strong>5.</strong> Salve e teste perguntando sobre suas finanças
+                    <strong>5.</strong> Clique em "Publicar" e teste perguntando sobre suas finanças
                   </p>
                 </div>
               )}
