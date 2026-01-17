@@ -590,8 +590,7 @@ pip install -r requirements.txt`}
                   <pre className="bg-gray-100 dark:bg-slate-700 p-3 rounded-lg overflow-x-auto text-xs">
 {`Tipo de autenticação: Chave de API
 Chave de API: biv_sua_chave_aqui
-Tipo de autorização: Personalizado
-Nome do cabeçalho personalizado: X-API-Key`}
+Tipo de autorização: Bearer`}
                   </pre>
                   <p className="text-gray-700 dark:text-gray-300">
                     <strong>5.</strong> Clique em "Publicar" e teste perguntando sobre suas finanças

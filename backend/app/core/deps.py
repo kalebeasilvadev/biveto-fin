@@ -66,27 +66,42 @@ DbSession = Annotated[AsyncSession, Depends(get_db)]
 async def get_user_from_api_key(
     request: Request,
     x_api_key: Annotated[str | None, Header()] = None,
+    authorization: Annotated[str | None, Header()] = None,
     db: AsyncSession = Depends(get_db),
 ) -> User:
     """
-    Autentica usuário via API Key (header X-API-Key).
-    Usado para acesso externo via MCP e integrações.
+    Autentica usuário via API Key.
+    Aceita múltiplos métodos:
+    - Header X-API-Key: biv_xxx
+    - Header Authorization: Bearer biv_xxx
     """
-    if not x_api_key:
+    # Tenta extrair API Key de diferentes fontes
+    api_key_value = None
+
+    if x_api_key:
+        api_key_value = x_api_key
+    elif authorization:
+        # Suporta "Bearer biv_xxx" ou apenas "biv_xxx"
+        if authorization.lower().startswith("bearer "):
+            api_key_value = authorization[7:].strip()
+        else:
+            api_key_value = authorization.strip()
+
+    if not api_key_value:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="API Key não fornecida. Use o header X-API-Key.",
+            detail="API Key não fornecida. Use o header X-API-Key ou Authorization: Bearer <key>.",
         )
 
     # Valida formato
-    if not verify_api_key_format(x_api_key):
+    if not verify_api_key_format(api_key_value):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Formato de API Key inválido",
         )
 
     # Busca a API Key pelo hash
-    key_hash = hash_api_key(x_api_key)
+    key_hash = hash_api_key(api_key_value)
     result = await db.execute(
         select(APIKey).where(APIKey.key_hash == key_hash)
     )

@@ -240,10 +240,9 @@ OPENAPI_SCHEMA = {
         },
         "securitySchemes": {
             "ApiKeyAuth": {
-                "type": "apiKey",
-                "in": "header",
-                "name": "X-API-Key",
-                "description": "API Key pessoal gerada em Configurações > API Keys"
+                "type": "http",
+                "scheme": "bearer",
+                "description": "API Key pessoal gerada em Configurações > API Keys. Use o formato: Bearer biv_xxx"
             }
         }
     },
