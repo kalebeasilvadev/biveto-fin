@@ -698,8 +698,15 @@ class TransactionService:
             if not result.scalar_one_or_none():
                 raise HTTPException(status_code=400, detail="Fatura nao encontrada")
 
+        # Se a transação é de cartão de crédito mas não tem invoice_id, vincular automaticamente
+        # Isso corrige transações antigas que foram criadas sem fatura
+        needs_invoice_link = False
+        if transaction.credit_card_id and not transaction.invoice_id and "invoice_id" not in update_data:
+            needs_invoice_link = True
+
         # Guardar invoice_id para atualizar total depois se amount mudar
         amount_changed = "amount" in update_data and update_data["amount"] != transaction.amount
+        date_changed = "date" in update_data and update_data["date"] != transaction.date
 
         # Registrar alteracoes para auditoria
         for field, value in update_data.items():
@@ -721,8 +728,40 @@ class TransactionService:
         # Atualizar totais das faturas se houve mudanca
         invoice_service = InvoiceService(self.db)
 
+        # Se a transação é de cartão de crédito e não tinha invoice_id, vincular automaticamente
+        if needs_invoice_link or (transaction.credit_card_id and not transaction.invoice_id):
+            # Buscar o cartão de crédito
+            card_result = await self.db.execute(
+                select(CreditCard).where(CreditCard.id == transaction.credit_card_id)
+            )
+            credit_card = card_result.scalar_one_or_none()
+
+            if credit_card:
+                # Usar a data atualizada se foi modificada
+                tx_date = update_data.get("date", transaction.date)
+
+                # Calcular período da fatura
+                period = invoice_service.calculate_invoice_period(credit_card, tx_date)
+
+                # Obter ou criar fatura
+                invoice = await invoice_service.get_or_create_invoice(
+                    user=user,
+                    credit_card=credit_card,
+                    reference_month=period['reference_month'],
+                    reference_year=period['reference_year'],
+                    closing_date=period['closing_date'],
+                    due_date=period['due_date'],
+                )
+
+                # Vincular transação à fatura
+                transaction.invoice_id = invoice.id
+                await self.db.flush()
+
+                # Atualizar total da fatura
+                await invoice_service.update_invoice_total(invoice)
+
         # Se mudou de fatura, atualizar ambas
-        if invoice_changed:
+        elif invoice_changed:
             # Atualizar fatura antiga (se existia)
             if old_invoice_id:
                 result = await self.db.execute(
@@ -740,14 +779,16 @@ class TransactionService:
                 new_invoice = result.scalar_one_or_none()
                 if new_invoice:
                     await invoice_service.update_invoice_total(new_invoice)
-        elif amount_changed and old_invoice_id:
-            # So mudou o valor, atualizar a fatura atual
-            result = await self.db.execute(
-                select(CreditCardInvoice).where(CreditCardInvoice.id == old_invoice_id)
-            )
-            invoice = result.scalar_one_or_none()
-            if invoice:
-                await invoice_service.update_invoice_total(invoice)
+
+        elif amount_changed or date_changed:
+            # Mudou valor ou data, atualizar a fatura atual
+            if transaction.invoice_id:
+                result = await self.db.execute(
+                    select(CreditCardInvoice).where(CreditCardInvoice.id == transaction.invoice_id)
+                )
+                invoice = result.scalar_one_or_none()
+                if invoice:
+                    await invoice_service.update_invoice_total(invoice)
 
         return transaction
 
