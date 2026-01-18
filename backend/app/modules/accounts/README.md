@@ -26,10 +26,10 @@ accounts/
 - **Core**: `deps` (CurrentUser, DbSession)
 
 ## Tipos de Conta
-- `wallet`: Carteira / Dinheiro em especie
-- `bank`: Conta bancaria
-- `credit_card`: Cartao de credito
-- `investment`: Investimentos
+- `wallet`: Carteira / Dinheiro em especie (permite transferencias)
+- `bank`: Conta bancaria (permite transferencias)
+- `credit_card`: Cartao de credito (NAO permite transferencias)
+- `investment`: Investimentos (permite transferencias)
 
 ## Endpoints
 

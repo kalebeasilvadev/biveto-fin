@@ -392,6 +392,13 @@ class TransactionResponse(BaseModel):
 - Ao editar valor/data/descricao, ambas sao sincronizadas
 - Transfers sao **excluidos** dos totais de receita/despesa no analytics
 
+**Tipos de conta permitidos:**
+- `wallet` (Carteira)
+- `bank` (Banco)
+- `investment` (Investimento)
+
+**Nota:** Cartoes de credito (`credit_card`) nao sao permitidos em transferencias.
+
 ## Seguranca
 
 ### Autenticacao

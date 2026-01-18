@@ -40,7 +40,14 @@ O sistema suporta transferencias entre contas atraves do tipo `transfer`. Cada t
 1. **Transacao de saida** (conta origem): Deduz o valor do saldo
 2. **Transacao de entrada** (conta destino): Adiciona o valor ao saldo
 
-Ambas sao vinculadas pelo campo `linked_transaction_id`, permitindo:
+**Tipos de conta permitidos para transferencia:**
+- `wallet` (Carteira)
+- `bank` (Banco)
+- `investment` (Investimento)
+
+**Nota:** Cartoes de credito (`credit_card`) nao sao permitidos em transferencias, pois o fluxo de pagamento de fatura e diferente.
+
+Ambas as transacoes sao vinculadas pelo campo `linked_transaction_id`, permitindo:
 - Exclusao em cascata (deletar uma remove ambas)
 - Atualizacao sincronizada (editar valor/data/descricao atualiza ambas)
 - Identificacao de direcao (`is_transfer_out` / `is_transfer_in`)
