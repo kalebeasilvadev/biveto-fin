@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { X, Check, User, Users } from 'lucide-react'
+import { X, Check, User, Users, ArrowRightLeft } from 'lucide-react'
 import { clsx } from 'clsx'
 import { transactionsApi, accountsApi, categoriesApi, familyApi } from '../services/api'
 
@@ -32,10 +32,11 @@ const getLocalDateString = () => {
 export default function QuickTransactionModal({ isOpen, onClose }: QuickTransactionModalProps) {
   const queryClient = useQueryClient()
   const [formData, setFormData] = useState({
-    type: 'expense' as 'expense' | 'income',
+    type: 'expense' as 'expense' | 'income' | 'transfer',
     amount: '',
     date: getLocalDateString(),
     account_id: '',
+    destination_account_id: '',  // For transfers
     category_id: '',
     description: '',
     ownership_type: 'personal' as 'personal' | 'household',
@@ -114,6 +115,7 @@ export default function QuickTransactionModal({ isOpen, onClose }: QuickTransact
       amount: '',
       date: getLocalDateString(),
       account_id: accounts.length > 0 ? String(accounts[0].id) : '',
+      destination_account_id: '',
       category_id: '',
       description: '',
       ownership_type: 'personal',
@@ -122,15 +124,27 @@ export default function QuickTransactionModal({ isOpen, onClose }: QuickTransact
   }
 
   const handleSubmit = () => {
-    createMutation.mutate({
+    const baseData = {
       type: formData.type,
       amount: parseFloat(formData.amount),
       date: formData.date,
       account_id: parseInt(formData.account_id),
-      category_id: formData.category_id ? parseInt(formData.category_id) : null,
       description: formData.description || null,
       ownership_type: formData.ownership_type,
-    })
+    }
+
+    // For transfers, add destination_account_id and skip category
+    if (formData.type === 'transfer') {
+      createMutation.mutate({
+        ...baseData,
+        destination_account_id: parseInt(formData.destination_account_id),
+      })
+    } else {
+      createMutation.mutate({
+        ...baseData,
+        category_id: formData.category_id ? parseInt(formData.category_id) : null,
+      })
+    }
   }
 
   if (!isOpen) return null
@@ -156,9 +170,9 @@ export default function QuickTransactionModal({ isOpen, onClose }: QuickTransact
           {/* Type selector */}
           <div className="flex gap-2">
             <button
-              onClick={() => setFormData(prev => ({ ...prev, type: 'expense', category_id: '' }))}
+              onClick={() => setFormData(prev => ({ ...prev, type: 'expense', category_id: '', destination_account_id: '' }))}
               className={clsx(
-                'flex-1 py-3 rounded-xl font-medium transition-colors',
+                'flex-1 py-2 sm:py-3 rounded-xl font-medium transition-colors text-sm sm:text-base',
                 formData.type === 'expense'
                   ? 'bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 border-2 border-red-500'
                   : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-300'
@@ -167,15 +181,27 @@ export default function QuickTransactionModal({ isOpen, onClose }: QuickTransact
               Despesa
             </button>
             <button
-              onClick={() => setFormData(prev => ({ ...prev, type: 'income', category_id: '' }))}
+              onClick={() => setFormData(prev => ({ ...prev, type: 'income', category_id: '', destination_account_id: '' }))}
               className={clsx(
-                'flex-1 py-3 rounded-xl font-medium transition-colors',
+                'flex-1 py-2 sm:py-3 rounded-xl font-medium transition-colors text-sm sm:text-base',
                 formData.type === 'income'
                   ? 'bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300 border-2 border-green-500'
                   : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-300'
               )}
             >
               Receita
+            </button>
+            <button
+              onClick={() => setFormData(prev => ({ ...prev, type: 'transfer', category_id: '' }))}
+              className={clsx(
+                'flex-1 py-2 sm:py-3 rounded-xl font-medium transition-colors text-sm sm:text-base flex items-center justify-center gap-1',
+                formData.type === 'transfer'
+                  ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 border-2 border-blue-500'
+                  : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-300'
+              )}
+            >
+              <ArrowRightLeft size={16} className="hidden sm:block" />
+              Transf.
             </button>
           </div>
 
@@ -196,39 +222,91 @@ export default function QuickTransactionModal({ isOpen, onClose }: QuickTransact
             />
           </div>
 
-          {/* Account selector */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Conta *
-            </label>
-            <select
-              value={formData.account_id}
-              onChange={(e) => setFormData(prev => ({ ...prev, account_id: e.target.value }))}
-              className="input"
-            >
-              <option value="">Selecione</option>
-              {accounts.map((acc) => (
-                <option key={acc.id} value={acc.id}>{acc.name}</option>
-              ))}
-            </select>
-          </div>
+          {/* Account selector - different for transfer */}
+          {formData.type === 'transfer' ? (
+            <>
+              {/* Source Account (From) */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  De (Conta Origem) *
+                </label>
+                <select
+                  value={formData.account_id}
+                  onChange={(e) => setFormData(prev => ({ ...prev, account_id: e.target.value }))}
+                  className="input"
+                >
+                  <option value="">Selecione a conta de origem</option>
+                  {accounts
+                    .filter(acc => String(acc.id) !== formData.destination_account_id)
+                    .map((acc) => (
+                      <option key={acc.id} value={acc.id}>{acc.name}</option>
+                    ))}
+                </select>
+              </div>
 
-          {/* Category */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Categoria
-            </label>
-            <select
-              value={formData.category_id}
-              onChange={(e) => setFormData(prev => ({ ...prev, category_id: e.target.value }))}
-              className="input"
-            >
-              <option value="">Selecione</option>
-              {filteredCategories.map((cat) => (
-                <option key={cat.id} value={cat.id}>{cat.name}</option>
-              ))}
-            </select>
-          </div>
+              {/* Transfer Arrow Indicator */}
+              <div className="flex justify-center">
+                <div className="flex items-center justify-center w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30">
+                  <ArrowRightLeft size={20} className="text-blue-600 dark:text-blue-400 rotate-90" />
+                </div>
+              </div>
+
+              {/* Destination Account (To) */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Para (Conta Destino) *
+                </label>
+                <select
+                  value={formData.destination_account_id}
+                  onChange={(e) => setFormData(prev => ({ ...prev, destination_account_id: e.target.value }))}
+                  className="input"
+                >
+                  <option value="">Selecione a conta de destino</option>
+                  {accounts
+                    .filter(acc => String(acc.id) !== formData.account_id)
+                    .map((acc) => (
+                      <option key={acc.id} value={acc.id}>{acc.name}</option>
+                    ))}
+                </select>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Regular Account selector */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Conta *
+                </label>
+                <select
+                  value={formData.account_id}
+                  onChange={(e) => setFormData(prev => ({ ...prev, account_id: e.target.value }))}
+                  className="input"
+                >
+                  <option value="">Selecione</option>
+                  {accounts.map((acc) => (
+                    <option key={acc.id} value={acc.id}>{acc.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Category - only for expense/income */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Categoria
+                </label>
+                <select
+                  value={formData.category_id}
+                  onChange={(e) => setFormData(prev => ({ ...prev, category_id: e.target.value }))}
+                  className="input"
+                >
+                  <option value="">Selecione</option>
+                  {filteredCategories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>{cat.name}</option>
+                  ))}
+                </select>
+              </div>
+            </>
+          )}
 
           {/* Date */}
           <div>
@@ -308,13 +386,18 @@ export default function QuickTransactionModal({ isOpen, onClose }: QuickTransact
           {/* Submit button */}
           <button
             onClick={handleSubmit}
-            disabled={!formData.amount || !formData.account_id || createMutation.isPending}
+            disabled={
+              !formData.amount ||
+              !formData.account_id ||
+              (formData.type === 'transfer' && !formData.destination_account_id) ||
+              createMutation.isPending
+            }
             className="btn-primary w-full py-4 text-lg flex items-center justify-center gap-2"
           >
             {createMutation.isPending ? 'Salvando...' : (
               <>
                 <Check size={20} />
-                Salvar
+                {formData.type === 'transfer' ? 'Transferir' : 'Salvar'}
               </>
             )}
           </button>

@@ -350,6 +350,48 @@ class TransactionResponse(BaseModel):
      │◀─────────────│◀─────────────────│                  │
 ```
 
+### 4. Transferencia entre Contas
+
+```
+┌────────┐     ┌───────────┐     ┌─────────────┐     ┌──────────┐
+│ Client │────▶│/transact. │────▶│TransactionSvc────▶│ Database │
+└────────┘     └───────────┘     └─────────────┘     └──────────┘
+     │              │                  │                  │
+     │  type:       │                  │                  │
+     │  transfer    │                  │                  │
+     │  from: A     │                  │                  │
+     │  to: B       │                  │                  │
+     │─────────────▶│                  │                  │
+     │              │   validate       │                  │
+     │              │   accounts       │                  │
+     │              │─────────────────▶│                  │
+     │              │                  │                  │
+     │              │                  │  create tx_out   │
+     │              │                  │  (conta A, -)    │
+     │              │                  │─────────────────▶│
+     │              │                  │                  │
+     │              │                  │  create tx_in    │
+     │              │                  │  (conta B, +)    │
+     │              │                  │─────────────────▶│
+     │              │                  │                  │
+     │              │                  │  link txs via    │
+     │              │                  │  linked_tx_id    │
+     │              │                  │─────────────────▶│
+     │              │                  │                  │
+     │  transfer    │                  │                  │
+     │  created     │                  │                  │
+     │◀─────────────│◀─────────────────│                  │
+```
+
+**Logica de Transferencia:**
+- Cria duas transacoes do tipo `transfer`
+- Transacao de saida: conta origem, amount negativo no calculo de saldo
+- Transacao de entrada: conta destino, amount positivo no calculo de saldo
+- Ambas linkadas via `linked_transaction_id` (relacao bidirecional)
+- Ao deletar uma, ambas sao removidas
+- Ao editar valor/data/descricao, ambas sao sincronizadas
+- Transfers sao **excluidos** dos totais de receita/despesa no analytics
+
 ## Seguranca
 
 ### Autenticacao

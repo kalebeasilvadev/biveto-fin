@@ -31,6 +31,46 @@ transactions/
 ## Tipos de Transacao
 - `income`: Receita
 - `expense`: Despesa
+- `transfer`: Transferencia entre contas
+
+### Transferencias entre Contas
+
+O sistema suporta transferencias entre contas atraves do tipo `transfer`. Cada transferencia cria **duas transacoes vinculadas**:
+
+1. **Transacao de saida** (conta origem): Deduz o valor do saldo
+2. **Transacao de entrada** (conta destino): Adiciona o valor ao saldo
+
+Ambas sao vinculadas pelo campo `linked_transaction_id`, permitindo:
+- Exclusao em cascata (deletar uma remove ambas)
+- Atualizacao sincronizada (editar valor/data/descricao atualiza ambas)
+- Identificacao de direcao (`is_transfer_out` / `is_transfer_in`)
+
+#### Criando uma Transferencia
+```json
+POST /transactions
+{
+  "type": "transfer",
+  "amount": 500.00,
+  "date": "2025-01-15",
+  "account_id": 1,
+  "destination_account_id": 2,
+  "description": "Transferencia para poupanca"
+}
+```
+
+#### Resposta
+A resposta inclui campos adicionais para transferencias:
+```json
+{
+  "id": 123,
+  "type": "transfer",
+  "amount": 500.00,
+  "linked_transaction_id": 124,
+  "is_transfer_out": true,
+  "is_transfer_in": false,
+  "linked_account_name": "Poupanca"
+}
+```
 
 ## Endpoints
 

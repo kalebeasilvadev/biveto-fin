@@ -71,6 +71,11 @@ class Transaction(Base):
         ForeignKey("recurring_transactions.id", ondelete="SET NULL"), index=True
     )
 
+    # Transfer support - links two transactions together for transfers between accounts
+    linked_transaction_id: Mapped[int | None] = mapped_column(
+        ForeignKey("transactions.id", ondelete="SET NULL"), index=True
+    )
+
     # Parcelas
     installment_series_id: Mapped[int | None] = mapped_column(
         ForeignKey("installment_series.id", ondelete="SET NULL"), index=True
@@ -151,9 +156,20 @@ class Transaction(Base):
 
     @property
     def signed_amount(self) -> float:
-        """Retorna o valor com sinal: negativo para despesas, positivo para receitas"""
+        """Retorna o valor com sinal: negativo para despesas/saidas, positivo para receitas/entradas"""
         if self.type == TransactionType.EXPENSE.value:
             return -float(self.amount)
+        # Para transfers, o sinal depende se é a transação de saída ou entrada
+        # A transação de saída tem linked_transaction_id apontando para a entrada
+        # A transação de entrada é a que não tem linked_transaction_id inicial
+        if self.type == TransactionType.TRANSFER.value:
+            # Se tem linked_transaction_id, é a transação original (saída = negativo)
+            # Se não tem, é a transação linkada (entrada = positivo)
+            # Após o link bidirecional, ambas terão linked_transaction_id
+            # Usamos a convenção: a primeira criada (menor ID) é a saída
+            if self.linked_transaction_id and self.linked_transaction_id > self.id:
+                return -float(self.amount)  # Saída (esta é a original)
+            return float(self.amount)  # Entrada
         return float(self.amount)
 
     @property
@@ -171,6 +187,26 @@ class Transaction(Base):
             PaymentMethod.VOUCHER.value: "Vale",
         }
         return display_names.get(self.payment_method, self.payment_method)
+
+    @property
+    def is_transfer_out(self) -> bool:
+        """Retorna True se esta é a transação de saída de uma transferência"""
+        if self.type != TransactionType.TRANSFER.value:
+            return False
+        # A transação com menor ID é a de saída (criada primeiro)
+        if self.linked_transaction_id:
+            return self.id < self.linked_transaction_id
+        return False
+
+    @property
+    def is_transfer_in(self) -> bool:
+        """Retorna True se esta é a transação de entrada de uma transferência"""
+        if self.type != TransactionType.TRANSFER.value:
+            return False
+        # A transação com maior ID é a de entrada (criada segundo)
+        if self.linked_transaction_id:
+            return self.id > self.linked_transaction_id
+        return False
 
 
 class TransactionAudit(Base):

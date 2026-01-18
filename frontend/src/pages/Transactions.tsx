@@ -6,6 +6,7 @@ import {
   Filter,
   ArrowUpRight,
   ArrowDownRight,
+  ArrowRightLeft,
   Download,
   ChevronLeft,
   ChevronRight,
@@ -26,7 +27,7 @@ import { clsx } from 'clsx'
 
 interface Transaction {
   id: number
-  type: 'expense' | 'income'
+  type: 'expense' | 'income' | 'transfer'
   amount: number
   date: string
   description: string | null
@@ -42,6 +43,11 @@ interface Transaction {
   installment_number: number | null
   installment_total: number | null
   tags: string[] | null
+  // Transfer fields
+  linked_transaction_id: number | null
+  is_transfer_out: boolean
+  is_transfer_in: boolean
+  linked_account_name: string | null
 }
 
 interface Category {
@@ -311,7 +317,7 @@ export default function Transactions() {
     })
   }, [allTransactions, selectedDay, selectedMonth, selectedYear])
 
-  // Calculate summary for selected period
+  // Calculate summary for selected period (exclude transfers from income/expense totals)
   const periodSummary = useMemo(() => {
     const income = filteredTransactions
       .filter(t => t.type === 'income')
@@ -319,10 +325,13 @@ export default function Transactions() {
     const expenses = filteredTransactions
       .filter(t => t.type === 'expense')
       .reduce((sum, t) => sum + t.amount, 0)
+    const transfers = filteredTransactions
+      .filter(t => t.type === 'transfer')
+      .length
     const balance = income - expenses
     const projected = filteredTransactions.filter(t => !t.is_paid).length
 
-    return { income, expenses, balance, projected, count: filteredTransactions.length }
+    return { income, expenses, balance, projected, count: filteredTransactions.length, transfers }
   }, [filteredTransactions])
 
   // Pagination for table view
@@ -770,19 +779,30 @@ export default function Transactions() {
                                 'p-1.5 rounded-full',
                                 transaction.type === 'income'
                                   ? 'bg-green-100 dark:bg-green-900/30'
-                                  : 'bg-red-100 dark:bg-red-900/30'
+                                  : transaction.type === 'transfer'
+                                    ? 'bg-blue-100 dark:bg-blue-900/30'
+                                    : 'bg-red-100 dark:bg-red-900/30'
                               )}
                             >
                               {transaction.type === 'income' ? (
                                 <ArrowUpRight className="text-income" size={14} />
+                              ) : transaction.type === 'transfer' ? (
+                                <ArrowRightLeft className="text-blue-600 dark:text-blue-400" size={14} />
                               ) : (
                                 <ArrowDownRight className="text-expense" size={14} />
                               )}
                             </div>
                             <div className="min-w-0 flex-1">
                               <p className="font-medium text-sm text-gray-900 dark:text-white truncate max-w-[200px] md:max-w-[300px]">
-                                {transaction.merchant_name || transaction.description || 'Transação'}
+                                {transaction.type === 'transfer'
+                                  ? (transaction.description || 'Transferência')
+                                  : (transaction.merchant_name || transaction.description || 'Transação')}
                               </p>
+                              {transaction.type === 'transfer' && transaction.linked_account_name && (
+                                <p className="text-xs text-blue-600 dark:text-blue-400">
+                                  {transaction.is_transfer_out ? '→' : '←'} {transaction.linked_account_name}
+                                </p>
+                              )}
                               {(transaction.installment_number || transaction.is_recurring) && (
                                 <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
                                   {transaction.installment_number && transaction.installment_total && (
@@ -799,8 +819,13 @@ export default function Transactions() {
                           </div>
                         </td>
                         <td className="px-4 py-3">
-                          <span className="text-sm text-gray-600 dark:text-gray-300">
-                            {transaction.category_name || 'Sem categoria'}
+                          <span className={clsx(
+                            'text-sm',
+                            transaction.type === 'transfer'
+                              ? 'text-blue-600 dark:text-blue-400 font-medium'
+                              : 'text-gray-600 dark:text-gray-300'
+                          )}>
+                            {transaction.type === 'transfer' ? 'Transferência' : (transaction.category_name || 'Sem categoria')}
                           </span>
                         </td>
                         <td className="px-4 py-3">
@@ -817,10 +842,12 @@ export default function Transactions() {
                               'font-semibold text-sm',
                               transaction.type === 'income'
                                 ? 'text-green-600 dark:text-green-400'
-                                : 'text-red-600 dark:text-red-400'
+                                : transaction.type === 'transfer'
+                                  ? 'text-blue-600 dark:text-blue-400'
+                                  : 'text-red-600 dark:text-red-400'
                             )}
                           >
-                            {transaction.type === 'income' ? '+' : '-'}
+                            {transaction.type === 'income' ? '+' : transaction.type === 'transfer' ? (transaction.is_transfer_out ? '-' : '+') : '-'}
                             {formatCurrency(transaction.amount)}
                           </span>
                         </td>
@@ -879,21 +906,27 @@ export default function Transactions() {
                     'p-2 rounded-full',
                     selectedTransaction.type === 'income'
                       ? 'bg-green-100 dark:bg-green-900/30'
-                      : 'bg-red-100 dark:bg-red-900/30'
+                      : selectedTransaction.type === 'transfer'
+                        ? 'bg-blue-100 dark:bg-blue-900/30'
+                        : 'bg-red-100 dark:bg-red-900/30'
                   )}
                 >
                   {selectedTransaction.type === 'income' ? (
                     <ArrowUpRight className="text-income" size={20} />
+                  ) : selectedTransaction.type === 'transfer' ? (
+                    <ArrowRightLeft className="text-blue-600 dark:text-blue-400" size={20} />
                   ) : (
                     <ArrowDownRight className="text-expense" size={20} />
                   )}
                 </div>
                 <div>
                   <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                    {selectedTransaction.type === 'income' ? 'Receita' : 'Despesa'}
+                    {selectedTransaction.type === 'income' ? 'Receita' : selectedTransaction.type === 'transfer' ? 'Transferência' : 'Despesa'}
                   </h2>
                   <p className="text-sm text-gray-500 dark:text-gray-400">
-                    {selectedTransaction.merchant_name || selectedTransaction.description || 'Editar transação'}
+                    {selectedTransaction.type === 'transfer'
+                      ? (selectedTransaction.description || 'Transferência entre contas')
+                      : (selectedTransaction.merchant_name || selectedTransaction.description || 'Editar transação')}
                   </p>
                 </div>
               </div>
@@ -913,7 +946,9 @@ export default function Transactions() {
                   'text-lg font-bold',
                   selectedTransaction.type === 'income'
                     ? 'text-green-600 dark:text-green-400'
-                    : 'text-red-600 dark:text-red-400'
+                    : selectedTransaction.type === 'transfer'
+                      ? 'text-blue-600 dark:text-blue-400'
+                      : 'text-red-600 dark:text-red-400'
                 )}>
                   {formatCurrency(selectedTransaction.amount)}
                 </p>

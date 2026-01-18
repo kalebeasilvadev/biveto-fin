@@ -22,6 +22,10 @@ class TransactionService:
         self.db = db
 
     async def create(self, user: User, data: TransactionCreate) -> Transaction:
+        # Handle transfer between accounts
+        if data.type == TransactionType.TRANSFER:
+            return await self._create_transfer(user, data)
+
         merchant_id = None
         if data.merchant_name:
             merchant_id = await self._get_or_create_merchant(data.merchant_name)
@@ -95,6 +99,105 @@ class TransactionService:
             await self._create_recurring_from_transaction(user, data, transaction)
 
         return transaction
+
+    async def _create_transfer(self, user: User, data: TransactionCreate) -> Transaction:
+        """
+        Cria uma transferência entre contas, gerando duas transações linkadas.
+
+        A primeira transação (saída) é vinculada à conta de origem.
+        A segunda transação (entrada) é vinculada à conta de destino.
+        Ambas são linkadas via linked_transaction_id.
+
+        Returns:
+            Transaction: A transação de saída (primeira criada)
+        """
+        destination_account_id = getattr(data, 'destination_account_id', None)
+
+        if not destination_account_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="destination_account_id é obrigatório para transferências"
+            )
+
+        if data.account_id == destination_account_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Conta de origem e destino não podem ser a mesma"
+            )
+
+        # Validar que ambas as contas pertencem ao usuário
+        household_user_ids = await self._get_household_user_ids(user)
+
+        for acc_id in [data.account_id, destination_account_id]:
+            if household_user_ids:
+                result = await self.db.execute(
+                    select(Account).where(
+                        Account.id == acc_id,
+                        or_(
+                            and_(Account.user_id == user.id, Account.ownership_type == "personal"),
+                            and_(Account.user_id.in_(household_user_ids), Account.ownership_type == "household")
+                        )
+                    )
+                )
+            else:
+                result = await self.db.execute(
+                    select(Account).where(Account.id == acc_id, Account.user_id == user.id)
+                )
+            if not result.scalar_one_or_none():
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Conta {acc_id} não encontrada ou não pertence ao usuário"
+                )
+
+        ownership_type = data.ownership_type.value if hasattr(data.ownership_type, 'value') else data.ownership_type
+        description = data.description or "Transferência entre contas"
+
+        # Criar transação de SAÍDA (conta origem)
+        transfer_out = Transaction(
+            user_id=user.id,
+            account_id=data.account_id,
+            type=TransactionType.TRANSFER.value,
+            payment_method=PaymentMethod.BANK_TRANSFER.value,
+            amount=data.amount,
+            currency=data.currency,
+            date=data.date,
+            description=description,
+            notes=data.notes,
+            tags=data.tags,
+            is_fixed=False,
+            is_paid=True,
+            ownership_type=ownership_type,
+        )
+        self.db.add(transfer_out)
+        await self.db.flush()
+
+        # Criar transação de ENTRADA (conta destino)
+        transfer_in = Transaction(
+            user_id=user.id,
+            account_id=destination_account_id,
+            type=TransactionType.TRANSFER.value,
+            payment_method=PaymentMethod.BANK_TRANSFER.value,
+            amount=data.amount,
+            currency=data.currency,
+            date=data.date,
+            description=description,
+            notes=data.notes,
+            tags=data.tags,
+            is_fixed=False,
+            is_paid=True,
+            ownership_type=ownership_type,
+        )
+        self.db.add(transfer_in)
+        await self.db.flush()
+
+        # Linkar as duas transações bidirecionalmente
+        transfer_out.linked_transaction_id = transfer_in.id
+        transfer_in.linked_transaction_id = transfer_out.id
+
+        await self.db.flush()
+        await self.db.refresh(transfer_out)
+
+        return transfer_out
 
     async def _create_recurring_from_transaction(
         self, user: User, data: TransactionCreate, transaction: Transaction
@@ -850,6 +953,26 @@ class TransactionService:
                 if invoice:
                     await invoice_service.update_invoice_total(invoice)
 
+        # Se é uma transferência, sincronizar a transação linkada
+        if transaction.type == TransactionType.TRANSFER.value and transaction.linked_transaction_id:
+            linked_result = await self.db.execute(
+                select(Transaction).where(Transaction.id == transaction.linked_transaction_id)
+            )
+            linked_transaction = linked_result.scalar_one_or_none()
+
+            if linked_transaction:
+                # Sincronizar campos importantes
+                if amount_changed:
+                    linked_transaction.amount = transaction.amount
+                if date_changed:
+                    linked_transaction.date = transaction.date
+                if "description" in update_data:
+                    linked_transaction.description = transaction.description
+                if "notes" in update_data:
+                    linked_transaction.notes = transaction.notes
+
+                await self.db.flush()
+
         return transaction
 
     async def delete(self, user: User, transaction_id: int, delete_series: bool = True) -> dict:
@@ -858,6 +981,8 @@ class TransactionService:
 
         Se a transacao faz parte de uma serie de parcelas e delete_series=True,
         deleta todas as parcelas da serie e limpa faturas que ficarem vazias.
+
+        Se a transacao é uma transferência, deleta ambas as transacoes linkadas.
 
         Returns:
             Dict com informacoes sobre o que foi deletado
@@ -877,6 +1002,23 @@ class TransactionService:
             "invoices_deleted": 0,
             "series_deleted": False,
         }
+
+        # Se é uma transferência, deletar ambas as transações linkadas
+        if transaction.type == TransactionType.TRANSFER.value and transaction.linked_transaction_id:
+            linked_result = await self.db.execute(
+                select(Transaction).where(Transaction.id == transaction.linked_transaction_id)
+            )
+            linked_transaction = linked_result.scalar_one_or_none()
+
+            if linked_transaction:
+                await self.db.delete(linked_transaction)
+                result["transactions_deleted"] += 1
+
+            await self.db.delete(transaction)
+            result["transactions_deleted"] += 1
+            await self.db.flush()
+
+            return result
 
         # Se faz parte de uma serie de parcelas e deve deletar a serie
         if transaction.installment_series_id and delete_series:

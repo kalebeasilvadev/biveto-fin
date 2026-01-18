@@ -24,6 +24,9 @@ class TransactionCreate(TransactionBase):
     credit_card_id: int | None = None  # For credit card expenses
     income_source_id: int | None = None  # For income transactions
 
+    # Transfer support - destination account for transfers between accounts
+    destination_account_id: int | None = None  # Required when type=transfer
+
     # Campos para criar recorrencia junto com a transacao
     create_recurring: bool = False
     recurring_frequency: str | None = None  # 'daily', 'weekly', 'monthly', 'yearly'
@@ -102,6 +105,11 @@ class TransactionResponse(TransactionBase):
     created_at: datetime
     updated_at: datetime
 
+    # Transfer support
+    linked_transaction_id: int | None = None
+    is_transfer_out: bool = False  # True se é a saída de uma transferência
+    is_transfer_in: bool = False   # True se é a entrada de uma transferência
+
     # Dados relacionados
     category_name: str | None = None
     account_name: str | None = None
@@ -111,6 +119,9 @@ class TransactionResponse(TransactionBase):
     invoice_display: str | None = None  # Ex: "Jan/2026"
     payment_method_display: str | None = None  # Ex: "Cartao de Credito"
     signed_amount: float | None = None  # Valor com sinal (negativo para despesas)
+
+    # Transfer related account name (for display purposes)
+    linked_account_name: str | None = None  # Nome da conta de destino/origem da transferência
 
     # Indicador de parcelamento
     @property

@@ -53,9 +53,21 @@ from app.modules.accounts import (
 ## Calculo de Saldo
 O saldo de cada conta e calculado dinamicamente:
 ```
-saldo_atual = saldo_inicial + receitas - despesas
+saldo_atual = saldo_inicial + receitas - despesas + transferencias_entrada - transferencias_saida
 ```
 Onde:
 - `saldo_inicial`: Valor definido na criacao da conta
 - `receitas`: Soma de transacoes do tipo INCOME
 - `despesas`: Soma de transacoes do tipo EXPENSE
+- `transferencias_entrada`: Soma de transferencias recebidas (TRANSFER onde `id > linked_transaction_id`)
+- `transferencias_saida`: Soma de transferencias enviadas (TRANSFER onde `id < linked_transaction_id`)
+
+### Transferencias entre Contas
+O calculo de saldo considera transferencias usando a logica de ID vinculado:
+- **Saida**: Transacao TRANSFER onde `id < linked_transaction_id` (deduz do saldo)
+- **Entrada**: Transacao TRANSFER onde `id > linked_transaction_id` (soma ao saldo)
+
+Isso garante que:
+- A conta de origem tem o valor deduzido
+- A conta de destino tem o valor adicionado
+- O saldo total do sistema permanece consistente

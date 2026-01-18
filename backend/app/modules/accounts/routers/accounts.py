@@ -28,7 +28,11 @@ async def get_household_user_ids(db, user) -> list[int]:
 async def calculate_account_balance(db, account_id: int) -> Decimal:
     """
     Calcula o saldo real da conta baseado nas transações.
-    Saldo = saldo_inicial + receitas - despesas
+    Saldo = saldo_inicial + receitas - despesas + transfers_in - transfers_out
+
+    Para transfers:
+    - Se id < linked_transaction_id → saída (subtrair do saldo)
+    - Se id > linked_transaction_id → entrada (somar ao saldo)
     """
     result = await db.execute(
         select(
@@ -37,6 +41,24 @@ async def calculate_account_balance(db, account_id: int) -> Decimal:
                     case(
                         (Transaction.type == TransactionType.INCOME.value, Transaction.amount),
                         (Transaction.type == TransactionType.EXPENSE.value, -Transaction.amount),
+                        # Transfer: saída (id menor que linked) = subtrai
+                        (
+                            and_(
+                                Transaction.type == TransactionType.TRANSFER.value,
+                                Transaction.linked_transaction_id.isnot(None),
+                                Transaction.id < Transaction.linked_transaction_id
+                            ),
+                            -Transaction.amount
+                        ),
+                        # Transfer: entrada (id maior que linked) = soma
+                        (
+                            and_(
+                                Transaction.type == TransactionType.TRANSFER.value,
+                                Transaction.linked_transaction_id.isnot(None),
+                                Transaction.id > Transaction.linked_transaction_id
+                            ),
+                            Transaction.amount
+                        ),
                         else_=0
                     )
                 ),
@@ -61,6 +83,24 @@ async def list_accounts(current_user: CurrentUser, db: DbSession):
                     case(
                         (Transaction.type == TransactionType.INCOME.value, Transaction.amount),
                         (Transaction.type == TransactionType.EXPENSE.value, -Transaction.amount),
+                        # Transfer: saída (id menor que linked) = subtrai
+                        (
+                            and_(
+                                Transaction.type == TransactionType.TRANSFER.value,
+                                Transaction.linked_transaction_id.isnot(None),
+                                Transaction.id < Transaction.linked_transaction_id
+                            ),
+                            -Transaction.amount
+                        ),
+                        # Transfer: entrada (id maior que linked) = soma
+                        (
+                            and_(
+                                Transaction.type == TransactionType.TRANSFER.value,
+                                Transaction.linked_transaction_id.isnot(None),
+                                Transaction.id > Transaction.linked_transaction_id
+                            ),
+                            Transaction.amount
+                        ),
                         else_=0
                     )
                 ),

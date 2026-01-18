@@ -34,6 +34,32 @@ class PaginatedTransactions(BaseModel):
     has_more: bool
 
 
+async def enrich_transactions_with_linked_account(db, transactions: list) -> list:
+    """Enrich transfer transactions with linked account names"""
+    from app.models.account import Account
+    from app.models.transaction import Transaction as TransactionModel, TransactionType
+
+    # Get all linked transaction IDs
+    linked_ids = [t.linked_transaction_id for t in transactions if t.linked_transaction_id]
+    if not linked_ids:
+        return transactions
+
+    # Fetch linked transactions with their accounts
+    result = await db.execute(
+        select(TransactionModel, Account.name)
+        .join(Account, TransactionModel.account_id == Account.id)
+        .where(TransactionModel.id.in_(linked_ids))
+    )
+    linked_map = {row[0].id: row[1] for row in result.all()}
+
+    # Enrich original transactions
+    for t in transactions:
+        if t.linked_transaction_id and t.linked_transaction_id in linked_map:
+            t.linked_account_name = linked_map[t.linked_transaction_id]
+
+    return transactions
+
+
 @router.get("", response_model=PaginatedTransactions)
 async def list_transactions(
     current_user: CurrentUser,
@@ -59,6 +85,9 @@ async def list_transactions(
         limit=limit,
         offset=offset,
     )
+
+    # Enrich transfer transactions with linked account names
+    items = await enrich_transactions_with_linked_account(db, items)
 
     total = await service.count(
         current_user,
@@ -116,7 +145,8 @@ async def export_transactions_csv(
 
     # Data rows
     for t in transactions:
-        tipo = "Receita" if t.type == "income" else "Despesa"
+        tipo_map = {"income": "Receita", "expense": "Despesa", "transfer": "Transferência"}
+        tipo = tipo_map.get(t.type, t.type)
         valor = f"{t.amount:.2f}"
         parcela = f"{t.installment_number}/{t.installment_total}" if t.installment_total else ""
         writer.writerow([

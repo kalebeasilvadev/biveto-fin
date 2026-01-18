@@ -58,3 +58,11 @@ O resumo mensal inclui:
 - Breakdown por categoria
 - Top 5 estabelecimentos
 - Comparativo percentual com mes anterior
+
+### Tratamento de Transferencias
+Transferencias entre contas (`type: transfer`) sao **excluidas** dos calculos de analytics:
+- Nao sao contabilizadas como receita ou despesa
+- Nao aparecem nos breakdowns por categoria
+- Nao sao listadas nos top merchants
+
+Isso evita que movimentacoes internas entre contas distorcam os relatorios de gastos e receitas reais do usuario.

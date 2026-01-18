@@ -57,14 +57,19 @@ class AnalyticsService:
         pending_invoices = await self._get_pending_invoices_fast(user_ids, year, month)
 
         # Calcular totais (converter para float para evitar problemas com Decimal)
+        # Excluir transfers dos totais de receita/despesa
         total_income = float(sum(
-            t.amount for t in transactions if t.type == TransactionType.INCOME
+            t.amount for t in transactions
+            if t.type == TransactionType.INCOME
+            and t.type != TransactionType.TRANSFER  # Excluir transfers
         ) or 0)
 
         # Debito/Dinheiro = despesas SEM invoice_id (nao sao de cartao) no periodo
+        # Excluir transfers dos totais
         debit_cash_expenses = float(sum(
             t.amount for t in transactions
             if t.type == TransactionType.EXPENSE
+            and t.type != TransactionType.TRANSFER  # Excluir transfers
             and t.id not in payment_transaction_ids
             and getattr(t, 'invoice_id', None) is None
         ) or 0)
@@ -73,10 +78,12 @@ class AnalyticsService:
         total_expense = credit_card_expenses + debit_cash_expenses
 
         # Fixos = despesas fixas no debito (nao conta cartao pois ja esta na fatura)
+        # Excluir transfers
         fixed_expenses = float(sum(
             t.amount
             for t in transactions
             if t.type == TransactionType.EXPENSE
+            and t.type != TransactionType.TRANSFER  # Excluir transfers
             and t.is_fixed
             and t.id not in payment_transaction_ids
             and getattr(t, 'invoice_id', None) is None
@@ -230,15 +237,16 @@ class AnalyticsService:
     def _group_by_category_sync(
         self, transactions: list[Transaction], exclude_ids: set[int]
     ) -> list[dict]:
-        """Agrupa por categoria sem queries (sync)"""
+        """Agrupa por categoria sem queries (sync). Exclui transfers."""
         from collections import defaultdict
 
         by_category: dict[int | None, list[Transaction]] = defaultdict(list)
         for t in transactions:
-            if t.type == TransactionType.EXPENSE and t.id not in exclude_ids:
+            # Excluir transfers da análise por categoria
+            if t.type == TransactionType.EXPENSE and t.type != TransactionType.TRANSFER and t.id not in exclude_ids:
                 by_category[t.category_id].append(t)
 
-        total = float(sum(t.amount for t in transactions if t.type == TransactionType.EXPENSE and t.id not in exclude_ids) or 0)
+        total = float(sum(t.amount for t in transactions if t.type == TransactionType.EXPENSE and t.type != TransactionType.TRANSFER and t.id not in exclude_ids) or 0)
 
         summaries = []
         for category_id, txs in by_category.items():
@@ -257,12 +265,13 @@ class AnalyticsService:
     def _group_by_merchant_sync(
         self, transactions: list[Transaction], exclude_ids: set[int]
     ) -> list[dict]:
-        """Agrupa por merchant sem queries (sync)"""
+        """Agrupa por merchant sem queries (sync). Exclui transfers."""
         from collections import defaultdict
 
         by_merchant: dict[int | None, list[Transaction]] = defaultdict(list)
         for t in transactions:
-            if t.type == TransactionType.EXPENSE and t.id not in exclude_ids:
+            # Excluir transfers da análise por merchant
+            if t.type == TransactionType.EXPENSE and t.type != TransactionType.TRANSFER and t.id not in exclude_ids:
                 by_merchant[t.merchant_id].append(t)
 
         summaries = []
