@@ -7,6 +7,7 @@ import { transactionsApi, accountsApi, categoriesApi, familyApi } from '../servi
 interface Account {
   id: number
   name: string
+  type: string
 }
 
 interface Category {
@@ -237,6 +238,7 @@ export default function QuickTransactionModal({ isOpen, onClose }: QuickTransact
                 >
                   <option value="">Selecione a conta de origem</option>
                   {accounts
+                    .filter(acc => ['wallet', 'bank'].includes(acc.type))
                     .filter(acc => String(acc.id) !== formData.destination_account_id)
                     .map((acc) => (
                       <option key={acc.id} value={acc.id}>{acc.name}</option>
@@ -263,6 +265,7 @@ export default function QuickTransactionModal({ isOpen, onClose }: QuickTransact
                 >
                   <option value="">Selecione a conta de destino</option>
                   {accounts
+                    .filter(acc => ['wallet', 'bank'].includes(acc.type))
                     .filter(acc => String(acc.id) !== formData.account_id)
                     .map((acc) => (
                       <option key={acc.id} value={acc.id}>{acc.name}</option>
