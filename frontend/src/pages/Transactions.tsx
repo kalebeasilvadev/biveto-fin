@@ -21,7 +21,6 @@ import {
   TrendingUp,
   TrendingDown,
 } from 'lucide-react'
-import { Link } from 'react-router-dom'
 import EmptyState from '../components/EmptyState'
 import { clsx } from 'clsx'
 import { useQuickTransactionStore } from '../stores/quickTransactionStore'
