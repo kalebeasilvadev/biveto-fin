@@ -61,15 +61,17 @@ export function getApiErrorMessage(error: unknown, defaultMessage: string): stri
   }
 
   // Tratamento por status code
-  const status = axiosErr.response.status
-  if (status === 404) {
-    return 'Recurso não encontrado'
-  }
-  if (status === 429) {
-    return 'Muitas tentativas. Aguarde um momento e tente novamente.'
-  }
-  if (status >= 500) {
-    return 'Erro no servidor. Tente novamente mais tarde.'
+  const status = axiosErr.response?.status
+  if (status) {
+    if (status === 404) {
+      return 'Recurso não encontrado'
+    }
+    if (status === 429) {
+      return 'Muitas tentativas. Aguarde um momento e tente novamente.'
+    }
+    if (status >= 500) {
+      return 'Erro no servidor. Tente novamente mais tarde.'
+    }
   }
 
   return defaultMessage
