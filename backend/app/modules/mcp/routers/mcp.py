@@ -36,22 +36,7 @@ O endpoint /query é para consultas específicas de registros quando você preci
             "post": {
                 "operationId": "getFinancialContext",
                 "summary": "Contexto financeiro agregado para análise (RECOMENDADO)",
-                "description": """ENDPOINT PRINCIPAL! Use este endpoint para QUALQUER pergunta sobre finanças.
-
-**SEMPRE retorna dados completos do período** (gastos por categoria, por estabelecimento, maiores gastos, etc.)
-para que você possa analisar e responder qualquer pergunta.
-
-**Parâmetro search (opcional):**
-- Quando informado, destaca transações que contêm o termo no campo 'resultado_busca'
-- IMPORTANTE: Os dados completos SEMPRE são retornados em gastos_por_categoria e gastos_por_estabelecimento
-- Se resultado_busca.total for 0, analise gastos_por_categoria e gastos_por_estabelecimento para encontrar gastos relacionados
-
-**Exemplos de perguntas que pode responder:**
-- "quanto gastei com carne em janeiro" → search="carne", month="janeiro"
-- "quanto gastei no mercado" → search="mercado"
-- "quanto gastei com Netflix" → search="netflix"
-- "quais meus maiores gastos" → sem search, analise maiores_gastos
-- "como estão minhas finanças" → sem search, analise resumo""",
+                "description": "Retorna dados financeiros agregados do período. Use search para destacar termos específicos. Dados completos sempre disponíveis para análise.",
                 "security": [{"ApiKeyAuth": []}],
                 "requestBody": {
                     "required": True,

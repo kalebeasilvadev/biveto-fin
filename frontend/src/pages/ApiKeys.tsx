@@ -576,16 +576,39 @@ pip install -r requirements.txt`}
                     <strong>1.</strong> Acesse <code className="bg-gray-100 dark:bg-slate-700 px-1 rounded">chatgpt.com/gpts/editor</code> ou clique no seu nome → "Meus GPTs" → "Criar um GPT"
                   </p>
                   <p className="text-gray-700 dark:text-gray-300">
-                    <strong>2.</strong> Vá na aba "Configurar" e role até "Ações"
+                    <strong>2.</strong> Na aba "Configurar", preencha:
                   </p>
+                  <div className="bg-gray-100 dark:bg-slate-700 p-3 rounded-lg space-y-2">
+                    <p className="text-xs"><strong>Nome:</strong> Biveto - Assistente Financeiro</p>
+                    <p className="text-xs"><strong>Descrição:</strong> Analisa suas finanças pessoais do Biveto</p>
+                  </div>
                   <p className="text-gray-700 dark:text-gray-300">
-                    <strong>3.</strong> Clique em "Criar nova ação" e depois em "Importar de URL":
+                    <strong>3.</strong> No campo "Instruções", cole o seguinte prompt:
+                  </p>
+                  <pre className="bg-gray-100 dark:bg-slate-700 p-3 rounded-lg overflow-x-auto text-xs whitespace-pre-wrap">
+{`Você é um assistente financeiro pessoal conectado ao Biveto.
+
+COMO RESPONDER PERGUNTAS:
+1. Use SEMPRE o endpoint /context primeiro com o mês e termo de busca
+2. Analise os dados retornados: gastos_por_categoria, gastos_por_estabelecimento, maiores_gastos
+3. Se resultado_busca.total = 0, procure o termo nos dados de categorias e estabelecimentos
+4. Responda em português, com valores em R$ e formatação clara
+
+EXEMPLOS:
+- "quanto gastei com carne" → /context com search="carne", month=mês atual
+- "meus gastos de janeiro" → /context com month="janeiro"
+- "como estão minhas finanças" → /context sem filtros, analise o resumo
+
+Seja preciso com números e ofereça insights úteis sobre os gastos.`}
+                  </pre>
+                  <p className="text-gray-700 dark:text-gray-300">
+                    <strong>4.</strong> Role até "Ações" e clique em "Criar nova ação" → "Importar de URL":
                   </p>
                   <pre className="bg-gray-100 dark:bg-slate-700 p-3 rounded-lg overflow-x-auto text-xs">
 {`https://biveto.com/api/v1/mcp/openapi.json`}
                   </pre>
                   <p className="text-gray-700 dark:text-gray-300">
-                    <strong>4.</strong> Em "Autenticação", selecione "Chave de API" e configure:
+                    <strong>5.</strong> Em "Autenticação", selecione "Chave de API" e configure:
                   </p>
                   <pre className="bg-gray-100 dark:bg-slate-700 p-3 rounded-lg overflow-x-auto text-xs">
 {`Tipo de autenticação: Chave de API
@@ -593,13 +616,8 @@ Chave de API: biv_sua_chave_aqui
 Tipo de autorização: Bearer`}
                   </pre>
                   <p className="text-gray-700 dark:text-gray-300">
-                    <strong>5.</strong> Clique em "Publicar" e teste perguntando sobre suas finanças
+                    <strong>6.</strong> Clique em "Publicar" e teste perguntando sobre suas finanças
                   </p>
-                  <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3 mt-3">
-                    <p className="text-green-800 dark:text-green-200 text-xs">
-                      <strong>Dica:</strong> O endpoint <code>/context</code> é o principal! Use-o para perguntas como "quanto gastei com carne em janeiro" passando <code>{`{"month": "janeiro", "search": "carne"}`}</code>
-                    </p>
-                  </div>
                 </div>
               )}
             </div>
