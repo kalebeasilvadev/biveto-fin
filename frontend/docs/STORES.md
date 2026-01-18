@@ -8,10 +8,11 @@ O frontend utiliza **Zustand** para gerenciamento de estado global. As stores sa
 
 ```
 stores/
-├── authStore.ts      # Autenticacao e sessao
-├── toastStore.ts     # Notificacoes toast
-├── themeStore.ts     # Tema claro/escuro
-└── pwaStore.ts       # Estado de instalacao PWA
+├── authStore.ts              # Autenticacao e sessao
+├── toastStore.ts             # Notificacoes toast
+├── themeStore.ts             # Tema claro/escuro
+├── pwaStore.ts               # Estado de instalacao PWA
+└── quickTransactionStore.ts  # Modal de transacao rapida
 ```
 
 ---
@@ -305,6 +306,50 @@ function InstallBanner() {
   );
 }
 ```
+
+---
+
+## quickTransactionStore
+
+Store para controlar o modal de criacao rapida de transacoes.
+
+### Estado
+
+| Campo | Tipo | Descricao |
+|-------|------|-----------|
+| `isOpen` | `boolean` | Se o modal esta aberto |
+
+### Acoes
+
+```typescript
+// Abre o modal
+open()
+
+// Fecha o modal
+close()
+```
+
+### Uso
+
+```tsx
+import { useQuickTransactionStore } from '@/stores/quickTransactionStore';
+
+function MyComponent() {
+  const openQuickTransaction = useQuickTransactionStore((state) => state.open);
+
+  return (
+    <button onClick={openQuickTransaction}>
+      Nova Transacao
+    </button>
+  );
+}
+```
+
+### Integracao
+
+O modal e controlado globalmente pelo `Layout.tsx` e pode ser aberto de qualquer lugar:
+- Botao "+" no mobile (bottom nav)
+- Botao "Nova Transacao" na pagina de Transacoes (desktop)
 
 ---
 

@@ -326,17 +326,30 @@ Botao flutuante do assistente financeiro IA.
 ---
 
 ### QuickTransactionModal.tsx
-Modal rapido para adicionar transacao.
+Modal rapido para adicionar transacao (despesa, receita ou transferencia).
 
 **Props:**
 | Prop | Tipo | Obrigatorio | Descricao |
 |------|------|-------------|-----------|
 | `isOpen` | `boolean` | Sim | Controla visibilidade |
 | `onClose` | `() => void` | Sim | Callback ao fechar |
-| `defaultType` | `'income' \| 'expense'` | Nao | Tipo padrao |
 
-**Uso:**
-Acessivel via botao "+" no header para adicao rapida.
+**Tipos de Transacao:**
+- `expense` - Despesa (vermelho)
+- `income` - Receita (verde)
+- `transfer` - Transferencia entre contas (azul)
+
+**Transferencias:**
+- Permite transferir entre contas do tipo: `wallet`, `bank`, `investment`
+- Cartoes de credito (`credit_card`) NAO aparecem nas opcoes
+- Seleciona conta de origem ("De") e conta de destino ("Para")
+
+**Acesso:**
+- Mobile: Botao "+" na barra de navegacao inferior
+- Desktop: Botao "Nova Transacao" na pagina de Transacoes
+
+**State Management:**
+Controlado via `quickTransactionStore` (Zustand) para acesso global.
 
 ---
 

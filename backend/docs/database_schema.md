@@ -101,6 +101,7 @@ erDiagram
         int income_source_id FK
         int installment_series_id FK
         int recurring_id FK
+        int linked_transaction_id FK
         string type
         decimal amount
         date date
@@ -471,6 +472,21 @@ erDiagram
   │                                                                │
   │  Total da Fatura = SUM(transactions WHERE invoice_id = Y)      │
   └────────────────────────────────────────────────────────────────┘
+
+  TRANSFERENCIA ENTRE CONTAS:
+  ┌────────────────────────────────────────────────────────────────┐
+  │  Cada transferencia cria 2 transacoes linkadas:                │
+  │                                                                │
+  │  tx_out (id menor): conta origem, linked_transaction_id = X    │
+  │  tx_in  (id maior): conta destino, linked_transaction_id = Y   │
+  │                                                                │
+  │  Calculo de saldo:                                             │
+  │  - Se id < linked_transaction_id = SAIDA (subtrair)            │
+  │  - Se id > linked_transaction_id = ENTRADA (somar)             │
+  │                                                                │
+  │  Contas permitidas: wallet, bank, investment                   │
+  │  NAO permitido: credit_card                                    │
+  └────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -534,6 +550,7 @@ USER
 ### Transaction.type
 - `income` - Receita
 - `expense` - Despesa
+- `transfer` - Transferencia entre contas
 
 ### InvoiceStatus
 - `open` - Aberta (acumulando)
