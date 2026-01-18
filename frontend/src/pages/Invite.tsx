@@ -64,10 +64,10 @@ export default function Invite() {
   // Show loading state
   if (isValidating) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin text-biveto mx-auto mb-4" />
-          <p className="text-gray-600">Validando convite...</p>
+          <p className="text-gray-600 dark:text-gray-400">Validando convite...</p>
         </div>
       </div>
     )
@@ -78,14 +78,14 @@ export default function Invite() {
     const errorMessage = getApiErrorMessage(validationError, 'Convite inválido ou expirado')
 
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex items-center justify-center p-4">
         <div className="w-full max-w-md">
           <div className="card text-center">
-            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <AlertCircle className="w-8 h-8 text-red-600" />
+            <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+              <AlertCircle className="w-8 h-8 text-red-600 dark:text-red-400" />
             </div>
-            <h1 className="text-xl font-bold text-gray-900 mb-2">Convite Inválido</h1>
-            <p className="text-gray-600 mb-6">{errorMessage}</p>
+            <h1 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Convite Inválido</h1>
+            <p className="text-gray-600 dark:text-gray-400 mb-6">{errorMessage}</p>
             <Link to="/login" className="btn-primary inline-block">
               Ir para Login
             </Link>
@@ -96,31 +96,31 @@ export default function Invite() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
           <img src="/logo.svg" alt="Biveto" className="h-12 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-gray-900">Crie sua conta</h1>
-          <p className="text-gray-600 mt-2">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Crie sua conta</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-2">
             Você foi convidado para o Biveto
           </p>
         </div>
 
         <div className="card">
           {/* Email display */}
-          <div className="mb-6 p-3 bg-biveto-light rounded-lg">
-            <p className="text-sm text-gray-600">Seu email</p>
-            <p className="font-medium text-gray-900">{invitation.email}</p>
+          <div className="mb-6 p-3 bg-biveto-light dark:bg-biveto/20 rounded-lg">
+            <p className="text-sm text-gray-600 dark:text-gray-400">Seu email</p>
+            <p className="font-medium text-gray-900 dark:text-white">{invitation.email}</p>
           </div>
 
           {/* License info */}
           {invitation.license_type && (
-            <div className="mb-6 p-3 bg-gray-50 rounded-lg flex items-center gap-3">
-              <Check className="w-5 h-5 text-green-600" />
+            <div className="mb-6 p-3 bg-gray-50 dark:bg-slate-800 rounded-lg flex items-center gap-3">
+              <Check className="w-5 h-5 text-green-600 dark:text-green-400" />
               <div>
-                <p className="text-sm text-gray-600">Licença</p>
-                <p className="font-medium text-gray-900 capitalize">
+                <p className="text-sm text-gray-600 dark:text-gray-400">Licença</p>
+                <p className="font-medium text-gray-900 dark:text-white capitalize">
                   {invitation.license_type}
                 </p>
               </div>
@@ -128,7 +128,7 @@ export default function Invite() {
           )}
 
           {error && (
-            <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg flex items-center gap-2">
+            <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-lg flex items-center gap-2">
               <AlertCircle size={18} />
               <span>{error}</span>
             </div>
@@ -136,7 +136,7 @@ export default function Invite() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Seu nome
               </label>
               <div className="relative">
@@ -156,7 +156,7 @@ export default function Invite() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Senha
               </label>
               <div className="relative">
@@ -176,7 +176,7 @@ export default function Invite() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Confirmar senha
               </label>
               <div className="relative">
@@ -204,7 +204,7 @@ export default function Invite() {
             </button>
           </form>
 
-          <p className="mt-6 text-center text-sm text-gray-600">
+          <p className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
             Já tem uma conta?{' '}
             <Link to="/login" className="text-biveto hover:underline font-medium">
               Fazer login

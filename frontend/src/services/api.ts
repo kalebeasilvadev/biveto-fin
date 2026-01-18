@@ -5,18 +5,50 @@ import { useAuthStore } from '../stores/authStore'
 const errorMessages: Record<string, string> = {
   'String should have at least 8 characters': 'A senha deve ter pelo menos 8 caracteres',
   'String should have at least 2 characters': 'O nome deve ter pelo menos 2 caracteres',
+  'String should have at least 6 characters': 'A senha deve ter pelo menos 6 caracteres',
   'value is not a valid email address': 'Email inválido',
   'Field required': 'Campo obrigatório',
+  // Erros do backend de convite (com e sem acentos)
+  'Convite nao encontrado': 'Convite não encontrado',
+  'Convite não encontrado': 'Convite não encontrado',
+  'Convite expirado': 'Este convite expirou',
+  'Email ja cadastrado': 'Este email já está cadastrado',
+  'Email já cadastrado': 'Este email já está cadastrado',
 }
 
 // Extrai mensagem de erro amigável do FastAPI
 export function getApiErrorMessage(error: unknown, defaultMessage: string): string {
-  const err = error as { response?: { data?: { detail?: unknown } } }
-  const detail = err?.response?.data?.detail
+  // Verifica se é um erro de rede (sem resposta do servidor)
+  const axiosErr = error as { response?: { data?: { detail?: unknown }; status?: number }; message?: string; code?: string }
 
-  // Se detail é uma string, retorna diretamente
+  // Erro de rede ou servidor offline
+  if (!axiosErr?.response) {
+    if (axiosErr?.code === 'ERR_NETWORK' || axiosErr?.message?.includes('Network Error')) {
+      return 'Erro de conexão. Verifique sua internet e tente novamente.'
+    }
+    if (axiosErr?.code === 'ECONNABORTED' || axiosErr?.message?.includes('timeout')) {
+      return 'O servidor demorou para responder. Tente novamente.'
+    }
+    return defaultMessage
+  }
+
+  const detail = axiosErr.response.data?.detail
+
+  // Se detail é uma string, traduz ou retorna diretamente
   if (typeof detail === 'string') {
-    return detail
+    return errorMessages[detail] || detail
+  }
+
+  // Se detail é um objeto com message e errors (erro de validação de senha)
+  if (detail && typeof detail === 'object' && !Array.isArray(detail)) {
+    const detailObj = detail as { message?: string; errors?: string[] }
+    if (detailObj.errors && Array.isArray(detailObj.errors) && detailObj.errors.length > 0) {
+      // Retorna o primeiro erro de senha
+      return detailObj.errors[0]
+    }
+    if (detailObj.message) {
+      return detailObj.message
+    }
   }
 
   // Se detail é um array (erro de validação 422), extrai a primeira mensagem
@@ -26,6 +58,18 @@ export function getApiErrorMessage(error: unknown, defaultMessage: string): stri
       // Tenta traduzir a mensagem
       return errorMessages[firstError.msg] || firstError.msg
     }
+  }
+
+  // Tratamento por status code
+  const status = axiosErr.response.status
+  if (status === 404) {
+    return 'Recurso não encontrado'
+  }
+  if (status === 429) {
+    return 'Muitas tentativas. Aguarde um momento e tente novamente.'
+  }
+  if (status >= 500) {
+    return 'Erro no servidor. Tente novamente mais tarde.'
   }
 
   return defaultMessage
