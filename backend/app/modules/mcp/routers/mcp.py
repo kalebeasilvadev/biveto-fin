@@ -335,23 +335,69 @@ Muito mais eficiente que fazer múltiplas queries.""",
                     },
                     "maiores_gastos": {
                         "type": "array",
-                        "description": "Top 10 maiores gastos do período"
+                        "description": "Top 10 maiores gastos do período",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "valor": {"type": "number"},
+                                "data": {"type": "string"},
+                                "estabelecimento": {"type": "string"},
+                                "categoria": {"type": "string"}
+                            }
+                        }
                     },
                     "contas": {
                         "type": "array",
-                        "description": "Lista de contas com saldos"
+                        "description": "Lista de contas com saldos",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "nome": {"type": "string"},
+                                "tipo": {"type": "string"},
+                                "saldo": {"type": "number"}
+                            }
+                        }
                     },
                     "cartoes_credito": {
                         "type": "array",
-                        "description": "Cartões de crédito com faturas"
+                        "description": "Cartões de crédito com faturas",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "nome": {"type": "string"},
+                                "bandeira": {"type": "string"},
+                                "limite_total": {"type": "number"},
+                                "saldo_em_aberto": {"type": "number"},
+                                "limite_disponivel": {"type": "number"}
+                            }
+                        }
                     },
                     "dividas": {
                         "type": "array",
-                        "description": "Dívidas ativas"
+                        "description": "Dívidas ativas",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "nome": {"type": "string"},
+                                "saldo": {"type": "number"},
+                                "taxa_juros": {"type": "number"},
+                                "pagamento_minimo": {"type": "number"}
+                            }
+                        }
                     },
                     "metas": {
                         "type": "array",
-                        "description": "Metas financeiras ativas"
+                        "description": "Metas financeiras ativas",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "nome": {"type": "string"},
+                                "valor_alvo": {"type": "number"},
+                                "valor_atual": {"type": "number"},
+                                "progresso": {"type": "number"},
+                                "falta": {"type": "number"}
+                            }
+                        }
                     },
                     "comparacao_periodo_anterior": {
                         "type": "object",
