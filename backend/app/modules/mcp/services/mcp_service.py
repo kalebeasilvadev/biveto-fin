@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
-from sqlalchemy import select, func, text, inspect
+from sqlalchemy import select, func, text, inspect, String
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
 
@@ -339,7 +339,29 @@ class MCPService:
         if has_user_id:
             query = query.where(model.user_id == user.id)
 
-        # Filtros adicionais
+        # Filtro de busca por texto (search)
+        if request.search:
+            search_term = f"%{request.search}%"
+            if hasattr(model, "description"):
+                query = query.where(model.description.ilike(search_term))
+            elif hasattr(model, "name"):
+                query = query.where(model.name.ilike(search_term))
+
+        # Filtro de data (date_from, date_to)
+        if hasattr(model, "date"):
+            if request.date_from:
+                query = query.where(model.date >= request.date_from)
+            if request.date_to:
+                query = query.where(model.date <= request.date_to)
+
+        # Filtro de valor (amount_min, amount_max)
+        if hasattr(model, "amount"):
+            if request.amount_min is not None:
+                query = query.where(model.amount >= request.amount_min)
+            if request.amount_max is not None:
+                query = query.where(model.amount <= request.amount_max)
+
+        # Filtros exatos adicionais
         if request.filters:
             for col, val in request.filters.items():
                 if hasattr(model, col):

@@ -150,14 +150,19 @@ OPENAPI_SCHEMA = {
                 "required": ["table"],
                 "properties": {
                     "table": {"type": "string", "description": "Nome da tabela (ex: transactions, accounts, credit_cards)"},
+                    "search": {"type": "string", "description": "RECOMENDADO: Busca por texto em description/name (ex: 'carne', 'mercado', 'uber')"},
+                    "date_from": {"type": "string", "description": "Data inicial YYYY-MM-DD (ex: '2026-01-01' para início de janeiro)"},
+                    "date_to": {"type": "string", "description": "Data final YYYY-MM-DD (ex: '2026-01-31' para fim de janeiro)"},
+                    "amount_min": {"type": "number", "description": "Valor mínimo"},
+                    "amount_max": {"type": "number", "description": "Valor máximo"},
                     "filters": {
                         "type": "object",
-                        "description": "Filtros no formato {coluna: valor}",
+                        "description": "Filtros exatos adicionais. Ex: {\"type\": \"expense\"} para despesas",
                         "additionalProperties": True
                     },
-                    "order_by": {"type": "string", "description": "Coluna para ordenação"},
-                    "order_desc": {"type": "boolean", "description": "Se true, ordena descendente", "default": False},
-                    "limit": {"type": "integer", "description": "Máximo de resultados (1-1000)", "default": 100},
+                    "order_by": {"type": "string", "description": "Coluna para ordenação (ex: date, amount)", "default": "date"},
+                    "order_desc": {"type": "boolean", "description": "Se true, ordena descendente", "default": True},
+                    "limit": {"type": "integer", "description": "Máximo de resultados (1-200)", "default": 50, "maximum": 200},
                     "offset": {"type": "integer", "description": "Offset para paginação", "default": 0}
                 }
             },
