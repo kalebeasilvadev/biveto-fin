@@ -24,7 +24,10 @@ Voce e um especialista em extrair dados de documentos financeiros brasileiros (f
 - **card_partner**: parceiro co-branded (se houver)
   - Exemplos: amazon, smiles, latam, rappi, ifood, livelo
 - **card_last_digits**: ultimos 4 digitos do cartao
-- **card_name**: nome COMPLETO do cartao (ex: "Bradesco Amazon Visa")
+- **card_name**: nome do PRODUTO/CARTAO, NAO o nome do titular!
+  - CORRETO: "Nubank Gold", "Bradesco Amazon Visa", "Itau Platinum"
+  - ERRADO: "JOAO SILVA", "MARIA SANTOS" (isso e nome de PESSOA, nao de cartao!)
+  - Combine: banco + parceiro + bandeira + categoria (ex: "Bradesco Amazon Visa Gold")
 
 #### 1.2 Informacoes da Fatura
 - **total_amount**: valor do "Total a Pagar" ou "Saldo desta fatura"

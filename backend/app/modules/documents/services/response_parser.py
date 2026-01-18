@@ -120,10 +120,15 @@ class ResponseParser:
 
     def _normalize_card_info(self, card_info: dict) -> dict:
         """Normaliza informacoes do cartao"""
+        # Valida card_name para evitar nomes de pessoas
+        card_name = card_info.get('card_name')
+        if card_name:
+            card_name = self._validate_card_name(card_name, card_info)
+
         result = {
             'card_issuer': card_info.get('card_issuer'),
             'card_last_digits': str(card_info.get('card_last_digits', ''))[-4:] if card_info.get('card_last_digits') else None,
-            'card_name': card_info.get('card_name'),
+            'card_name': card_name,
             'card_bank': card_info.get('card_bank'),
             'card_brand': card_info.get('card_brand'),
             'card_partner': card_info.get('card_partner'),
@@ -158,3 +163,69 @@ class ResponseParser:
                 print(f"[Parser] Erro ao extrair due_day: {e}")
 
         return {k: v for k, v in result.items() if v is not None}
+
+    def _validate_card_name(self, card_name: str, card_info: dict) -> str | None:
+        """
+        Valida se o card_name e realmente um nome de cartao e nao o nome do titular.
+        Retorna None se parecer ser nome de pessoa, ou gera um nome correto.
+        """
+        if not card_name:
+            return None
+
+        card_name_upper = card_name.upper().strip()
+
+        # Palavras que indicam que e um nome de cartao valido
+        valid_card_keywords = [
+            'VISA', 'MASTERCARD', 'ELO', 'HIPERCARD', 'AMEX', 'DINERS',
+            'GOLD', 'PLATINUM', 'BLACK', 'INFINITE', 'SIGNATURE',
+            'NUBANK', 'ITAU', 'BRADESCO', 'SANTANDER', 'INTER', 'C6',
+            'AMAZON', 'SMILES', 'LATAM', 'RAPPI', 'IFOOD',
+            'CARTAO', 'CREDITO', 'DEBITO', 'CARD'
+        ]
+
+        # Se contem alguma palavra-chave de cartao, provavelmente e valido
+        has_card_keyword = any(kw in card_name_upper for kw in valid_card_keywords)
+        if has_card_keyword:
+            return card_name
+
+        # Verifica se parece ser nome de pessoa (apenas palavras sem numeros/simbolos)
+        # Nomes de pessoas geralmente sao 2-4 palavras, todas alfabeticas
+        words = card_name_upper.split()
+        if len(words) >= 2 and len(words) <= 4:
+            # Todas as palavras sao apenas letras (nome de pessoa)
+            all_alpha = all(word.replace(' ', '').isalpha() for word in words)
+            if all_alpha:
+                # Parece ser nome de pessoa - gerar nome do cartao a partir de outros campos
+                print(f"[Parser] card_name '{card_name}' parece ser nome de pessoa, gerando nome do cartao...")
+                return self._generate_card_name(card_info)
+
+        return card_name
+
+    def _generate_card_name(self, card_info: dict) -> str | None:
+        """Gera um nome de cartao a partir dos outros campos disponiveis"""
+        parts = []
+
+        # Banco
+        issuer = card_info.get('card_issuer') or card_info.get('card_bank')
+        if issuer:
+            issuer_names = {
+                'nubank': 'Nubank', 'itau': 'Itaú', 'bradesco': 'Bradesco',
+                'santander': 'Santander', 'inter': 'Inter', 'bb': 'Banco do Brasil',
+                'caixa': 'Caixa', 'c6': 'C6 Bank', 'bradescard': 'Bradescard',
+            }
+            parts.append(issuer_names.get(issuer.lower(), issuer.title()))
+
+        # Parceiro (Amazon, Smiles, etc)
+        partner = card_info.get('card_partner')
+        if partner:
+            parts.append(partner.title())
+
+        # Bandeira
+        brand = card_info.get('card_brand')
+        if brand:
+            parts.append(brand.upper())
+
+        if parts:
+            return ' '.join(parts)
+
+        return None
