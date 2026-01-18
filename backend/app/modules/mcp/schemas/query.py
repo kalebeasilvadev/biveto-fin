@@ -43,4 +43,4 @@ class TableStatsResponse(BaseModel):
     """Estatísticas de uma tabela"""
     table: str
     total_records: int
-    columns: dict[str, dict[str, Any]]  # {coluna: {distinct_count, sample_values, etc}}
+    columns: dict[str, str]  # {coluna: descrição}
