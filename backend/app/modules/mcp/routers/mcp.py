@@ -42,7 +42,17 @@ O endpoint /query é para consultas específicas de registros quando você preci
 - "quais meus maiores gastos"
 
 Retorna dados pré-agregados por categoria, estabelecimento, com totais e comparações.
-Muito mais eficiente que fazer múltiplas queries.""",
+
+**BUSCA INTELIGENTE (parâmetro search):**
+O campo search usa sinônimos e categorias relacionadas automaticamente:
+- "carne" busca: carne, carnes, açougue, bife, picanha + categorias Mercado/Alimentação
+- "mercado" busca: mercado, supermercado, carrefour, assaí + categoria Mercado
+- "restaurante" busca: restaurante, ifood, delivery, pizzaria + categoria Alimentação
+- "uber" busca: uber, 99, taxi + categoria Transporte
+- "gasolina" busca: gasolina, combustível, posto, shell + categoria Transporte
+- "farmacia" busca: farmácia, drogaria, remédio + categoria Saúde
+
+O campo total_filtrado na resposta mostra o TOTAL gasto com o termo buscado.""",
                 "security": [{"ApiKeyAuth": []}],
                 "requestBody": {
                     "required": True,
@@ -291,7 +301,7 @@ Muito mais eficiente que fazer múltiplas queries.""",
                     "year": {"type": "integer", "description": "Ano para análise (ex: 2026)"},
                     "date_from": {"type": "string", "description": "Data inicial YYYY-MM-DD"},
                     "date_to": {"type": "string", "description": "Data final YYYY-MM-DD"},
-                    "search": {"type": "string", "description": "IMPORTANTE: Busca por palavra-chave (ex: 'carne', 'mercado', 'uber', 'ifood')"}
+                    "search": {"type": "string", "description": "Busca inteligente com sinônimos e categorias relacionadas. Ex: 'carne' busca também açougue, carnes + categoria Mercado; 'mercado' busca supermercados + categoria Mercado; 'uber' busca 99, taxi + categoria Transporte"}
                 }
             },
             "ContextResponse": {

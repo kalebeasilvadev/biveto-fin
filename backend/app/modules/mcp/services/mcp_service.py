@@ -662,28 +662,58 @@ class MCPService:
 
         # Sinônimos e palavras relacionadas para buscas comuns
         SEARCH_SYNONYMS = {
-            "carne": ["carne", "carnes", "açougue", "acougue", "bife", "picanha", "costela", "frango", "proteina"],
-            "mercado": ["mercado", "supermercado", "atacadao", "atacadão", "assai", "assaí", "carrefour", "extra", "pao de acucar", "pão de açúcar"],
-            "restaurante": ["restaurante", "lanchonete", "ifood", "rappi", "uber eats", "delivery", "pizzaria", "hamburgueria"],
-            "uber": ["uber", "99", "cabify", "taxi", "táxi"],
-            "gasolina": ["gasolina", "combustivel", "combustível", "posto", "shell", "ipiranga", "br", "petrobras"],
-            "farmacia": ["farmacia", "farmácia", "drogaria", "droga", "remedio", "remédio", "medicamento"],
+            "carne": ["carne", "carnes", "açougue", "acougue", "bife", "picanha", "costela", "frango", "proteina", "churrasco"],
+            "mercado": ["mercado", "supermercado", "atacadao", "atacadão", "assai", "assaí", "carrefour", "extra", "pao de acucar", "pão de açúcar", "compras"],
+            "restaurante": ["restaurante", "lanchonete", "ifood", "rappi", "uber eats", "delivery", "pizzaria", "hamburgueria", "comida"],
+            "uber": ["uber", "99", "cabify", "taxi", "táxi", "corrida"],
+            "gasolina": ["gasolina", "combustivel", "combustível", "posto", "shell", "ipiranga", "br", "petrobras", "alcool", "álcool"],
+            "farmacia": ["farmacia", "farmácia", "drogaria", "droga", "remedio", "remédio", "medicamento", "saude", "saúde"],
+            "alimentacao": ["alimentacao", "alimentação", "comida", "refeicao", "refeição", "almoco", "almoço", "jantar", "cafe", "café", "lanche"],
+        }
+
+        # Mapeamento de keywords para categorias relacionadas (busca pela categoria também)
+        CATEGORY_MAPPING = {
+            "carne": ["mercado", "alimentacao", "alimentação", "compras"],
+            "mercado": ["mercado", "supermercado", "compras"],
+            "restaurante": ["alimentacao", "alimentação", "restaurante", "lazer"],
+            "gasolina": ["transporte", "combustivel", "combustível", "veiculo", "veículo"],
+            "farmacia": ["saude", "saúde", "farmacia", "farmácia"],
+            "uber": ["transporte", "mobilidade"],
+            "alimentacao": ["alimentacao", "alimentação", "mercado", "restaurante"],
         }
 
         # Expande a keyword para incluir sinônimos
         search_terms = [search_keyword] if search_keyword else []
+        related_categories: list[str] = []
         if search_keyword:
             for base_term, synonyms in SEARCH_SYNONYMS.items():
                 if search_keyword in synonyms or search_keyword == base_term:
                     search_terms = synonyms
+                    # Também adiciona categorias relacionadas
+                    related_categories = CATEGORY_MAPPING.get(base_term, [])
                     break
 
         def matches_search(description: str, merchant_name: str, category: str) -> bool:
             """Verifica se a transação corresponde aos termos de busca"""
             if not search_terms:
                 return True
-            text_to_search = f"{description} {merchant_name} {category}".lower()
-            return any(term in text_to_search for term in search_terms)
+            text_to_search = f"{description} {merchant_name}".lower()
+            category_lower = category.lower()
+
+            # Verifica se algum termo de busca está na descrição/merchant
+            if any(term in text_to_search for term in search_terms):
+                return True
+
+            # Verifica se a categoria está nas categorias relacionadas
+            if related_categories:
+                if any(cat in category_lower for cat in related_categories):
+                    return True
+
+            # Verifica se algum termo está no nome da categoria
+            if any(term in category_lower for term in search_terms):
+                return True
+
+            return False
 
         for t in txs:
             if t.type == TransactionType.EXPENSE.value:
