@@ -1,42 +1,89 @@
 # Modulo Documents
 
 ## Descricao
-Modulo responsavel pelo upload e processamento de documentos financeiros. Utiliza LLM Vision (Google Gemini) para extracao de dados de faturas, cupons fiscais e extratos bancarios com alta precisao.
+Modulo responsavel pelo upload e processamento de documentos financeiros. Utiliza LLM Vision com **multiplos providers** (Google Gemini, OpenAI GPT-4o, Anthropic Claude, Mistral OCR) para extracao de dados de faturas, cupons fiscais e extratos bancarios com alta precisao.
 
 ## Responsabilidades
 - Upload e validacao de arquivos (PDF, imagens, CSV, Excel)
-- Extracao de dados com LLM Vision (Google Gemini)
+- Extracao de dados com LLM Vision (multiplos providers)
 - Parser de planilhas (CSV/Excel) de bancos brasileiros
 - Deteccao de duplicatas
 - Identificacao de parcelamentos
 - Deteccao de servicos recorrentes (Netflix, Spotify, etc.)
 - Reprocessamento de documentos com falha
+- Validacao e normalizacao de dados extraidos
 
 ## Estrutura
 ```
 documents/
 ├── __init__.py
+├── README.md
 ├── models/
-│   └── __init__.py       # Re-exporta models de app.models
+│   └── __init__.py              # Re-exporta models de app.models
 ├── schemas/
-│   └── document.py       # DocumentResponse, DocumentExtractionResponse, ExtractedItemResponse,
-│                         # FutureInstallmentResponse, InstallmentAnalysisResponse, CardInfoResponse
+│   ├── __init__.py
+│   └── document.py              # DocumentResponse, DocumentExtractionResponse,
+│                                # ExtractedItemResponse, FutureInstallmentResponse,
+│                                # InstallmentAnalysisResponse, CardInfoResponse
 ├── services/
-│   ├── document_service.py         # DocumentService (upload, processamento)
-│   ├── llm_ocr_service.py          # LLMOCRService (Google Gemini Vision)
-│   └── spreadsheet_parser_service.py # Parser de CSV/Excel
+│   ├── __init__.py
+│   ├── document_service.py      # DocumentService (upload, processamento)
+│   ├── llm_ocr_service.py       # LLMOCRService (orquestra providers)
+│   ├── spreadsheet_parser_service.py  # Parser de CSV/Excel
+│   ├── extraction_validator.py  # Validacao de dados extraidos
+│   ├── pdf_converter.py         # Conversao de PDF para imagens
+│   ├── response_parser.py       # Parser de respostas dos LLMs
+│   ├── prompts.py               # Prompts para extracao de faturas
+│   ├── prompts_cupom.py         # Prompts para cupons fiscais
+│   ├── schemas.py               # Schemas internos dos services
+│   └── providers/               # Providers de LLM Vision
+│       ├── __init__.py
+│       ├── base.py              # Interface base para providers
+│       ├── google_provider.py   # Google Gemini Vision
+│       ├── openai_provider.py   # OpenAI GPT-4o Vision
+│       ├── anthropic_provider.py # Anthropic Claude Vision
+│       └── mistral_provider.py  # Mistral OCR + LLM (2 etapas)
 ├── prompts/
 │   ├── __init__.py
-│   ├── detalhes_faturas.md         # Prompt para extracao de faturas
-│   └── explicacao_erro_santander.md # Explicacao de erros Santander
+│   ├── detalhes_faturas.md      # Prompt para extracao de faturas
+│   ├── explicacao_erro_santander.md  # Explicacao de erros Santander
+│   └── prompt_mistral.md        # Prompt otimizado para Mistral OCR
 └── routers/
-    └── documents.py      # Endpoints de documentos
+    └── documents.py             # Endpoints de documentos
 ```
 
 ## Dependencias
 - **Models**: `Document`, `DocumentExtraction`
 - **Outros Modulos**: `known_services` (deteccao de recorrencias)
 - **Core**: `deps` (CurrentUser, DbSession)
+
+## Providers de LLM Vision
+
+O modulo suporta **multiplos providers** para extracao de dados, com possibilidade de fallback automatico:
+
+| Provider | Modelo | Custo Relativo | Processo |
+|----------|--------|----------------|----------|
+| **Google** | Gemini 2.0 Flash | Medio | Vision direto |
+| **OpenAI** | GPT-4o | Alto | Vision direto |
+| **Anthropic** | Claude 3.5 | Alto | Vision direto |
+| **Mistral** | OCR + Large | Baixo | 2 etapas (OCR + LLM) |
+
+### Configuracao do Provider
+```python
+# .env
+VISION_PROVIDER=google  # google, openai, anthropic, mistral
+GOOGLE_API_KEY=xxx
+OPENAI_API_KEY=xxx
+ANTHROPIC_API_KEY=xxx
+MISTRAL_API_KEY=xxx
+```
+
+### Mistral OCR (Recomendado)
+O provider Mistral usa processo em **2 etapas**:
+1. **Mistral OCR API**: Extrai texto/markdown do PDF com alta fidelidade
+2. **Mistral LLM**: Estrutura os dados extraidos em JSON
+
+Vantagens: ~60% mais barato, 100% de taxa de sucesso em faturas brasileiras.
 
 ## Tipos de Documento
 - `fatura_cartao`: Faturas de cartao de credito
@@ -89,22 +136,39 @@ from app.modules.documents import (
 2. Validacao de formato e tamanho
 3. Deteccao de duplicatas (hash do arquivo)
 4. Processamento:
-   - **PDF/Imagens**: LLM Vision (Gemini) com Structured Output
+   - **PDF/Imagens**: LLM Vision via provider configurado
    - **CSV/Excel**: SpreadsheetParserService
 5. Extracao de itens (transacoes)
-6. Identificacao de parcelamentos
-7. Deteccao de servicos recorrentes (Netflix, Spotify, etc.) via `RecurringDetectorService`
-8. Verificacao de transacoes duplicadas no banco
-9. Extracao de informacoes do cartao (para faturas) em `card_info`
-10. Retorno dos dados para confirmacao pelo usuario
+6. **Validacao** dos dados extraidos (ExtractionValidator)
+7. Identificacao de parcelamentos
+8. Deteccao de servicos recorrentes (Netflix, Spotify, etc.) via `RecurringDetectorService`
+9. Verificacao de transacoes duplicadas no banco
+10. Extracao de informacoes do cartao (para faturas) em `card_info`
+11. Retorno dos dados para confirmacao pelo usuario
 
-## Tecnologia de Extracao
+## Services
 
-O modulo utiliza **Google Gemini Vision** com **Structured Output** (Pydantic schemas) para garantir:
-- Alta precisao na extracao de dados
-- Formato estruturado e validado
-- Suporte a PDFs multipaginas
-- Deteccao de transacoes canceladas/estornadas
+### DocumentService
+Orquestra todo o fluxo de upload e processamento.
+
+### LLMOCRService
+Coordena a extracao via LLM Vision, delegando para o provider apropriado.
+
+### ExtractionValidator
+Valida e normaliza dados extraidos:
+- Corrige sinais de valores (pagamentos negativos, compras positivas)
+- Normaliza nomes de cartoes
+- Remove itens cancelados/estornados
+- Valida campos obrigatorios
+
+### SpreadsheetParserService
+Parser para CSV/Excel de extratos bancarios brasileiros.
+
+### PDFConverter
+Converte PDFs para imagens quando necessario (para providers que nao suportam PDF nativo).
+
+### ResponseParser
+Parser e normalizacao de respostas dos diferentes LLMs.
 
 ## Schemas
 
