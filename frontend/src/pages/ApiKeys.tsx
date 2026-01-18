@@ -597,7 +597,7 @@ Tipo de autorização: Bearer`}
                   </p>
                   <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3 mt-3">
                     <p className="text-green-800 dark:text-green-200 text-xs">
-                      <strong>Dica:</strong> O endpoint <code>/context</code> é o principal! Use-o para perguntas como "quanto gastei com carne em janeiro" passando <code>{"month": "janeiro", "search": "carne"}</code>
+                      <strong>Dica:</strong> O endpoint <code>/context</code> é o principal! Use-o para perguntas como "quanto gastei com carne em janeiro" passando <code>{`{"month": "janeiro", "search": "carne"}`}</code>
                     </p>
                   </div>
                 </div>
