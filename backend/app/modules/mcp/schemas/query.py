@@ -49,3 +49,30 @@ class TableStatsResponse(BaseModel):
     table: str
     total_records: int
     columns: dict[str, str]  # {coluna: descrição}
+
+
+class ContextRequest(BaseModel):
+    """
+    Requisição de contexto financeiro agregado.
+    RECOMENDADO para perguntas de análise financeira.
+    """
+    month: int | str | None = Field(
+        None,
+        description="Mês para análise (1-12 ou nome: 'janeiro', 'fevereiro', etc.)"
+    )
+    year: int | None = Field(
+        None,
+        description="Ano para análise (ex: 2026). Se não informado, usa ano atual ou anterior conforme o mês."
+    )
+    date_from: str | None = Field(
+        None,
+        description="Data inicial YYYY-MM-DD (alternativa ao mês)"
+    )
+    date_to: str | None = Field(
+        None,
+        description="Data final YYYY-MM-DD (alternativa ao mês)"
+    )
+    search: str | None = Field(
+        None,
+        description="Busca por palavra-chave em descrição/estabelecimento (ex: 'carne', 'mercado', 'uber')"
+    )

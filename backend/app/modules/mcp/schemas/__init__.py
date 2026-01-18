@@ -5,6 +5,7 @@ from .query import (
     QueryRequest,
     QueryResponse,
     TableStatsResponse,
+    ContextRequest,
 )
 
 __all__ = [
@@ -14,4 +15,5 @@ __all__ = [
     "QueryRequest",
     "QueryResponse",
     "TableStatsResponse",
+    "ContextRequest",
 ]

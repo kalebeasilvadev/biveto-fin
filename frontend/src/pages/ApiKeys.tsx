@@ -595,6 +595,11 @@ Tipo de autorização: Bearer`}
                   <p className="text-gray-700 dark:text-gray-300">
                     <strong>5.</strong> Clique em "Publicar" e teste perguntando sobre suas finanças
                   </p>
+                  <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3 mt-3">
+                    <p className="text-green-800 dark:text-green-200 text-xs">
+                      <strong>Dica:</strong> O endpoint <code>/context</code> é o principal! Use-o para perguntas como "quanto gastei com carne em janeiro" passando <code>{"month": "janeiro", "search": "carne"}</code>
+                    </p>
+                  </div>
                 </div>
               )}
             </div>
@@ -626,13 +631,27 @@ Tipo de autorização: Bearer`}
                   </p>
 
                   <div className="space-y-2">
+                    <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg border border-green-200 dark:border-green-800">
+                      <p className="text-xs text-green-700 dark:text-green-300 mb-1 font-semibold">⭐ PRINCIPAL: Contexto financeiro agregado</p>
+                      <code className="text-xs">POST /api/v1/mcp/context</code>
+                      <pre className="text-xs mt-2 text-green-600 dark:text-green-300">
+{`{
+  "month": "janeiro",
+  "search": "carne"
+}`}
+                      </pre>
+                      <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                        Retorna dados agregados ideais para análise por IA
+                      </p>
+                    </div>
+
                     <div className="bg-gray-100 dark:bg-slate-700 p-3 rounded-lg">
                       <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Listar tabelas disponíveis</p>
                       <code className="text-xs">GET /api/v1/mcp/tables</code>
                     </div>
 
                     <div className="bg-gray-100 dark:bg-slate-700 p-3 rounded-lg">
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Consultar dados de uma tabela</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Consultar dados brutos de uma tabela</p>
                       <code className="text-xs">POST /api/v1/mcp/query</code>
                       <pre className="text-xs mt-2 text-gray-600 dark:text-gray-300">
 {`{

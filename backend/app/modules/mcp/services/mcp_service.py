@@ -1,7 +1,9 @@
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Any
-from sqlalchemy import select, func, text, inspect, String
+from collections import defaultdict
+from dateutil.relativedelta import relativedelta
+from sqlalchemy import select, func, text, inspect, String, or_, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
 
@@ -11,7 +13,11 @@ from ....models import (
     Goal, GoalContribution, Debt, DebtPayment, RecurringTransaction,
     IncomeSource, Document, Merchant,
 )
-from ..schemas import TableInfo, ColumnInfo, QueryRequest
+from ....models.transaction import TransactionType
+from ....models.credit_card_invoice import InvoiceStatus
+from ....models.debt import DebtStatus
+from ....models.household import HouseholdMember
+from ..schemas import TableInfo, ColumnInfo, QueryRequest, ContextRequest
 
 
 # Mapeamento de tabelas permitidas e suas descrições
@@ -515,3 +521,363 @@ class MCPService:
         }
 
         return summary
+
+    # Mapeamento de meses em português
+    MONTHS_PT = {
+        "janeiro": 1, "fevereiro": 2, "marco": 3, "abril": 4,
+        "maio": 5, "junho": 6, "julho": 7, "agosto": 8, "setembro": 9,
+        "outubro": 10, "novembro": 11, "dezembro": 12,
+        "jan": 1, "fev": 2, "mar": 3, "abr": 4, "mai": 5, "jun": 6,
+        "jul": 7, "ago": 8, "set": 9, "out": 10, "nov": 11, "dez": 12
+    }
+
+    async def _get_household_user_ids(self, user: User) -> list[int]:
+        """Busca IDs de usuários do mesmo household"""
+        if not user.license_id:
+            return []
+
+        result = await self.db.execute(
+            select(HouseholdMember.user_id).where(
+                HouseholdMember.license_id == user.license_id
+            )
+        )
+        return list(result.scalars().all())
+
+    def _parse_period(self, request: ContextRequest) -> dict[str, Any]:
+        """Analisa parâmetros de período e retorna datas de início/fim"""
+        today = date.today()
+
+        # Se informou mês específico
+        if request.month:
+            month_num = request.month
+            if isinstance(request.month, str):
+                month_num = self.MONTHS_PT.get(request.month.lower(), today.month)
+            year = request.year or today.year
+            # Se mês > mês atual, provavelmente é ano anterior
+            if month_num > today.month and not request.year:
+                year -= 1
+            start = date(year, month_num, 1)
+            end = (start + relativedelta(months=1)) - timedelta(days=1)
+            return {"start": start, "end": end}
+
+        # Se informou datas customizadas
+        if request.date_from and request.date_to:
+            return {
+                "start": datetime.strptime(request.date_from, "%Y-%m-%d").date(),
+                "end": datetime.strptime(request.date_to, "%Y-%m-%d").date(),
+            }
+
+        # Padrão: mês atual
+        return {
+            "start": date(today.year, today.month, 1),
+            "end": today,
+        }
+
+    async def get_context(self, user: User, request: ContextRequest) -> dict[str, Any]:
+        """
+        Retorna contexto financeiro agregado para análise por IA.
+        Similar ao que o chatbot interno usa, mas otimizado para o MCP.
+        """
+        context: dict[str, Any] = {}
+        today = date.today()
+        period = self._parse_period(request)
+        period_start = period["start"]
+        period_end = period["end"]
+
+        household_user_ids = await self._get_household_user_ids(user)
+
+        # 1. Buscar categorias do usuário
+        categories_result = await self.db.execute(
+            select(Category).where(Category.user_id == user.id)
+        )
+        categories: dict[int | None, str] = {c.id: c.name for c in categories_result.scalars().all()}
+
+        # 2. Resumo de contas
+        if household_user_ids:
+            accounts_query = select(Account).where(
+                or_(
+                    and_(Account.user_id == user.id, Account.ownership_type == "personal"),
+                    and_(Account.user_id.in_(household_user_ids), Account.ownership_type == "household")
+                )
+            )
+        else:
+            accounts_query = select(Account).where(Account.user_id == user.id)
+
+        accounts = await self.db.execute(accounts_query)
+        accounts_list = accounts.scalars().all()
+        context["contas"] = [
+            {"nome": a.name, "tipo": a.type, "saldo": float(a.balance)}
+            for a in accounts_list if a.is_active
+        ]
+        context["saldo_total"] = sum(float(a.balance) for a in accounts_list if a.is_active)
+
+        # 3. Transações do período
+        if household_user_ids:
+            tx_query = select(Transaction).where(
+                Transaction.date >= period_start,
+                Transaction.date <= period_end,
+                or_(
+                    and_(Transaction.user_id == user.id, Transaction.ownership_type == "personal"),
+                    and_(Transaction.user_id.in_(household_user_ids), Transaction.ownership_type == "household")
+                )
+            )
+        else:
+            tx_query = select(Transaction).where(
+                Transaction.user_id == user.id,
+                Transaction.date >= period_start,
+                Transaction.date <= period_end
+            )
+
+        transactions = await self.db.execute(tx_query)
+        txs = transactions.scalars().all()
+
+        # Buscar merchants para mapear IDs para nomes
+        merchant_ids = [t.merchant_id for t in txs if t.merchant_id]
+        merchants: dict[int | None, str] = {}
+        if merchant_ids:
+            merchants_result = await self.db.execute(
+                select(Merchant).where(Merchant.id.in_(merchant_ids))
+            )
+            merchants = {m.id: m.name for m in merchants_result.scalars().all()}
+
+        # Calcular totais
+        receitas = sum(float(t.amount) for t in txs if t.type == TransactionType.INCOME.value)
+        despesas = sum(float(t.amount) for t in txs if t.type == TransactionType.EXPENSE.value)
+
+        context["periodo"] = {
+            "inicio": period_start.strftime("%d/%m/%Y"),
+            "fim": period_end.strftime("%d/%m/%Y"),
+        }
+
+        context["resumo"] = {
+            "receitas": round(receitas, 2),
+            "despesas": round(despesas, 2),
+            "saldo": round(receitas - despesas, 2),
+            "total_transacoes": len(txs),
+        }
+
+        # 4. Gastos por categoria (com filtro de keyword se informado)
+        gastos_por_categoria: dict[str, dict[str, Any]] = defaultdict(lambda: {"total": 0, "count": 0, "transacoes": []})
+        search_keyword = request.search.lower() if request.search else None
+
+        for t in txs:
+            if t.type == TransactionType.EXPENSE.value:
+                cat_name = categories.get(t.category_id, "Sem categoria")
+                merchant_name = merchants.get(t.merchant_id, t.description or "Não identificado")
+                description = t.description or ""
+
+                # Se tem keyword, filtrar
+                if search_keyword:
+                    if search_keyword not in description.lower() and search_keyword not in merchant_name.lower():
+                        continue
+
+                gastos_por_categoria[cat_name]["total"] += float(t.amount)
+                gastos_por_categoria[cat_name]["count"] += 1
+                # Limitar transações detalhadas para não ficar muito grande
+                if len(gastos_por_categoria[cat_name]["transacoes"]) < 10:
+                    gastos_por_categoria[cat_name]["transacoes"].append({
+                        "valor": float(t.amount),
+                        "data": t.date.strftime("%d/%m"),
+                        "estabelecimento": merchant_name,
+                        "descricao": description,
+                    })
+
+        # Ordenar por valor e arredondar
+        context["gastos_por_categoria"] = {
+            k: {"total": round(v["total"], 2), "count": v["count"], "transacoes": v["transacoes"]}
+            for k, v in sorted(gastos_por_categoria.items(), key=lambda x: x[1]["total"], reverse=True)
+        }
+
+        # 5. Gastos por estabelecimento (top 10)
+        gastos_por_estabelecimento: dict[str, dict[str, Any]] = defaultdict(lambda: {"total": 0, "count": 0})
+        for t in txs:
+            if t.type == TransactionType.EXPENSE.value:
+                merchant_name = merchants.get(t.merchant_id, t.description or "Outros")
+
+                if search_keyword:
+                    if search_keyword not in (t.description or "").lower() and search_keyword not in merchant_name.lower():
+                        continue
+
+                gastos_por_estabelecimento[merchant_name]["total"] += float(t.amount)
+                gastos_por_estabelecimento[merchant_name]["count"] += 1
+
+        context["gastos_por_estabelecimento"] = {
+            k: {"total": round(v["total"], 2), "count": v["count"]}
+            for k, v in sorted(gastos_por_estabelecimento.items(), key=lambda x: x[1]["total"], reverse=True)[:10]
+        }
+
+        # 6. Receitas por categoria
+        receitas_por_categoria: dict[str, dict[str, Any]] = defaultdict(lambda: {"total": 0, "count": 0})
+        for t in txs:
+            if t.type == TransactionType.INCOME.value:
+                cat_name = categories.get(t.category_id, "Sem categoria")
+                receitas_por_categoria[cat_name]["total"] += float(t.amount)
+                receitas_por_categoria[cat_name]["count"] += 1
+
+        context["receitas_por_categoria"] = {
+            k: {"total": round(v["total"], 2), "count": v["count"]}
+            for k, v in receitas_por_categoria.items()
+        }
+
+        # 7. Top 10 maiores gastos (aplicando filtro de keyword se existir)
+        despesas_filtradas = [t for t in txs if t.type == TransactionType.EXPENSE.value]
+        if search_keyword:
+            despesas_filtradas = [
+                t for t in despesas_filtradas
+                if search_keyword in (t.description or "").lower()
+                or search_keyword in merchants.get(t.merchant_id, "").lower()
+            ]
+        despesas_filtradas.sort(key=lambda x: float(x.amount), reverse=True)
+
+        context["maiores_gastos"] = [
+            {
+                "valor": float(t.amount),
+                "data": t.date.strftime("%d/%m/%Y"),
+                "estabelecimento": merchants.get(t.merchant_id, t.description or "Não identificado"),
+                "categoria": categories.get(t.category_id, "Sem categoria"),
+            }
+            for t in despesas_filtradas[:10]
+        ]
+
+        # 8. Total filtrado por keyword (se existir)
+        if search_keyword:
+            total_keyword = sum(float(t.amount) for t in despesas_filtradas)
+            context["total_filtrado"] = {
+                "keyword": request.search,
+                "total": round(total_keyword, 2),
+                "transacoes": len(despesas_filtradas),
+            }
+
+        # 9. Dívidas ativas
+        debts = await self.db.execute(
+            select(Debt).where(
+                Debt.user_id == user.id,
+                Debt.status == DebtStatus.ACTIVE.value
+            )
+        )
+        debts_list = debts.scalars().all()
+        context["dividas"] = [
+            {
+                "nome": d.name,
+                "saldo": float(d.current_balance),
+                "taxa_juros": float(d.interest_rate) * 100 if d.interest_rate else 0,
+                "pagamento_minimo": float(d.minimum_payment) if d.minimum_payment else 0,
+            }
+            for d in debts_list
+        ]
+        context["total_dividas"] = round(sum(float(d.current_balance) for d in debts_list), 2)
+
+        # 10. Metas financeiras
+        goals = await self.db.execute(
+            select(Goal).where(
+                Goal.user_id == user.id,
+                Goal.status == "active"
+            )
+        )
+        goals_list = goals.scalars().all()
+        context["metas"] = [
+            {
+                "nome": g.name,
+                "valor_alvo": float(g.target_amount),
+                "valor_atual": float(g.current_amount),
+                "progresso": round(float(g.current_amount / g.target_amount * 100), 1) if g.target_amount > 0 else 0,
+                "falta": round(float(g.target_amount - g.current_amount), 2),
+            }
+            for g in goals_list
+        ]
+
+        # 11. Cartões de crédito e faturas
+        credit_cards_result = await self.db.execute(
+            select(CreditCard).where(
+                CreditCard.user_id == user.id,
+                CreditCard.is_active == True
+            )
+        )
+        credit_cards_list = credit_cards_result.scalars().all()
+
+        cartoes_info = []
+        for card in credit_cards_list:
+            invoices_result = await self.db.execute(
+                select(CreditCardInvoice).where(
+                    CreditCardInvoice.credit_card_id == card.id,
+                    or_(
+                        CreditCardInvoice.status == InvoiceStatus.OPEN.value,
+                        CreditCardInvoice.status == InvoiceStatus.CLOSED.value,
+                        CreditCardInvoice.status == InvoiceStatus.PARTIAL.value,
+                        CreditCardInvoice.status == InvoiceStatus.OVERDUE.value
+                    )
+                ).order_by(
+                    CreditCardInvoice.reference_year.desc(),
+                    CreditCardInvoice.reference_month.desc()
+                )
+            )
+            invoices_list = invoices_result.scalars().all()
+
+            saldo_em_aberto = sum(
+                float(inv.remaining_amount)
+                for inv in invoices_list
+                if inv.status != InvoiceStatus.PAID.value
+            )
+
+            # Buscar conta vinculada
+            account_result = await self.db.execute(
+                select(Account).where(Account.id == card.account_id)
+            )
+            account = account_result.scalar_one_or_none()
+
+            faturas_info = []
+            for inv in invoices_list[:2]:  # Mostrar até 2 faturas
+                faturas_info.append({
+                    "periodo": f"{inv.reference_month:02d}/{inv.reference_year}",
+                    "status": inv.status,
+                    "valor_total": float(inv.total_amount),
+                    "valor_restante": float(inv.remaining_amount),
+                    "vencimento": inv.due_date.strftime("%d/%m/%Y"),
+                })
+
+            cartoes_info.append({
+                "nome": account.name if account else card.nickname or "Cartão",
+                "bandeira": card.card_brand,
+                "limite_total": float(card.credit_limit),
+                "saldo_em_aberto": round(saldo_em_aberto, 2),
+                "limite_disponivel": round(float(card.credit_limit) - saldo_em_aberto, 2),
+                "faturas": faturas_info,
+            })
+
+        context["cartoes_credito"] = cartoes_info
+
+        # 12. Comparação com período anterior
+        last_month = period_start - relativedelta(months=1)
+        last_month_start = date(last_month.year, last_month.month, 1)
+        last_month_end = (last_month_start + relativedelta(months=1)) - timedelta(days=1)
+
+        if household_user_ids:
+            last_month_query = select(Transaction).where(
+                Transaction.date >= last_month_start,
+                Transaction.date <= last_month_end,
+                or_(
+                    and_(Transaction.user_id == user.id, Transaction.ownership_type == "personal"),
+                    and_(Transaction.user_id.in_(household_user_ids), Transaction.ownership_type == "household")
+                )
+            )
+        else:
+            last_month_query = select(Transaction).where(
+                Transaction.user_id == user.id,
+                Transaction.date >= last_month_start,
+                Transaction.date <= last_month_end
+            )
+
+        last_txs = await self.db.execute(last_month_query)
+        last_txs_list = last_txs.scalars().all()
+
+        last_despesas = sum(float(t.amount) for t in last_txs_list if t.type == TransactionType.EXPENSE.value)
+        last_receitas = sum(float(t.amount) for t in last_txs_list if t.type == TransactionType.INCOME.value)
+
+        context["comparacao_periodo_anterior"] = {
+            "periodo": f"{last_month_start.strftime('%d/%m')} - {last_month_end.strftime('%d/%m/%Y')}",
+            "despesas": round(last_despesas, 2),
+            "receitas": round(last_receitas, 2),
+            "variacao_despesas_pct": round(((despesas - last_despesas) / max(1, last_despesas)) * 100, 1) if last_despesas > 0 else 0,
+        }
+
+        return context

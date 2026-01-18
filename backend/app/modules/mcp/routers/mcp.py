@@ -8,6 +8,7 @@ from ..schemas import (
     QueryRequest,
     QueryResponse,
     TableStatsResponse,
+    ContextRequest,
 )
 from ..services import MCPService
 
@@ -19,13 +20,50 @@ OPENAPI_SCHEMA = {
     "openapi": "3.1.0",
     "info": {
         "title": "Biveto MCP API",
-        "description": "API para consulta de dados financeiros do Biveto. Use para analisar transações, contas, cartões de crédito, metas e dívidas.",
-        "version": "1.0.0",
+        "description": """API para consulta de dados financeiros do Biveto.
+
+IMPORTANTE: Para perguntas de análise financeira (ex: "quanto gastei com X", "como estão minhas finanças"),
+use SEMPRE o endpoint /context primeiro! Ele retorna dados pré-agregados ideais para análise por IA.
+
+O endpoint /query é para consultas específicas de registros quando você precisa de dados brutos.""",
+        "version": "1.1.0",
     },
     "servers": [
         {"url": "https://biveto.com/api/v1"}
     ],
     "paths": {
+        "/mcp/context": {
+            "post": {
+                "operationId": "getFinancialContext",
+                "summary": "Contexto financeiro agregado para análise (RECOMENDADO)",
+                "description": """ENDPOINT PRINCIPAL! Use este endpoint para perguntas como:
+- "quanto gastei com carne em janeiro"
+- "como estão minhas finanças"
+- "quais meus maiores gastos"
+
+Retorna dados pré-agregados por categoria, estabelecimento, com totais e comparações.
+Muito mais eficiente que fazer múltiplas queries.""",
+                "security": [{"ApiKeyAuth": []}],
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "application/json": {
+                            "schema": {"$ref": "#/components/schemas/ContextRequest"}
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Contexto financeiro agregado",
+                        "content": {
+                            "application/json": {
+                                "schema": {"$ref": "#/components/schemas/ContextResponse"}
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/mcp/tables": {
             "get": {
                 "operationId": "listTables",
@@ -241,6 +279,85 @@ OPENAPI_SCHEMA = {
                         "additionalProperties": {"type": "string"}
                     }
                 }
+            },
+            "ContextRequest": {
+                "type": "object",
+                "description": "Parâmetros para contexto financeiro agregado",
+                "properties": {
+                    "month": {
+                        "oneOf": [{"type": "integer"}, {"type": "string"}],
+                        "description": "Mês para análise (1-12 ou nome: 'janeiro', 'fevereiro'). Ex: 1 ou 'janeiro'"
+                    },
+                    "year": {"type": "integer", "description": "Ano para análise (ex: 2026)"},
+                    "date_from": {"type": "string", "description": "Data inicial YYYY-MM-DD"},
+                    "date_to": {"type": "string", "description": "Data final YYYY-MM-DD"},
+                    "search": {"type": "string", "description": "IMPORTANTE: Busca por palavra-chave (ex: 'carne', 'mercado', 'uber', 'ifood')"}
+                }
+            },
+            "ContextResponse": {
+                "type": "object",
+                "description": "Contexto financeiro agregado para análise",
+                "properties": {
+                    "periodo": {
+                        "type": "object",
+                        "description": "Período analisado",
+                        "properties": {
+                            "inicio": {"type": "string"},
+                            "fim": {"type": "string"}
+                        }
+                    },
+                    "resumo": {
+                        "type": "object",
+                        "description": "Resumo financeiro do período",
+                        "properties": {
+                            "receitas": {"type": "number"},
+                            "despesas": {"type": "number"},
+                            "saldo": {"type": "number"},
+                            "total_transacoes": {"type": "integer"}
+                        }
+                    },
+                    "total_filtrado": {
+                        "type": "object",
+                        "description": "Total filtrado pela keyword (quando search é usado)",
+                        "properties": {
+                            "keyword": {"type": "string"},
+                            "total": {"type": "number", "description": "VALOR TOTAL gasto com a keyword"},
+                            "transacoes": {"type": "integer"}
+                        }
+                    },
+                    "gastos_por_categoria": {
+                        "type": "object",
+                        "description": "Gastos agrupados por categoria com totais"
+                    },
+                    "gastos_por_estabelecimento": {
+                        "type": "object",
+                        "description": "Top 10 estabelecimentos com mais gastos"
+                    },
+                    "maiores_gastos": {
+                        "type": "array",
+                        "description": "Top 10 maiores gastos do período"
+                    },
+                    "contas": {
+                        "type": "array",
+                        "description": "Lista de contas com saldos"
+                    },
+                    "cartoes_credito": {
+                        "type": "array",
+                        "description": "Cartões de crédito com faturas"
+                    },
+                    "dividas": {
+                        "type": "array",
+                        "description": "Dívidas ativas"
+                    },
+                    "metas": {
+                        "type": "array",
+                        "description": "Metas financeiras ativas"
+                    },
+                    "comparacao_periodo_anterior": {
+                        "type": "object",
+                        "description": "Comparação com período anterior"
+                    }
+                }
             }
         },
         "securitySchemes": {
@@ -387,3 +504,40 @@ async def get_current_user_info(
         "email": user.email,
         "is_active": user.is_active,
     }
+
+
+@router.post("/context")
+async def get_financial_context(
+    request: ContextRequest,
+    user: ApiKeyUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Retorna contexto financeiro agregado para análise por IA.
+
+    **ENDPOINT PRINCIPAL!** Use este endpoint para perguntas como:
+    - "quanto gastei com carne em janeiro"
+    - "como estão minhas finanças"
+    - "quais meus maiores gastos"
+
+    **Autenticação**: Header `Authorization: Bearer <API_KEY>`.
+
+    **Parâmetros**:
+    - `month`: Mês para análise (1-12 ou nome: 'janeiro', 'fevereiro')
+    - `year`: Ano para análise (ex: 2026)
+    - `date_from` / `date_to`: Período customizado (alternativa ao mês)
+    - `search`: **IMPORTANTE** - Busca por palavra-chave (ex: 'carne', 'mercado', 'uber')
+
+    **Exemplo de uso**:
+    ```json
+    {
+        "month": "janeiro",
+        "search": "carne"
+    }
+    ```
+
+    Retorna dados pré-agregados: gastos por categoria, por estabelecimento,
+    maiores gastos, cartões, dívidas, metas e comparação com período anterior.
+    """
+    service = MCPService(db)
+    return await service.get_context(user, request)
