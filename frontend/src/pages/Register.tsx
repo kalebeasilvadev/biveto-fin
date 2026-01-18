@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { authApi, getApiErrorMessage } from '../services/api'
 import { useAuthStore } from '../stores/authStore'
+import { Eye, EyeOff } from 'lucide-react'
 
 const schema = z.object({
   name: z.string().min(2, 'Mínimo 2 caracteres'),
@@ -17,6 +18,7 @@ type FormData = z.infer<typeof schema>
 export default function Register() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
   const navigate = useNavigate()
   const { setTokens, isAuthenticated } = useAuthStore()
 
@@ -99,12 +101,21 @@ export default function Register() {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Senha
               </label>
-              <input
-                type="password"
-                {...register('password')}
-                className="input"
-                placeholder="••••••••"
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  {...register('password')}
+                  className="input pr-10"
+                  placeholder="••••••••"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                >
+                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+              </div>
               {errors.password && (
                 <p className="text-red-500 text-sm mt-1">
                   {errors.password.message}

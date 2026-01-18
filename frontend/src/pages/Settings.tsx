@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useAuthStore } from '../stores/authStore'
 import api, { getApiErrorMessage, familyApi } from '../services/api'
-import { Lock, User, Mail, Check, AlertCircle, Users, ChevronRight, Database, Key } from 'lucide-react'
+import { Lock, User, Mail, Check, AlertCircle, Users, ChevronRight, Database, Key, Eye, EyeOff } from 'lucide-react'
 
 export default function Settings() {
   const user = useAuthStore((state) => state.user)
@@ -12,6 +12,9 @@ export default function Settings() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState('')
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false)
+  const [showNewPassword, setShowNewPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
   // Verifica se é owner para mostrar opção de API Keys
   const { data: familyContext } = useQuery({
@@ -175,44 +178,71 @@ export default function Settings() {
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Senha Atual
             </label>
-            <input
-              type="password"
-              value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
-              className="input"
-              required
-              placeholder="Digite sua senha atual"
-            />
+            <div className="relative">
+              <input
+                type={showCurrentPassword ? 'text' : 'password'}
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                className="input pr-10"
+                required
+                placeholder="Digite sua senha atual"
+              />
+              <button
+                type="button"
+                onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              >
+                {showCurrentPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+              </button>
+            </div>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Nova Senha
             </label>
-            <input
-              type="password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              className="input"
-              required
-              minLength={8}
-              placeholder="Digite a nova senha (mín. 8 caracteres)"
-            />
+            <div className="relative">
+              <input
+                type={showNewPassword ? 'text' : 'password'}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                className="input pr-10"
+                required
+                minLength={8}
+                placeholder="Digite a nova senha (mín. 8 caracteres)"
+              />
+              <button
+                type="button"
+                onClick={() => setShowNewPassword(!showNewPassword)}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              >
+                {showNewPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+              </button>
+            </div>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Confirmar Nova Senha
             </label>
-            <input
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              className="input"
-              required
-              minLength={8}
-              placeholder="Confirme a nova senha"
-            />
+            <div className="relative">
+              <input
+                type={showConfirmPassword ? 'text' : 'password'}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="input pr-10"
+                required
+                minLength={8}
+                placeholder="Confirme a nova senha"
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              >
+                {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+              </button>
+            </div>
           </div>
 
           <button

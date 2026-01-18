@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useAuthStore } from '../stores/authStore'
 import api, { getApiErrorMessage } from '../services/api'
-import { Lock, AlertCircle, Loader2 } from 'lucide-react'
+import { Lock, AlertCircle, Loader2, Eye, EyeOff } from 'lucide-react'
 
 export default function ResetPassword() {
   const { token } = useParams<{ token: string }>()
@@ -13,6 +13,8 @@ export default function ResetPassword() {
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
   // Validate reset token
   const {
@@ -130,14 +132,21 @@ export default function ResetPassword() {
                   <Lock className="h-5 w-5 text-gray-400" />
                 </div>
                 <input
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="input pl-10"
+                  className="input pl-10 pr-10"
                   placeholder="Mínimo 8 caracteres"
                   required
                   minLength={8}
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                >
+                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
               </div>
             </div>
 
@@ -150,14 +159,21 @@ export default function ResetPassword() {
                   <Lock className="h-5 w-5 text-gray-400" />
                 </div>
                 <input
-                  type="password"
+                  type={showConfirmPassword ? 'text' : 'password'}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="input pl-10"
+                  className="input pl-10 pr-10"
                   placeholder="Digite a senha novamente"
                   required
                   minLength={8}
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                >
+                  {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
               </div>
             </div>
 
