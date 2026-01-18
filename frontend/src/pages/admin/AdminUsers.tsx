@@ -16,8 +16,6 @@ import {
   KeyRound,
   AlertTriangle,
   CheckCircle,
-  Eye,
-  EyeOff,
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import api, { getApiErrorMessage } from '../../services/api'
@@ -86,7 +84,6 @@ export default function AdminUsers() {
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteLicenseId, setInviteLicenseId] = useState<number | null>(null)
   const [activeTab, setActiveTab] = useState<'users' | 'invitations'>('users')
-  const [showPassword, setShowPassword] = useState(false)
 
   const queryClient = useQueryClient()
 
@@ -181,7 +178,6 @@ export default function AdminUsers() {
     setShowModal(false)
     setEditingUser(null)
     setForm({ email: '', password: '', name: '', is_admin: false, license_id: null })
-    setShowPassword(false)
   }
 
   const closeInviteModal = () => {
@@ -581,23 +577,14 @@ export default function AdminUsers() {
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Senha {editingUser && '(deixe vazio para manter)'}
                 </label>
-                <div className="relative">
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    value={form.password}
-                    onChange={(e) => setForm({ ...form, password: e.target.value })}
-                    className="input pr-10"
-                    required={!editingUser}
-                    minLength={8}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                  >
-                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                  </button>
-                </div>
+                <input
+                  type="password"
+                  value={form.password}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                  className="input"
+                  required={!editingUser}
+                  minLength={8}
+                />
               </div>
 
               <div>
