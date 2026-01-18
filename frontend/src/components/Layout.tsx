@@ -1,6 +1,7 @@
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
 import { useThemeStore } from '../stores/themeStore'
+import { useQuickTransactionStore } from '../stores/quickTransactionStore'
 import {
   LayoutDashboard,
   Receipt,
@@ -63,8 +64,8 @@ const bottomNavItems = [
 
 export default function Layout() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [showQuickTransaction, setShowQuickTransaction] = useState(false)
   const [showIOSInstallModal, setShowIOSInstallModal] = useState(false)
+  const { isOpen: showQuickTransaction, open: openQuickTransaction, close: closeQuickTransaction } = useQuickTransactionStore()
   const logout = useAuthStore((state) => state.logout)
   const user = useAuthStore((state) => state.user)
   const setUser = useAuthStore((state) => state.setUser)
@@ -367,7 +368,7 @@ export default function Layout() {
       {/* Quick Transaction Modal */}
       <QuickTransactionModal
         isOpen={showQuickTransaction}
-        onClose={() => setShowQuickTransaction(false)}
+        onClose={closeQuickTransaction}
       />
 
       {/* Toast Notifications */}
@@ -388,7 +389,7 @@ export default function Layout() {
           item.primary ? (
             <button
               key={item.to}
-              onClick={() => setShowQuickTransaction(true)}
+              onClick={openQuickTransaction}
               className="relative -mt-5"
               aria-label="Adicionar nova transação"
             >

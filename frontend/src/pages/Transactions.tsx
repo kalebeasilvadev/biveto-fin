@@ -24,6 +24,7 @@ import {
 import { Link } from 'react-router-dom'
 import EmptyState from '../components/EmptyState'
 import { clsx } from 'clsx'
+import { useQuickTransactionStore } from '../stores/quickTransactionStore'
 
 interface Transaction {
   id: number
@@ -110,6 +111,7 @@ export default function Transactions() {
   })
 
   const queryClient = useQueryClient()
+  const openQuickTransaction = useQuickTransactionStore((state) => state.open)
 
   // Debounce search input
   useEffect(() => {
@@ -555,9 +557,10 @@ export default function Transactions() {
             )}
           </div>
 
-          <Link to="/upload" className="btn-primary flex items-center gap-2">
+          <button onClick={openQuickTransaction} className="btn-primary flex items-center gap-2">
             <Plus size={18} />
-          </Link>
+            <span className="hidden sm:inline">Nova Transação</span>
+          </button>
         </div>
       </div>
 
