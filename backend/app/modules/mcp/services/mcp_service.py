@@ -660,16 +660,40 @@ class MCPService:
         gastos_por_categoria: dict[str, dict[str, Any]] = defaultdict(lambda: {"total": 0, "count": 0, "transacoes": []})
         search_keyword = request.search.lower() if request.search else None
 
+        # Sinônimos e palavras relacionadas para buscas comuns
+        SEARCH_SYNONYMS = {
+            "carne": ["carne", "carnes", "açougue", "acougue", "bife", "picanha", "costela", "frango", "proteina"],
+            "mercado": ["mercado", "supermercado", "atacadao", "atacadão", "assai", "assaí", "carrefour", "extra", "pao de acucar", "pão de açúcar"],
+            "restaurante": ["restaurante", "lanchonete", "ifood", "rappi", "uber eats", "delivery", "pizzaria", "hamburgueria"],
+            "uber": ["uber", "99", "cabify", "taxi", "táxi"],
+            "gasolina": ["gasolina", "combustivel", "combustível", "posto", "shell", "ipiranga", "br", "petrobras"],
+            "farmacia": ["farmacia", "farmácia", "drogaria", "droga", "remedio", "remédio", "medicamento"],
+        }
+
+        # Expande a keyword para incluir sinônimos
+        search_terms = [search_keyword] if search_keyword else []
+        if search_keyword:
+            for base_term, synonyms in SEARCH_SYNONYMS.items():
+                if search_keyword in synonyms or search_keyword == base_term:
+                    search_terms = synonyms
+                    break
+
+        def matches_search(description: str, merchant_name: str, category: str) -> bool:
+            """Verifica se a transação corresponde aos termos de busca"""
+            if not search_terms:
+                return True
+            text_to_search = f"{description} {merchant_name} {category}".lower()
+            return any(term in text_to_search for term in search_terms)
+
         for t in txs:
             if t.type == TransactionType.EXPENSE.value:
                 cat_name = categories.get(t.category_id, "Sem categoria")
                 merchant_name = merchants.get(t.merchant_id, t.description or "Não identificado")
                 description = t.description or ""
 
-                # Se tem keyword, filtrar
-                if search_keyword:
-                    if search_keyword not in description.lower() and search_keyword not in merchant_name.lower():
-                        continue
+                # Se tem keyword, filtrar usando busca expandida
+                if search_keyword and not matches_search(description, merchant_name, cat_name):
+                    continue
 
                 gastos_por_categoria[cat_name]["total"] += float(t.amount)
                 gastos_por_categoria[cat_name]["count"] += 1
@@ -692,11 +716,11 @@ class MCPService:
         gastos_por_estabelecimento: dict[str, dict[str, Any]] = defaultdict(lambda: {"total": 0, "count": 0})
         for t in txs:
             if t.type == TransactionType.EXPENSE.value:
+                cat_name = categories.get(t.category_id, "Sem categoria")
                 merchant_name = merchants.get(t.merchant_id, t.description or "Outros")
 
-                if search_keyword:
-                    if search_keyword not in (t.description or "").lower() and search_keyword not in merchant_name.lower():
-                        continue
+                if search_keyword and not matches_search(t.description or "", merchant_name, cat_name):
+                    continue
 
                 gastos_por_estabelecimento[merchant_name]["total"] += float(t.amount)
                 gastos_por_estabelecimento[merchant_name]["count"] += 1
@@ -724,8 +748,11 @@ class MCPService:
         if search_keyword:
             despesas_filtradas = [
                 t for t in despesas_filtradas
-                if search_keyword in (t.description or "").lower()
-                or search_keyword in merchants.get(t.merchant_id, "").lower()
+                if matches_search(
+                    t.description or "",
+                    merchants.get(t.merchant_id, ""),
+                    categories.get(t.category_id, "")
+                )
             ]
         despesas_filtradas.sort(key=lambda x: float(x.amount), reverse=True)
 
