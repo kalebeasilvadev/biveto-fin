@@ -528,6 +528,10 @@ export const invoicesApi = {
     include_installments?: boolean
     include_recurring?: boolean
   }) => api.post('/invoices/project-future', data),
+  reprocessOrphanTransactions: (creditCardId?: number) =>
+    api.post('/invoices/reprocess-orphan-transactions', null, {
+      params: creditCardId ? { credit_card_id: creditCardId } : {},
+    }),
 }
 
 export const apiKeysApi = {

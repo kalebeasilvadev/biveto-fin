@@ -981,3 +981,55 @@ async def project_future_transactions(
         invoices_created=new_invoices,
         transactions_created=total_transactions,
     )
+
+
+class ReprocessOrphanResponse(BaseModel):
+    """Resposta do reprocessamento de transações órfãs"""
+    message: str
+    found: int
+    processed: int
+    errors: list[dict]
+    invoices_updated: list[int]
+    transactions: list[dict]
+
+
+@router.post("/reprocess-orphan-transactions", response_model=ReprocessOrphanResponse)
+async def reprocess_orphan_transactions(
+    current_user: CurrentUser,
+    db: DbSession,
+    credit_card_id: int | None = Query(
+        None,
+        description="ID do cartão específico para reprocessar. Se não informado, processa todos os cartões."
+    ),
+):
+    """
+    Reprocessa transações órfãs que estão em contas de cartão de crédito
+    mas não foram vinculadas à fatura corretamente.
+
+    Isso é útil para corrigir transações que foram criadas antes do fix
+    de auto-inferência de credit_card_id a partir do account_id.
+
+    O endpoint irá:
+    1. Encontrar transações em contas do tipo 'credit_card' sem credit_card_id
+    2. Vincular essas transações ao cartão de crédito correto
+    3. Calcular e vincular à fatura apropriada baseado na data da transação
+    4. Atualizar o payment_method para 'credit_card'
+    5. Recalcular os totais das faturas afetadas
+    """
+    service = InvoiceService(db)
+
+    result = await service.reprocess_orphan_transactions(
+        user=current_user,
+        credit_card_id=credit_card_id,
+    )
+
+    await db.commit()
+
+    return ReprocessOrphanResponse(
+        message=f"Reprocessamento concluído: {result['processed']}/{result['found']} transações processadas",
+        found=result["found"],
+        processed=result["processed"],
+        errors=result["errors"],
+        invoices_updated=result["invoices_updated"],
+        transactions=result["transactions"],
+    )

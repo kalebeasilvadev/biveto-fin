@@ -55,6 +55,9 @@ class Settings(BaseSettings):
     # Frontend URL (para links nos emails)
     frontend_url: str = "https://biveto.com"
 
+    # Biveto API Key (para integrações internas)
+    biveto_api_key: str | None = None
+
     class Config:
         env_file = ".env"
         case_sensitive = False

@@ -31,6 +31,10 @@ class TransactionService:
         invoice_id = None
         invoice = None
 
+        # Auto-inferir credit_card_id se account é do tipo credit_card
+        if not credit_card_id and data.account_id:
+            credit_card_id = await self._get_credit_card_from_account(user, data.account_id)
+
         if credit_card_id:
             # Buscar cartao de credito
             card_result = await self.db.execute(
@@ -218,6 +222,10 @@ class TransactionService:
         credit_card = None
         invoice = None
         invoice_service = None
+
+        # Auto-inferir credit_card_id se account é do tipo credit_card
+        if not credit_card_id and data.account_id:
+            credit_card_id = await self._get_credit_card_from_account(user, data.account_id)
 
         if credit_card_id:
             # Buscar cartao de credito
@@ -970,6 +978,37 @@ class TransactionService:
             await self.db.flush()
 
         return merchant.id
+
+    async def _get_credit_card_from_account(self, user: User, account_id: int) -> int | None:
+        """
+        Verifica se a conta é do tipo credit_card e retorna o credit_card_id associado.
+
+        Isso permite auto-inferir o cartão de crédito quando o usuário seleciona
+        uma conta do tipo credit_card, garantindo que a transação seja vinculada
+        à fatura correta.
+        """
+        # Buscar a conta
+        account_result = await self.db.execute(
+            select(Account).where(
+                Account.id == account_id,
+                Account.user_id == user.id,
+            )
+        )
+        account = account_result.scalar_one_or_none()
+
+        if not account or account.type != "credit_card":
+            return None
+
+        # Buscar o cartão de crédito associado à conta
+        cc_result = await self.db.execute(
+            select(CreditCard).where(
+                CreditCard.account_id == account_id,
+                CreditCard.user_id == user.id,
+            )
+        )
+        credit_card = cc_result.scalar_one_or_none()
+
+        return credit_card.id if credit_card else None
 
     # Tipos extraidos pelo LLM que indicam CREDITO (type=INCOME)
     # Creditos reduzem o valor da fatura

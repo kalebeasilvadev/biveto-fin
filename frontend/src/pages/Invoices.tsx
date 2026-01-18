@@ -17,6 +17,7 @@ import {
   AlertTriangle,
   Eye,
   MoreVertical,
+  RefreshCw,
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import EmptyState from '../components/EmptyState'
@@ -170,6 +171,25 @@ export default function Invoices() {
       queryClient.invalidateQueries({ queryKey: ['transactions'] })
       setShowMoveModal(false)
       setTransactionToMove(null)
+    },
+  })
+
+  const reprocessMutation = useMutation({
+    mutationFn: (creditCardId?: number) => invoicesApi.reprocessOrphanTransactions(creditCardId),
+    onSuccess: (response) => {
+      queryClient.invalidateQueries({ queryKey: ['invoices'] })
+      queryClient.invalidateQueries({ queryKey: ['invoice'] })
+      queryClient.invalidateQueries({ queryKey: ['transactions'] })
+      queryClient.invalidateQueries({ queryKey: ['credit-cards'] })
+      const data = response.data
+      if (data.processed > 0) {
+        alert(`Reprocessamento concluído!\n\n${data.processed} transações vinculadas às faturas.`)
+      } else if (data.found === 0) {
+        alert('Nenhuma transação órfã encontrada.')
+      }
+    },
+    onError: (error: Error & { response?: { data?: { detail?: string } } }) => {
+      alert(`Erro ao reprocessar: ${error.response?.data?.detail || error.message}`)
     },
   })
 
@@ -393,6 +413,17 @@ export default function Invoices() {
                 </option>
               ))}
             </select>
+
+            {/* Reprocess Orphan Transactions Button */}
+            <button
+              onClick={() => reprocessMutation.mutate(selectedCardId || undefined)}
+              disabled={reprocessMutation.isPending}
+              className="btn btn-secondary text-sm flex items-center gap-1.5"
+              title="Reprocessar transações órfãs - vincula transações de cartão que ficaram sem fatura"
+            >
+              <RefreshCw size={16} className={reprocessMutation.isPending ? 'animate-spin' : ''} />
+              <span className="hidden sm:inline">Reprocessar</span>
+            </button>
           </div>
         </div>
 

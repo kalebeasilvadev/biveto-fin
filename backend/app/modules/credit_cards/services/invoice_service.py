@@ -1012,3 +1012,119 @@ class InvoiceService:
                 await self.update_invoice_total(invoice)
 
         return created_transactions
+
+    async def reprocess_orphan_transactions(
+        self,
+        user: User,
+        credit_card_id: int | None = None,
+    ) -> dict:
+        """
+        Reprocessa transações órfãs que estão em contas de cartão de crédito
+        mas não têm credit_card_id ou invoice_id definidos.
+
+        Isso é útil para corrigir transações que foram criadas antes do fix
+        de auto-inferência de credit_card_id.
+
+        Args:
+            user: Usuário autenticado
+            credit_card_id: Se fornecido, processa apenas transações desse cartão
+
+        Returns:
+            Dict com estatísticas do reprocessamento:
+            - found: número de transações órfãs encontradas
+            - processed: número de transações processadas com sucesso
+            - errors: lista de erros encontrados
+            - invoices_updated: conjunto de faturas atualizadas
+        """
+        result = {
+            "found": 0,
+            "processed": 0,
+            "errors": [],
+            "invoices_updated": set(),
+            "transactions": [],
+        }
+
+        # Buscar todos os cartões de crédito do usuário (ou um específico)
+        cc_query = select(CreditCard).where(CreditCard.user_id == user.id)
+        if credit_card_id:
+            cc_query = cc_query.where(CreditCard.id == credit_card_id)
+
+        cc_result = await self.db.execute(cc_query)
+        credit_cards = cc_result.scalars().all()
+
+        if not credit_cards:
+            return result
+
+        # Para cada cartão, buscar account_id associado
+        for credit_card in credit_cards:
+            # Buscar transações órfãs: estão na conta do cartão mas sem credit_card_id
+            orphan_query = select(Transaction).where(
+                and_(
+                    Transaction.user_id == user.id,
+                    Transaction.account_id == credit_card.account_id,
+                    Transaction.credit_card_id.is_(None),
+                    Transaction.type == TransactionType.EXPENSE.value,
+                )
+            ).order_by(Transaction.date)
+
+            orphan_result = await self.db.execute(orphan_query)
+            orphan_transactions = orphan_result.scalars().all()
+
+            result["found"] += len(orphan_transactions)
+
+            for tx in orphan_transactions:
+                try:
+                    # Calcular período da fatura baseado na data da transação
+                    period = self.calculate_invoice_period(credit_card, tx.date)
+
+                    # Obter ou criar fatura para o período
+                    invoice = await self.get_or_create_invoice(
+                        user=user,
+                        credit_card=credit_card,
+                        reference_month=period['reference_month'],
+                        reference_year=period['reference_year'],
+                        closing_date=period['closing_date'],
+                        due_date=period['due_date'],
+                    )
+
+                    # Atualizar a transação
+                    tx.credit_card_id = credit_card.id
+                    tx.invoice_id = invoice.id
+
+                    # Atualizar payment_method se estava incorreto
+                    if tx.payment_method != PaymentMethod.CREDIT_CARD.value:
+                        tx.payment_method = PaymentMethod.CREDIT_CARD.value
+
+                    result["processed"] += 1
+                    result["invoices_updated"].add(invoice.id)
+                    result["transactions"].append({
+                        "id": tx.id,
+                        "description": tx.description,
+                        "amount": float(tx.amount),
+                        "date": tx.date.isoformat(),
+                        "invoice_id": invoice.id,
+                        "invoice_ref": f"{period['reference_month']:02d}/{period['reference_year']}",
+                    })
+
+                except Exception as e:
+                    result["errors"].append({
+                        "transaction_id": tx.id,
+                        "error": str(e),
+                    })
+
+        await self.db.flush()
+
+        # Atualizar totais das faturas afetadas
+        if result["invoices_updated"]:
+            invoices_result = await self.db.execute(
+                select(CreditCardInvoice).where(
+                    CreditCardInvoice.id.in_(result["invoices_updated"])
+                )
+            )
+            for invoice in invoices_result.scalars().all():
+                await self.update_invoice_total(invoice)
+
+        # Converter set para lista para serialização JSON
+        result["invoices_updated"] = list(result["invoices_updated"])
+
+        return result
