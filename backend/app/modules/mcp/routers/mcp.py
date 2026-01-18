@@ -317,7 +317,20 @@ O endpoint /query é para consultas específicas de registros quando você preci
                             "termo": {"type": "string", "description": "Termo buscado"},
                             "total": {"type": "number", "description": "VALOR TOTAL encontrado com o termo"},
                             "quantidade": {"type": "integer", "description": "Número de transações encontradas"},
-                            "transacoes": {"type": "array", "description": "Lista das transações encontradas"},
+                            "transacoes": {
+                                "type": "array",
+                                "description": "Lista das transações encontradas",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "valor": {"type": "number"},
+                                        "data": {"type": "string"},
+                                        "estabelecimento": {"type": "string"},
+                                        "descricao": {"type": "string"},
+                                        "categoria": {"type": "string"}
+                                    }
+                                }
+                            },
                             "dica": {"type": "string", "description": "Dica caso não encontre resultados"}
                         }
                     },
