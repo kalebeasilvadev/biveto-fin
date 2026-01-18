@@ -116,14 +116,11 @@ export default function Invoices() {
 
   const { data: invoicesData, isLoading } = useQuery({
     queryKey: ['invoices', selectedCardId, selectedYear],
-    queryFn: () => {
-      console.log('[Invoices] Fetching with params:', { credit_card_id: selectedCardId, year: selectedYear, limit: 200 })
-      return invoicesApi.list({
-        credit_card_id: selectedCardId || undefined,
-        year: selectedYear,
-        limit: 200, // Ensure all invoices for the year are fetched
-      })
-    },
+    queryFn: () => invoicesApi.list({
+      credit_card_id: selectedCardId || undefined,
+      year: selectedYear,
+      limit: 200, // Ensure all invoices for the year are fetched
+    }),
     staleTime: 0, // Always refetch to ensure fresh data
   })
 
