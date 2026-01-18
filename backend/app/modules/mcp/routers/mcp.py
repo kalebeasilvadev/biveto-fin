@@ -36,23 +36,22 @@ O endpoint /query é para consultas específicas de registros quando você preci
             "post": {
                 "operationId": "getFinancialContext",
                 "summary": "Contexto financeiro agregado para análise (RECOMENDADO)",
-                "description": """ENDPOINT PRINCIPAL! Use este endpoint para perguntas como:
-- "quanto gastei com carne em janeiro"
-- "como estão minhas finanças"
-- "quais meus maiores gastos"
+                "description": """ENDPOINT PRINCIPAL! Use este endpoint para QUALQUER pergunta sobre finanças.
 
-Retorna dados pré-agregados por categoria, estabelecimento, com totais e comparações.
+**SEMPRE retorna dados completos do período** (gastos por categoria, por estabelecimento, maiores gastos, etc.)
+para que você possa analisar e responder qualquer pergunta.
 
-**BUSCA INTELIGENTE (parâmetro search):**
-O campo search usa sinônimos e categorias relacionadas automaticamente:
-- "carne" busca: carne, carnes, açougue, bife, picanha + categorias Mercado/Alimentação
-- "mercado" busca: mercado, supermercado, carrefour, assaí + categoria Mercado
-- "restaurante" busca: restaurante, ifood, delivery, pizzaria + categoria Alimentação
-- "uber" busca: uber, 99, taxi + categoria Transporte
-- "gasolina" busca: gasolina, combustível, posto, shell + categoria Transporte
-- "farmacia" busca: farmácia, drogaria, remédio + categoria Saúde
+**Parâmetro search (opcional):**
+- Quando informado, destaca transações que contêm o termo no campo 'resultado_busca'
+- IMPORTANTE: Os dados completos SEMPRE são retornados em gastos_por_categoria e gastos_por_estabelecimento
+- Se resultado_busca.total for 0, analise gastos_por_categoria e gastos_por_estabelecimento para encontrar gastos relacionados
 
-O campo total_filtrado na resposta mostra o TOTAL gasto com o termo buscado.""",
+**Exemplos de perguntas que pode responder:**
+- "quanto gastei com carne em janeiro" → search="carne", month="janeiro"
+- "quanto gastei no mercado" → search="mercado"
+- "quanto gastei com Netflix" → search="netflix"
+- "quais meus maiores gastos" → sem search, analise maiores_gastos
+- "como estão minhas finanças" → sem search, analise resumo""",
                 "security": [{"ApiKeyAuth": []}],
                 "requestBody": {
                     "required": True,
@@ -301,7 +300,7 @@ O campo total_filtrado na resposta mostra o TOTAL gasto com o termo buscado.""",
                     "year": {"type": "integer", "description": "Ano para análise (ex: 2026)"},
                     "date_from": {"type": "string", "description": "Data inicial YYYY-MM-DD"},
                     "date_to": {"type": "string", "description": "Data final YYYY-MM-DD"},
-                    "search": {"type": "string", "description": "Busca inteligente com sinônimos e categorias relacionadas. Ex: 'carne' busca também açougue, carnes + categoria Mercado; 'mercado' busca supermercados + categoria Mercado; 'uber' busca 99, taxi + categoria Transporte"}
+                    "search": {"type": "string", "description": "Termo para buscar em descrições e estabelecimentos. Resultados aparecem em 'resultado_busca'. Os dados completos SEMPRE são retornados para análise."}
                 }
             },
             "ContextResponse": {
@@ -326,13 +325,15 @@ O campo total_filtrado na resposta mostra o TOTAL gasto com o termo buscado.""",
                             "total_transacoes": {"type": "integer"}
                         }
                     },
-                    "total_filtrado": {
+                    "resultado_busca": {
                         "type": "object",
-                        "description": "Total filtrado pela keyword (quando search é usado)",
+                        "description": "Transações que correspondem ao termo de busca (quando search é usado). Se total=0, analise gastos_por_categoria para encontrar gastos relacionados.",
                         "properties": {
-                            "keyword": {"type": "string"},
-                            "total": {"type": "number", "description": "VALOR TOTAL gasto com a keyword"},
-                            "transacoes": {"type": "integer"}
+                            "termo": {"type": "string", "description": "Termo buscado"},
+                            "total": {"type": "number", "description": "VALOR TOTAL encontrado com o termo"},
+                            "quantidade": {"type": "integer", "description": "Número de transações encontradas"},
+                            "transacoes": {"type": "array", "description": "Lista das transações encontradas"},
+                            "dica": {"type": "string", "description": "Dica caso não encontre resultados"}
                         }
                     },
                     "gastos_por_categoria": {

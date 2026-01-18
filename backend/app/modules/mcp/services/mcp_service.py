@@ -656,64 +656,21 @@ class MCPService:
             "total_transacoes": len(txs),
         }
 
-        # 4. Gastos por categoria (com filtro de keyword se informado)
+        # 4. Gastos por categoria - SEMPRE retorna todos para o ChatGPT analisar
         gastos_por_categoria: dict[str, dict[str, Any]] = defaultdict(lambda: {"total": 0, "count": 0, "transacoes": []})
         search_keyword = request.search.lower() if request.search else None
 
-        # Sinônimos e palavras relacionadas para buscas comuns
-        SEARCH_SYNONYMS = {
-            "carne": ["carne", "carnes", "açougue", "acougue", "bife", "picanha", "costela", "frango", "proteina", "churrasco"],
-            "mercado": ["mercado", "supermercado", "atacadao", "atacadão", "assai", "assaí", "carrefour", "extra", "pao de acucar", "pão de açúcar", "compras"],
-            "restaurante": ["restaurante", "lanchonete", "ifood", "rappi", "uber eats", "delivery", "pizzaria", "hamburgueria", "comida"],
-            "uber": ["uber", "99", "cabify", "taxi", "táxi", "corrida"],
-            "gasolina": ["gasolina", "combustivel", "combustível", "posto", "shell", "ipiranga", "br", "petrobras", "alcool", "álcool"],
-            "farmacia": ["farmacia", "farmácia", "drogaria", "droga", "remedio", "remédio", "medicamento", "saude", "saúde"],
-            "alimentacao": ["alimentacao", "alimentação", "comida", "refeicao", "refeição", "almoco", "almoço", "jantar", "cafe", "café", "lanche"],
-        }
-
-        # Mapeamento de keywords para categorias relacionadas (busca pela categoria também)
-        CATEGORY_MAPPING = {
-            "carne": ["mercado", "alimentacao", "alimentação", "compras"],
-            "mercado": ["mercado", "supermercado", "compras"],
-            "restaurante": ["alimentacao", "alimentação", "restaurante", "lazer"],
-            "gasolina": ["transporte", "combustivel", "combustível", "veiculo", "veículo"],
-            "farmacia": ["saude", "saúde", "farmacia", "farmácia"],
-            "uber": ["transporte", "mobilidade"],
-            "alimentacao": ["alimentacao", "alimentação", "mercado", "restaurante"],
-        }
-
-        # Expande a keyword para incluir sinônimos
-        search_terms = [search_keyword] if search_keyword else []
-        related_categories: list[str] = []
-        if search_keyword:
-            for base_term, synonyms in SEARCH_SYNONYMS.items():
-                if search_keyword in synonyms or search_keyword == base_term:
-                    search_terms = synonyms
-                    # Também adiciona categorias relacionadas
-                    related_categories = CATEGORY_MAPPING.get(base_term, [])
-                    break
-
+        # Função para verificar se transação corresponde à busca (para destacar resultados)
         def matches_search(description: str, merchant_name: str, category: str) -> bool:
-            """Verifica se a transação corresponde aos termos de busca"""
-            if not search_terms:
-                return True
-            text_to_search = f"{description} {merchant_name}".lower()
-            category_lower = category.lower()
+            """Verifica se a transação corresponde ao termo de busca"""
+            if not search_keyword:
+                return False
+            text_to_search = f"{description} {merchant_name} {category}".lower()
+            return search_keyword in text_to_search
 
-            # Verifica se algum termo de busca está na descrição/merchant
-            if any(term in text_to_search for term in search_terms):
-                return True
-
-            # Verifica se a categoria está nas categorias relacionadas
-            if related_categories:
-                if any(cat in category_lower for cat in related_categories):
-                    return True
-
-            # Verifica se algum termo está no nome da categoria
-            if any(term in category_lower for term in search_terms):
-                return True
-
-            return False
+        # Acumula transações que correspondem à busca para destaque
+        transacoes_encontradas: list[dict[str, Any]] = []
+        total_encontrado = 0.0
 
         for t in txs:
             if t.type == TransactionType.EXPENSE.value:
@@ -721,14 +678,11 @@ class MCPService:
                 merchant_name = merchants.get(t.merchant_id, t.description or "Não identificado")
                 description = t.description or ""
 
-                # Se tem keyword, filtrar usando busca expandida
-                if search_keyword and not matches_search(description, merchant_name, cat_name):
-                    continue
-
+                # SEMPRE adiciona aos totais por categoria
                 gastos_por_categoria[cat_name]["total"] += float(t.amount)
                 gastos_por_categoria[cat_name]["count"] += 1
                 # Limitar transações detalhadas para não ficar muito grande
-                if len(gastos_por_categoria[cat_name]["transacoes"]) < 10:
+                if len(gastos_por_categoria[cat_name]["transacoes"]) < 5:
                     gastos_por_categoria[cat_name]["transacoes"].append({
                         "valor": float(t.amount),
                         "data": t.date.strftime("%d/%m"),
@@ -736,22 +690,39 @@ class MCPService:
                         "descricao": description,
                     })
 
+                # Se tem keyword e corresponde, acumula para destaque
+                if search_keyword and matches_search(description, merchant_name, cat_name):
+                    total_encontrado += float(t.amount)
+                    if len(transacoes_encontradas) < 20:
+                        transacoes_encontradas.append({
+                            "valor": float(t.amount),
+                            "data": t.date.strftime("%d/%m/%Y"),
+                            "estabelecimento": merchant_name,
+                            "descricao": description,
+                            "categoria": cat_name,
+                        })
+
         # Ordenar por valor e arredondar
         context["gastos_por_categoria"] = {
             k: {"total": round(v["total"], 2), "count": v["count"], "transacoes": v["transacoes"]}
             for k, v in sorted(gastos_por_categoria.items(), key=lambda x: x[1]["total"], reverse=True)
         }
 
-        # 5. Gastos por estabelecimento (top 10)
+        # Se teve busca, adiciona resultado destacado
+        if search_keyword:
+            context["resultado_busca"] = {
+                "termo": request.search,
+                "total": round(total_encontrado, 2),
+                "quantidade": len(transacoes_encontradas),
+                "transacoes": sorted(transacoes_encontradas, key=lambda x: x["valor"], reverse=True),
+                "dica": "Se não encontrou o que procurava, analise os dados de gastos_por_categoria e gastos_por_estabelecimento para encontrar transações relacionadas."
+            }
+
+        # 5. Gastos por estabelecimento (top 15) - SEMPRE retorna todos
         gastos_por_estabelecimento: dict[str, dict[str, Any]] = defaultdict(lambda: {"total": 0, "count": 0})
         for t in txs:
             if t.type == TransactionType.EXPENSE.value:
-                cat_name = categories.get(t.category_id, "Sem categoria")
                 merchant_name = merchants.get(t.merchant_id, t.description or "Outros")
-
-                if search_keyword and not matches_search(t.description or "", merchant_name, cat_name):
-                    continue
-
                 gastos_por_estabelecimento[merchant_name]["total"] += float(t.amount)
                 gastos_por_estabelecimento[merchant_name]["count"] += 1
 
@@ -773,18 +744,9 @@ class MCPService:
             for k, v in receitas_por_categoria.items()
         }
 
-        # 7. Top 10 maiores gastos (aplicando filtro de keyword se existir)
-        despesas_filtradas = [t for t in txs if t.type == TransactionType.EXPENSE.value]
-        if search_keyword:
-            despesas_filtradas = [
-                t for t in despesas_filtradas
-                if matches_search(
-                    t.description or "",
-                    merchants.get(t.merchant_id, ""),
-                    categories.get(t.category_id, "")
-                )
-            ]
-        despesas_filtradas.sort(key=lambda x: float(x.amount), reverse=True)
+        # 7. Top 10 maiores gastos do período (SEMPRE sem filtro)
+        todas_despesas = [t for t in txs if t.type == TransactionType.EXPENSE.value]
+        todas_despesas.sort(key=lambda x: float(x.amount), reverse=True)
 
         context["maiores_gastos"] = [
             {
@@ -793,17 +755,8 @@ class MCPService:
                 "estabelecimento": merchants.get(t.merchant_id, t.description or "Não identificado"),
                 "categoria": categories.get(t.category_id, "Sem categoria"),
             }
-            for t in despesas_filtradas[:10]
+            for t in todas_despesas[:10]
         ]
-
-        # 8. Total filtrado por keyword (se existir)
-        if search_keyword:
-            total_keyword = sum(float(t.amount) for t in despesas_filtradas)
-            context["total_filtrado"] = {
-                "keyword": request.search,
-                "total": round(total_keyword, 2),
-                "transacoes": len(despesas_filtradas),
-            }
 
         # 9. Dívidas ativas
         debts = await self.db.execute(
