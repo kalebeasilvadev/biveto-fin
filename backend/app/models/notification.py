@@ -10,8 +10,8 @@ from sqlalchemy import (
     Integer,
     Index,
     UniqueConstraint,
+    JSON,
 )
-from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from ..core.database import Base
 
@@ -112,7 +112,7 @@ class Notification(Base):
     sent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     # Metadados extras (JSON)
-    extra_data: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    extra_data: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 

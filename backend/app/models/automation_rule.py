@@ -6,8 +6,7 @@ from datetime import datetime
 from decimal import Decimal
 from enum import Enum
 
-from sqlalchemy import ForeignKey, Index, String, Text, UniqueConstraint
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import ForeignKey, Index, JSON, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..core.database import Base
@@ -77,7 +76,7 @@ class AutomationRule(Base):
 
     # Trigger configuration
     trigger_type: Mapped[str] = mapped_column(String(20))
-    trigger_config: Mapped[dict] = mapped_column(JSONB, default=dict)
+    trigger_config: Mapped[dict] = mapped_column(JSON, default=dict)
     """
     trigger_config examples:
 
@@ -109,7 +108,7 @@ class AutomationRule(Base):
     """
 
     # Conditions (additional filters)
-    conditions: Mapped[dict] = mapped_column(JSONB, default=dict)
+    conditions: Mapped[dict] = mapped_column(JSON, default=dict)
     """
     conditions example:
     {
@@ -123,7 +122,7 @@ class AutomationRule(Base):
 
     # Action configuration
     action_type: Mapped[str] = mapped_column(String(20))
-    action_config: Mapped[dict] = mapped_column(JSONB, default=dict)
+    action_config: Mapped[dict] = mapped_column(JSON, default=dict)
     """
     action_config examples:
 
@@ -232,7 +231,7 @@ class AutomationExecution(Base):
 
     # Result
     status: Mapped[str] = mapped_column(String(20))  # success, failed, skipped
-    result_data: Mapped[dict | None] = mapped_column(JSONB, default=None)
+    result_data: Mapped[dict | None] = mapped_column(JSON, default=None)
     """
     result_data example:
     {
@@ -245,11 +244,11 @@ class AutomationExecution(Base):
     """
 
     error_message: Mapped[str | None] = mapped_column(Text, default=None)
-    error_details: Mapped[dict | None] = mapped_column(JSONB, default=None)
+    error_details: Mapped[dict | None] = mapped_column(JSON, default=None)
 
     # Conditions evaluated
     conditions_met: Mapped[bool | None] = mapped_column(default=None)
-    conditions_result: Mapped[dict | None] = mapped_column(JSONB, default=None)
+    conditions_result: Mapped[dict | None] = mapped_column(JSON, default=None)
 
     # Timing
     duration_ms: Mapped[int | None] = mapped_column(default=None)
