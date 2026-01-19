@@ -86,16 +86,20 @@ O Biveto e uma aplicacao web de gestao financeira que permite:
 ```
 biveto-app/
 ├── README.md                 # Este arquivo
-├── docs/                     # Documentacao geral
-│   ├── ARCHITECTURE.md      # Arquitetura do sistema
-│   └── DEVELOPMENT.md       # Guia de desenvolvimento
+├── docs/                     # Documentacao centralizada
+│   ├── README.md            # Indice da documentacao
+│   ├── architecture/        # Arquitetura e database schema
+│   ├── development/         # Guias de desenvolvimento
+│   ├── frontend/            # Docs do frontend
+│   ├── backend/             # Docs do backend
+│   ├── business/            # Regras de negocio e audit
+│   └── integrations/        # Integracoes externas
 ├── backend/                  # API FastAPI
 │   ├── app/
 │   │   ├── core/            # Configuracao, seguranca, deps
 │   │   ├── models/          # Models SQLAlchemy
 │   │   ├── modules/         # Modulos de funcionalidades
 │   │   └── main.py          # Entry point
-│   ├── docs/                # Docs do backend
 │   └── requirements.txt
 └── frontend/                 # SPA React
     ├── src/
@@ -104,7 +108,6 @@ biveto-app/
     │   ├── stores/          # Zustand stores
     │   ├── services/        # Camada de API
     │   └── App.tsx
-    ├── docs/                # Docs do frontend
     └── package.json
 ```
 
@@ -309,13 +312,20 @@ fly tokens create deploy
 
 ## Documentacao
 
+Toda documentacao esta centralizada na pasta [`docs/`](./docs/README.md).
+
 | Documento | Descricao |
 |-----------|-----------|
-| [Arquitetura](./docs/ARCHITECTURE.md) | Arquitetura detalhada do sistema |
-| [Desenvolvimento](./docs/DEVELOPMENT.md) | Guia para desenvolvedores |
-| [Backend](./backend/README.md) | Documentacao do backend |
-| [Frontend](./frontend/README.md) | Documentacao do frontend |
-| [Database Schema](./backend/docs/database_schema.md) | Esquema do banco de dados |
+| [Indice Geral](./docs/README.md) | Navegacao completa da documentacao |
+| [Arquitetura](./docs/architecture/OVERVIEW.md) | Arquitetura detalhada do sistema |
+| [Database Schema](./docs/architecture/DATABASE_SCHEMA.md) | Esquema do banco de dados |
+| [Getting Started](./docs/development/GETTING_STARTED.md) | Guia para desenvolvedores |
+| [Convencoes](./docs/development/CONVENTIONS.md) | Padroes de codigo |
+| [Backend](./docs/backend/README.md) | Documentacao do backend |
+| [Modulos](./docs/backend/MODULES.md) | Descricao dos 20 modulos |
+| [Frontend](./docs/frontend/README.md) | Documentacao do frontend |
+| [Regras de Negocio](./docs/business/LOGIC_MAP.md) | Mapa logico do sistema |
+| [Integracoes](./docs/integrations/MISTRAL_INTEGRATION.md) | Integracao com Mistral OCR |
 
 ## Scripts Uteis
 
