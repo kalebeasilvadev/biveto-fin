@@ -17,6 +17,15 @@ from .credit_card import CreditCard, PointsProgram
 from .income_source import IncomeSource, IncomeType, IncomeFrequency
 from .credit_card_invoice import CreditCardInvoice, InvoiceStatus
 from .api_key import APIKey, APIKeyStatus
+from .notification import (
+    Notification,
+    NotificationPreference,
+    NotificationSettings,
+    PushSubscription,
+    NotificationType,
+    NotificationPriority,
+    NotificationFrequency,
+)
 from app.modules.known_services.models.known_service import KnownRecurringService
 
 __all__ = [
@@ -63,5 +72,12 @@ __all__ = [
     "InvoiceStatus",
     "APIKey",
     "APIKeyStatus",
+    "Notification",
+    "NotificationPreference",
+    "NotificationSettings",
+    "PushSubscription",
+    "NotificationType",
+    "NotificationPriority",
+    "NotificationFrequency",
     "KnownRecurringService",
 ]

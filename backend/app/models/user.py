@@ -81,6 +81,18 @@ class User(Base):
     api_keys: Mapped[list["APIKey"]] = relationship(
         back_populates="user", lazy="noload", cascade="all, delete-orphan"
     )
+    notifications: Mapped[list["Notification"]] = relationship(
+        back_populates="user", lazy="noload", cascade="all, delete-orphan"
+    )
+    notification_preferences: Mapped[list["NotificationPreference"]] = relationship(
+        back_populates="user", lazy="noload", cascade="all, delete-orphan"
+    )
+    notification_settings: Mapped["NotificationSettings | None"] = relationship(
+        back_populates="user", lazy="noload", uselist=False, cascade="all, delete-orphan"
+    )
+    push_subscriptions: Mapped[list["PushSubscription"]] = relationship(
+        back_populates="user", lazy="noload", cascade="all, delete-orphan"
+    )
 
     @property
     def household_role(self) -> str | None:
@@ -118,3 +130,4 @@ from .credit_card import CreditCard
 from .income_source import IncomeSource
 from .credit_card_invoice import CreditCardInvoice
 from .api_key import APIKey
+from .notification import Notification, NotificationPreference, NotificationSettings, PushSubscription

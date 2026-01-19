@@ -28,6 +28,7 @@ from app.modules.income.routers.income_sources import router as income_sources_r
 from app.modules.credit_cards.routers.invoices import router as invoices_router
 from app.modules.api_keys.routers.api_keys import router as api_keys_router
 from app.modules.mcp.routers.mcp import router as mcp_router
+from app.modules.notifications.routers.notifications import router as notifications_router
 
 api_router = APIRouter()
 
@@ -87,3 +88,6 @@ api_router.include_router(api_keys_router, tags=["API Keys"])
 
 # MCP module (consultas via Claude Code)
 api_router.include_router(mcp_router, tags=["MCP"])
+
+# Notifications module
+api_router.include_router(notifications_router, prefix="/notifications", tags=["Notificações"])

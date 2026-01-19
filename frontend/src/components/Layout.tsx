@@ -35,6 +35,7 @@ import ToastContainer from './shared/ToastContainer'
 import InstallPromptBanner from './InstallPromptBanner'
 import IOSInstallModal from './IOSInstallModal'
 import { usePWAInstall } from '../hooks/usePWAInstall'
+import { NotificationBell } from './notifications'
 
 // Main navigation items
 const mainNavItems = [
@@ -116,13 +117,16 @@ export default function Layout() {
       <header className="lg:hidden fixed top-0 left-0 right-0 z-30 glass border-b border-gray-200/50 dark:bg-slate-900/80 dark:border-slate-700 mobile-header">
         <div className="flex items-center justify-between px-4 h-14">
           <img src={isDark ? "/logo-white.svg" : "/logo.svg"} alt="Biveto" className="h-8" />
-          <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="btn-icon"
-            aria-label="Menu"
-          >
-            {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
-          </button>
+          <div className="flex items-center gap-1">
+            <NotificationBell />
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="btn-icon"
+              aria-label="Menu"
+            >
+              {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
+            </button>
+          </div>
         </div>
       </header>
 
@@ -190,6 +194,7 @@ export default function Layout() {
                   {user?.email || ''}
                 </p>
               </div>
+              <NotificationBell />
               <button
                 onClick={toggleTheme}
                 className="p-2 text-gray-400 hover:text-biveto hover:bg-biveto-light rounded-lg transition-colors dark:hover:bg-slate-700"

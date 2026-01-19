@@ -542,3 +542,37 @@ export const apiKeysApi = {
   revoke: (id: number) => api.post(`/api-keys/${id}/revoke`),
   delete: (id: number) => api.delete(`/api-keys/${id}`),
 }
+
+export const notificationsApi = {
+  // Notifications
+  list: (params?: { limit?: number; offset?: number; unread_only?: boolean; type?: string }) =>
+    api.get('/notifications', { params }),
+  getUnreadCount: () => api.get('/notifications/unread-count'),
+  getSummary: () => api.get('/notifications/summary'),
+  get: (id: number) => api.get(`/notifications/${id}`),
+  markAsRead: (id: number) => api.post(`/notifications/${id}/read`),
+  markAllAsRead: () => api.post('/notifications/read-all'),
+  dismiss: (id: number) => api.delete(`/notifications/${id}`),
+
+  // Preferences
+  listPreferences: () => api.get('/notifications/preferences'),
+  getPreference: (type: string) => api.get(`/notifications/preferences/${type}`),
+  updatePreference: (type: string, data: unknown) =>
+    api.put(`/notifications/preferences/${type}`, data),
+
+  // Settings
+  getSettings: () => api.get('/notifications/settings'),
+  updateSettings: (data: unknown) => api.put('/notifications/settings', data),
+
+  // Push
+  subscribePush: (data: {
+    endpoint: string
+    p256dh_key: string
+    auth_key: string
+    user_agent?: string
+    device_name?: string
+  }) => api.post('/notifications/push/subscribe', data),
+  unsubscribePush: (endpoint: string) =>
+    api.post('/notifications/push/unsubscribe', null, { params: { endpoint } }),
+  listPushSubscriptions: () => api.get('/notifications/push/subscriptions'),
+}
