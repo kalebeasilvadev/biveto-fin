@@ -10,9 +10,6 @@ import {
   RefreshCw,
   ArrowRight,
   Clock,
-  TrendingDown,
-  TrendingUp,
-  AlertTriangle,
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import EmptyState from '../components/EmptyState'
@@ -99,7 +96,7 @@ export default function Envelopes() {
   const queryClient = useQueryClient()
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
-  const [ownershipType, setOwnershipType] = useState<'personal' | 'household'>('personal')
+  const [_ownershipType, _setOwnershipType] = useState<'personal' | 'household'>('personal')
   const [showTransferModal, setShowTransferModal] = useState(false)
 
   // Form state

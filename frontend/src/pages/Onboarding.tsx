@@ -10,13 +10,12 @@ import {
   ChevronLeft,
   Check,
   Wallet,
-  CreditCard,
   PiggyBank,
   TrendingUp,
   Upload,
   Plus,
 } from 'lucide-react'
-import { accountsApi, transactionsApi } from '../services/api'
+import { accountsApi } from '../services/api'
 import { useToastStore } from '../stores/toastStore'
 import { HelpButton } from '../components/help'
 import { useAuthStore } from '../stores/authStore'

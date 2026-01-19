@@ -10,8 +10,6 @@ import {
   AlertCircle,
   CheckCircle,
   XCircle,
-  Calendar,
-  DollarSign,
   Bell,
   ArrowRightLeft,
   Tag,
@@ -20,7 +18,6 @@ import {
   ChevronUp,
   History,
   TestTube,
-  Settings,
   X,
 } from 'lucide-react'
 import { automationsApi, accountsApi, categoriesApi } from '../services/api'
@@ -289,7 +286,7 @@ function CreateAutomationModal({
   isOpen,
   onClose,
   accounts,
-  categories,
+  categories: _categories,
 }: {
   isOpen: boolean
   onClose: () => void

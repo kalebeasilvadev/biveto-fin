@@ -12,8 +12,6 @@ import {
   Calendar,
   Lightbulb,
   CheckCircle,
-  AlertTriangle,
-  ArrowRight,
   Wallet,
   Receipt,
   DollarSign,
@@ -739,7 +737,6 @@ function TipsStep({ data }: { data: WeeklyReviewData }) {
 
 export default function WeeklyReview() {
   const [currentStep, setCurrentStep] = useState(0)
-  const queryClient = useQueryClient()
   const { addToast } = useToastStore()
 
   // Get current week

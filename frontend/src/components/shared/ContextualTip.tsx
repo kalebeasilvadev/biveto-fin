@@ -38,7 +38,7 @@ export default function ContextualTip({
   context,
   className = '',
   variant = 'banner',
-  showMultiple = false,
+  showMultiple: _showMultiple = false,
   maxTips = 3,
 }: ContextualTipProps) {
   const [tips, setTips] = useState<FinancialTip[]>([])

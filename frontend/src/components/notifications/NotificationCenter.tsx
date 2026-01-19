@@ -21,12 +21,11 @@ export function NotificationCenter({ isOpen, onClose }: NotificationCenterProps)
     markAsRead,
     markAllAsRead: markAllAsReadStore,
     dismissNotification,
-    setUnreadCount,
     setIsLoading,
   } = useNotificationStore()
 
   // Fetch notifications
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ['notifications'],
     queryFn: async () => {
       const response = await notificationsApi.list({ limit: 20 })

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { calendarApi } from '../services/api'
 import {
@@ -8,7 +8,6 @@ import {
   TrendingUp,
   TrendingDown,
   AlertTriangle,
-  ArrowRight,
   RefreshCw,
 } from 'lucide-react'
 import { clsx } from 'clsx'
