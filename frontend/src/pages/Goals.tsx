@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { goalsApi, familyApi } from '../services/api'
 import { Plus, Target, Wallet, TrendingUp, PiggyBank, Calculator } from 'lucide-react'
+import { HelpButton } from '../components/help'
 import { clsx } from 'clsx'
 import EmptyState from '../components/EmptyState'
 import OwnershipSelector from '../components/shared/OwnershipSelector'
@@ -149,7 +150,10 @@ export default function Goals() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Metas Financeiras</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Metas Financeiras</h1>
+          <HelpButton pageId="goals" />
+        </div>
         <button
           onClick={() => setShowCreateModal(true)}
           className="btn-primary flex items-center gap-2"

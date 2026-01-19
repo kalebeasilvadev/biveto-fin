@@ -21,6 +21,7 @@ import {
   ChevronDown,
 } from 'lucide-react'
 import { apiKeysApi, familyApi, getApiErrorMessage } from '../services/api'
+import { HelpButton } from '../components/help'
 import { formatDistanceToNow } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
@@ -188,6 +189,7 @@ export default function ApiKeys() {
               <ArrowLeft size={20} className="text-gray-600 dark:text-gray-400" />
             </Link>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">API Keys</h1>
+            <HelpButton pageId="api-keys" />
           </div>
           <p className="text-gray-500 dark:text-gray-400 ml-11">
             Gerencie chaves de API para integração com Claude Code e outras ferramentas

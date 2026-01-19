@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { documentsApi, transactionsApi, accountsApi, categoriesApi, familyApi, creditCardsApi, invoicesApi, recurringApi, getApiErrorMessage } from '../services/api'
 import { X, CreditCard, Repeat, Plus, AlertCircle, Check } from 'lucide-react'
@@ -18,6 +18,7 @@ import {
   TransactionForm,
 } from '../components/upload'
 import OwnershipSelector from '../components/shared/OwnershipSelector'
+import { HelpButton } from '../components/help'
 
 const accountTypeLabels: Record<string, string> = {
   wallet: 'Carteira',
@@ -28,8 +29,20 @@ const accountTypeLabels: Record<string, string> = {
 
 export default function Upload() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const queryClient = useQueryClient()
-  const [mode, setMode] = useState<UploadMode>('select')
+
+  // Initialize mode from URL parameter and track if came directly from URL
+  const initialMode = searchParams.get('mode') === 'manual' ? 'manual' : 'select'
+  const [cameFromUrl] = useState(() => searchParams.get('mode') === 'manual')
+  const [mode, setMode] = useState<UploadMode>(initialMode)
+
+  // Clear URL parameter when mode changes away from manual
+  useEffect(() => {
+    if (mode !== 'manual' && searchParams.get('mode') === 'manual') {
+      setSearchParams({}, { replace: true })
+    }
+  }, [mode, searchParams, setSearchParams])
   const [document, setDocument] = useState<Document | null>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [formData, setFormData] = useState<TransactionFormData>(initialFormData)
@@ -603,6 +616,21 @@ export default function Upload() {
 
   const handleManualSubmit = () => {
     const accountId = parseInt(formData.account_id)
+
+    // Para transferências, usar dados diferentes
+    if (formData.type === 'transfer') {
+      createMutation.mutate({
+        type: 'transfer',
+        amount: parseFloat(formData.amount),
+        date: formData.date,
+        account_id: accountId,
+        destination_account_id: parseInt(formData.destination_account_id),
+        description: formData.description || null,
+        ownership_type: formData.ownership_type,
+      })
+      return
+    }
+
     // Verificar se a conta é de cartão de crédito e obter o credit_card_id
     const creditCardId = accountToCreditCardMap.get(accountId) || null
 
@@ -939,6 +967,12 @@ export default function Upload() {
   }
 
   const resetForm = () => {
+    // If came directly from URL (e.g., from Transactions page), go back
+    if (cameFromUrl && mode === 'manual') {
+      navigate(-1)
+      return
+    }
+
     setMode('select')
     setDocument(null)
     setUploadError(null)
@@ -989,9 +1023,12 @@ export default function Upload() {
   return (
     <div className="max-w-lg mx-auto space-y-6 pb-20">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-          {isManual ? 'Nova Transação' : 'Confirmar Transação'}
-        </h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+            {isManual ? 'Nova Transação' : 'Confirmar Transação'}
+          </h1>
+          <HelpButton pageId="upload" />
+        </div>
         <button onClick={resetForm} className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
           <X size={24} />
         </button>

@@ -21,9 +21,10 @@ import {
   TrendingUp,
   TrendingDown,
 } from 'lucide-react'
+import { HelpButton } from '../components/help'
 import EmptyState from '../components/EmptyState'
 import { clsx } from 'clsx'
-import { useQuickTransactionStore } from '../stores/quickTransactionStore'
+import { Link } from 'react-router-dom'
 
 interface Transaction {
   id: number
@@ -75,6 +76,98 @@ const accountTypeLabels: Record<string, string> = {
 
 const MONTH_NAMES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
 
+// TransactionCard component for mobile view
+function TransactionCard({
+  transaction,
+  onClick,
+  formatCurrency,
+  formatDateBR
+}: {
+  transaction: Transaction
+  onClick: () => void
+  formatCurrency: (value: number) => string
+  formatDateBR: (dateStr: string) => string
+}) {
+  const typeConfig = {
+    income: {
+      icon: ArrowUpRight,
+      color: 'text-green-600 dark:text-green-400',
+      bgColor: 'bg-green-100 dark:bg-green-900/30'
+    },
+    expense: {
+      icon: ArrowDownRight,
+      color: 'text-red-600 dark:text-red-400',
+      bgColor: 'bg-red-100 dark:bg-red-900/30'
+    },
+    transfer: {
+      icon: ArrowRightLeft,
+      color: 'text-blue-600 dark:text-blue-400',
+      bgColor: 'bg-blue-100 dark:bg-blue-900/30'
+    },
+  }
+
+  const config = typeConfig[transaction.type]
+  const Icon = config.icon
+
+  const displayName = transaction.type === 'transfer'
+    ? (transaction.description || 'Transferência')
+    : (transaction.merchant_name || transaction.description || 'Transação')
+
+  return (
+    <div
+      onClick={onClick}
+      className={clsx(
+        'px-3 py-2.5 bg-white dark:bg-slate-800 rounded-lg border border-gray-100 dark:border-slate-700',
+        'active:scale-[0.99] transition-transform cursor-pointer',
+        !transaction.is_paid && 'border-l-2 border-l-purple-400 dark:border-l-purple-500'
+      )}
+    >
+      <div className="flex items-center gap-2.5">
+        {/* Ícone */}
+        <div className={clsx('p-1.5 rounded-md flex-shrink-0', config.bgColor)}>
+          <Icon size={14} className={config.color} />
+        </div>
+
+        {/* Conteúdo central */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between gap-2">
+            <p className="font-medium text-sm text-gray-900 dark:text-white truncate">
+              {displayName}
+            </p>
+            <span className={clsx('font-semibold text-sm flex-shrink-0', config.color)}>
+              {transaction.type === 'income' ? '+' : transaction.type === 'transfer' ? (transaction.is_transfer_out ? '-' : '+') : '-'}
+              {formatCurrency(transaction.amount)}
+            </span>
+          </div>
+          <div className="flex items-center justify-between gap-2 mt-0.5">
+            <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+              {transaction.type === 'transfer'
+                ? `${transaction.linked_account_name ? `${transaction.is_transfer_out ? '→' : '←'} ${transaction.linked_account_name}` : 'Transferência'}`
+                : (transaction.category_name || 'Sem categoria')
+              } • {transaction.account_name || 'N/A'}
+            </p>
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              <span className="text-xs text-gray-400 dark:text-gray-500">
+                {formatDateBR(transaction.date)}
+              </span>
+              {!transaction.is_paid && (
+                <span className="px-1.5 py-0.5 text-[10px] bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 rounded">
+                  Proj.
+                </span>
+              )}
+              {transaction.installment_number && transaction.installment_total && (
+                <span className="text-[10px] text-gray-500 dark:text-gray-400">
+                  {transaction.installment_number}/{transaction.installment_total}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // Helper to get current month/year
 const getCurrentPeriod = () => {
   const now = new Date()
@@ -110,7 +203,6 @@ export default function Transactions() {
   })
 
   const queryClient = useQueryClient()
-  const openQuickTransaction = useQuickTransactionStore((state) => state.open)
 
   // Debounce search input
   useEffect(() => {
@@ -438,7 +530,10 @@ export default function Transactions() {
       {/* Header with Summary */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Transações</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Transações</h1>
+            <HelpButton pageId="transactions" />
+          </div>
           {!isLoading && filteredTransactions.length > 0 && selectedMonth && (
             <div className="flex flex-wrap items-center gap-3 mt-1 text-sm">
               <span className="text-gray-500 dark:text-gray-400">
@@ -556,10 +651,10 @@ export default function Transactions() {
             )}
           </div>
 
-          <button onClick={openQuickTransaction} className="btn-primary flex items-center gap-2">
+          <Link to="/upload?mode=manual" className="btn-primary flex items-center gap-2">
             <Plus size={18} />
             <span className="hidden sm:inline">Nova Transação</span>
-          </button>
+          </Link>
         </div>
       </div>
 
@@ -624,16 +719,13 @@ export default function Transactions() {
                       setPage(0)
                     }}
                     className={clsx(
-                      'flex-shrink-0 px-3 sm:px-4 py-2 rounded-md text-xs sm:text-sm font-medium transition-colors',
+                      'flex-shrink-0 px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-colors',
                       selectedDay === tab.day
                         ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
                         : 'bg-gray-100 text-gray-700 dark:bg-slate-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-600'
                     )}
                   >
-                    <div className="flex flex-col items-center gap-0.5">
-                      <span className="font-semibold whitespace-nowrap">Dia {tab.label}</span>
-                      <span className="text-[10px] sm:text-xs opacity-75">{tab.count}</span>
-                    </div>
+                    <span className="whitespace-nowrap">Dia {tab.label}</span>
                   </button>
                 ))}
               </div>
@@ -642,49 +734,47 @@ export default function Transactions() {
 
           {/* Period Summary */}
           {selectedTab && filteredTransactions.length > 0 && (
-            <div className="bg-gray-50 dark:bg-slate-800/50 rounded-lg p-4">
-              <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <Calendar size={16} className="text-gray-500 dark:text-gray-400" />
+            <div className="bg-gray-50 dark:bg-slate-800/50 rounded-lg px-3 py-2.5">
+              {/* Linha 1: Data e info de projetadas */}
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-1.5">
+                  <Calendar size={14} className="text-gray-500 dark:text-gray-400" />
                   <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                     {selectedDay ? `${selectedDay} de ` : ''}{MONTH_NAMES[selectedMonth! - 1]} de {selectedYear}
                   </span>
                 </div>
+                <div className="flex items-center gap-3 text-sm">
+                  <span className="text-gray-500 dark:text-gray-400">{periodSummary.count} transações</span>
+                  {periodSummary.projected > 0 && (
+                    <span className="flex items-center gap-1 text-purple-600 dark:text-purple-400">
+                      <Clock size={12} />
+                      {periodSummary.projected} projetada{periodSummary.projected > 1 ? 's' : ''}
+                    </span>
+                  )}
+                </div>
+              </div>
 
-                <div className="hidden sm:block h-4 w-px bg-gray-300 dark:bg-gray-600" />
-
-                <div className="grid grid-cols-2 sm:flex sm:items-center gap-4 sm:gap-6 flex-1">
+              {/* Linha 2: KPIs */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
                   <div>
                     <span className="text-xs text-gray-500 dark:text-gray-400">Receitas</span>
-                    <p className="font-semibold text-green-600 dark:text-green-400 text-sm sm:text-base">{formatCurrency(periodSummary.income)}</p>
+                    <p className="font-semibold text-green-600 dark:text-green-400 text-sm">{formatCurrency(periodSummary.income)}</p>
                   </div>
                   <div>
                     <span className="text-xs text-gray-500 dark:text-gray-400">Despesas</span>
-                    <p className="font-semibold text-red-600 dark:text-red-400 text-sm sm:text-base">{formatCurrency(periodSummary.expenses)}</p>
-                  </div>
-                  <div>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">Balanço</span>
-                    <p className={clsx(
-                      'font-semibold text-sm sm:text-base',
-                      periodSummary.balance >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
-                    )}>
-                      {formatCurrency(periodSummary.balance)}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">Transações</span>
-                    <p className="font-semibold text-gray-900 dark:text-white text-sm sm:text-base">{periodSummary.count}</p>
+                    <p className="font-semibold text-red-600 dark:text-red-400 text-sm">{formatCurrency(periodSummary.expenses)}</p>
                   </div>
                 </div>
-
-                {periodSummary.projected > 0 && (
-                  <div className="flex items-center gap-2 text-purple-600 dark:text-purple-400 pt-3 sm:pt-0 border-t sm:border-t-0 sm:border-l border-gray-300 dark:border-gray-600 sm:pl-6">
-                    <Clock size={16} />
-                    <span className="text-sm font-medium">
-                      {periodSummary.projected} projetada{periodSummary.projected > 1 ? 's' : ''}
-                    </span>
-                  </div>
-                )}
+                <div>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">Balanço</span>
+                  <p className={clsx(
+                    'font-semibold text-sm',
+                    periodSummary.balance >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+                  )}>
+                    {formatCurrency(periodSummary.balance)}
+                  </p>
+                </div>
               </div>
             </div>
           )}
@@ -731,8 +821,21 @@ export default function Transactions() {
             )
           ) : (
             <>
-              {/* Table View */}
-              <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm overflow-x-auto max-w-full">
+              {/* Mobile: Cards View */}
+              <div className="lg:hidden space-y-2">
+                {transactions.map((transaction) => (
+                  <TransactionCard
+                    key={transaction.id}
+                    transaction={transaction}
+                    onClick={() => openEditModal(transaction)}
+                    formatCurrency={formatCurrency}
+                    formatDateBR={formatDateBR}
+                  />
+                ))}
+              </div>
+
+              {/* Desktop: Table View */}
+              <div className="hidden lg:block bg-white dark:bg-slate-800 rounded-lg shadow-sm overflow-x-auto max-w-full">
                 <table className="w-full min-w-[700px] table-auto">
                   <thead>
                     <tr className="border-b border-gray-200 dark:border-slate-700">

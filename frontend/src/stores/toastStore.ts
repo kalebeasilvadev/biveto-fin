@@ -11,7 +11,7 @@ export interface Toast {
 
 interface ToastStore {
   toasts: Toast[]
-  addToast: (toast: Omit<Toast, 'id'>) => void
+  addToast: (messageOrToast: string | Omit<Toast, 'id'>, type?: ToastType) => void
   removeToast: (id: string) => void
   success: (message: string) => void
   error: (message: string) => void
@@ -22,8 +22,12 @@ interface ToastStore {
 export const useToastStore = create<ToastStore>((set) => ({
   toasts: [],
 
-  addToast: (toast) => {
+  addToast: (messageOrToast, type) => {
     const id = Math.random().toString(36).substring(2, 9)
+    // Support both addToast('message', 'success') and addToast({ message, type })
+    const toast = typeof messageOrToast === 'string'
+      ? { message: messageOrToast, type: type ?? 'info' }
+      : messageOrToast
     const newToast = { ...toast, id, duration: toast.duration ?? 4000 }
 
     set((state) => ({

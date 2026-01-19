@@ -12,6 +12,7 @@ import {
   Users,
   User,
 } from 'lucide-react'
+import { HelpButton } from '../components/help'
 import { clsx } from 'clsx'
 import EmptyState from '../components/EmptyState'
 import BankSelector from '../components/shared/BankSelector'
@@ -208,7 +209,10 @@ export default function Accounts() {
     <div className="space-y-6 pb-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Minhas Contas</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Minhas Contas</h1>
+            <HelpButton pageId="accounts" />
+          </div>
           <p className="text-sm text-gray-500 dark:text-gray-400">Gerencie suas contas bancárias e carteiras</p>
         </div>
         <button onClick={openCreateModal} className="btn-primary flex items-center gap-2 whitespace-nowrap flex-shrink-0">

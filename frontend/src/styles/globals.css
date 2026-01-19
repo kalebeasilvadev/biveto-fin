@@ -260,7 +260,7 @@
   }
 
   .bottom-nav-item {
-    @apply flex flex-col items-center gap-0.5 px-3 py-2 rounded-xl
+    @apply flex flex-1 flex-col items-center justify-center gap-0.5 py-2 rounded-xl
            transition-all duration-200 ease-out
            text-gray-400;
   }
@@ -273,6 +273,27 @@
 
   .bottom-nav-item:active {
     @apply scale-95;
+  }
+
+  /* Chat Container - Full screen on mobile, relative on desktop */
+  .chat-container {
+    position: fixed;
+    left: 0;
+    right: 0;
+    top: calc(3.5rem + env(safe-area-inset-top, 0px));
+    bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  @screen lg {
+    .chat-container {
+      position: relative;
+      top: auto;
+      bottom: auto;
+      left: auto;
+      right: auto;
+      height: calc(100vh - 8rem);
+      margin: -2rem;
+    }
   }
 
   /* Transaction List Item */

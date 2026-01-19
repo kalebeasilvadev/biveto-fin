@@ -576,3 +576,149 @@ export const notificationsApi = {
     api.post('/notifications/push/unsubscribe', null, { params: { endpoint } }),
   listPushSubscriptions: () => api.get('/notifications/push/subscriptions'),
 }
+
+// Simulator API extensions (using existing debt/goal endpoints)
+export const simulatorsApi = {
+  // Debt simulators
+  getSnowballPlan: (monthlyPayment: number) =>
+    api.get('/debts/snowball', { params: { monthly_payment: monthlyPayment } }),
+  getAvalanchePlan: (monthlyPayment: number) =>
+    api.get('/debts/avalanche', { params: { monthly_payment: monthlyPayment } }),
+  compareStrategies: (monthlyPayment: number) =>
+    api.get('/debts/compare-strategies', { params: { monthly_payment: monthlyPayment } }),
+
+  // Goal simulators
+  calculateEmergencyFund: (months: number = 6) =>
+    api.get('/goals/emergency-fund', { params: { months } }),
+  calculatePNIF: (expectedReturn: number = 0.08) =>
+    api.get('/goals/pnif', { params: { expected_return: expectedReturn } }),
+
+  // Cash flow projection (using calendar)
+  projectCashFlow: (daysAhead: number = 90) =>
+    api.get(`/calendar/projections/${daysAhead}`),
+}
+
+export const envelopesApi = {
+  // Envelopes CRUD
+  list: (includeInactive: boolean = false) =>
+    api.get('/envelopes', { params: { include_inactive: includeInactive } }),
+  get: (id: number) => api.get(`/envelopes/${id}`),
+  create: (data: {
+    name: string
+    description?: string
+    category_id?: number
+    period_type?: string
+    limit_amount: number
+    allow_rollover?: boolean
+    max_rollover_amount?: number
+    refill_schedule?: string
+    custom_refill_day?: number
+    auto_refill?: boolean
+    priority?: number
+    color?: string
+    icon?: string
+    ownership_type?: string
+  }) => api.post('/envelopes', data),
+  update: (id: number, data: unknown) => api.patch(`/envelopes/${id}`, data),
+  delete: (id: number) => api.delete(`/envelopes/${id}`),
+
+  // Summary and allowance
+  getSummary: () => api.get('/envelopes/summary'),
+  getDailyAllowance: (id: number) => api.get(`/envelopes/${id}/daily-allowance`),
+  getHistory: (id: number, limit: number = 50) =>
+    api.get(`/envelopes/${id}/history`, { params: { limit } }),
+
+  // Actions
+  refill: (id: number) => api.post(`/envelopes/${id}/refill`),
+  transfer: (data: {
+    from_envelope_id: number
+    to_envelope_id: number
+    amount: number
+    notes?: string
+  }) => api.post('/envelopes/transfer', data),
+  autoAssign: (transactionId: number) =>
+    api.post('/envelopes/auto-assign', null, {
+      params: { transaction_id: transactionId },
+    }),
+}
+
+export const calendarApi = {
+  // Daily calendar with projections
+  getDaily: (params?: {
+    start_date?: string
+    end_date?: string
+    include_details?: boolean
+  }) => api.get('/calendar/daily', { params }),
+
+  // Weekly summary
+  getWeekly: (year: number, week: number, comparePrevious: boolean = true) =>
+    api.get(`/calendar/weekly/${year}/${week}`, {
+      params: { compare_previous: comparePrevious },
+    }),
+
+  // Monthly calendar
+  getMonthly: (year: number, month: number, includeDetails: boolean = false) =>
+    api.get(`/calendar/monthly/${year}/${month}`, {
+      params: { include_details: includeDetails },
+    }),
+
+  // Running balance projection
+  getRunningBalance: (params?: {
+    start_date?: string
+    end_date?: string
+    days?: number
+  }) => api.get('/calendar/running-balance', { params }),
+
+  // Future projections
+  getProjections: (daysAhead: number, includeDetails: boolean = true) =>
+    api.get(`/calendar/projections/${daysAhead}`, {
+      params: { include_details: includeDetails },
+    }),
+}
+
+export const automationsApi = {
+  // Automation rules CRUD
+  list: (params?: {
+    include_inactive?: boolean
+    trigger_type?: string
+    action_type?: string
+  }) => api.get('/automations', { params }),
+  get: (id: number) => api.get(`/automations/${id}`),
+  create: (data: {
+    name: string
+    description?: string
+    trigger_type: string
+    trigger_config: Record<string, unknown>
+    conditions?: Record<string, unknown>
+    action_type: string
+    action_config: Record<string, unknown>
+    is_active?: boolean
+    priority?: number
+  }) => api.post('/automations', data),
+  update: (id: number, data: unknown) => api.patch(`/automations/${id}`, data),
+  delete: (id: number) => api.delete(`/automations/${id}`),
+
+  // Actions
+  toggle: (id: number) => api.post(`/automations/${id}/toggle`),
+  test: (id: number) => api.post(`/automations/${id}/test`),
+  execute: (id: number) => api.post(`/automations/${id}/execute`),
+
+  // Execution history
+  listExecutions: (params?: {
+    rule_id?: number
+    status?: string
+    limit?: number
+  }) => api.get('/automations/executions', { params }),
+  getRuleExecutions: (ruleId: number, limit: number = 20) =>
+    api.get(`/automations/${ruleId}/executions`, { params: { limit } }),
+}
+
+export const reviewApi = {
+  // Weekly review
+  getWeeklyReview: (year: number, week: number) =>
+    api.get(`/review/weekly/${year}/${week}`),
+  getCurrentWeekReview: () =>
+    api.get('/review/weekly/current'),
+  completeReview: (year: number, week: number, notes?: string) =>
+    api.post(`/review/weekly/${year}/${week}/complete`, { year, week, notes }),
+}

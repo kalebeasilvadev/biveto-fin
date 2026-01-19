@@ -17,6 +17,7 @@ import {
   RefreshCw,
 } from 'lucide-react'
 import { clsx } from 'clsx'
+import { HelpButton } from '../components/help'
 
 interface HouseholdMember {
   id: number
@@ -188,7 +189,10 @@ export default function Family() {
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Família</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Família</h1>
+          <HelpButton pageId="family" />
+        </div>
         <p className="text-gray-500 dark:text-gray-400">Gerencie os membros do seu plano familiar</p>
       </div>
 

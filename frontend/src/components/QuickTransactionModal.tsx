@@ -219,7 +219,6 @@ export default function QuickTransactionModal({ isOpen, onClose }: QuickTransact
               onChange={(e) => setFormData(prev => ({ ...prev, amount: e.target.value }))}
               className="input text-2xl font-bold text-center"
               placeholder="0,00"
-              autoFocus
             />
           </div>
 

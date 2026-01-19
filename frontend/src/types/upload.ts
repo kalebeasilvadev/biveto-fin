@@ -90,10 +90,11 @@ export interface TransactionFormData {
   amount: string
   date: string
   account_id: string
+  destination_account_id: string  // Para transferências
   category_id: string
   merchant_name: string
   description: string
-  type: 'expense' | 'income'
+  type: 'expense' | 'income' | 'transfer'
   is_installment: boolean
   installment_current: string
   installment_total: string
@@ -141,6 +142,7 @@ export const initialFormData: TransactionFormData = {
   amount: '',
   date: getLocalDateString(),
   account_id: '',
+  destination_account_id: '',
   category_id: '',
   merchant_name: '',
   description: '',

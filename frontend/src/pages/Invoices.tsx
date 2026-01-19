@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import EmptyState from '../components/EmptyState'
+import { HelpButton } from '../components/help'
 
 interface Invoice {
   id: number
@@ -367,7 +368,10 @@ export default function Invoices() {
       <div className="flex flex-col gap-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="min-w-0">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Faturas</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Faturas</h1>
+              <HelpButton pageId="invoices" />
+            </div>
             {!isLoading && invoices.length > 0 && overallSummary.overdueCount > 0 && (
               <div className="flex items-center gap-1 mt-1 text-sm text-red-600 dark:text-red-400 font-medium">
                 <AlertTriangle size={14} />

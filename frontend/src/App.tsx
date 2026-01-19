@@ -25,6 +25,12 @@ import ApiKeys from './pages/ApiKeys'
 import Invite from './pages/Invite'
 import ResetPassword from './pages/ResetPassword'
 import ShareTarget from './pages/ShareTarget'
+import CashCalendar from './pages/CashCalendar'
+import Envelopes from './pages/Envelopes'
+import Simulators from './pages/Simulators'
+import Automations from './pages/Automations'
+import WeeklyReview from './pages/WeeklyReview'
+import Onboarding from './pages/Onboarding'
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
@@ -63,6 +69,14 @@ function App() {
       <Route path="/invite/:token" element={<Invite />} />
       <Route path="/reset-password/:token" element={<ResetPassword />} />
       <Route
+        path="/onboarding"
+        element={
+          <PrivateRoute>
+            <Onboarding />
+          </PrivateRoute>
+        }
+      />
+      <Route
         path="/"
         element={
           <PrivateRoute>
@@ -76,6 +90,11 @@ function App() {
         <Route path="goals" element={<Goals />} />
         <Route path="debts" element={<Debts />} />
         <Route path="recurring" element={<Recurring />} />
+        <Route path="calendar" element={<CashCalendar />} />
+        <Route path="envelopes" element={<Envelopes />} />
+        <Route path="simulators" element={<Simulators />} />
+        <Route path="automations" element={<Automations />} />
+        <Route path="weekly-review" element={<WeeklyReview />} />
         <Route path="upload" element={<Upload />} />
         <Route path="insights" element={<Insights />} />
         <Route path="chat" element={<Chat />} />

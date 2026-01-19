@@ -12,6 +12,7 @@ import {
   MoreVertical,
   FileText,
 } from 'lucide-react'
+import { HelpButton } from '../components/help'
 import { useRef, useEffect } from 'react'
 import { clsx } from 'clsx'
 import EmptyState from '../components/EmptyState'
@@ -249,7 +250,10 @@ export default function CreditCards() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Cartões de Crédito</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Cartões de Crédito</h1>
+            <HelpButton pageId="credit-cards" />
+          </div>
           <p className="text-sm text-gray-500 dark:text-gray-400">Gerencie seus cartões e pontos</p>
         </div>
         <button onClick={openCreateModal} className="btn-primary flex items-center gap-2 whitespace-nowrap flex-shrink-0">

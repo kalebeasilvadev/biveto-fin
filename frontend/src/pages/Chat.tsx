@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import ReactMarkdown from 'react-markdown'
+import { HelpButton } from '../components/help'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -216,7 +217,7 @@ export default function Chat() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-12rem)] lg:h-[calc(100vh-8rem)] -mx-4 lg:-mx-8 -my-4 lg:-my-8 relative overflow-hidden">
+    <div className="chat-container flex z-10 bg-white dark:bg-slate-800 overflow-hidden">
       {/* Sidebar overlay for mobile */}
       {showSidebar && (
         <div
@@ -308,7 +309,10 @@ export default function Chat() {
             <Bot className="text-primary-600 dark:text-primary-400" size={22} />
           </div>
           <div className="flex-1 min-w-0">
-            <h1 className="text-lg font-bold text-gray-900 dark:text-white">Biveto Assistente</h1>
+            <div className="flex items-center gap-1">
+              <h1 className="text-lg font-bold text-gray-900 dark:text-white">Biveto Assistente</h1>
+              <HelpButton pageId="chat" />
+            </div>
             <p className="text-xs text-gray-500 dark:text-gray-400">
               Powered by IA - Análise personalizada das suas finanças
             </p>

@@ -26,6 +26,23 @@ from .notification import (
     NotificationPriority,
     NotificationFrequency,
 )
+from .envelope import (
+    SpendingEnvelope,
+    EnvelopeHistory,
+    EnvelopePeriodType,
+    EnvelopeStatus,
+    EnvelopeRefillSchedule,
+    EnvelopeChangeType,
+)
+from .automation_rule import (
+    AutomationRule,
+    AutomationExecution,
+    TriggerType,
+    ActionType,
+    ScheduleFrequency,
+    EventType,
+    ThresholdType,
+)
 from app.modules.known_services.models.known_service import KnownRecurringService
 
 __all__ = [
@@ -79,5 +96,18 @@ __all__ = [
     "NotificationType",
     "NotificationPriority",
     "NotificationFrequency",
+    "SpendingEnvelope",
+    "EnvelopeHistory",
+    "EnvelopePeriodType",
+    "EnvelopeStatus",
+    "EnvelopeRefillSchedule",
+    "EnvelopeChangeType",
+    "AutomationRule",
+    "AutomationExecution",
+    "TriggerType",
+    "ActionType",
+    "ScheduleFrequency",
+    "EventType",
+    "ThresholdType",
     "KnownRecurringService",
 ]

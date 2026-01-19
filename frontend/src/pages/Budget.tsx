@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { budgetsApi, categoriesApi, familyApi } from '../services/api'
 import { ChevronLeft, ChevronRight, Plus, Trash2, Copy, Wallet } from 'lucide-react'
+import { HelpButton } from '../components/help'
 import { clsx } from 'clsx'
 import EmptyState from '../components/EmptyState'
 import OwnershipSelector from '../components/shared/OwnershipSelector'
@@ -144,7 +145,10 @@ export default function Budget() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Orçamento</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Orçamento</h1>
+          <HelpButton pageId="budget" />
+        </div>
         <div className="flex gap-2 flex-shrink-0">
           <button
             onClick={() => setShowCopyModal(true)}

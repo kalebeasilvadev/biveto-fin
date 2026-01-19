@@ -1,4 +1,5 @@
 import { test as setup, expect } from '@playwright/test'
+import { TEST_CREDENTIALS } from './fixtures/test-data'
 
 const authFile = 'e2e/.auth/user.json'
 
@@ -6,21 +7,14 @@ const authFile = 'e2e/.auth/user.json'
  * Setup de autenticação que roda antes de todos os testes.
  * Faz login e salva o estado de autenticação para reutilização.
  *
- * Variáveis de ambiente necessárias:
+ * Variáveis de ambiente (opcionais - usa credenciais padrão se não definidas):
  * - E2E_USER_EMAIL: Email do usuário de teste
  * - E2E_USER_PASSWORD: Senha do usuário de teste
  */
 setup('authenticate', async ({ page }) => {
-  // Credenciais de teste - OBRIGATÓRIO usar variáveis de ambiente
-  const email = process.env.E2E_USER_EMAIL
-  const password = process.env.E2E_USER_PASSWORD
-
-  if (!email || !password) {
-    throw new Error(
-      'E2E_USER_EMAIL e E2E_USER_PASSWORD são obrigatórios. ' +
-      'Configure as variáveis de ambiente antes de rodar os testes.'
-    )
-  }
+  // Credenciais de teste - usa variáveis de ambiente ou valores padrão
+  const email = process.env.E2E_USER_EMAIL || TEST_CREDENTIALS.email
+  const password = process.env.E2E_USER_PASSWORD || TEST_CREDENTIALS.password
 
   // Ir para página de login
   await page.goto('/login')

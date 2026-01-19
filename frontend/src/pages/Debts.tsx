@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { debtsApi, familyApi } from '../services/api'
 import { Plus, CreditCard, AlertCircle, CheckCircle, Calculator } from 'lucide-react'
+import { HelpButton } from '../components/help'
 import { clsx } from 'clsx'
 import EmptyState from '../components/EmptyState'
 import OwnershipSelector from '../components/shared/OwnershipSelector'
@@ -232,7 +233,10 @@ export default function Debts() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Dívidas</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Dívidas</h1>
+          <HelpButton pageId="debts" />
+        </div>
         <button
           onClick={() => setShowCreateModal(true)}
           className="btn-primary flex items-center gap-2 whitespace-nowrap flex-shrink-0"

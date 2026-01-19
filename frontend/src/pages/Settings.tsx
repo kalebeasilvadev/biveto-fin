@@ -4,6 +4,7 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { useAuthStore } from '../stores/authStore'
 import api, { getApiErrorMessage, familyApi } from '../services/api'
 import { Lock, User, Mail, Check, AlertCircle, Users, ChevronRight, Database, Key, Eye, EyeOff } from 'lucide-react'
+import { HelpButton } from '../components/help'
 
 export default function Settings() {
   const user = useAuthStore((state) => state.user)
@@ -67,7 +68,10 @@ export default function Settings() {
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Configurações</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Configurações</h1>
+          <HelpButton pageId="settings" />
+        </div>
         <p className="text-gray-500 dark:text-gray-400">Gerencie sua conta e preferências</p>
       </div>
 

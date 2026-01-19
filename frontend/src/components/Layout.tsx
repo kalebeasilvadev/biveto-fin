@@ -1,7 +1,6 @@
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
 import { useThemeStore } from '../stores/themeStore'
-import { useQuickTransactionStore } from '../stores/quickTransactionStore'
 import {
   LayoutDashboard,
   Receipt,
@@ -9,7 +8,6 @@ import {
   Lightbulb,
   LogOut,
   Menu,
-  X,
   Wallet,
   Target,
   CreditCard,
@@ -19,61 +17,294 @@ import {
   Building,
   Plus,
   ChevronRight,
+  ChevronDown,
   Moon,
   Sun,
   Briefcase,
   BadgeDollarSign,
   FileText,
-  Download,
+  Calendar,
+  Inbox,
+  Calculator,
+  Zap,
+  ClipboardCheck,
+  PieChart,
+  ArrowLeftRight,
+  Wrench,
+  LucideIcon,
+  Camera,
 } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { clsx } from 'clsx'
 import api from '../services/api'
 import FloatingAssistant from './FloatingAssistant'
-import QuickTransactionModal from './QuickTransactionModal'
 import ToastContainer from './shared/ToastContainer'
 import InstallPromptBanner from './InstallPromptBanner'
 import IOSInstallModal from './IOSInstallModal'
 import { usePWAInstall } from '../hooks/usePWAInstall'
+import { usePullToRefresh } from '../hooks/usePullToRefresh'
+import { useServiceWorker } from '../hooks/useServiceWorker'
+import { useBottomSheet } from '../hooks/useBottomSheet'
 import { NotificationBell } from './notifications'
+import { PullToRefreshIndicator, UpdateBanner } from './pwa'
+import { BottomSheet, UserCard } from './mobile'
 
-// Main navigation items
-const mainNavItems = [
-  { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/transactions', icon: Receipt, label: 'Transações' },
-  { to: '/accounts', icon: Building, label: 'Contas' },
-  { to: '/credit-cards', icon: CreditCard, label: 'Cartões' },
-  { to: '/invoices', icon: FileText, label: 'Faturas' },
-  { to: '/income-sources', icon: Briefcase, label: 'Receitas' },
-  { to: '/budget', icon: Wallet, label: 'Orçamento' },
-  { to: '/goals', icon: Target, label: 'Metas' },
-  { to: '/debts', icon: BadgeDollarSign, label: 'Dívidas' },
-  { to: '/recurring', icon: Repeat, label: 'Recorrentes' },
-  { to: '/upload', icon: Upload, label: 'Adicionar' },
-  { to: '/insights', icon: Lightbulb, label: 'Insights' },
-  { to: '/chat', icon: Bot, label: 'Assistente' },
+// Types for menu structure
+interface NavItem {
+  to: string
+  icon: LucideIcon
+  label: string
+}
+
+interface NavGroup {
+  id: string
+  label: string
+  icon: LucideIcon
+  items: NavItem[]
+  defaultOpen?: boolean
+}
+
+// Menu groups structure
+const menuGroups: NavGroup[] = [
+  {
+    id: 'overview',
+    label: 'Visão Geral',
+    icon: PieChart,
+    defaultOpen: true,
+    items: [
+      { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
+      { to: '/insights', icon: Lightbulb, label: 'Insights' },
+      { to: '/calendar', icon: Calendar, label: 'Calendário' },
+    ],
+  },
+  {
+    id: 'accounts',
+    label: 'Contas & Cartões',
+    icon: Building,
+    items: [
+      { to: '/accounts', icon: Building, label: 'Contas' },
+      { to: '/credit-cards', icon: CreditCard, label: 'Cartões' },
+      { to: '/invoices', icon: FileText, label: 'Faturas' },
+    ],
+  },
+  {
+    id: 'transactions',
+    label: 'Movimentações',
+    icon: ArrowLeftRight,
+    items: [
+      { to: '/transactions', icon: Receipt, label: 'Transações' },
+      { to: '/recurring', icon: Repeat, label: 'Recorrentes' },
+      { to: '/income-sources', icon: Briefcase, label: 'Receitas' },
+    ],
+  },
+  {
+    id: 'planning',
+    label: 'Planejamento',
+    icon: Target,
+    items: [
+      { to: '/budget', icon: Wallet, label: 'Orçamento' },
+      { to: '/goals', icon: Target, label: 'Metas' },
+      { to: '/envelopes', icon: Inbox, label: 'Envelopes' },
+      { to: '/debts', icon: BadgeDollarSign, label: 'Dívidas' },
+    ],
+  },
+  {
+    id: 'tools',
+    label: 'Ferramentas',
+    icon: Wrench,
+    items: [
+      { to: '/simulators', icon: Calculator, label: 'Simuladores' },
+      { to: '/automations', icon: Zap, label: 'Automações' },
+      { to: '/weekly-review', icon: ClipboardCheck, label: 'Revisão' },
+    ],
+  },
 ]
 
 // Bottom navigation items (mobile) - most important screens
-const bottomNavItems = [
+// Note: 'action' items trigger callbacks instead of navigation
+interface BottomNavItem {
+  to?: string
+  icon: LucideIcon
+  label: string
+  primary?: boolean
+  action?: 'openMenu'
+}
+
+const bottomNavItems: BottomNavItem[] = [
   { to: '/', icon: LayoutDashboard, label: 'Home' },
   { to: '/transactions', icon: Receipt, label: 'Transações' },
   { to: '/upload', icon: Plus, label: 'Adicionar', primary: true },
-  { to: '/insights', icon: Lightbulb, label: 'Insights' },
   { to: '/chat', icon: Bot, label: 'Chat' },
+  { icon: Menu, label: 'Menu', action: 'openMenu' },
 ]
 
+// LocalStorage key for persisting group states
+const MENU_STATE_KEY = 'biveto_menu_groups_state'
+
+// Hook for managing menu group states with persistence
+function useMenuGroupState() {
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
+    // Initialize from localStorage or defaults
+    try {
+      const saved = localStorage.getItem(MENU_STATE_KEY)
+      if (saved) {
+        return JSON.parse(saved)
+      }
+    } catch {
+      // Ignore parse errors
+    }
+    // Default: only 'overview' is open
+    return menuGroups.reduce((acc, group) => {
+      acc[group.id] = group.defaultOpen ?? false
+      return acc
+    }, {} as Record<string, boolean>)
+  })
+
+  // Persist to localStorage whenever state changes
+  useEffect(() => {
+    try {
+      localStorage.setItem(MENU_STATE_KEY, JSON.stringify(openGroups))
+    } catch {
+      // Ignore storage errors
+    }
+  }, [openGroups])
+
+  const toggleGroup = useCallback((groupId: string) => {
+    setOpenGroups(prev => ({
+      ...prev,
+      [groupId]: !prev[groupId],
+    }))
+  }, [])
+
+  const isGroupOpen = useCallback((groupId: string) => {
+    return openGroups[groupId] ?? false
+  }, [openGroups])
+
+  return { isGroupOpen, toggleGroup }
+}
+
+// NavGroup component for collapsible menu sections
+interface NavGroupComponentProps {
+  group: NavGroup
+  isOpen: boolean
+  onToggle: () => void
+  isMobile?: boolean
+  currentPath: string
+}
+
+function NavGroupComponent({ group, isOpen, onToggle, isMobile = false, currentPath }: NavGroupComponentProps) {
+  const hasActiveChild = group.items.some(item =>
+    item.to === '/' ? currentPath === '/' : currentPath.startsWith(item.to)
+  )
+
+  return (
+    <div className="space-y-1">
+      {/* Group header */}
+      <button
+        onClick={onToggle}
+        className={clsx(
+          'w-full flex items-center justify-between px-4 py-2.5 rounded-xl font-medium transition-all duration-200',
+          hasActiveChild && !isOpen
+            ? 'bg-biveto-light/50 text-biveto dark:bg-biveto/10 dark:text-biveto'
+            : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-slate-700/50 dark:hover:text-gray-200'
+        )}
+      >
+        <div className="flex items-center gap-3">
+          <group.icon size={20} />
+          <span>{group.label}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          {!isOpen && (
+            <span className="text-xs text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-slate-700 px-1.5 py-0.5 rounded">
+              {group.items.length}
+            </span>
+          )}
+          <ChevronDown
+            size={16}
+            className={clsx(
+              'transition-transform duration-200',
+              isOpen ? 'rotate-0' : '-rotate-90'
+            )}
+          />
+        </div>
+      </button>
+
+      {/* Group items */}
+      <div
+        className={clsx(
+          'overflow-hidden transition-all duration-200',
+          isOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+        )}
+      >
+        <div className={clsx('pl-4 space-y-0.5', isMobile ? 'py-1' : 'py-0.5')}>
+          {group.items.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={({ isActive }) =>
+                clsx(
+                  'flex items-center gap-3 px-4 py-2 rounded-xl font-medium transition-all duration-200',
+                  isMobile ? 'justify-between' : '',
+                  isActive
+                    ? 'bg-biveto-light text-biveto shadow-sm dark:bg-biveto/20 dark:text-biveto'
+                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-slate-700 dark:hover:text-white'
+                )
+              }
+            >
+              <div className="flex items-center gap-3">
+                <item.icon size={18} />
+                <span>{item.label}</span>
+              </div>
+              {isMobile && (
+                <ChevronRight size={16} className="text-gray-400 dark:text-gray-500" />
+              )}
+            </NavLink>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function Layout() {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [showIOSInstallModal, setShowIOSInstallModal] = useState(false)
-  const { isOpen: showQuickTransaction, open: openQuickTransaction, close: closeQuickTransaction } = useQuickTransactionStore()
+  const [fabMenuOpen, setFabMenuOpen] = useState(false)
   const logout = useAuthStore((state) => state.logout)
   const user = useAuthStore((state) => state.user)
   const setUser = useAuthStore((state) => state.setUser)
   const { theme, toggleTheme } = useThemeStore()
-  const { canInstall, isIOS, promptInstall } = usePWAInstall()
+  // PWA install prompt is handled by InstallPromptBanner - install option available in Settings
+  usePWAInstall()
+  const { hasUpdate, isUpdating, updateApp, dismissUpdate } = useServiceWorker()
   const navigate = useNavigate()
   const location = useLocation()
+  const { isGroupOpen, toggleGroup } = useMenuGroupState()
+
+  // Bottom sheet for mobile menu
+  const {
+    isOpen: mobileMenuOpen,
+    open: openMobileMenu,
+    close: closeMobileMenu,
+    dragHandlers,
+    translateY,
+    isDragging,
+  } = useBottomSheet({ snapPoints: [0.7, 0.9] })
+
+  // Pull to refresh
+  const handleRefresh = useCallback(async () => {
+    // Refresh the current page data
+    window.location.reload()
+  }, [])
+
+  const {
+    pullDistance,
+    isRefreshing,
+    containerRef,
+  } = usePullToRefresh({
+    onRefresh: handleRefresh,
+    threshold: 80,
+    disabled: mobileMenuOpen || fabMenuOpen,
+  })
 
   const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
   const hasValidSession = useAuthStore((state) => state.hasValidSession)
@@ -101,10 +332,11 @@ export default function Layout() {
     }
   }, [user?.is_admin, hasValidSession, setUser])
 
-  // Close mobile menu on route change
+  // Close mobile menu and FAB menu on route change
   useEffect(() => {
-    setMobileMenuOpen(false)
-  }, [location.pathname])
+    closeMobileMenu()
+    setFabMenuOpen(false)
+  }, [location.pathname, closeMobileMenu])
 
   const handleLogout = () => {
     logout()
@@ -113,20 +345,18 @@ export default function Layout() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-900 transition-colors">
+      {/* Pull to Refresh Indicator */}
+      <PullToRefreshIndicator
+        pullDistance={pullDistance}
+        isRefreshing={isRefreshing}
+        threshold={80}
+      />
+
       {/* Mobile header */}
       <header className="lg:hidden fixed top-0 left-0 right-0 z-30 glass border-b border-gray-200/50 dark:bg-slate-900/80 dark:border-slate-700 mobile-header">
         <div className="flex items-center justify-between px-4 h-14">
           <img src={isDark ? "/logo-white.svg" : "/logo.svg"} alt="Biveto" className="h-8" />
-          <div className="flex items-center gap-1">
-            <NotificationBell />
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="btn-icon"
-              aria-label="Menu"
-            >
-              {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
-            </button>
-          </div>
+          <NotificationBell />
         </div>
       </header>
 
@@ -138,25 +368,60 @@ export default function Layout() {
             <img src={isDark ? "/logo-white.svg" : "/logo.svg"} alt="Biveto" className="h-9" />
           </div>
 
-          {/* Navigation */}
-          <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto" role="navigation" aria-label="Navegação principal">
-            {mainNavItems.map((item) => (
+          {/* Quick Actions */}
+          <div className="px-3 pt-4 pb-2 space-y-2">
+            <NavLink
+              to="/upload?mode=manual"
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 gradient-biveto text-white font-semibold rounded-xl shadow-md hover:shadow-lg transition-all duration-200 active:scale-[0.98]"
+            >
+              <Plus size={18} strokeWidth={2.5} />
+              <span>Nova Transação</span>
+            </NavLink>
+            <NavLink
+              to="/upload"
+              className={({ isActive }) =>
+                clsx(
+                  'w-full flex items-center justify-center gap-2 px-4 py-2.5 font-medium rounded-xl transition-all duration-200 border-2 border-dashed',
+                  isActive
+                    ? 'border-biveto bg-biveto-light text-biveto dark:bg-biveto/20'
+                    : 'border-gray-300 dark:border-slate-600 text-gray-600 dark:text-gray-300 hover:border-biveto hover:text-biveto dark:hover:border-biveto dark:hover:text-biveto'
+                )
+              }
+            >
+              <Upload size={18} />
+              <span>Importar</span>
+            </NavLink>
+          </div>
+
+          {/* Navigation with Groups */}
+          <nav className="flex-1 px-3 py-2 space-y-2 overflow-y-auto" role="navigation" aria-label="Navegação principal">
+            {menuGroups.map((group) => (
+              <NavGroupComponent
+                key={group.id}
+                group={group}
+                isOpen={isGroupOpen(group.id)}
+                onToggle={() => toggleGroup(group.id)}
+                currentPath={location.pathname}
+              />
+            ))}
+
+            {/* Assistente IA - Item especial */}
+            <div className="pt-2 border-t border-gray-100 dark:border-slate-700">
               <NavLink
-                key={item.to}
-                to={item.to}
+                to="/chat"
                 className={({ isActive }) =>
                   clsx(
                     'flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium transition-all duration-200',
                     isActive
-                      ? 'bg-biveto-light text-biveto shadow-sm dark:bg-biveto/20 dark:text-biveto'
+                      ? 'bg-gradient-to-r from-purple-500/10 to-biveto/10 text-purple-600 dark:text-purple-400 shadow-sm'
                       : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-slate-700 dark:hover:text-white'
                   )
                 }
               >
-                <item.icon size={20} />
-                <span>{item.label}</span>
+                <Bot size={20} />
+                <span>Assistente IA</span>
               </NavLink>
-            ))}
+            </div>
 
             {/* Admin Menu */}
             {user?.is_admin && (
@@ -181,115 +446,133 @@ export default function Layout() {
           </nav>
 
           {/* User section */}
-          <div className="p-4 border-t border-gray-100 dark:border-slate-700">
-            <div className="flex items-center gap-3 p-2 rounded-xl hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">
-              <div className="avatar avatar-sm">
+          <div className="p-3 border-t border-gray-100 dark:border-slate-700 space-y-3">
+            {/* User info card */}
+            <NavLink
+              to="/settings"
+              className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 hover:bg-gray-100 dark:bg-slate-700/50 dark:hover:bg-slate-700 transition-colors group"
+            >
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-biveto-navy to-biveto-green flex items-center justify-center text-white font-semibold text-sm shadow-md">
                 {user?.name?.charAt(0).toUpperCase() || 'U'}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
                   {user?.name || 'Usuário'}
                 </p>
                 <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
                   {user?.email || ''}
                 </p>
               </div>
-              <NotificationBell />
-              <button
-                onClick={toggleTheme}
-                className="p-2 text-gray-400 hover:text-biveto hover:bg-biveto-light rounded-lg transition-colors dark:hover:bg-slate-700"
-                title={isDark ? 'Modo claro' : 'Modo escuro'}
-              >
-                {isDark ? <Sun size={18} /> : <Moon size={18} />}
-              </button>
-              <NavLink
-                to="/settings"
-                className="p-2 text-gray-400 hover:text-biveto hover:bg-biveto-light rounded-lg transition-colors dark:hover:bg-slate-700"
-                title="Configurações"
-              >
-                <Settings size={18} />
-              </NavLink>
+              <ChevronRight size={16} className="text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors" />
+            </NavLink>
+
+            {/* Action buttons row */}
+            <div className="flex items-center justify-between px-1">
+              <div className="flex items-center gap-1">
+                <NotificationBell />
+                <button
+                  onClick={toggleTheme}
+                  className="p-2.5 text-gray-500 hover:text-biveto hover:bg-biveto-light rounded-xl transition-all dark:text-gray-400 dark:hover:bg-slate-700 dark:hover:text-white"
+                  title={isDark ? 'Modo claro' : 'Modo escuro'}
+                >
+                  {isDark ? <Sun size={20} /> : <Moon size={20} />}
+                </button>
+              </div>
               <button
                 onClick={handleLogout}
-                className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors dark:hover:bg-red-900/30"
+                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded-xl transition-all dark:text-red-400 dark:hover:bg-red-900/30"
                 title="Sair"
               >
                 <LogOut size={18} />
+                <span>Sair</span>
               </button>
             </div>
           </div>
         </aside>
 
-        {/* Mobile Sidebar Overlay */}
-        {mobileMenuOpen && (
-          <div
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 lg:hidden"
-            onClick={() => setMobileMenuOpen(false)}
-          />
-        )}
-
-        {/* Mobile Sidebar */}
-        <aside
-          className={clsx(
-            'fixed inset-y-0 left-0 z-50 w-72 bg-white dark:bg-slate-800 shadow-xl transform transition-transform duration-300 ease-out lg:hidden flex flex-col',
-            mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
-          )}
-          role="dialog"
-          aria-label="Menu de navegação"
-          aria-modal="true"
-          aria-hidden={!mobileMenuOpen}
+        {/* Mobile Bottom Sheet Menu */}
+        <BottomSheet
+          isOpen={mobileMenuOpen}
+          onClose={closeMobileMenu}
+          snapPoints={[0.7, 0.9]}
+          dragHandlers={dragHandlers}
+          translateY={translateY}
+          isDragging={isDragging}
+          className="lg:hidden"
         >
-          {/* Header with safe area */}
-          <div className="flex items-center justify-between h-14 px-4 border-b border-gray-100 dark:border-slate-700 mobile-header">
-            <img src={isDark ? "/logo-white.svg" : "/logo.svg"} alt="Biveto" className="h-8" />
-            <button
-              onClick={() => setMobileMenuOpen(false)}
-              className="btn-icon"
-              aria-label="Fechar menu"
+          {/* User Card - Compact */}
+          <div className="mb-4">
+            <UserCard
+              user={user}
+              onLogout={handleLogout}
+              onClose={closeMobileMenu}
+            />
+          </div>
+
+          {/* Quick Actions */}
+          <div className="space-y-2 mb-4">
+            <NavLink
+              to="/upload?mode=manual"
+              onClick={closeMobileMenu}
+              className="w-full flex items-center gap-3 px-4 py-3 gradient-biveto text-white font-semibold rounded-xl shadow-md active:scale-[0.98] transition-transform"
             >
-              <X size={22} aria-hidden="true" />
-            </button>
+              <Plus size={20} strokeWidth={2.5} />
+              <span>Nova Transação</span>
+            </NavLink>
+            <NavLink
+              to="/upload"
+              onClick={closeMobileMenu}
+              className={({ isActive }) =>
+                clsx(
+                  'w-full flex items-center gap-3 px-4 py-3 font-medium rounded-xl transition-all duration-200 border-2 border-dashed',
+                  isActive
+                    ? 'border-biveto bg-biveto-light text-biveto dark:bg-biveto/20'
+                    : 'border-gray-300 dark:border-slate-600 text-gray-600 dark:text-gray-300'
+                )
+              }
+            >
+              <Upload size={20} />
+              <span>Importar</span>
+            </NavLink>
           </div>
 
-          {/* User info */}
-          <div className="p-4 border-b border-gray-100 dark:border-slate-700">
-            <div className="flex items-center gap-3">
-              <div className="avatar">
-                {user?.name?.charAt(0).toUpperCase() || 'U'}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-gray-900 dark:text-white truncate">
-                  {user?.name || 'Usuário'}
-                </p>
-                <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
-                  {user?.email || ''}
-                </p>
-              </div>
-            </div>
-          </div>
+          {/* Divider */}
+          <div className="border-t border-gray-100 dark:border-slate-700 my-3" />
 
-          {/* Navigation - scrollable area */}
-          <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto min-h-0" role="navigation" aria-label="Navegação do menu">
-            {mainNavItems.map((item) => (
+          {/* Navigation Groups */}
+          <nav className="space-y-2" role="navigation" aria-label="Navegação do menu">
+            {menuGroups.map((group) => (
+              <NavGroupComponent
+                key={group.id}
+                group={group}
+                isOpen={isGroupOpen(group.id)}
+                onToggle={() => toggleGroup(group.id)}
+                isMobile={true}
+                currentPath={location.pathname}
+              />
+            ))}
+
+            {/* Assistente IA - Item especial */}
+            <div className="pt-2 border-t border-gray-100 dark:border-slate-700">
               <NavLink
-                key={item.to}
-                to={item.to}
+                to="/chat"
+                onClick={closeMobileMenu}
                 className={({ isActive }) =>
                   clsx(
                     'flex items-center justify-between px-4 py-3 rounded-xl font-medium transition-all duration-200',
                     isActive
-                      ? 'bg-biveto-light text-biveto dark:bg-biveto/20'
+                      ? 'bg-gradient-to-r from-purple-500/10 to-biveto/10 text-purple-600 dark:text-purple-400'
                       : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-slate-700 dark:hover:text-white'
                   )
                 }
               >
                 <div className="flex items-center gap-3">
-                  <item.icon size={20} />
-                  <span>{item.label}</span>
+                  <Bot size={20} />
+                  <span>Assistente IA</span>
                 </div>
                 <ChevronRight size={16} className="text-gray-400 dark:text-gray-500" />
               </NavLink>
-            ))}
+            </div>
 
             {/* Admin Menu */}
             {user?.is_admin && (
@@ -297,6 +580,7 @@ export default function Layout() {
                 <div className="border-t border-gray-100 dark:border-slate-700 my-3" />
                 <NavLink
                   to="/admin"
+                  onClick={closeMobileMenu}
                   className={({ isActive }) =>
                     clsx(
                       'flex items-center justify-between px-4 py-3 rounded-xl font-medium transition-all duration-200',
@@ -316,44 +600,22 @@ export default function Layout() {
             )}
           </nav>
 
-          {/* Settings & Logout - with extra padding for bottom nav + safe area */}
-          <div className="p-4 border-t border-gray-100 dark:border-slate-700 space-y-2 pb-safe" style={{ paddingBottom: 'max(1rem, calc(env(safe-area-inset-bottom) + 5rem))' }}>
-            {/* Install App Option */}
-            {canInstall && (
-              <button
-                onClick={() => {
-                  if (isIOS) {
-                    setShowIOSInstallModal(true)
-                  } else {
-                    promptInstall()
-                  }
-                  setMobileMenuOpen(false)
-                }}
-                className="w-full flex items-center justify-center gap-2 px-4 py-3 text-white gradient-biveto rounded-xl font-medium transition-all active:scale-[0.98]"
-              >
-                <Download size={20} />
-                <span>Instalar App</span>
-              </button>
-            )}
-            <NavLink
-              to="/settings"
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 text-gray-700 bg-gray-50 hover:bg-gray-100 dark:text-gray-300 dark:bg-slate-700 dark:hover:bg-slate-600 rounded-xl font-medium transition-colors"
-            >
-              <Settings size={20} />
-              <span>Configurações</span>
-            </NavLink>
-            <button
-              onClick={handleLogout}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 text-red-600 bg-red-50 hover:bg-red-100 dark:bg-red-900/30 dark:hover:bg-red-900/50 rounded-xl font-medium transition-colors"
-            >
-              <LogOut size={20} />
-              <span>Sair da conta</span>
-            </button>
-          </div>
-        </aside>
+          {/* Bottom padding for safe area */}
+          <div className="h-24" />
+        </BottomSheet>
 
         {/* Main content */}
-        <main className="flex-1 lg:ml-64 overflow-x-hidden" role="main" aria-label="Conteúdo principal">
+        <main
+          ref={containerRef as React.RefObject<HTMLElement>}
+          className="flex-1 lg:ml-64 overflow-x-hidden overflow-y-auto"
+          role="main"
+          aria-label="Conteúdo principal"
+          style={{
+            // Add padding top when pulling
+            paddingTop: pullDistance > 0 ? `${pullDistance}px` : undefined,
+            transition: pullDistance === 0 ? 'padding-top 0.2s ease-out' : undefined,
+          }}
+        >
           {/* Spacer for mobile header (h-14 = 56px + safe area top) */}
           <div className="lg:hidden safe-area-top" style={{ height: 'calc(3.5rem + env(safe-area-inset-top, 0px))' }} aria-hidden="true" />
 
@@ -370,14 +632,16 @@ export default function Layout() {
       {/* Floating Assistant Button */}
       <FloatingAssistant />
 
-      {/* Quick Transaction Modal */}
-      <QuickTransactionModal
-        isOpen={showQuickTransaction}
-        onClose={closeQuickTransaction}
-      />
-
       {/* Toast Notifications */}
       <ToastContainer />
+
+      {/* PWA Update Banner */}
+      <UpdateBanner
+        isVisible={hasUpdate}
+        isUpdating={isUpdating}
+        onUpdate={updateApp}
+        onDismiss={dismissUpdate}
+      />
 
       {/* PWA Install Prompt */}
       <InstallPromptBanner />
@@ -388,24 +652,101 @@ export default function Layout() {
         onClose={() => setShowIOSInstallModal(false)}
       />
 
+      {/* FAB Menu Overlay */}
+      {fabMenuOpen && (
+        <div
+          className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40 lg:hidden"
+          onClick={() => setFabMenuOpen(false)}
+        />
+      )}
+
       {/* Mobile Bottom Navigation */}
       <nav className="bottom-nav" role="navigation" aria-label="Navegação principal mobile">
-        {bottomNavItems.map((item) =>
-          item.primary ? (
-            <button
-              key={item.to}
-              onClick={openQuickTransaction}
-              className="relative -mt-5"
-              aria-label="Adicionar nova transação"
-            >
-              <div className="w-14 h-14 rounded-2xl gradient-biveto shadow-lg shadow-biveto flex items-center justify-center text-white active:scale-95 transition-transform">
-                <item.icon size={26} strokeWidth={2.5} aria-hidden="true" />
+        {bottomNavItems.map((item, index) => {
+          // FAB Primary Button
+          if (item.primary) {
+            return (
+              <div key={item.to || index} className="relative -mt-5 flex-1 flex justify-center">
+                {/* FAB Expanded Menu */}
+                <div
+                  className={clsx(
+                    'absolute bottom-full mb-3 left-1/2 -translate-x-1/2 flex flex-col gap-2 transition-all duration-200',
+                    fabMenuOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'
+                  )}
+                >
+                  {/* Importar Option */}
+                  <NavLink
+                    to="/upload"
+                    onClick={() => setFabMenuOpen(false)}
+                    className="flex items-center gap-3 px-4 py-3 bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-gray-100 dark:border-slate-700 min-w-[160px]"
+                  >
+                    <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                      <Camera size={20} className="text-amber-600 dark:text-amber-400" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-900 dark:text-white text-sm">Importar</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Foto ou arquivo</p>
+                    </div>
+                  </NavLink>
+
+                  {/* Nova Transação Option */}
+                  <NavLink
+                    to="/upload?mode=manual"
+                    onClick={() => setFabMenuOpen(false)}
+                    className="flex items-center gap-3 px-4 py-3 bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-gray-100 dark:border-slate-700 min-w-[160px]"
+                  >
+                    <div className="w-10 h-10 rounded-xl bg-biveto-light dark:bg-biveto/20 flex items-center justify-center">
+                      <Plus size={20} className="text-biveto" />
+                    </div>
+                    <div className="text-left">
+                      <p className="font-medium text-gray-900 dark:text-white text-sm">Nova Transação</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Adicionar manual</p>
+                    </div>
+                  </NavLink>
+                </div>
+
+                {/* Main FAB Button */}
+                <button
+                  onClick={() => setFabMenuOpen(!fabMenuOpen)}
+                  aria-label="Adicionar"
+                  aria-expanded={fabMenuOpen}
+                  className="relative"
+                >
+                  <div className={clsx(
+                    'w-14 h-14 rounded-2xl gradient-biveto shadow-lg shadow-biveto/30 flex items-center justify-center text-white transition-all duration-200',
+                    fabMenuOpen ? 'rotate-45 scale-95' : 'active:scale-95'
+                  )}>
+                    <Plus size={26} strokeWidth={2.5} aria-hidden="true" />
+                  </div>
+                </button>
               </div>
-            </button>
-          ) : (
+            )
+          }
+
+          // Menu Action Button (opens Bottom Sheet)
+          if (item.action === 'openMenu') {
+            return (
+              <button
+                key={item.label}
+                onClick={openMobileMenu}
+                className={clsx(
+                  'bottom-nav-item',
+                  mobileMenuOpen && 'bottom-nav-item-active'
+                )}
+                aria-label={item.label}
+                aria-expanded={mobileMenuOpen}
+              >
+                <item.icon size={22} />
+                <span className="text-[10px] font-medium">{item.label}</span>
+              </button>
+            )
+          }
+
+          // Regular NavLink
+          return (
             <NavLink
               key={item.to}
-              to={item.to}
+              to={item.to!}
               className={({ isActive }) =>
                 clsx(
                   'bottom-nav-item',
@@ -417,7 +758,7 @@ export default function Layout() {
               <span className="text-[10px] font-medium">{item.label}</span>
             </NavLink>
           )
-        )}
+        })}
       </nav>
     </div>
   )

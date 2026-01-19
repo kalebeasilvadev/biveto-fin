@@ -101,7 +101,7 @@ class NotificationService:
             action_url=data.action_url,
             action_label=data.action_label,
             scheduled_for=data.scheduled_for,
-            metadata=data.metadata,
+            extra_data=data.metadata,
             sent_in_app=True,
         )
         self.db.add(notification)
@@ -521,6 +521,6 @@ class NotificationService:
             sent_push=notification.sent_push,
             scheduled_for=notification.scheduled_for,
             sent_at=notification.sent_at,
-            metadata=notification.metadata,
+            metadata=notification.extra_data,
             created_at=notification.created_at,
         )

@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { recurringApi, accountsApi, categoriesApi, familyApi } from '../services/api'
 import { Plus, Repeat, Pause, Play, Trash2, Edit2, Calendar, Search, X, ChevronLeft, ChevronRight } from 'lucide-react'
+import { HelpButton } from '../components/help'
 import { clsx } from 'clsx'
 import EmptyState from '../components/EmptyState'
 import OwnershipSelector from '../components/shared/OwnershipSelector'
@@ -356,7 +357,10 @@ export default function Recurring() {
       {/* Header */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Despesas Recorrentes</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Despesas Recorrentes</h1>
+            <HelpButton pageId="recurring" />
+          </div>
           {!isLoading && filteredRecurring.length > 0 && (
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
               {filteredRecurring.length} recorrência{filteredRecurring.length > 1 ? 's' : ''} cadastrada{filteredRecurring.length > 1 ? 's' : ''}
