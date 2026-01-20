@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { groceryApi, familyApi } from '../services/api'
+import { groceryApi } from '../services/api'
 import {
   ShoppingCart,
   Plus,
@@ -12,13 +12,11 @@ import {
   ChevronRight,
   Check,
   Trash2,
-  Edit2,
   Sparkles,
   AlertCircle,
   PieChart,
   Clock,
   DollarSign,
-  Filter,
   Search,
   X,
 } from 'lucide-react'
@@ -133,12 +131,6 @@ interface Insights {
   most_frequent_items: Array<{ name: string; count: number }>
 }
 
-interface FamilyContext {
-  license_id: number
-  member_count: number
-  max_members: number
-}
-
 // Tab types
 type TabType = 'dashboard' | 'lists' | 'history' | 'analytics'
 
@@ -186,24 +178,6 @@ export default function Market() {
     queryKey: ['grocery-insights'],
     queryFn: () => groceryApi.getInsights(),
     enabled: activeTab === 'analytics',
-  })
-
-  const { data: categoryAnalytics } = useQuery({
-    queryKey: ['grocery-category-analytics'],
-    queryFn: () => groceryApi.getCategoryAnalytics(),
-    enabled: activeTab === 'analytics',
-  })
-
-  const { data: familyData } = useQuery({
-    queryKey: ['family-context'],
-    queryFn: async () => {
-      try {
-        const response = await familyApi.getContext()
-        return response.data as FamilyContext
-      } catch {
-        return null
-      }
-    },
   })
 
   // Mutations
