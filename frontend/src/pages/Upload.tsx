@@ -1059,7 +1059,7 @@ export default function Upload() {
         onCameraClick={() => setMode('camera')}
         onFileSelect={handleFileUpload}
         onManualClick={() => setMode('manual')}
-        onQRCodeClick={() => setMode('qrcode')}
+        // onQRCodeClick={() => setMode('qrcode')} // DESABILITADO: QR Code temporariamente desativado
         isUploading={uploadMutation.isPending}
         uploadError={uploadError}
       />

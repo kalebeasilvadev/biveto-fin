@@ -98,13 +98,23 @@ class NFCeService:
             ) as client:
                 response = await client.get(url)
 
+                logger.info(f"NFCe fetch response: status={response.status_code}, url={url[:100]}...")
+
                 if response.status_code == 404:
                     return NFCeResult(
                         error="NFCe não encontrada na base da Receita",
                         error_type="not_found",
                     )
 
+                if response.status_code == 403:
+                    logger.warning(f"SEFAZ returned 403 Forbidden for URL: {url[:100]}...")
+                    return NFCeResult(
+                        error="SEFAZ bloqueou a consulta automática. Use a opção de foto do cupom.",
+                        error_type="not_available",
+                    )
+
                 if response.status_code != 200:
+                    logger.warning(f"NFCe fetch failed with status {response.status_code}")
                     return NFCeResult(
                         error=f"Erro ao consultar NFCe: HTTP {response.status_code}",
                         error_type="not_available",

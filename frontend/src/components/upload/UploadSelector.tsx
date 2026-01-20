@@ -1,11 +1,12 @@
 import { useRef } from 'react'
-import { Camera, Image, PenLine, FileSpreadsheet, X, QrCode } from 'lucide-react'
+import { Camera, Image, PenLine, FileSpreadsheet, X } from 'lucide-react'
+// import { QrCode } from 'lucide-react' // DESABILITADO: QR Code temporariamente desativado
 
 interface UploadSelectorProps {
   onCameraClick: () => void
   onFileSelect: (file: File) => void
   onManualClick: () => void
-  onQRCodeClick?: () => void
+  // onQRCodeClick?: () => void // DESABILITADO: QR Code temporariamente desativado
   isUploading: boolean
   uploadError: string | null
 }
@@ -14,7 +15,7 @@ export default function UploadSelector({
   onCameraClick,
   onFileSelect,
   onManualClick,
-  onQRCodeClick,
+  // onQRCodeClick, // DESABILITADO: QR Code temporariamente desativado
   isUploading,
   uploadError,
 }: UploadSelectorProps) {
@@ -68,6 +69,7 @@ export default function UploadSelector({
         />
 
         {/* QR Code - For grocery receipts (NFCe) */}
+        {/* DESABILITADO: SEFAZ bloqueia consultas de servidores cloud
         {onQRCodeClick && (
           <button
             onClick={onQRCodeClick}
@@ -82,6 +84,7 @@ export default function UploadSelector({
             </div>
           </button>
         )}
+        */}
 
         <div className="grid grid-cols-2 gap-4">
           {/* Gallery */}
