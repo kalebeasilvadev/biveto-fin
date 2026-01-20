@@ -42,6 +42,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
     tesseract-ocr \
     tesseract-ocr-por \
+    libzbar0 \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy virtual environment from builder
