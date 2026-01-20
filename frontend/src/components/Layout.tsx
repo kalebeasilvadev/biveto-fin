@@ -298,6 +298,9 @@ export default function Layout() {
     window.location.reload()
   }, [])
 
+  // Desabilitar pull to refresh em certas páginas (upload tem sua própria navegação)
+  const isUploadPage = location.pathname === '/upload'
+
   const {
     pullDistance,
     isRefreshing,
@@ -305,7 +308,7 @@ export default function Layout() {
   } = usePullToRefresh({
     onRefresh: handleRefresh,
     threshold: 80,
-    disabled: mobileMenuOpen || fabMenuOpen,
+    disabled: mobileMenuOpen || fabMenuOpen || isUploadPage,
   })
 
   const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
