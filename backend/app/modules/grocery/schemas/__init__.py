@@ -12,6 +12,9 @@ from .purchase import (
     GroceryPurchaseResponse,
     GroceryPurchaseSummary,
     GroceryPurchaseComparison,
+    BackfillRequest,
+    BackfillResponse,
+    BackfillTransactionDetail,
 )
 from .shopping_list import (
     ShoppingListBase,
@@ -48,6 +51,10 @@ __all__ = [
     "GroceryPurchaseResponse",
     "GroceryPurchaseSummary",
     "GroceryPurchaseComparison",
+    # Backfill
+    "BackfillRequest",
+    "BackfillResponse",
+    "BackfillTransactionDetail",
     # Shopping List
     "ShoppingListBase",
     "ShoppingListCreate",

@@ -316,6 +316,14 @@ export const documentsApi = {
   },
   list: () => api.get('/documents'),
   get: (id: number) => api.get(`/documents/${id}`),
+
+  // QR Code Scanning
+  scanQRCode: (data: { image_base64?: string; url?: string; access_key?: string }) =>
+    api.post('/documents/scan-qrcode', data),
+  extractQRCode: (image_base64: string) =>
+    api.post('/documents/scan-qrcode/extract', { image_base64 }),
+  fetchNFCe: (data: { url?: string; access_key?: string }) =>
+    api.post('/documents/scan-qrcode/fetch', data),
 }
 
 export const analyticsApi = {
@@ -797,4 +805,8 @@ export const groceryApi = {
     api.get('/grocery/insights', { params }),
   getBudgetStatus: (month: number, year: number) =>
     api.get('/grocery/budget/status', { params: { month, year } }),
+
+  // Backfill
+  backfillPurchases: (data: { dry_run?: boolean; category_names?: string[] }) =>
+    api.post('/grocery/backfill', data),
 }

@@ -20,6 +20,8 @@ from app.models.grocery import (
 )
 from app.models.merchant import Merchant
 from app.models.user import User
+from app.models.transaction import Transaction
+from app.models.category import Category
 from app.modules.grocery.schemas.product import (
     GroceryProductCreate,
     GroceryProductUpdate,
@@ -35,6 +37,9 @@ from app.modules.grocery.schemas.purchase import (
     CategorySummary,
     NecessitySummary,
     MonthData,
+    BackfillRequest,
+    BackfillResponse,
+    BackfillTransactionDetail,
 )
 from app.modules.household.utils import (
     get_household_user_ids,
@@ -746,3 +751,134 @@ class GroceryService:
 
         await self.db.refresh(purchase)
         return purchase
+
+    # ==================== BACKFILL ====================
+
+    # Default category names that indicate grocery purchases
+    MARKET_CATEGORY_NAMES = [
+        "supermercado",
+        "alimentação",
+        "alimentacao",
+        "mercado",
+        "grocery",
+    ]
+
+    async def backfill_grocery_purchases(
+        self,
+        user: User,
+        request: BackfillRequest,
+    ) -> BackfillResponse:
+        """
+        Backfill grocery purchases from existing transactions.
+        Creates GroceryPurchase records for transactions in market-related categories
+        that don't already have associated grocery purchases.
+        """
+        household_user_ids = await get_household_user_ids(self.db, user)
+
+        # Determine which category names to use
+        category_names = request.category_names or self.MARKET_CATEGORY_NAMES
+        category_names_lower = [name.lower() for name in category_names]
+
+        # Find category IDs matching the names
+        category_query = select(Category).where(
+            func.lower(Category.name).in_(category_names_lower)
+        )
+        category_result = await self.db.execute(category_query)
+        categories = category_result.scalars().all()
+
+        if not categories:
+            return BackfillResponse(
+                transactions_found=0,
+                already_have_purchases=0,
+                to_create=0,
+                created=0,
+                details=[],
+            )
+
+        category_ids = [c.id for c in categories]
+
+        # Find transaction IDs that already have grocery purchases
+        existing_query = select(GroceryPurchase.transaction_id).where(
+            GroceryPurchase.transaction_id.isnot(None),
+            GroceryPurchase.user_id.in_(household_user_ids),
+        )
+        existing_result = await self.db.execute(existing_query)
+        existing_transaction_ids = set(row[0] for row in existing_result.all())
+
+        # Find transactions in market categories without grocery purchases
+        transactions_query = (
+            select(Transaction)
+            .options(selectinload(Transaction.merchant))
+            .where(
+                Transaction.category_id.in_(category_ids),
+                Transaction.type == "expense",
+                Transaction.user_id.in_(household_user_ids),
+            )
+            .order_by(Transaction.date.desc())
+        )
+        transactions_result = await self.db.execute(transactions_query)
+        all_transactions = transactions_result.scalars().all()
+
+        # Separate transactions
+        to_backfill = [t for t in all_transactions if t.id not in existing_transaction_ids]
+        already_have = [t for t in all_transactions if t.id in existing_transaction_ids]
+
+        details: list[BackfillTransactionDetail] = []
+        created_count = 0
+
+        for tx in to_backfill:
+            product_name = tx.description or tx.merchant_name or "Compra de mercado"
+            merchant_id = tx.merchant_id
+
+            if request.dry_run:
+                detail_status = "would_create"
+            else:
+                # Create GroceryPurchase
+                purchase = GroceryPurchase(
+                    user_id=tx.user_id,
+                    transaction_id=tx.id,
+                    document_id=None,
+                    product_id=None,
+                    merchant_id=merchant_id,
+                    product_name=product_name,
+                    quantity=1,
+                    unit="un",
+                    unit_price=float(tx.amount),
+                    total_price=float(tx.amount),
+                    category=GroceryCategory.OTHER.value,
+                    necessity_type=NecessityType.ESSENTIAL.value,
+                    purchase_date=tx.date,
+                    ownership_type=tx.ownership_type or "personal",
+                )
+                self.db.add(purchase)
+                created_count += 1
+                detail_status = "created"
+
+            details.append(BackfillTransactionDetail(
+                transaction_id=tx.id,
+                description=tx.description,
+                amount=float(tx.amount),
+                date=tx.date.isoformat(),
+                status=detail_status,
+            ))
+
+        # Add skipped transactions
+        for tx in already_have:
+            details.append(BackfillTransactionDetail(
+                transaction_id=tx.id,
+                description=tx.description,
+                amount=float(tx.amount),
+                date=tx.date.isoformat(),
+                status="skipped",
+            ))
+
+        if not request.dry_run and created_count > 0:
+            await self.db.commit()
+
+        return BackfillResponse(
+            transactions_found=len(all_transactions),
+            already_have_purchases=len(already_have),
+            to_create=len(to_backfill),
+            created=created_count,
+            details=details,
+        )

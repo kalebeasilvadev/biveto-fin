@@ -16,6 +16,7 @@ import {
   UploadSelector,
   ExtractedItemsList,
   TransactionForm,
+  QRCodeScanner,
 } from '../components/upload'
 import OwnershipSelector from '../components/shared/OwnershipSelector'
 import { HelpButton } from '../components/help'
@@ -1015,6 +1016,42 @@ export default function Upload() {
     )
   }
 
+  // Render QR code scanner mode
+  if (mode === 'qrcode') {
+    return (
+      <QRCodeScanner
+        onSuccess={(nfceData) => {
+          // Convert NFCe data to our Document format
+          const extractedItems: ExtractedItem[] = nfceData.itens.map(item => ({
+            description: item.descricao,
+            amount: item.valor_total,
+            date: nfceData.data_emissao.split('T')[0],
+            category: 'mercado',
+            confidence: 0.95,
+            quantity: item.quantidade,
+            unit: item.unidade,
+            unit_price: item.valor_unitario,
+            grocery_category: 'other', // Will be classified by LLM or user
+            necessity_type: 'essential',
+          }))
+
+          // Create a virtual document with the NFCe data
+          setDocument({
+            id: 0, // Virtual document (not stored in DB yet)
+            status: 'completed',
+            extracted_items: extractedItems,
+            document_type: 'cupom_fiscal',
+          })
+
+          // Switch to confirm mode
+          setMode('confirm')
+        }}
+        onCancel={() => setMode('select')}
+        onFallbackToPhoto={() => setMode('camera')}
+      />
+    )
+  }
+
   // Render selection screen
   if (mode === 'select') {
     return (
@@ -1022,6 +1059,7 @@ export default function Upload() {
         onCameraClick={() => setMode('camera')}
         onFileSelect={handleFileUpload}
         onManualClick={() => setMode('manual')}
+        onQRCodeClick={() => setMode('qrcode')}
         isUploading={uploadMutation.isPending}
         uploadError={uploadError}
       />

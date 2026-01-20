@@ -128,3 +128,36 @@ class GroceryPurchaseComparison(BaseModel):
     current_month: MonthData
     previous_month: MonthData
     comparison: dict  # Contains diffs and analysis
+
+
+# ==================== BACKFILL ====================
+
+
+class BackfillRequest(BaseModel):
+    """Request to backfill grocery purchases from existing transactions"""
+    dry_run: bool = Field(
+        default=True,
+        description="Se True, apenas simula sem criar registros"
+    )
+    category_names: list[str] | None = Field(
+        default=None,
+        description="Nomes das categorias a considerar (ex: Supermercado, alimentação)"
+    )
+
+
+class BackfillTransactionDetail(BaseModel):
+    """Detail of a transaction being backfilled"""
+    transaction_id: int
+    description: str | None
+    amount: float
+    date: str  # YYYY-MM-DD
+    status: str  # 'created', 'skipped', 'would_create'
+
+
+class BackfillResponse(BaseModel):
+    """Response from backfill operation"""
+    transactions_found: int
+    already_have_purchases: int
+    to_create: int
+    created: int  # 0 se dry_run=True
+    details: list[BackfillTransactionDetail]

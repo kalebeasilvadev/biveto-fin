@@ -20,6 +20,8 @@ from app.modules.grocery.schemas.purchase import (
     GroceryPurchaseResponse,
     GroceryPurchaseSummary,
     GroceryPurchaseComparison,
+    BackfillRequest,
+    BackfillResponse,
 )
 from app.modules.grocery.schemas.shopping_list import (
     ShoppingListCreate,
@@ -461,3 +463,25 @@ async def get_budget_status(
     """Status do orçamento de mercado do mês"""
     service = GroceryAnalyticsService(db)
     return await service.get_budget_status(current_user, month, year)
+
+
+# ============================================
+# Backfill
+# ============================================
+
+@router.post("/backfill", response_model=BackfillResponse)
+async def backfill_grocery_purchases(
+    data: BackfillRequest,
+    current_user: CurrentUser,
+    db: DbSession,
+):
+    """
+    Migra transações antigas de categorias de mercado para grocery_purchases.
+
+    Por padrão executa em modo dry_run (apenas simula).
+    Defina dry_run=false para criar os registros.
+
+    Categorias padrão: Supermercado, alimentação, Mercado
+    """
+    service = GroceryService(db)
+    return await service.backfill_grocery_purchases(current_user, data)

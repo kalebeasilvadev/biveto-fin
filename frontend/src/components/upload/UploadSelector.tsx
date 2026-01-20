@@ -1,10 +1,11 @@
 import { useRef } from 'react'
-import { Camera, Image, PenLine, FileSpreadsheet, X } from 'lucide-react'
+import { Camera, Image, PenLine, FileSpreadsheet, X, QrCode } from 'lucide-react'
 
 interface UploadSelectorProps {
   onCameraClick: () => void
   onFileSelect: (file: File) => void
   onManualClick: () => void
+  onQRCodeClick?: () => void
   isUploading: boolean
   uploadError: string | null
 }
@@ -13,6 +14,7 @@ export default function UploadSelector({
   onCameraClick,
   onFileSelect,
   onManualClick,
+  onQRCodeClick,
   isUploading,
   uploadError,
 }: UploadSelectorProps) {
@@ -64,6 +66,22 @@ export default function UploadSelector({
           onChange={handleFileInput}
           className="hidden"
         />
+
+        {/* QR Code - For grocery receipts (NFCe) */}
+        {onQRCodeClick && (
+          <button
+            onClick={onQRCodeClick}
+            className="card bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors text-left p-6 flex items-center gap-4"
+          >
+            <div className="p-3 bg-green-100 dark:bg-green-900/50 rounded-xl">
+              <QrCode className="text-green-600" size={32} />
+            </div>
+            <div>
+              <p className="font-semibold text-gray-900 dark:text-white text-lg">QR Code do Cupom</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Escaneie o QR Code do cupom fiscal para dados completos</p>
+            </div>
+          </button>
+        )}
 
         <div className="grid grid-cols-2 gap-4">
           {/* Gallery */}
