@@ -556,19 +556,19 @@ export default function CameraCapture({
         {/* Ghost Image Overlay - Multi capture mode */}
         {!capturedImage && allowMultiple && capturedImages.length > 0 && showGhostOverlay && (
           <div className="absolute inset-0 pointer-events-none">
-            {/* Ghost image: shows bottom 30% of last photo, positioned at top */}
+            {/* Ghost image: shows bottom 40% of last photo, positioned at top */}
             <img
               src={capturedImages[capturedImages.length - 1].dataUrl}
               alt="Guia de alinhamento"
-              className="absolute top-0 left-0 w-full opacity-35"
+              className="absolute top-0 left-0 w-full opacity-60"
               style={{
-                clipPath: 'inset(70% 0 0 0)',
-                transform: 'translateY(-70%)',
+                clipPath: 'inset(60% 0 0 0)',
+                transform: 'translateY(-60%)',
               }}
             />
-            {/* Guide line for alignment */}
-            <div className="absolute top-[30%] left-0 right-0 border-t-2 border-dashed border-yellow-400/80" />
-            <div className="absolute top-[30%] left-1/2 -translate-x-1/2 -translate-y-full bg-yellow-400 text-black text-xs font-medium px-3 py-1 rounded-t-lg">
+            {/* Guide line for alignment - mais visível */}
+            <div className="absolute top-[40%] left-0 right-0 border-t-4 border-dashed border-yellow-400" />
+            <div className="absolute top-[40%] left-1/2 -translate-x-1/2 -translate-y-full bg-yellow-400 text-black text-sm font-bold px-4 py-1.5 rounded-t-lg shadow-lg">
               ↑ Alinhe aqui
             </div>
           </div>
