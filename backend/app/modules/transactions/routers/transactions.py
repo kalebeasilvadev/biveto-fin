@@ -332,6 +332,12 @@ async def batch_confirm_transactions(
                 mark_previous_as_paid=item.mark_previous_as_paid,
                 create_future_installments=item.create_future_installments,
                 force_duplicate=item.force_duplicate,
+                # Campos para cupom fiscal (grocery tracking)
+                quantity=item.quantity,
+                unit=item.unit,
+                unit_price=item.unit_price,
+                grocery_category=item.grocery_category,
+                necessity_type=item.necessity_type,
             )
 
             result = await service.confirm_from_document(current_user, confirm_data)

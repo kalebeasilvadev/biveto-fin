@@ -33,6 +33,7 @@ import {
   Wrench,
   LucideIcon,
   Camera,
+  ShoppingCart,
 } from 'lucide-react'
 import { useState, useEffect, useCallback } from 'react'
 import { clsx } from 'clsx'
@@ -106,6 +107,7 @@ const menuGroups: NavGroup[] = [
       { to: '/goals', icon: Target, label: 'Metas' },
       { to: '/envelopes', icon: Inbox, label: 'Envelopes' },
       { to: '/debts', icon: BadgeDollarSign, label: 'Dívidas' },
+      { to: '/market', icon: ShoppingCart, label: 'Mercado' },
     ],
   },
   {

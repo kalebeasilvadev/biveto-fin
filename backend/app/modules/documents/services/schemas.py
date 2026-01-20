@@ -30,6 +30,20 @@ class FaturaItem(BaseModel):
         default=None,
         description="Parcelas futuras restantes. Apenas se is_installment=true"
     )
+    # Campos para cupom fiscal (grocery tracking)
+    quantity: Optional[float] = Field(default=None, description="Quantidade do produto")
+    unit: Optional[str] = Field(default=None, description="Unidade de medida (kg, un, L, etc)")
+    unit_price: Optional[float] = Field(default=None, description="Preco unitario")
+    grocery_category: Optional[str] = Field(
+        default=None,
+        description="Categoria de mercado: fruits_vegetables, meat_fish, dairy, bakery, "
+                    "beverages, snacks, frozen, canned, grains_pasta, condiments, "
+                    "cleaning, hygiene, baby, pet, household, other"
+    )
+    necessity_type: Optional[str] = Field(
+        default=None,
+        description="Tipo de necessidade: essential (basico) ou non_essential (superfluo)"
+    )
 
 
 class CardInfo(BaseModel):

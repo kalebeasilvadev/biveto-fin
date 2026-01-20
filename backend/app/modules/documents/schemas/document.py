@@ -38,6 +38,13 @@ class ExtractedItemResponse(BaseModel):
     # Deteccao de recorrencia (Netflix, Spotify, etc.)
     recurring_detection: RecurringDetection | None = None
 
+    # Campos para cupom fiscal (grocery tracking)
+    quantity: float | None = None  # Quantidade do produto
+    unit: str | None = None  # Unidade de medida (kg, un, L, etc)
+    unit_price: float | None = None  # Preco unitario
+    grocery_category: str | None = None  # Categoria de mercado detalhada
+    necessity_type: str | None = None  # essential ou non_essential
+
     class Config:
         from_attributes = True
 

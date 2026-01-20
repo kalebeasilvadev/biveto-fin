@@ -161,6 +161,12 @@ class DocumentService:
                     is_duplicate=duplicate_info['is_duplicate'],
                     existing_transaction_id=duplicate_info.get('transaction_id'),
                     recurring_detection=recurring_detection,
+                    # Campos para cupom fiscal (grocery tracking)
+                    quantity=item.get('quantity'),
+                    unit=item.get('unit'),
+                    unit_price=item.get('unit_price'),
+                    grocery_category=item.get('grocery_category'),
+                    necessity_type=item.get('necessity_type'),
                 ))
 
             response.extracted_items = extracted_items

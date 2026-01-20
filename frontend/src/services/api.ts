@@ -722,3 +722,79 @@ export const reviewApi = {
   completeReview: (year: number, week: number, notes?: string) =>
     api.post(`/review/weekly/${year}/${week}/complete`, { year, week, notes }),
 }
+
+export const groceryApi = {
+  // Products
+  listProducts: (params?: { search?: string; category?: string; limit?: number; offset?: number }) =>
+    api.get('/grocery/products', { params }),
+  createProduct: (data: { name: string; category?: string; necessity_type?: string; default_unit?: string }) =>
+    api.post('/grocery/products', data),
+  updateProduct: (id: number, data: unknown) =>
+    api.patch(`/grocery/products/${id}`, data),
+  deleteProduct: (id: number) =>
+    api.delete(`/grocery/products/${id}`),
+
+  // Purchases
+  listPurchases: (params?: {
+    start_date?: string
+    end_date?: string
+    category?: string
+    necessity_type?: string
+    merchant_id?: number
+    search?: string
+    limit?: number
+    offset?: number
+  }) => api.get('/grocery/purchases', { params }),
+  createPurchase: (data: unknown) =>
+    api.post('/grocery/purchases', data),
+  createPurchasesBulk: (data: unknown) =>
+    api.post('/grocery/purchases/bulk', data),
+  getPurchaseSummary: (month: number, year: number) =>
+    api.get('/grocery/purchases/summary', { params: { month, year } }),
+  getPurchaseComparison: (month: number, year: number) =>
+    api.get('/grocery/purchases/comparison', { params: { month, year } }),
+  updatePurchase: (id: number, data: unknown) =>
+    api.patch(`/grocery/purchases/${id}`, data),
+  deletePurchase: (id: number) =>
+    api.delete(`/grocery/purchases/${id}`),
+
+  // Shopping Lists
+  listShoppingLists: (params?: { status?: string; limit?: number; offset?: number }) =>
+    api.get('/grocery/lists', { params }),
+  createShoppingList: (data: { name: string; notes?: string; items?: unknown[] }) =>
+    api.post('/grocery/lists', data),
+  generateShoppingList: (data: { period_days?: number; min_frequency?: number; include_non_essential?: boolean; name?: string }) =>
+    api.post('/grocery/lists/generate', data),
+  getShoppingList: (id: number) =>
+    api.get(`/grocery/lists/${id}`),
+  updateShoppingList: (id: number, data: unknown) =>
+    api.patch(`/grocery/lists/${id}`, data),
+  deleteShoppingList: (id: number) =>
+    api.delete(`/grocery/lists/${id}`),
+
+  // Shopping List Items
+  addListItem: (listId: number, data: unknown) =>
+    api.post(`/grocery/lists/${listId}/items`, data),
+  updateListItem: (listId: number, itemId: number, data: unknown) =>
+    api.patch(`/grocery/lists/${listId}/items/${itemId}`, data),
+  deleteListItem: (listId: number, itemId: number) =>
+    api.delete(`/grocery/lists/${listId}/items/${itemId}`),
+
+  // Prices
+  getPriceHistory: (productId: number, days?: number) =>
+    api.get(`/grocery/prices/${productId}`, { params: days ? { days } : {} }),
+  getCheapestPrices: (productIds?: string, limit?: number) =>
+    api.get('/grocery/prices/cheapest', { params: { product_ids: productIds, limit } }),
+
+  // Analytics
+  getSpendingAnalytics: (params?: { start_date?: string; end_date?: string; granularity?: string }) =>
+    api.get('/grocery/analytics/spending', { params }),
+  getCategoryAnalytics: (params?: { start_date?: string; end_date?: string }) =>
+    api.get('/grocery/analytics/by-category', { params }),
+  getNecessityAnalytics: (params?: { start_date?: string; end_date?: string }) =>
+    api.get('/grocery/analytics/by-necessity', { params }),
+  getInsights: (params?: { start_date?: string; end_date?: string }) =>
+    api.get('/grocery/insights', { params }),
+  getBudgetStatus: (month: number, year: number) =>
+    api.get('/grocery/budget/status', { params: { month, year } }),
+}

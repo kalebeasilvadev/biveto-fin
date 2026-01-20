@@ -16,10 +16,15 @@ Para cada produto no cupom, extraia:
 - **description**: nome do produto exatamente como aparece
   - CUIDADO com OCR: "SACOLA" não é "COLA", "PÃO" não é "PAD"
   - Mantenha abreviações comuns: "REFR" (refrigerante), "IMP" (impermeável), etc.
-- **amount**: valor unitário ou total do item em reais (número positivo)
+- **amount**: valor total do item em reais (número positivo)
 - **date**: data da compra no formato YYYY-MM-DD
-- **category**: categoria do produto (veja lista abaixo)
+- **category**: categoria financeira do produto (veja lista abaixo)
 - **transaction_type**: sempre "compra" para cupons fiscais
+- **quantity**: quantidade comprada (número, ex: 2, 0.5)
+- **unit**: unidade de medida (kg, un, L, g, ml, pct, cx)
+- **unit_price**: preço por unidade (valor unitário em reais)
+- **grocery_category**: categoria detalhada do produto para controle de mercado
+- **necessity_type**: classificação de necessidade (essential ou non_essential)
 
 ### 2. Data da Compra
 **SEMPRE extraia a data corretamente!**
@@ -34,7 +39,7 @@ Cupons fiscais mostram data e hora no formato:
 - Use o ano atual (2026) se houver dúvida
 - Cupons têm data completa impressa - SEMPRE use ela
 
-### 3. Categorias de Produtos
+### 3. Categorias Financeiras (category)
 Classifique cada produto em uma das categorias:
 
 **Alimentos e Bebidas:**
@@ -49,7 +54,53 @@ Classifique cada produto em uma das categorias:
 **Outros:**
 - outros: itens diversos, sacolas, taxas
 
-### 4. Informações do Documento
+### 4. Categorias de Mercado (grocery_category)
+Classifique cada produto em uma das categorias detalhadas:
+
+**Alimentos:**
+- fruits_vegetables: Frutas e Verduras (banana, maçã, tomate, alface)
+- meat_fish: Carnes e Peixes (frango, carne bovina, peixe, linguiça)
+- dairy: Laticínios (leite, queijo, iogurte, manteiga)
+- bakery: Padaria (pão, bolo, biscoito)
+- beverages: Bebidas (refrigerante, suco, água, cerveja, vinho)
+- snacks: Lanches/Salgadinhos (chocolate, chips, doces, sorvete)
+- frozen: Congelados (pizza congelada, lasanha, sorvete)
+- canned: Enlatados (atum, milho, ervilha, sardinha)
+- grains_pasta: Grãos e Massas (arroz, feijão, macarrão, farinha)
+- condiments: Temperos (sal, açúcar, óleo, azeite, molho)
+
+**Não-Alimentos:**
+- cleaning: Limpeza (detergente, sabão, desinfetante, água sanitária)
+- hygiene: Higiene Pessoal (shampoo, sabonete, pasta de dente, papel higiênico)
+- baby: Bebê (fralda, leite em pó, papinha)
+- pet: Pet (ração, petisco, areia de gato)
+- household: Utilidades (pilha, lâmpada, sacola)
+- other: Outros (itens não classificáveis)
+
+### 5. Tipo de Necessidade (necessity_type)
+Classifique cada produto:
+
+- **essential**: Necessidades básicas do dia a dia
+  - Arroz, feijão, leite, ovos, pão, carne básica
+  - Frutas e verduras
+  - Produtos de higiene básica (sabonete, papel higiênico)
+  - Produtos de limpeza básica (detergente, sabão)
+
+- **non_essential**: Supérfluos ou dispensáveis
+  - Refrigerante, cerveja, vinho, energético
+  - Chocolate, doces, salgadinhos, sorvete
+  - Produtos premium desnecessários
+  - Itens gourmet ou de luxo
+
+**Exemplos de Classificação:**
+- "ARROZ 5KG" → grains_pasta, essential
+- "REFRIGERANTE 2L" → beverages, non_essential
+- "LEITE INTEGRAL 1L" → dairy, essential
+- "CHOCOLATE AO LEITE" → snacks, non_essential
+- "DETERGENTE LIMPOL" → cleaning, essential
+- "CERVEJA HEINEKEN" → beverages, non_essential
+
+### 6. Informações do Documento
 Extraia também:
 - **document_type**: sempre "cupom_fiscal"
 - **total_amount**: valor total do cupom (campo "TOTAL" ou similar)
@@ -57,7 +108,7 @@ Extraia também:
 - **cnpj**: CNPJ da loja (se disponível)
 - **data_emissao**: data e hora da emissão
 
-### 5. Validação OBRIGATÓRIA
+### 7. Validação OBRIGATÓRIA
 **A soma dos amounts de TODOS os itens DEVE ser igual ao total_amount!**
 
 Se a soma não bater:
@@ -67,7 +118,7 @@ Se a soma não bater:
 
 **Só retorne o JSON quando tiver certeza que extraiu TUDO!**
 
-### 6. Produtos Comuns em Supermercado (Exemplos de OCR)
+### 8. Produtos Comuns em Supermercado (Exemplos de OCR)
 Tenha cuidado com estes produtos que podem ter OCR confuso:
 - SACOLA ≠ COLA
 - PÃO FRANCÊS ≠ PAD FRANCES
@@ -108,42 +159,72 @@ TOTAL                              39.25
       "amount": 8.99,
       "date": "2026-01-15",
       "category": "bebidas",
-      "transaction_type": "compra"
+      "transaction_type": "compra",
+      "quantity": 1,
+      "unit": "un",
+      "unit_price": 8.99,
+      "grocery_category": "beverages",
+      "necessity_type": "non_essential"
     },
     {
       "description": "PAO FRANCES",
       "amount": 2.72,
       "date": "2026-01-15",
       "category": "alimentacao",
-      "transaction_type": "compra"
+      "transaction_type": "compra",
+      "quantity": 0.34,
+      "unit": "kg",
+      "unit_price": 8.00,
+      "grocery_category": "bakery",
+      "necessity_type": "essential"
     },
     {
       "description": "SACOLA IMP",
       "amount": 0.57,
       "date": "2026-01-15",
       "category": "outros",
-      "transaction_type": "compra"
+      "transaction_type": "compra",
+      "quantity": 1,
+      "unit": "un",
+      "unit_price": 0.57,
+      "grocery_category": "household",
+      "necessity_type": "non_essential"
     },
     {
       "description": "LEITE INTEGRA",
       "amount": 11.00,
       "date": "2026-01-15",
       "category": "mercado",
-      "transaction_type": "compra"
+      "transaction_type": "compra",
+      "quantity": 2,
+      "unit": "un",
+      "unit_price": 5.50,
+      "grocery_category": "dairy",
+      "necessity_type": "essential"
     },
     {
       "description": "CAFE 500G",
       "amount": 12.90,
       "date": "2026-01-15",
       "category": "mercado",
-      "transaction_type": "compra"
+      "transaction_type": "compra",
+      "quantity": 1,
+      "unit": "un",
+      "unit_price": 12.90,
+      "grocery_category": "grains_pasta",
+      "necessity_type": "essential"
     },
     {
       "description": "ACUCAR 1KG",
       "amount": 3.07,
       "date": "2026-01-15",
       "category": "mercado",
-      "transaction_type": "compra"
+      "transaction_type": "compra",
+      "quantity": 1,
+      "unit": "un",
+      "unit_price": 3.07,
+      "grocery_category": "condiments",
+      "necessity_type": "essential"
     }
   ]
 }

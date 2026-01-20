@@ -43,6 +43,19 @@ from .automation_rule import (
     EventType,
     ThresholdType,
 )
+from .grocery import (
+    GroceryProduct,
+    GroceryPurchase,
+    GroceryPriceHistory,
+    ShoppingList,
+    ShoppingListItem,
+    GroceryCategory,
+    NecessityType,
+    ShoppingListStatus,
+    ShoppingListSource,
+    GROCERY_CATEGORY_DISPLAY,
+    NECESSITY_TYPE_DISPLAY,
+)
 from app.modules.known_services.models.known_service import KnownRecurringService
 
 __all__ = [
@@ -110,4 +123,15 @@ __all__ = [
     "EventType",
     "ThresholdType",
     "KnownRecurringService",
+    "GroceryProduct",
+    "GroceryPurchase",
+    "GroceryPriceHistory",
+    "ShoppingList",
+    "ShoppingListItem",
+    "GroceryCategory",
+    "NecessityType",
+    "ShoppingListStatus",
+    "ShoppingListSource",
+    "GROCERY_CATEGORY_DISPLAY",
+    "NECESSITY_TYPE_DISPLAY",
 ]

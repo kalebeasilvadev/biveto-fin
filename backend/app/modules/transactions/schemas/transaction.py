@@ -70,6 +70,13 @@ class TransactionConfirm(BaseModel):
     # Forcar salvamento mesmo se detectar duplicado
     force_duplicate: bool = False
 
+    # Campos para cupom fiscal (grocery tracking)
+    quantity: float | None = None  # Quantidade do produto
+    unit: str | None = None  # Unidade de medida (kg, un, L, etc)
+    unit_price: float | None = None  # Preco unitario
+    grocery_category: str | None = None  # Categoria de mercado detalhada
+    necessity_type: str | None = None  # essential ou non_essential
+
 
 class TransactionUpdate(BaseModel):
     amount: float | None = Field(None, gt=0)
@@ -161,6 +168,12 @@ class BatchConfirmItem(BaseModel):
     mark_previous_as_paid: bool = False
     create_future_installments: bool = False
     force_duplicate: bool = False
+    # Campos para cupom fiscal (grocery tracking)
+    quantity: float | None = None
+    unit: str | None = None
+    unit_price: float | None = None
+    grocery_category: str | None = None
+    necessity_type: str | None = None
 
 
 class BatchConfirmRequest(BaseModel):

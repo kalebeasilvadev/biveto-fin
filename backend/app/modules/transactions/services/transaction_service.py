@@ -566,6 +566,27 @@ class TransactionService:
                 await self.db.refresh(transaction)
                 result["transaction"] = transaction
 
+        # Criar GroceryPurchase se for item de cupom fiscal
+        transaction = result.get("transaction")
+        if transaction and hasattr(data, 'grocery_category') and data.grocery_category:
+            from app.modules.grocery.services.grocery_service import GroceryService
+            grocery_service = GroceryService(self.db)
+            await grocery_service.create_purchase_from_transaction(
+                user=user,
+                transaction_id=transaction.id,
+                document_id=data.document_id,
+                merchant_id=merchant_id,
+                product_name=data.merchant_name or data.description or "Item",
+                total_price=float(data.amount),
+                purchase_date=data.date,
+                quantity=getattr(data, 'quantity', None),
+                unit=getattr(data, 'unit', None),
+                unit_price=getattr(data, 'unit_price', None),
+                grocery_category=data.grocery_category,
+                necessity_type=getattr(data, 'necessity_type', None),
+                ownership_type=data.ownership_type.value if hasattr(data.ownership_type, 'value') else data.ownership_type,
+            )
+
         # Atualizar total da fatura se houver
         if invoice and invoice_service:
             await invoice_service.update_invoice_total(invoice)
