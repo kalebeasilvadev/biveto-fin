@@ -556,20 +556,36 @@ export default function CameraCapture({
         {/* Ghost Image Overlay - Multi capture mode */}
         {!capturedImage && allowMultiple && capturedImages.length > 0 && showGhostOverlay && (
           <div className="absolute inset-0 pointer-events-none">
+            {/* Fundo escuro na área do ghost para destacar */}
+            <div
+              className="absolute top-0 left-0 right-0 bg-black/40"
+              style={{ height: '40%' }}
+            />
             {/* Ghost image: shows bottom 40% of last photo, positioned at top */}
             <img
               src={capturedImages[capturedImages.length - 1].dataUrl}
               alt="Guia de alinhamento"
-              className="absolute top-0 left-0 w-full opacity-60"
+              className="absolute top-0 left-0 w-full opacity-90"
               style={{
                 clipPath: 'inset(60% 0 0 0)',
                 transform: 'translateY(-60%)',
               }}
             />
-            {/* Guide line for alignment - mais visível */}
-            <div className="absolute top-[40%] left-0 right-0 border-t-4 border-dashed border-yellow-400" />
-            <div className="absolute top-[40%] left-1/2 -translate-x-1/2 -translate-y-full bg-yellow-400 text-black text-sm font-bold px-4 py-1.5 rounded-t-lg shadow-lg">
-              ↑ Alinhe aqui
+            {/* Borda de separação sólida */}
+            <div
+              className="absolute left-0 right-0 h-1 bg-yellow-400"
+              style={{ top: '40%' }}
+            />
+            {/* Label de alinhamento */}
+            <div
+              className="absolute left-1/2 -translate-x-1/2 bg-yellow-400 text-black text-sm font-bold px-4 py-2 rounded-b-lg shadow-lg"
+              style={{ top: '40%' }}
+            >
+              ↑ ALINHE O CUPOM AQUI ↑
+            </div>
+            {/* Indicador "FOTO ANTERIOR" */}
+            <div className="absolute top-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+              📷 Foto anterior
             </div>
           </div>
         )}
