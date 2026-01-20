@@ -713,6 +713,12 @@ export default function Upload() {
             item.installment_current < item.installment_total,
           // Tipo de transacao extraido pelo LLM (pagamento, credito, estorno, compra, etc)
           extracted_transaction_type: item.transaction_type || null,
+          // Campos para cupom fiscal (grocery tracking)
+          quantity: item.quantity || null,
+          unit: item.unit || null,
+          unit_price: item.unit_price || null,
+          grocery_category: item.grocery_category || null,
+          necessity_type: item.necessity_type || null,
         }
       }
     })
@@ -757,6 +763,12 @@ export default function Upload() {
           item.installment_current < item.installment_total,
         // Tipo de transacao extraido pelo LLM (pagamento, credito, estorno, compra, etc)
         extracted_transaction_type: item.transaction_type || null,
+        // Campos para cupom fiscal (grocery tracking)
+        quantity: item.quantity || null,
+        unit: item.unit || null,
+        unit_price: item.unit_price || null,
+        grocery_category: item.grocery_category || null,
+        necessity_type: item.necessity_type || null,
       }
     }))
 

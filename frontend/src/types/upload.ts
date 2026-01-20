@@ -49,6 +49,12 @@ export interface ExtractedItem {
   recurring_detection?: RecurringDetection
   // Tipo de transacao extraido pelo LLM: compra, estorno, credito, pagamento, anuidade, encargo
   transaction_type?: string | null
+  // Campos para cupom fiscal (grocery tracking)
+  quantity?: number | null
+  unit?: string | null
+  unit_price?: number | null
+  grocery_category?: string | null
+  necessity_type?: string | null
 }
 
 export interface CardInfo {
