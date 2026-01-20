@@ -53,22 +53,112 @@ class MistralProvider(BaseProvider):
                 }
             ],
             response_format={"type": "json_object"},
-            temperature=0.0
+            temperature=0.0,
+            max_tokens=32000  # Aumentado para cupons grandes com muitos itens
         )
 
-    def _get_prompt(self) -> str:
-        """Carrega o prompt otimizado para Mistral OCR."""
-        prompt_path = Path(__file__).parent.parent.parent / "prompts" / "prompt_mistral.md"
+    def _get_prompt(self, ocr_text: str = "") -> str:
+        """Carrega o prompt apropriado baseado no tipo de documento detectado."""
+        prompts_dir = Path(__file__).parent.parent.parent / "prompts"
+
+        # Detectar tipo de documento pelo texto OCR
+        doc_type = self._detect_document_type(ocr_text)
+        print(f"[MistralProvider] Tipo de documento detectado: {doc_type}")
+
+        if doc_type == "cupom_fiscal":
+            prompt_path = prompts_dir / "prompt_cupom_fiscal.md"
+        else:
+            prompt_path = prompts_dir / "prompt_mistral.md"
+
         if prompt_path.exists():
             return prompt_path.read_text(encoding="utf-8")
         return self.prompt
 
+    def _detect_document_type(self, ocr_text: str) -> str:
+        """Detecta se é cupom fiscal ou fatura de cartão."""
+        text_lower = ocr_text.lower()
+
+        # Indicadores de cupom fiscal / NFC-e
+        cupom_indicators = [
+            "cupom fiscal",
+            "nfc-e",
+            "nota fiscal",
+            "danfe",
+            "cnpj",
+            "item codigo descricao",
+            "qtde un vl unit",
+            "valor total r$",
+            "forma de pagamento",
+            "troco",
+            "chave de acesso",
+            "protocolo de autorizacao",
+            "qr code",
+            "consumidor final",
+        ]
+
+        # Indicadores de fatura de cartão
+        fatura_indicators = [
+            "fatura",
+            "vencimento",
+            "limite de credito",
+            "limite disponivel",
+            "pagamento minimo",
+            "encargos",
+            "parcelamento",
+            "total a pagar",
+            "cartao final",
+            "nubank",
+            "itau",
+            "bradesco",
+            "santander",
+            "banco",
+        ]
+
+        cupom_score = sum(1 for indicator in cupom_indicators if indicator in text_lower)
+        fatura_score = sum(1 for indicator in fatura_indicators if indicator in text_lower)
+
+        print(f"[MistralProvider] Score cupom: {cupom_score}, Score fatura: {fatura_score}")
+
+        return "cupom_fiscal" if cupom_score > fatura_score else "fatura_cartao"
+
     async def extract_from_image(self, image_content: bytes, mime_type: str) -> dict:
-        """Mistral nao suporta visao direta - use extract_from_pdf"""
-        return {
-            'items': [],
-            'error': 'Mistral provider suporta apenas PDFs via OCR'
-        }
+        """Converte imagem para PDF e processa via OCR"""
+        # Converter imagem para PDF
+        pdf_content = await self._image_to_pdf(image_content, mime_type)
+        return await self.extract_from_pdf(pdf_content, "image.pdf")
+
+    async def extract_multi_page(self, images: list[tuple[bytes, str]]) -> dict:
+        """Converte multiplas imagens para PDF e processa via OCR"""
+        print(f"[MistralProvider] Convertendo {len(images)} imagens para PDF...")
+        pdf_content = await self._images_to_pdf(images)
+        print(f"[MistralProvider] PDF gerado: {len(pdf_content)} bytes")
+        return await self.extract_from_pdf(pdf_content, "multi_page.pdf")
+
+    async def _image_to_pdf(self, image_content: bytes, mime_type: str) -> bytes:
+        """Converte uma imagem para PDF"""
+        return await self._images_to_pdf([(image_content, mime_type)])
+
+    async def _images_to_pdf(self, images: list[tuple[bytes, str]]) -> bytes:
+        """Converte multiplas imagens para um unico PDF"""
+        import io
+        from PIL import Image
+
+        def _convert():
+            pdf_images = []
+            for img_content, _ in images:
+                img = Image.open(io.BytesIO(img_content))
+                if img.mode in ('RGBA', 'P'):
+                    img = img.convert('RGB')
+                pdf_images.append(img)
+
+            output = io.BytesIO()
+            if len(pdf_images) == 1:
+                pdf_images[0].save(output, format='PDF')
+            else:
+                pdf_images[0].save(output, format='PDF', save_all=True, append_images=pdf_images[1:])
+            return output.getvalue()
+
+        return await asyncio.to_thread(_convert)
 
     async def extract_from_pdf(self, pdf_content: bytes, filename: str = "document.pdf") -> dict:
         """
@@ -139,7 +229,7 @@ class MistralProvider(BaseProvider):
             # Passo 3: Estruturar com LLM (em thread separada com retry)
             print(f"[MistralProvider] Passo 3: Estruturando com LLM {settings.mistral_llm_model}...")
 
-            prompt = self._get_prompt()
+            prompt = self._get_prompt(ocr_text)
             full_prompt = f"{prompt}\n\n## Texto extraido do PDF pelo OCR:\n\n{ocr_text}"
 
             last_error = None

@@ -90,7 +90,7 @@ export interface Document {
   card_info?: CardInfo
 }
 
-export type UploadMode = 'select' | 'upload' | 'camera' | 'manual' | 'confirm' | 'qrcode'
+export type UploadMode = 'select' | 'upload' | 'camera' | 'camera-multi' | 'gallery-multi' | 'manual' | 'confirm'
 
 export interface TransactionFormData {
   amount: string

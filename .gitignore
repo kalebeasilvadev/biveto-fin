@@ -73,5 +73,8 @@ prints/
 
 # MCP config (may contain sensitive info)
 mcp-config.json
+
+# HTTPS certificates for local development
+frontend/certs/
 Nubank_2026-01-12 2.csv
 credencial_test.txt

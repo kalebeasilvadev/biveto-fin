@@ -163,3 +163,73 @@ class LLMOCRService:
             'document_type': document_type,
             'card_info': card_info,
         }
+
+    async def extract_from_multiple_images(
+        self,
+        images: list[tuple[bytes, str]],  # (content, mime_type)
+    ) -> dict:
+        """Extrai dados de multiplas imagens (cupons grandes)
+
+        Args:
+            images: Lista de tuples (content, mime_type)
+
+        Returns:
+            Dict com items, card_info, document_type ou error
+        """
+        print(f"[LLM_OCR] extract_from_multiple_images: provider={self.provider_name}, num_images={len(images)}")
+
+        try:
+            provider = self._get_provider()
+
+            # Usar extract_multi_page (Google e Mistral suportam)
+            if self.provider_name in ('google', 'mistral'):
+                result = await provider.extract_multi_page(images)
+            else:
+                # Fallback: processar separadamente e consolidar
+                all_items = []
+                document_type = None
+                card_info = None
+                errors = []
+
+                for page_num, (img_content, img_mime) in enumerate(images, 1):
+                    page_result = await provider.extract_from_image(img_content, img_mime)
+
+                    if page_result.get('error'):
+                        errors.append(f"Imagem {page_num}: {page_result['error']}")
+                    if page_result.get('items'):
+                        all_items.extend(page_result['items'])
+                    if page_result.get('document_type') and not document_type:
+                        document_type = page_result['document_type']
+                    if page_result.get('card_info') and not card_info:
+                        card_info = page_result['card_info']
+
+                if not all_items and errors:
+                    return {'items': [], 'error': '; '.join(errors)}
+
+                result = {
+                    'items': all_items,
+                    'document_type': document_type,
+                    'card_info': card_info,
+                }
+
+            # Aplicar validacoes e limpezas
+            if result and not result.get('error'):
+                items = result.get('items', [])
+                card_info = result.get('card_info')
+                document_type = result.get('document_type')
+
+                if items:
+                    items = self.validator.validate_and_clean(items, card_info, document_type)
+                    result['items'] = items
+
+                    validation = self.validator.validate_extraction(items, card_info)
+                    if not validation['is_valid']:
+                        print(f"[LLM_OCR] AVISO: Validacao falhou - diff={validation['difference']:.2f}")
+
+            return result
+
+        except Exception as e:
+            print(f"[LLM_OCR] Error in extract_from_multiple_images: {type(e).__name__}: {e}")
+            import traceback
+            traceback.print_exc()
+            return {'items': [], 'error': str(e)}

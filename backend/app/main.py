@@ -195,7 +195,7 @@ app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
 app.add_middleware(SecurityHeadersMiddleware)
 
 # CORS - mais restritivo
-# Em desenvolvimento, permitir localhost. Em produção, usar lista específica.
+# Em desenvolvimento, permitir localhost e rede local. Em produção, usar lista específica.
 if settings.debug:
     allowed_origins = [
         "http://localhost:3000",
@@ -207,12 +207,18 @@ if settings.debug:
         "http://127.0.0.1:5173",
         "http://127.0.0.1:5174",
     ]
+    # Regex para permitir IPs de rede local, localtunnel e cloudflare tunnel (para teste no celular)
+    # Aceita HTTP e HTTPS em 192.168.x.x, 10.x.x.x, 172.16-31.x.x nas portas 3000 e 5173
+    # Também aceita *.loca.lt e *.trycloudflare.com
+    allow_origin_regex = r"^https?://((192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2[0-9]|3[01])\.\d+\.\d+):(3000|5173)|[\w-]+\.loca\.lt|[\w-]+\.trycloudflare\.com)$"
 else:
     allowed_origins = [origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()]
+    allow_origin_regex = None
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
+    allow_origin_regex=allow_origin_regex,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization", "X-Requested-With", "X-API-Key"],

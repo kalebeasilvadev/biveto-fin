@@ -170,6 +170,7 @@ class GoogleProvider(BaseProvider):
                     contents=parts,
                     config=types.GenerateContentConfig(
                         temperature=0.1,
+                        max_output_tokens=32000,  # Increased for large receipts with many items
                         response_mime_type="application/json",
                         response_schema=self.response_schema,
                     ),

@@ -16,7 +16,6 @@ import {
   UploadSelector,
   ExtractedItemsList,
   TransactionForm,
-  QRCodeScanner,
 } from '../components/upload'
 import OwnershipSelector from '../components/shared/OwnershipSelector'
 import { HelpButton } from '../components/help'
@@ -205,7 +204,21 @@ export default function Upload() {
   // Mutations
   const uploadMutation = useMutation({
     mutationFn: (file: File) => documentsApi.upload(file),
-    onSuccess: (response) => {
+    onSuccess: handleUploadSuccess,
+    onError: (error: unknown) => {
+      setUploadError(getApiErrorMessage(error, 'Erro ao processar documento'))
+    },
+  })
+
+  const uploadBatchMutation = useMutation({
+    mutationFn: (files: File[]) => documentsApi.uploadBatch(files),
+    onSuccess: handleUploadSuccess,
+    onError: (error: unknown) => {
+      setUploadError(getApiErrorMessage(error, 'Erro ao processar documentos'))
+    },
+  })
+
+  function handleUploadSuccess(response: { data: Document }) {
       setUploadError(null)
       const doc = response.data as Document
       setDocument(doc)
@@ -357,11 +370,7 @@ export default function Upload() {
           setShowCreateCardPrompt(true)
         }
       }
-    },
-    onError: (error: unknown) => {
-      setUploadError(getApiErrorMessage(error, 'Erro ao processar documento'))
-    },
-  })
+  }
 
   // Função para invalidar todos os caches relacionados a transações
   const invalidateTransactionCaches = () => {
@@ -613,6 +622,10 @@ export default function Upload() {
   // Handlers
   const handleFileUpload = (file: File) => {
     uploadMutation.mutate(file)
+  }
+
+  const handleBatchUpload = (files: File[]) => {
+    uploadBatchMutation.mutate(files)
   }
 
   const handleManualSubmit = () => {
@@ -1004,7 +1017,7 @@ export default function Upload() {
     setBatchOwnershipType('household')
   }
 
-  // Render camera mode
+  // Render camera mode (single photo)
   if (mode === 'camera') {
     return (
       <CameraCapture
@@ -1016,38 +1029,16 @@ export default function Upload() {
     )
   }
 
-  // Render QR code scanner mode
-  if (mode === 'qrcode') {
+  // Render camera-multi mode (multiple photos for large receipts)
+  if (mode === 'camera-multi') {
     return (
-      <QRCodeScanner
-        onSuccess={(nfceData) => {
-          // Convert NFCe data to our Document format
-          const extractedItems: ExtractedItem[] = nfceData.itens.map(item => ({
-            description: item.descricao,
-            amount: item.valor_total,
-            date: nfceData.data_emissao.split('T')[0],
-            category: 'mercado',
-            confidence: 0.95,
-            quantity: item.quantidade,
-            unit: item.unidade,
-            unit_price: item.valor_unitario,
-            grocery_category: 'other', // Will be classified by LLM or user
-            necessity_type: 'essential',
-          }))
-
-          // Create a virtual document with the NFCe data
-          setDocument({
-            id: 0, // Virtual document (not stored in DB yet)
-            status: 'completed',
-            extracted_items: extractedItems,
-            document_type: 'cupom_fiscal',
-          })
-
-          // Switch to confirm mode
-          setMode('confirm')
-        }}
+      <CameraCapture
+        onCapture={handleFileUpload}
+        onCaptureBatch={handleBatchUpload}
         onCancel={() => setMode('select')}
-        onFallbackToPhoto={() => setMode('camera')}
+        isUploading={uploadBatchMutation.isPending}
+        uploadError={uploadError}
+        allowMultiple={true}
       />
     )
   }
@@ -1057,10 +1048,11 @@ export default function Upload() {
     return (
       <UploadSelector
         onCameraClick={() => setMode('camera')}
+        onCameraMultiClick={() => setMode('camera-multi')}
         onFileSelect={handleFileUpload}
+        onFilesSelect={handleBatchUpload}
         onManualClick={() => setMode('manual')}
-        // onQRCodeClick={() => setMode('qrcode')} // DESABILITADO: QR Code temporariamente desativado
-        isUploading={uploadMutation.isPending}
+        isUploading={uploadMutation.isPending || uploadBatchMutation.isPending}
         uploadError={uploadError}
       />
     )

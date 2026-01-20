@@ -78,9 +78,40 @@ export function getApiErrorMessage(error: unknown, defaultMessage: string): stri
 }
 
 // Em produção usa a URL completa, em dev usa proxy
-const baseURL = import.meta.env.VITE_API_URL
-  ? `${import.meta.env.VITE_API_URL}/api/v1`
-  : '/api/v1'
+// Se acessando via IP de rede local, usa URL direta do backend (porta 8000)
+function getBaseURL(): string {
+  const hostname = window.location.hostname
+
+  // PRIMEIRO: Se estiver acessando via localtunnel (loca.lt)
+  if (hostname.endsWith('.loca.lt')) {
+    const backendHost = hostname.replace('biveto-app', 'biveto-api')
+    return `https://${backendHost}/api/v1`
+  }
+
+  // Se estiver acessando via Cloudflare Tunnel (trycloudflare.com)
+  if (hostname.endsWith('.trycloudflare.com')) {
+    // Usar variável de ambiente ou URL hardcoded temporária para dev
+    const cloudflareBackend = import.meta.env.VITE_CLOUDFLARE_BACKEND || 'https://oldest-guaranteed-being-incidence.trycloudflare.com'
+    return `${cloudflareBackend}/api/v1`
+  }
+
+  // Se estiver acessando via IP de rede local, usa backend direto com HTTPS
+  // Isso tem prioridade sobre VITE_API_URL para funcionar no celular
+  const isLocalNetwork = /^(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[01])\.)/.test(hostname)
+  if (isLocalNetwork) {
+    return `https://${hostname}:8000/api/v1`
+  }
+
+  // Se variável de ambiente definida (e não está em rede local), usa ela
+  if (import.meta.env.VITE_API_URL) {
+    return `${import.meta.env.VITE_API_URL}/api/v1`
+  }
+
+  // Localhost ou produção: usa proxy ou caminho relativo
+  return '/api/v1'
+}
+
+const baseURL = getBaseURL()
 
 const api = axios.create({
   baseURL,
@@ -314,16 +345,15 @@ export const documentsApi = {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
   },
+  uploadBatch: (files: File[]) => {
+    const formData = new FormData()
+    files.forEach(file => formData.append('files', file))
+    return api.post('/documents/batch', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  },
   list: () => api.get('/documents'),
   get: (id: number) => api.get(`/documents/${id}`),
-
-  // QR Code Scanning
-  scanQRCode: (data: { image_base64?: string; url?: string; access_key?: string }) =>
-    api.post('/documents/scan-qrcode', data),
-  extractQRCode: (image_base64: string) =>
-    api.post('/documents/scan-qrcode/extract', { image_base64 }),
-  fetchNFCe: (data: { url?: string; access_key?: string }) =>
-    api.post('/documents/scan-qrcode/fetch', data),
 }
 
 export const analyticsApi = {
