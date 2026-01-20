@@ -21,6 +21,7 @@ import { familyHelp } from './family'
 import { settingsHelp } from './settings'
 import { apiKeysHelp } from './api-keys'
 import { onboardingHelp } from './onboarding'
+import { marketHelp } from './market'
 
 export type { HelpContent, HelpSection } from './types'
 
@@ -47,6 +48,7 @@ const helpContentRegistry: Record<string, HelpContent> = {
   settings: settingsHelp,
   'api-keys': apiKeysHelp,
   onboarding: onboardingHelp,
+  market: marketHelp,
 }
 
 export function getHelpContent(pageId: string): HelpContent | undefined {
