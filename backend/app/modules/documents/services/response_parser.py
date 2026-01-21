@@ -30,14 +30,22 @@ class ResponseParser:
                     items.append(normalized)
 
             # DEBUG: Log para verificar o que veio do LLM
-            print(f"[Parser] DEBUG: data keys={list(data.keys())}")
-            print(f"[Parser] DEBUG: data.get('total_amount')={data.get('total_amount')}")
-            print(f"[Parser] DEBUG: document_type={data.get('document_type')}")
+            import json as json_debug
+            print(f"[Parser] DEBUG: FULL JSON from LLM:")
+            print(json_debug.dumps(data, indent=2, ensure_ascii=False, default=str)[:2000])
+
+            # Extrair total_amount de varios lugares possiveis
+            total_amount = data.get('total_amount')
+            if not total_amount and 'payment_info' in data:
+                payment_info = data.get('payment_info', {})
+                if isinstance(payment_info, dict):
+                    total_amount = payment_info.get('total_amount') or payment_info.get('total') or payment_info.get('valor_total')
+                    print(f"[Parser] DEBUG: total_amount from payment_info={total_amount}")
 
             result = {
                 'items': items,
                 'document_type': data.get('document_type'),
-                'total_amount': data.get('total_amount'),  # Total do cupom fiscal
+                'total_amount': total_amount,
             }
 
             card_info = data.get('card_info')
@@ -121,6 +129,30 @@ class ResponseParser:
         future_installments = item.get('future_installments')
         if future_installments and isinstance(future_installments, list):
             normalized['future_installments'] = future_installments
+
+        # Campos específicos de cupom fiscal (grocery tracking)
+        if item.get('quantity') is not None:
+            normalized['quantity'] = float(item['quantity'])
+        if item.get('unit'):
+            normalized['unit'] = item['unit']
+        if item.get('unit_price') is not None:
+            normalized['unit_price'] = float(item['unit_price'])
+
+        # grocery_category - usar do LLM ou inferir default 'other'
+        grocery_category = item.get('grocery_category')
+        if grocery_category:
+            normalized['grocery_category'] = grocery_category
+        elif item.get('quantity') is not None or item.get('unit'):
+            # Se tem quantity/unit, é item de cupom fiscal - inferir categoria
+            normalized['grocery_category'] = 'other'
+
+        # necessity_type - usar do LLM ou inferir default 'essential'
+        necessity_type = item.get('necessity_type')
+        if necessity_type:
+            normalized['necessity_type'] = necessity_type
+        elif normalized.get('grocery_category'):
+            # Se tem grocery_category, é cupom fiscal - inferir necessidade
+            normalized['necessity_type'] = 'essential'
 
         return normalized
 

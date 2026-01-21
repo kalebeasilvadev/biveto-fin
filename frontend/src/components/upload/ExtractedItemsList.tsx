@@ -99,6 +99,7 @@ export default function ExtractedItemsList({
 
   // Estado para modal de edição
   const [editForm, setEditForm] = useState<{
+    description: string
     category: string
     amount: string
     is_installment: boolean
@@ -132,6 +133,7 @@ export default function ExtractedItemsList({
   // Funções de edição
   const startEditing = (index: number, item: ExtractedItem) => {
     setEditForm({
+      description: item.description || '',
       category: item.category || 'outros',
       amount: Math.abs(item.amount).toString(),
       is_installment: item.is_installment || false,
@@ -146,6 +148,7 @@ export default function ExtractedItemsList({
     const amount = parseFloat(editForm.amount) || item.amount
     const finalAmount = item.amount < 0 ? -Math.abs(amount) : Math.abs(amount)
     onUpdateItem(index, {
+      description: editForm.description.trim() || item.description,
       category: editForm.category,
       amount: finalAmount,
       is_installment: editForm.is_installment,
@@ -600,9 +603,13 @@ export default function ExtractedItemsList({
             {/* Descrição */}
             <div className="mb-4">
               <label className="block text-xs font-medium text-gray-500 mb-1">Descrição</label>
-              <p className="text-sm text-white bg-slate-800 rounded-lg px-3 py-2">
-                {editingItem.description}
-              </p>
+              <input
+                type="text"
+                value={editForm.description}
+                onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                className="w-full text-sm px-3 py-2.5 rounded-lg border border-slate-700 bg-slate-800 text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                placeholder="Nome do item"
+              />
             </div>
 
             {/* Categoria */}
