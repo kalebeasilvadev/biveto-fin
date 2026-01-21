@@ -93,6 +93,10 @@ export interface PaymentInfo {
   subtotal: number | null
   discount: number | null
   payments: DetectedPayment[]
+  // Store info for receipt confirmation
+  store_name?: string
+  store_cnpj?: string
+  total_amount?: number
 }
 
 export interface Document {

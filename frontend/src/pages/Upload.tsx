@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { documentsApi, transactionsApi, accountsApi, categoriesApi, familyApi, creditCardsApi, invoicesApi, recurringApi, getApiErrorMessage } from '../services/api'
-import { X, CreditCard, Repeat, Plus, AlertCircle, Check } from 'lucide-react'
+import { documentsApi, transactionsApi, accountsApi, categoriesApi, familyApi, creditCardsApi, invoicesApi, recurringApi, benefitCardsApi, receiptsApi, getApiErrorMessage } from '../services/api'
+import { X, CreditCard, Repeat, Plus, AlertCircle, Check, Wallet } from 'lucide-react'
 import {
   Document,
   TransactionFormData,
@@ -63,6 +63,11 @@ export default function Upload() {
   const [showCreateCardPrompt, setShowCreateCardPrompt] = useState(false)
   const [isCreatingCard, setIsCreatingCard] = useState(false)
 
+  // Payment mapping state for receipts with split payments
+  // Maps payment index to { account_id, benefit_card_id }
+  const [paymentMappings, setPaymentMappings] = useState<Record<number, { account_id: string; benefit_card_id: string }>>({})
+  const [receiptConfirmError, setReceiptConfirmError] = useState<string | null>(null)
+
   // Parcelas projetadas state
   const [projectedInfo, setProjectedInfo] = useState<Record<number, {
     has_projected: boolean
@@ -119,7 +124,13 @@ export default function Upload() {
     queryFn: creditCardsApi.list,
   })
 
+  const { data: benefitCardsData } = useQuery({
+    queryKey: ['benefit-cards'],
+    queryFn: benefitCardsApi.list,
+  })
+
   const accounts = accountsData?.data || []
+  const benefitCards = benefitCardsData?.data || []
   const categories = categoriesData?.data || []
   const creditCards = creditCardsData?.data || []
   const showOwnershipSelector = familyData && familyData.member_count >= 2
@@ -134,6 +145,17 @@ export default function Upload() {
 
   // Check if document is a credit card invoice
   const isCreditCardInvoice = document?.document_type === 'fatura_cartao'
+
+  // Check if document is a cupom fiscal with split payments
+  const isCupomFiscalWithSplitPayment = document?.document_type === 'cupom_fiscal' &&
+    document?.payment_info?.payments &&
+    document.payment_info.payments.length > 0
+
+  // Check if all payments are mapped to accounts
+  const allPaymentsMapped = !isCupomFiscalWithSplitPayment ||
+    (document?.payment_info?.payments?.every((_p, idx) =>
+      paymentMappings[idx]?.account_id
+    ) ?? false)
 
   // Verificar parcelas projetadas quando documento é carregado
   useEffect(() => {
@@ -619,6 +641,45 @@ export default function Upload() {
     },
   })
 
+  // Receipt confirmation mutation (for cupom fiscal with split payments)
+  const receiptConfirmMutation = useMutation({
+    mutationFn: async (data: {
+      document_id: number
+      store_name: string
+      store_cnpj?: string
+      purchase_date: string
+      total_amount: number
+      subtotal?: number
+      discount?: number
+      items: Array<{
+        description: string
+        amount: number
+        category_id?: number
+        quantity?: number
+        unit?: string
+        unit_price?: number
+      }>
+      payments: Array<{
+        payment_method: string
+        amount: number
+        account_id: number
+        benefit_card_id?: number
+        original_label?: string
+      }>
+      default_category_id?: number
+    }) => receiptsApi.confirm(data),
+    onSuccess: () => {
+      invalidateTransactionCaches()
+      queryClient.invalidateQueries({ queryKey: ['receipts'] })
+      queryClient.invalidateQueries({ queryKey: ['benefit-cards'] })
+      setBatchAddSuccess(document?.extracted_items?.length || 0)
+      setReceiptConfirmError(null)
+    },
+    onError: (error) => {
+      setReceiptConfirmError(getApiErrorMessage(error, 'Erro ao confirmar compra'))
+    },
+  })
+
   // Handlers
   const handleFileUpload = (file: File) => {
     uploadMutation.mutate(file)
@@ -696,8 +757,55 @@ export default function Upload() {
     if (!document?.extracted_items) return
     // For credit card invoices, require credit card selection
     if (isCreditCardInvoice && !selectedCreditCardId) return
+    // For cupom fiscal with split payment, require all payments mapped
+    if (isCupomFiscalWithSplitPayment && !allPaymentsMapped) return
     // For other documents, require account selection
-    if (!isCreditCardInvoice && !formData.account_id) return
+    if (!isCreditCardInvoice && !isCupomFiscalWithSplitPayment && !formData.account_id) return
+
+    setBatchAddSuccess(0)
+    setBatchAddSkipped([])
+    setBatchAddError(null)
+    setReceiptConfirmError(null)
+
+    // For cupom fiscal with split payments, use receipt confirmation API
+    if (isCupomFiscalWithSplitPayment && document.payment_info?.payments) {
+      const payments = document.payment_info.payments.map((payment, idx) => ({
+        payment_method: payment.method || 'other',
+        amount: payment.amount,
+        account_id: parseInt(paymentMappings[idx]?.account_id || '0'),
+        benefit_card_id: paymentMappings[idx]?.benefit_card_id ? parseInt(paymentMappings[idx].benefit_card_id) : undefined,
+        original_label: payment.label || undefined,
+      }))
+
+      const items = selectedItems.map(index => {
+        const item = document.extracted_items[index]
+        return {
+          description: item.description || 'Item',
+          amount: Math.abs(item.amount),
+          category_id: findCategoryId(item.category) ? parseInt(findCategoryId(item.category)) : undefined,
+          quantity: item.quantity || undefined,
+          unit: item.unit || undefined,
+          unit_price: item.unit_price || undefined,
+        }
+      })
+
+      const totalAmount = document.payment_info.total_amount ||
+        payments.reduce((sum, p) => sum + p.amount, 0)
+
+      receiptConfirmMutation.mutate({
+        document_id: document.id,
+        store_name: document.payment_info.store_name || document.extracted_items[0]?.description || 'Loja',
+        store_cnpj: document.payment_info.store_cnpj || undefined,
+        purchase_date: document.extracted_items[0]?.date || formData.date,
+        total_amount: totalAmount,
+        subtotal: document.payment_info.subtotal || undefined,
+        discount: document.payment_info.discount || undefined,
+        items,
+        payments,
+        default_category_id: undefined,
+      })
+      return
+    }
 
     const itemsToAdd = selectedItems.map(index => {
       const item = document.extracted_items[index]
@@ -737,9 +845,6 @@ export default function Upload() {
       }
     })
 
-    setBatchAddSuccess(0)
-    setBatchAddSkipped([])
-    setBatchAddError(null)
     batchAddMutation.mutate(itemsToAdd)
   }
 
@@ -747,8 +852,53 @@ export default function Upload() {
     if (!document?.extracted_items) return
     // For credit card invoices, require credit card selection
     if (isCreditCardInvoice && !selectedCreditCardId) return
+    // For cupom fiscal with split payment, require all payments mapped
+    if (isCupomFiscalWithSplitPayment && !allPaymentsMapped) return
     // For other documents, require account selection
-    if (!isCreditCardInvoice && !formData.account_id) return
+    if (!isCreditCardInvoice && !isCupomFiscalWithSplitPayment && !formData.account_id) return
+
+    setSelectedItems(document.extracted_items.map((_, i) => i))
+    setBatchAddSuccess(0)
+    setBatchAddSkipped([])
+    setBatchAddError(null)
+    setReceiptConfirmError(null)
+
+    // For cupom fiscal with split payments, use receipt confirmation API
+    if (isCupomFiscalWithSplitPayment && document.payment_info?.payments) {
+      const payments = document.payment_info.payments.map((payment, idx) => ({
+        payment_method: payment.method || 'other',
+        amount: payment.amount,
+        account_id: parseInt(paymentMappings[idx]?.account_id || '0'),
+        benefit_card_id: paymentMappings[idx]?.benefit_card_id ? parseInt(paymentMappings[idx].benefit_card_id) : undefined,
+        original_label: payment.label || undefined,
+      }))
+
+      const items = document.extracted_items.map(item => ({
+        description: item.description || 'Item',
+        amount: Math.abs(item.amount),
+        category_id: findCategoryId(item.category) ? parseInt(findCategoryId(item.category)) : undefined,
+        quantity: item.quantity || undefined,
+        unit: item.unit || undefined,
+        unit_price: item.unit_price || undefined,
+      }))
+
+      const totalAmount = document.payment_info.total_amount ||
+        payments.reduce((sum, p) => sum + p.amount, 0)
+
+      receiptConfirmMutation.mutate({
+        document_id: document.id,
+        store_name: document.payment_info.store_name || document.extracted_items[0]?.description || 'Loja',
+        store_cnpj: document.payment_info.store_cnpj || undefined,
+        purchase_date: document.extracted_items[0]?.date || formData.date,
+        total_amount: totalAmount,
+        subtotal: document.payment_info.subtotal || undefined,
+        discount: document.payment_info.discount || undefined,
+        items,
+        payments,
+        default_category_id: undefined,
+      })
+      return
+    }
 
     // Adicionar todos - usuário decide sobre duplicados
     const itemsToAdd = document.extracted_items.map((item, index) => ({
@@ -786,10 +936,6 @@ export default function Upload() {
       }
     }))
 
-    setSelectedItems(document.extracted_items.map((_, i) => i))
-    setBatchAddSuccess(0)
-    setBatchAddSkipped([])
-    setBatchAddError(null)
     batchAddMutation.mutate(itemsToAdd)
   }
 
@@ -1015,6 +1161,8 @@ export default function Upload() {
     setCreatingRecurringIndex(null)
     setCreateSuccess(null)
     setBatchOwnershipType('household')
+    setPaymentMappings({})
+    setReceiptConfirmError(null)
   }
 
   // Render camera mode (single photo)
@@ -1183,26 +1331,93 @@ export default function Upload() {
                 </div>
               )}
 
-              {/* Formas de Pagamento Detectadas */}
+              {/* Formas de Pagamento Detectadas - Com seletores de conta para cupom fiscal */}
               {document.payment_info?.payments && document.payment_info.payments.length > 0 && (
-                <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-3 mt-3 space-y-2 border border-amber-100 dark:border-amber-800">
+                <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-3 mt-3 space-y-3 border border-amber-100 dark:border-amber-800">
                   <div className="flex items-center gap-2">
-                    <CreditCard className="w-4 h-4 text-amber-600" />
+                    <Wallet className="w-4 h-4 text-amber-600" />
                     <span className="font-medium text-sm text-amber-800 dark:text-amber-300">Formas de Pagamento</span>
                   </div>
-                  <div className="space-y-1">
-                    {document.payment_info.payments.map((payment, idx) => (
-                      <div key={idx} className="flex justify-between items-center text-sm">
-                        <span className="text-gray-600 dark:text-gray-400">{payment.label || payment.method}</span>
-                        <span className="text-gray-900 dark:text-white font-medium">
-                          {payment.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                        </span>
-                      </div>
-                    ))}
+                  <div className="space-y-3">
+                    {document.payment_info.payments.map((payment, idx) => {
+                      // Filter benefit cards by payment method (VA cards for voucher_va, etc.)
+                      const isVAPayment = payment.method === 'voucher_va' || payment.label?.toLowerCase().includes('vale alimenta')
+                      const isVRPayment = payment.method === 'voucher_vr' || payment.label?.toLowerCase().includes('vale refei')
+                      const relevantBenefitCards = benefitCards.filter((card: { card_type: string; account_id: number; id: number; current_balance: number }) => {
+                        if (isVAPayment) return card.card_type === 'va' || card.card_type === 'flex'
+                        if (isVRPayment) return card.card_type === 'vr' || card.card_type === 'flex'
+                        return true
+                      })
+
+                      return (
+                        <div key={idx} className="bg-white dark:bg-slate-800 rounded-lg p-3 space-y-2">
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                              {payment.label || payment.method}
+                            </span>
+                            <span className="text-sm font-bold text-gray-900 dark:text-white">
+                              {payment.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            </span>
+                          </div>
+                          <div>
+                            <select
+                              value={paymentMappings[idx]?.benefit_card_id ? `bc_${paymentMappings[idx].benefit_card_id}` : paymentMappings[idx]?.account_id || ''}
+                              onChange={(e) => {
+                                const value = e.target.value
+                                // Check if it's a benefit card (prefixed with 'bc_')
+                                if (value.startsWith('bc_')) {
+                                  const bcId = value.replace('bc_', '')
+                                  const bc = benefitCards.find((c: { id: number; account_id: number }) => c.id === parseInt(bcId))
+                                  setPaymentMappings(prev => ({
+                                    ...prev,
+                                    [idx]: {
+                                      account_id: bc?.account_id?.toString() || '',
+                                      benefit_card_id: bcId
+                                    }
+                                  }))
+                                } else {
+                                  setPaymentMappings(prev => ({
+                                    ...prev,
+                                    [idx]: {
+                                      account_id: value,
+                                      benefit_card_id: ''
+                                    }
+                                  }))
+                                }
+                              }}
+                              className="input text-sm"
+                            >
+                              <option value="">Selecione a conta</option>
+                              {relevantBenefitCards.length > 0 && (
+                                <optgroup label="Cartoes de Beneficio">
+                                  {relevantBenefitCards.map((card: { id: number; name: string; current_balance: number; card_type_display?: string }) => (
+                                    <option key={`bc_${card.id}`} value={`bc_${card.id}`}>
+                                      {card.name} - Saldo: {card.current_balance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                    </option>
+                                  ))}
+                                </optgroup>
+                              )}
+                              <optgroup label="Outras Contas">
+                                {accounts.map((acc: { id: number; name: string; type: string }) => (
+                                  <option key={acc.id} value={acc.id}>
+                                    {acc.name} ({accountTypeLabels[acc.type] || acc.type})
+                                  </option>
+                                ))}
+                              </optgroup>
+                            </select>
+                          </div>
+                        </div>
+                      )
+                    })}
                   </div>
                   {document.payment_info.payments.length > 1 && (
-                    <p className="text-xs text-amber-600 dark:text-amber-400 pt-1 border-t border-amber-100 dark:border-amber-800">
-                      Pagamento dividido em {document.payment_info.payments.length} formas
+                    <p className="text-xs text-amber-600 dark:text-amber-400 pt-2 border-t border-amber-100 dark:border-amber-800">
+                      Pagamento dividido em {document.payment_info.payments.length} formas - selecione a conta para cada pagamento
+                    </p>
+                  )}
+                  {!allPaymentsMapped && (
+                    <p className="text-xs text-red-500 dark:text-red-400">
+                      Selecione uma conta para cada forma de pagamento
                     </p>
                   )}
                 </div>
@@ -1246,12 +1461,12 @@ export default function Upload() {
             onUpdateItem={handleUpdateItem}
             onBatchAdd={handleBatchAdd}
             onAddAll={handleAddAll}
-            hasAccount={isCreditCardInvoice ? !!selectedCreditCardId : !!formData.account_id}
-            batchAddPending={batchAddMutation.isPending}
+            hasAccount={isCreditCardInvoice ? !!selectedCreditCardId : (isCupomFiscalWithSplitPayment ? allPaymentsMapped : !!formData.account_id)}
+            batchAddPending={batchAddMutation.isPending || receiptConfirmMutation.isPending}
             batchAddSuccess={batchAddSuccess}
             batchAddSkipped={batchAddSkipped}
-            batchAddError={batchAddError}
-            onClearError={() => setBatchAddError(null)}
+            batchAddError={batchAddError || receiptConfirmError}
+            onClearError={() => { setBatchAddError(null); setReceiptConfirmError(null) }}
             pendingDuplicates={pendingDuplicates}
             onForceAddDuplicates={handleForceAddDuplicates}
             onSkipDuplicates={handleSkipDuplicates}
@@ -1262,6 +1477,7 @@ export default function Upload() {
               setBatchAddSuccess(0)
               setBatchAddSkipped([])
               setBatchAddError(null)
+              setReceiptConfirmError(null)
               setPendingDuplicates([])
               setSelectedItems([])
               setEditingItemIndex(null)
@@ -1269,6 +1485,7 @@ export default function Upload() {
               setProjectedInfo({})
               setCreatingRecurringIndex(null)
               setBatchOwnershipType('household')
+              setPaymentMappings({})
             }}
             projectedInfo={projectedInfo}
             isCheckingProjected={isCheckingProjected}
@@ -1356,8 +1573,8 @@ export default function Upload() {
           </div>
         )}
 
-        {/* Account selector - shown for batch operations only when NOT editing an item */}
-        {(!isManual && document?.extracted_items && document.extracted_items.length > 0 && editingItemIndex === null && !isCreditCardInvoice) && (
+        {/* Account selector - shown for batch operations only when NOT editing an item and NOT split payment */}
+        {(!isManual && document?.extracted_items && document.extracted_items.length > 0 && editingItemIndex === null && !isCreditCardInvoice && !isCupomFiscalWithSplitPayment) && (
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Conta *</label>
             <select
