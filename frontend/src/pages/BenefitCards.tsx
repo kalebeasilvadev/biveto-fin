@@ -213,14 +213,6 @@ export default function BenefitCards() {
   const totalBalance = cards.reduce((sum, card) => sum + card.current_balance, 0)
   const totalExpectedRecharge = cards.reduce((sum, card) => sum + (card.expected_monthly_recharge || 0), 0)
 
-  // Agrupa por tipo
-  const cardsByType = cards.reduce((acc, card) => {
-    const type = card.card_type
-    if (!acc[type]) acc[type] = []
-    acc[type].push(card)
-    return acc
-  }, {} as Record<string, BenefitCard[]>)
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
