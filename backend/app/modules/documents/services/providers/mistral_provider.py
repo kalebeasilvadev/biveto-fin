@@ -1,5 +1,6 @@
 """Mistral provider para extracao de documentos via OCR especializado"""
 import asyncio
+import io
 import json
 from pathlib import Path
 
@@ -9,6 +10,106 @@ from .base import BaseProvider
 
 DEFAULT_MAX_RETRIES = 3
 DEFAULT_RETRY_DELAY = 2.0
+# Tamanho maximo para imagens antes de comprimir (2MB)
+MAX_IMAGE_SIZE_MB = 2.0
+
+# Singleton Mistral client para connection pooling
+_mistral_client = None
+_mistral_client_lock = asyncio.Lock()
+
+
+async def get_mistral_client():
+    """
+    Retorna um cliente Mistral singleton com connection pooling.
+    Evita criar novo cliente a cada requisicao.
+    """
+    global _mistral_client
+
+    if _mistral_client is not None:
+        return _mistral_client
+
+    async with _mistral_client_lock:
+        # Double-check pattern
+        if _mistral_client is not None:
+            return _mistral_client
+
+        api_key = settings.mistral_api_key
+        if not api_key:
+            raise ValueError("MISTRAL_API_KEY nao configurada")
+
+        try:
+            from mistralai import Mistral
+            import httpx
+
+            # Criar cliente com timeout e limites de conexao customizados
+            http_client = httpx.Client(
+                timeout=httpx.Timeout(120.0, connect=10.0),  # 120s total, 10s connect
+                limits=httpx.Limits(
+                    max_connections=10,
+                    max_keepalive_connections=5,
+                    keepalive_expiry=300.0  # 5 minutos
+                )
+            )
+
+            _mistral_client = Mistral(api_key=api_key, http_client=http_client)
+            print("[MistralProvider] Cliente Mistral inicializado com connection pooling")
+            return _mistral_client
+
+        except ImportError:
+            raise ImportError("mistralai nao instalado. Execute: pip install mistralai")
+
+
+def compress_image_sync(image_bytes: bytes, max_size_mb: float = MAX_IMAGE_SIZE_MB) -> bytes:
+    """
+    Comprime imagem se exceder tamanho maximo.
+    Mantém qualidade aceitavel para OCR.
+    """
+    max_size = int(max_size_mb * 1024 * 1024)
+    if len(image_bytes) <= max_size:
+        return image_bytes
+
+    try:
+        from PIL import Image
+
+        img = Image.open(io.BytesIO(image_bytes))
+
+        # Converter para RGB se necessario
+        if img.mode in ('RGBA', 'P'):
+            img = img.convert('RGB')
+
+        # Tentar comprimir reduzindo qualidade
+        quality = 85
+        while quality >= 30:
+            buffer = io.BytesIO()
+            img.save(buffer, format='JPEG', quality=quality, optimize=True)
+            compressed = buffer.getvalue()
+            if len(compressed) <= max_size:
+                print(f"[MistralProvider] Imagem comprimida: {len(image_bytes)} -> {len(compressed)} bytes (quality={quality})")
+                return compressed
+            quality -= 10
+
+        # Se ainda muito grande, redimensionar
+        width, height = img.size
+        scale = 0.8
+        while scale >= 0.3:
+            new_width = int(width * scale)
+            new_height = int(height * scale)
+            resized = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+            buffer = io.BytesIO()
+            resized.save(buffer, format='JPEG', quality=70, optimize=True)
+            compressed = buffer.getvalue()
+            if len(compressed) <= max_size:
+                print(f"[MistralProvider] Imagem redimensionada e comprimida: {len(image_bytes)} -> {len(compressed)} bytes (scale={scale})")
+                return compressed
+            scale -= 0.1
+
+        # Retornar ultima tentativa mesmo se ainda grande
+        print(f"[MistralProvider] AVISO: Imagem ainda grande apos compressao: {len(compressed)} bytes")
+        return compressed
+
+    except Exception as e:
+        print(f"[MistralProvider] Erro ao comprimir imagem: {e}")
+        return image_bytes
 
 
 class MistralProvider(BaseProvider):
@@ -140,7 +241,6 @@ class MistralProvider(BaseProvider):
 
     async def _images_to_pdf(self, images: list[tuple[bytes, str]]) -> bytes:
         """Converte multiplas imagens para um unico PDF, dividindo páginas muito longas"""
-        import io
         from PIL import Image
 
         def _split_long_image(img: Image.Image, max_ratio: float = 3.0) -> list[Image.Image]:
@@ -172,6 +272,9 @@ class MistralProvider(BaseProvider):
         def _convert():
             pdf_images = []
             for img_content, _ in images:
+                # Comprimir imagem antes de converter para PDF
+                img_content = compress_image_sync(img_content)
+
                 img = Image.open(io.BytesIO(img_content))
                 if img.mode in ('RGBA', 'P'):
                     img = img.convert('RGB')
@@ -274,28 +377,25 @@ class MistralProvider(BaseProvider):
         # Pré-processar PDF para dividir páginas muito longas
         pdf_content = await self._split_long_pdf(pdf_content)
 
-        api_key = settings.mistral_api_key
-        if not api_key:
+        try:
+            # Usar cliente singleton com connection pooling
+            client = await get_mistral_client()
+        except ValueError as e:
             return {
                 'items': [],
                 'card_info': None,
                 'document_type': None,
-                'error': 'MISTRAL_API_KEY nao configurada'
+                'error': str(e)
             }
-
-        try:
-            from mistralai import Mistral
-        except ImportError:
+        except ImportError as e:
             return {
                 'items': [],
                 'card_info': None,
                 'document_type': None,
-                'error': 'mistralai nao instalado. Execute: pip install mistralai'
+                'error': str(e)
             }
 
         try:
-            client = Mistral(api_key=api_key)
-
             # Passo 1: Upload do PDF (em thread separada)
             print(f"[MistralProvider] Passo 1: Fazendo upload do PDF ({len(pdf_content)} bytes)...")
             uploaded_file = await asyncio.to_thread(

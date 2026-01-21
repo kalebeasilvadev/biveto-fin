@@ -1,7 +1,7 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, Query
+from fastapi import APIRouter, UploadFile, File, HTTPException, Query, BackgroundTasks
 
 from app.core.deps import CurrentUser, DbSession
-from app.modules.documents.schemas.document import DocumentResponse
+from app.modules.documents.schemas.document import DocumentResponse, DocumentAsyncUploadResponse
 from app.modules.documents.services.document_service import DocumentService
 
 router = APIRouter()
@@ -14,13 +14,31 @@ async def upload_document(
     file: UploadFile = File(...),
 ):
     """
-    Upload de documento (foto/PDF) para processamento.
+    Upload de documento (foto/PDF) para processamento SINCRONO.
     Retorna dados extraidos para confirmacao (nao salva automaticamente).
     Inclui alerta is_duplicate se documento ja foi enviado antes.
+
+    NOTA: Para melhor UX, use POST /documents/async que retorna imediatamente.
     """
     service = DocumentService(db)
     # Service agora retorna DocumentResponse diretamente
     return await service.upload(current_user, file)
+
+
+@router.post("/async", response_model=DocumentAsyncUploadResponse, status_code=202)
+async def upload_document_async(
+    current_user: CurrentUser,
+    db: DbSession,
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+):
+    """
+    Upload de documento (foto/PDF) para processamento ASSINCRONO.
+    Retorna imediatamente com status "processing".
+    Use GET /documents/{id} para verificar status e obter dados extraidos.
+    """
+    service = DocumentService(db)
+    return await service.upload_async(current_user, file, background_tasks)
 
 
 @router.post("/batch", response_model=DocumentResponse, status_code=201)
@@ -56,15 +74,137 @@ async def get_document(
     current_user: CurrentUser,
     db: DbSession,
 ):
-    """Retorna documento com status e dados extraidos"""
+    """
+    Retorna documento com status e dados extraidos.
+    Use para polling apos upload async.
+    """
     service = DocumentService(db)
     document = await service.get_by_id(current_user, document_id)
     if not document:
         raise HTTPException(status_code=404, detail="Documento nao encontrado")
 
-    # Adicionar ultima extracao ao response
+    # Se documento foi processado em background, converter dados salvos
     response = DocumentResponse.model_validate(document)
-    if document.extractions:
+
+    # Se tem extracted_data salvo (processamento async), converter para response
+    if document.extracted_data and document.status == 'completed':
+        from app.modules.documents.schemas.document import (
+            ExtractedItemResponse, CardInfoResponse, PaymentInfoResponse,
+            DetectedPaymentResponse, FutureInstallmentResponse
+        )
+        from app.modules.known_services.schemas.recurring_detection import RecurringDetection
+        from app.modules.known_services.services.recurring_detector import RecurringDetectorService
+
+        extraction_data = document.extracted_data
+        items = extraction_data.get('items', [])
+
+        # Detectar recorrencias
+        recurring_detector = RecurringDetectorService(db)
+        card_info = extraction_data.get('card_info', {})
+        invoice_month = card_info.get('invoice_month') if card_info else None
+        invoice_year = card_info.get('invoice_year') if card_info else None
+
+        items_with_detection = await recurring_detector.detect_all(
+            user=current_user,
+            items=items,
+            invoice_month=invoice_month,
+            invoice_year=invoice_year,
+        )
+
+        # Filtrar itens com valor != 0
+        valid_items = [item for item in items_with_detection if item.get('amount', 0) != 0]
+
+        # Verificar duplicatas em batch
+        items_for_dup_check = [
+            (item.get('description', 'Item'), item.get('amount', 0), item.get('date'))
+            for item in valid_items
+        ]
+        duplicate_results = await service._check_duplicates_batch(current_user, items_for_dup_check)
+
+        extracted_items = []
+        for idx, item in enumerate(valid_items):
+            duplicate_info = duplicate_results[idx] if idx < len(duplicate_results) else {'is_duplicate': False, 'transaction_id': None}
+
+            future_installments = None
+            if item.get('future_installments'):
+                future_installments = [
+                    FutureInstallmentResponse(
+                        installment=fi.get('installment'),
+                        reference_month=fi.get('reference_month'),
+                        reference_year=fi.get('reference_year'),
+                    )
+                    for fi in item['future_installments']
+                    if fi.get('installment') and fi.get('reference_month') and fi.get('reference_year')
+                ]
+
+            recurring_detection = None
+            if item.get('recurring_detection'):
+                recurring_detection = RecurringDetection(**item['recurring_detection'])
+
+            extracted_items.append(ExtractedItemResponse(
+                description=item.get('description', 'Item'),
+                amount=item.get('amount', 0),
+                date=item.get('date'),
+                category=item.get('category'),
+                confidence=item.get('confidence', 0.9),
+                transaction_type=item.get('transaction_type'),
+                is_installment=item.get('is_installment', False),
+                installment_current=item.get('installment_current'),
+                installment_total=item.get('installment_total'),
+                future_installments=future_installments,
+                is_duplicate=duplicate_info['is_duplicate'],
+                existing_transaction_id=duplicate_info.get('transaction_id'),
+                recurring_detection=recurring_detection,
+                quantity=item.get('quantity'),
+                unit=item.get('unit'),
+                unit_price=item.get('unit_price'),
+                grocery_category=item.get('grocery_category'),
+                necessity_type=item.get('necessity_type'),
+            ))
+
+        response.extracted_items = extracted_items
+
+        # Card info
+        if card_info:
+            response.card_info = CardInfoResponse(
+                card_issuer=card_info.get('card_issuer'),
+                card_bank=card_info.get('card_bank'),
+                card_brand=card_info.get('card_brand'),
+                card_partner=card_info.get('card_partner'),
+                card_last_digits=card_info.get('card_last_digits'),
+                card_name=card_info.get('card_name'),
+                invoice_month=card_info.get('invoice_month'),
+                invoice_year=card_info.get('invoice_year'),
+                closing_date=card_info.get('closing_date'),
+                closing_day=card_info.get('closing_day'),
+                due_date=card_info.get('due_date'),
+                due_day=card_info.get('due_day'),
+                total_amount=card_info.get('total_amount'),
+                credit_limit=card_info.get('credit_limit'),
+                credit_used=card_info.get('credit_used'),
+                credit_available=card_info.get('credit_available'),
+            )
+
+        # Payment info
+        payment_info = extraction_data.get('payment_info')
+        if payment_info:
+            payments = []
+            for p in payment_info.get('payments', []):
+                payments.append(DetectedPaymentResponse(
+                    method=p.get('method', ''),
+                    amount=p.get('amount', 0),
+                    label=p.get('label', ''),
+                    sequence=p.get('sequence', 0),
+                ))
+            response.payment_info = PaymentInfoResponse(
+                total=payment_info.get('total'),
+                subtotal=payment_info.get('subtotal'),
+                discount=payment_info.get('discount'),
+                payments=payments,
+            )
+
+    # Fallback: se tem extractions antigas
+    elif document.extractions:
         from app.modules.documents.schemas.document import DocumentExtractionResponse
         response.extraction = DocumentExtractionResponse.model_validate(
             document.extractions[0]

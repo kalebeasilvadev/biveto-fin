@@ -156,3 +156,10 @@ class DocumentResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class DocumentAsyncUploadResponse(BaseModel):
+    """Resposta para upload async (retorno imediato)"""
+    id: int
+    status: DocumentStatus
+    message: str

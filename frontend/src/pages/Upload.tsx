@@ -82,10 +82,35 @@ export default function Upload() {
   // Recurring creation state
   const [creatingRecurringIndex, setCreatingRecurringIndex] = useState<number | null>(null)
 
+  // State for async upload polling
+  const [processingDocumentId, setProcessingDocumentId] = useState<number | null>(null)
+
+  // Poll for document status when processing
+  const { data: polledDocument } = useQuery({
+    queryKey: ['document', processingDocumentId],
+    queryFn: () => documentsApi.get(processingDocumentId!),
+    enabled: !!processingDocumentId,
+    refetchInterval: (query) => {
+      const doc = query.state.data?.data as Document | undefined
+      // Poll every 2 seconds while processing, stop when completed or failed
+      return doc?.status === 'processing' ? 2000 : false
+    },
+  })
+
+  // Handle polling result
+  useEffect(() => {
+    if (!polledDocument?.data) return
+    const doc = polledDocument.data as Document
+    if (doc.status === 'completed' || doc.status === 'failed') {
+      setProcessingDocumentId(null)
+      handleUploadSuccess({ data: doc })
+    }
+  }, [polledDocument])
+
   // Prevent accidental page reload
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (document || mode === 'confirm') {
+      if (document || mode === 'confirm' || processingDocumentId) {
         e.preventDefault()
         e.returnValue = 'Você tem dados não salvos. Deseja realmente sair?'
         return e.returnValue
@@ -94,7 +119,7 @@ export default function Upload() {
 
     window.addEventListener('beforeunload', handleBeforeUnload)
     return () => window.removeEventListener('beforeunload', handleBeforeUnload)
-  }, [document, mode])
+  }, [document, mode, processingDocumentId])
 
   // Queries
   const { data: accountsData } = useQuery({
@@ -223,10 +248,16 @@ export default function Upload() {
     return found ? String(found.id) : ''
   }
 
-  // Mutations
+  // Mutations - use async upload for better UX
   const uploadMutation = useMutation({
-    mutationFn: (file: File) => documentsApi.upload(file),
-    onSuccess: handleUploadSuccess,
+    mutationFn: (file: File) => documentsApi.uploadAsync(file),
+    onSuccess: (response) => {
+      const data = response.data as { id: number; status: string; message: string }
+      setUploadError(null)
+      // Set document id to start polling
+      setProcessingDocumentId(data.id)
+      setMode('confirm')
+    },
     onError: (error: unknown) => {
       setUploadError(getApiErrorMessage(error, 'Erro ao processar documento'))
     },
@@ -1163,6 +1194,7 @@ export default function Upload() {
     setBatchOwnershipType('household')
     setPaymentMappings({})
     setReceiptConfirmError(null)
+    setProcessingDocumentId(null)  // Clear processing state
   }
 
   // Render camera mode (single photo)
@@ -1433,10 +1465,20 @@ export default function Upload() {
           </div>
         )}
 
-        {!isManual && document && document.status === 'processing' && (
-          <div className="flex items-center gap-3 p-4">
-            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary-600" />
-            <span className="text-gray-600 dark:text-gray-400">Processando documento...</span>
+        {!isManual && (document?.status === 'processing' || processingDocumentId) && (
+          <div className="flex flex-col items-center gap-4 p-6 bg-gradient-to-r from-primary-50 to-blue-50 dark:from-primary-900/30 dark:to-blue-900/30 rounded-xl">
+            <div className="relative">
+              <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary-200 border-t-primary-600" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="h-6 w-6 rounded-full bg-primary-100 animate-pulse" />
+              </div>
+            </div>
+            <div className="text-center">
+              <p className="font-semibold text-gray-900 dark:text-white">Processando documento...</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                Extraindo informações com IA. Isso pode levar alguns segundos.
+              </p>
+            </div>
           </div>
         )}
 

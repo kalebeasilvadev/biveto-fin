@@ -39,6 +39,8 @@ class Document(Base):
     error_message: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     processed_at: Mapped[datetime | None] = mapped_column(DateTime)
+    # Dados extraidos (para async processing)
+    extracted_data: Mapped[dict | None] = mapped_column(JSON)
 
     # Relationships
     user: Mapped["User"] = relationship(back_populates="documents")

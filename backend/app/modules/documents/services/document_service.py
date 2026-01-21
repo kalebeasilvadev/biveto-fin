@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import hashlib
 import os
@@ -6,13 +8,14 @@ from decimal import Decimal
 from pathlib import Path
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, func
-from fastapi import HTTPException, status, UploadFile
+from fastapi import HTTPException, status, UploadFile, BackgroundTasks
 
 from app.models.document import Document, DocumentExtraction, DocumentStatus
 from app.models.transaction import Transaction
 from app.models.user import User
 from app.core.config import settings
 from app.core.utils import utc_now
+from app.core.database import async_session_maker
 
 
 def _write_file_sync(file_path: Path, content: bytes) -> None:
@@ -27,9 +30,169 @@ def _read_file_sync(file_path: str) -> bytes:
         return f.read()
 
 
+async def process_document_background(document_id: int, user_id: int, file_bytes: bytes, mime_type: str, filename: str):
+    """
+    Processa documento em background (fora do request context).
+    Cria sua propria sessao do banco.
+    """
+    print(f"[DOC_BG] Iniciando processamento background: document_id={document_id}")
+
+    async with async_session_maker() as db:
+        try:
+            # Buscar documento
+            result = await db.execute(
+                select(Document).where(Document.id == document_id)
+            )
+            document = result.scalar_one_or_none()
+
+            if not document:
+                print(f"[DOC_BG] Documento {document_id} nao encontrado")
+                return
+
+            # Buscar usuario
+            from app.models.user import User
+            result = await db.execute(
+                select(User).where(User.id == user_id)
+            )
+            user = result.scalar_one_or_none()
+
+            if not user:
+                print(f"[DOC_BG] Usuario {user_id} nao encontrado")
+                document.status = DocumentStatus.FAILED
+                document.error_message = "Usuario nao encontrado"
+                await db.commit()
+                return
+
+            # Processar documento
+            document.status = DocumentStatus.PROCESSING
+            await db.commit()
+
+            # Determinar se e PDF ou imagem
+            is_pdf = mime_type == 'application/pdf' or filename.lower().endswith('.pdf')
+
+            if is_pdf:
+                from app.modules.documents.services.llm_ocr_service import LLMOCRService
+                if settings.mistral_api_key:
+                    llm_service = LLMOCRService(provider='mistral', model=settings.mistral_llm_model)
+                else:
+                    llm_service = LLMOCRService(provider='google', model=settings.vision_model or 'gemini-2.0-flash')
+                extraction_data = await llm_service.extract_from_image(file_bytes, mime_type, filename=filename)
+            else:
+                from app.modules.documents.services.llm_ocr_service import LLMOCRService
+                if settings.mistral_api_key:
+                    llm_service = LLMOCRService(provider='mistral', model=settings.mistral_llm_model)
+                else:
+                    llm_service = LLMOCRService(provider='google', model=settings.vision_model or 'gemini-2.0-flash')
+                extraction_data = await llm_service.extract_from_image(file_bytes, mime_type, filename=filename)
+
+            # Verificar se houve erro
+            if extraction_data is None or extraction_data.get('error'):
+                document.status = DocumentStatus.FAILED
+                document.error_message = extraction_data.get('error') if extraction_data else 'Extracao falhou'
+                print(f"[DOC_BG] Documento {document_id} falhou: {document.error_message}")
+            else:
+                document.status = DocumentStatus.COMPLETED
+                document.document_type = extraction_data.get('document_type')
+                # Salvar dados extraidos para recuperacao posterior
+                document.extracted_data = extraction_data
+                print(f"[DOC_BG] Documento {document_id} processado com sucesso: {len(extraction_data.get('items', []))} itens")
+
+            document.processed_at = utc_now()
+            await db.commit()
+
+        except Exception as e:
+            print(f"[DOC_BG] Erro ao processar documento {document_id}: {e}")
+            import traceback
+            traceback.print_exc()
+
+            try:
+                result = await db.execute(
+                    select(Document).where(Document.id == document_id)
+                )
+                document = result.scalar_one_or_none()
+                if document:
+                    document.status = DocumentStatus.FAILED
+                    document.error_message = str(e)
+                    await db.commit()
+            except Exception:
+                pass
+
+
 class DocumentService:
     def __init__(self, db: AsyncSession):
         self.db = db
+
+    async def upload_async(
+        self,
+        user: User,
+        file: UploadFile,
+        background_tasks: BackgroundTasks,
+    ) -> dict:
+        """
+        Upload async: retorna imediatamente e processa em background.
+        Retorna dict com id, status e message.
+        """
+        from app.modules.documents.schemas.document import DocumentAsyncUploadResponse
+
+        # Validar extensao
+        ext = file.filename.split(".")[-1].lower() if file.filename else ""
+        if ext not in settings.allowed_extensions:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Extensao nao permitida. Use: {', '.join(settings.allowed_extensions)}",
+            )
+
+        # Ler conteudo
+        content = await file.read()
+
+        # Validar tamanho
+        if len(content) > settings.max_upload_size_mb * 1024 * 1024:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Arquivo muito grande. Maximo: {settings.max_upload_size_mb}MB",
+            )
+
+        # Calcular hash para dedupe
+        file_hash = hashlib.sha256(content).hexdigest()
+
+        # Salvar arquivo
+        upload_dir = Path(settings.upload_dir) / str(user.id)
+        upload_dir.mkdir(parents=True, exist_ok=True)
+
+        file_path = upload_dir / f"{file_hash}.{ext}"
+        await asyncio.to_thread(_write_file_sync, file_path, content)
+
+        # Criar registro com status PROCESSING
+        document = Document(
+            user_id=user.id,
+            file_path=str(file_path),
+            file_hash=file_hash,
+            file_size=len(content),
+            mime_type=file.content_type or f"application/{ext}",
+            original_filename=file.filename or "unknown",
+            status=DocumentStatus.PROCESSING,  # Ja marca como processing
+        )
+        self.db.add(document)
+        await self.db.flush()
+        await self.db.refresh(document)
+
+        # Agendar processamento em background
+        background_tasks.add_task(
+            process_document_background,
+            document.id,
+            user.id,
+            content,
+            file.content_type or f"application/{ext}",
+            file.filename or "unknown",
+        )
+
+        print(f"[DOC_SVC] Upload async agendado: document_id={document.id}")
+
+        return DocumentAsyncUploadResponse(
+            id=document.id,
+            status=DocumentStatus.PROCESSING,
+            message="Documento enviado. Processamento em andamento.",
+        )
 
     async def upload(self, user: User, file: UploadFile) -> Document:
         # Validar extensao
@@ -114,18 +277,19 @@ class DocumentService:
                 invoice_year=invoice_year,
             )
 
-            extracted_items = []
-            for item in items_with_detection:
-                if item.get('amount', 0) == 0:
-                    continue
+            # Filtrar itens com valor != 0
+            valid_items = [item for item in items_with_detection if item.get('amount', 0) != 0]
 
-                # Verificar se ja existe transacao similar
-                duplicate_info = await self._check_duplicate_transaction(
-                    user=user,
-                    description=item.get('description', 'Item'),
-                    amount=item.get('amount', 0),
-                    item_date=item.get('date'),
-                )
+            # Verificar duplicatas em batch (1 query)
+            items_for_dup_check = [
+                (item.get('description', 'Item'), item.get('amount', 0), item.get('date'))
+                for item in valid_items
+            ]
+            duplicate_results = await self._check_duplicates_batch(user, items_for_dup_check)
+
+            extracted_items = []
+            for idx, item in enumerate(valid_items):
+                duplicate_info = duplicate_results[idx] if idx < len(duplicate_results) else {'is_duplicate': False, 'transaction_id': None}
 
                 # Converter future_installments se existir
                 future_installments = None
@@ -338,17 +502,19 @@ class DocumentService:
                 invoice_year=invoice_year,
             )
 
-            extracted_items = []
-            for item in items_with_detection:
-                if item.get('amount', 0) == 0:
-                    continue
+            # Filtrar itens com valor != 0
+            valid_items = [item for item in items_with_detection if item.get('amount', 0) != 0]
 
-                duplicate_info = await self._check_duplicate_transaction(
-                    user=user,
-                    description=item.get('description', 'Item'),
-                    amount=item.get('amount', 0),
-                    item_date=item.get('date'),
-                )
+            # Verificar duplicatas em batch (1 query)
+            items_for_dup_check = [
+                (item.get('description', 'Item'), item.get('amount', 0), item.get('date'))
+                for item in valid_items
+            ]
+            duplicate_results = await self._check_duplicates_batch(user, items_for_dup_check)
+
+            extracted_items = []
+            for idx, item in enumerate(valid_items):
+                duplicate_info = duplicate_results[idx] if idx < len(duplicate_results) else {'is_duplicate': False, 'transaction_id': None}
 
                 future_installments = None
                 if item.get('future_installments'):
@@ -683,6 +849,18 @@ class DocumentService:
     ) -> dict:
         """
         Verifica se ja existe uma transacao similar no banco.
+        Usa a versao batch internamente para manter consistencia.
+        """
+        results = await self._check_duplicates_batch(user, [(description, amount, item_date)])
+        return results[0] if results else {'is_duplicate': False, 'transaction_id': None}
+
+    async def _check_duplicates_batch(
+        self,
+        user: User,
+        items: list[tuple[str, float, str | None]],  # [(description, amount, date), ...]
+    ) -> list[dict]:
+        """
+        Verifica duplicatas em batch (1 query para todos os itens).
 
         Uma transacao e considerada duplicada se:
         - Mesmo usuario
@@ -691,66 +869,119 @@ class DocumentService:
         - Mesma data (se fornecida)
 
         Returns:
-            dict com is_duplicate (bool) e transaction_id (int | None)
+            Lista de dicts com is_duplicate (bool) e transaction_id (int | None)
         """
-        try:
-            # Converter data se fornecida
-            target_date = None
-            if item_date:
-                try:
-                    target_date = date.fromisoformat(item_date)
-                except ValueError:
-                    pass
+        if not items:
+            return []
 
-            # Buscar transacoes com mesmo valor (tolerancia de 0.01)
-            amount_decimal = Decimal(str(abs(amount)))
+        try:
+            from sqlalchemy import or_
+
+            # Coletar todos os valores unicos para busca
+            amounts_set = set()
+            dates_set = set()
             tolerance = Decimal('0.01')
+
+            for description, amount, item_date in items:
+                amount_decimal = Decimal(str(abs(amount)))
+                amounts_set.add(amount_decimal)
+                if item_date:
+                    try:
+                        dates_set.add(date.fromisoformat(item_date))
+                    except ValueError:
+                        pass
+
+            # Construir condições para buscar todos os candidatos em uma query
+            amount_conditions = []
+            for amt in amounts_set:
+                amount_conditions.append(
+                    func.abs(Transaction.amount - amt) <= tolerance
+                )
 
             query = select(Transaction).where(
                 Transaction.user_id == user.id,
-                func.abs(Transaction.amount - amount_decimal) <= tolerance,
+                or_(*amount_conditions) if amount_conditions else True,
             )
 
-            # Filtrar por data se disponivel
-            if target_date:
-                query = query.where(Transaction.date == target_date)
+            # Filtrar por datas se houver
+            if dates_set:
+                query = query.where(
+                    or_(
+                        Transaction.date.in_(dates_set),
+                        Transaction.date.is_(None)
+                    )
+                )
 
-            result = await self.db.execute(query.limit(10))
-            candidates = list(result.scalars().all())
+            result = await self.db.execute(query.limit(100))
+            all_candidates = list(result.scalars().all())
 
-            if not candidates:
-                return {'is_duplicate': False, 'transaction_id': None}
+            # Agora verificar cada item contra os candidatos carregados
+            results = []
+            for description, amount, item_date in items:
+                target_date = None
+                if item_date:
+                    try:
+                        target_date = date.fromisoformat(item_date)
+                    except ValueError:
+                        pass
 
-            # Verificar similaridade de descricao
-            description_lower = description.lower().strip()
-            description_words = set(description_lower.split())
+                amount_decimal = Decimal(str(abs(amount)))
 
-            for txn in candidates:
-                txn_desc = (txn.description or '').lower().strip()
-                txn_words = set(txn_desc.split())
+                # Filtrar candidatos por valor e data
+                candidates = [
+                    txn for txn in all_candidates
+                    if abs(txn.amount - amount_decimal) <= tolerance
+                    and (target_date is None or txn.date == target_date)
+                ]
 
-                # Considerar duplicado se:
-                # 1. Descricoes sao iguais
-                # 2. Uma contem a outra
-                # 3. Tem palavras significativas em comum (>= 50% das palavras)
-                if description_lower == txn_desc:
-                    return {'is_duplicate': True, 'transaction_id': txn.id}
+                if not candidates:
+                    results.append({'is_duplicate': False, 'transaction_id': None})
+                    continue
 
-                if description_lower in txn_desc or txn_desc in description_lower:
-                    return {'is_duplicate': True, 'transaction_id': txn.id}
+                # Verificar similaridade de descricao
+                description_lower = description.lower().strip()
+                description_words = set(description_lower.split())
+                found_duplicate = False
+                duplicate_id = None
 
-                # Verificar palavras em comum (ignorar palavras curtas)
-                significant_words = {w for w in description_words if len(w) > 3}
-                txn_significant = {w for w in txn_words if len(w) > 3}
+                for txn in candidates:
+                    txn_desc = (txn.description or '').lower().strip()
+                    txn_words = set(txn_desc.split())
 
-                if significant_words and txn_significant:
-                    common = significant_words & txn_significant
-                    similarity = len(common) / max(len(significant_words), len(txn_significant))
-                    if similarity >= 0.5:
-                        return {'is_duplicate': True, 'transaction_id': txn.id}
+                    # Considerar duplicado se:
+                    # 1. Descricoes sao iguais
+                    # 2. Uma contem a outra
+                    # 3. Tem palavras significativas em comum (>= 50% das palavras)
+                    if description_lower == txn_desc:
+                        found_duplicate = True
+                        duplicate_id = txn.id
+                        break
 
-            return {'is_duplicate': False, 'transaction_id': None}
+                    if description_lower in txn_desc or txn_desc in description_lower:
+                        found_duplicate = True
+                        duplicate_id = txn.id
+                        break
 
-        except Exception:
-            # Em caso de erro, nao marcar como duplicado
-            return {'is_duplicate': False, 'transaction_id': None}
+                    # Verificar palavras em comum (ignorar palavras curtas)
+                    significant_words = {w for w in description_words if len(w) > 3}
+                    txn_significant = {w for w in txn_words if len(w) > 3}
+
+                    if significant_words and txn_significant:
+                        common = significant_words & txn_significant
+                        similarity = len(common) / max(len(significant_words), len(txn_significant))
+                        if similarity >= 0.5:
+                            found_duplicate = True
+                            duplicate_id = txn.id
+                            break
+
+                results.append({
+                    'is_duplicate': found_duplicate,
+                    'transaction_id': duplicate_id
+                })
+
+            return results
+
+        except Exception as e:
+            print(f"[DOC_SVC] Error in batch duplicate check: {e}")
+            # Em caso de erro, retornar todos como nao duplicados
+            return [{'is_duplicate': False, 'transaction_id': None} for _ in items]

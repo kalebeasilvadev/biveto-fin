@@ -345,6 +345,14 @@ export const documentsApi = {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
   },
+  // Upload async: retorna imediatamente com status "processing"
+  uploadAsync: (file: File) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return api.post('/documents/async', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  },
   uploadBatch: (files: File[]) => {
     const formData = new FormData()
     files.forEach(file => formData.append('files', file))
