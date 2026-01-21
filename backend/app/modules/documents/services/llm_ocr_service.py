@@ -107,6 +107,12 @@ class LLMOCRService:
             # Total pode vir no root ou dentro de card_info (cupom_fiscal)
             total_amount = result.get('total_amount') or (card_info.get('total_amount') if card_info else None)
 
+            # DEBUG: Log para verificar total_amount
+            print(f"[LLM_OCR] DEBUG: document_type={document_type}, total_amount={total_amount}")
+            print(f"[LLM_OCR] DEBUG: result keys={list(result.keys())}")
+            if 'total_amount' in result:
+                print(f"[LLM_OCR] DEBUG: result['total_amount']={result.get('total_amount')}")
+
             if items:
                 items = self.validator.validate_and_clean(items, card_info, document_type, total_amount)
                 result['items'] = items

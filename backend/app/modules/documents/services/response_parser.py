@@ -29,6 +29,11 @@ class ResponseParser:
                 if normalized and normalized['amount'] != 0:
                     items.append(normalized)
 
+            # DEBUG: Log para verificar o que veio do LLM
+            print(f"[Parser] DEBUG: data keys={list(data.keys())}")
+            print(f"[Parser] DEBUG: data.get('total_amount')={data.get('total_amount')}")
+            print(f"[Parser] DEBUG: document_type={data.get('document_type')}")
+
             result = {
                 'items': items,
                 'document_type': data.get('document_type'),
