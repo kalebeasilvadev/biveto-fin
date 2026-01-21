@@ -395,46 +395,60 @@ export default function CameraCapture({
               : cameraError}
           </p>
 
-          <div className="space-y-3 pt-2">
-            {/* Botão para usar galeria/câmera nativa */}
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="w-full bg-primary-600 text-white py-3 px-4 rounded-xl font-medium flex items-center justify-center gap-2"
-            >
-              <Camera size={20} />
-              Tirar Foto
-            </button>
+          {uploadError && (
+            <div className="bg-red-500/20 border border-red-500 text-red-400 p-3 rounded-xl text-sm">
+              {uploadError}
+            </div>
+          )}
 
-            {/* Mostrar fotos já capturadas */}
-            {allowMultiple && capturedImages.length > 0 && (
-              <>
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-full bg-blue-600 text-white py-3 px-4 rounded-xl font-medium flex items-center justify-center gap-2"
-                >
-                  <Camera size={20} />
-                  Tirar mais fotos ({capturedImages.length}/{MAX_PHOTOS})
-                </button>
-                <button
-                  onClick={() => {
-                    setCameraError(null)
-                    setShowPreview(true)
-                  }}
-                  className="w-full bg-green-600 text-white py-3 px-4 rounded-xl font-medium flex items-center justify-center gap-2"
-                >
-                  <Check size={20} />
-                  Processar {capturedImages.length} foto{capturedImages.length !== 1 ? 's' : ''}
-                </button>
-              </>
-            )}
+          {isUploading ? (
+            <div className="flex flex-col items-center gap-3 py-4">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white" />
+              <p className="text-white font-medium">Processando foto...</p>
+              <p className="text-gray-400 text-sm">Aguarde enquanto analisamos o documento</p>
+            </div>
+          ) : (
+            <div className="space-y-3 pt-2">
+              {/* Botão para usar galeria/câmera nativa */}
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full bg-primary-600 text-white py-3 px-4 rounded-xl font-medium flex items-center justify-center gap-2"
+              >
+                <Camera size={20} />
+                Tirar Foto
+              </button>
 
-            <button
-              onClick={handleCancel}
-              className="w-full bg-gray-700 text-white py-3 px-4 rounded-xl font-medium"
-            >
-              Cancelar
-            </button>
-          </div>
+              {/* Mostrar fotos já capturadas */}
+              {allowMultiple && capturedImages.length > 0 && (
+                <>
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-full bg-blue-600 text-white py-3 px-4 rounded-xl font-medium flex items-center justify-center gap-2"
+                  >
+                    <Camera size={20} />
+                    Tirar mais fotos ({capturedImages.length}/{MAX_PHOTOS})
+                  </button>
+                  <button
+                    onClick={() => {
+                      setCameraError(null)
+                      setShowPreview(true)
+                    }}
+                    className="w-full bg-green-600 text-white py-3 px-4 rounded-xl font-medium flex items-center justify-center gap-2"
+                  >
+                    <Check size={20} />
+                    Processar {capturedImages.length} foto{capturedImages.length !== 1 ? 's' : ''}
+                  </button>
+                </>
+              )}
+
+              <button
+                onClick={handleCancel}
+                className="w-full bg-gray-700 text-white py-3 px-4 rounded-xl font-medium"
+              >
+                Cancelar
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Input oculto para fallback */}

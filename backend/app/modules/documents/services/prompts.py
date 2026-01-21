@@ -113,11 +113,11 @@ Cupons fiscais mostram data/hora no formato DD/MM/YYYY HH:MM:SS
 - "15/01/20" → 2020 (se aparecer, use 2020)
 - Sempre use a data COMPLETA do cupom, não invente
 
-### 3. Card Info para Cupons
-Para cupons fiscais, **não preencha card_info** (deixe null ou omita).
-Opcionalmente, você pode extrair:
-- estabelecimento: nome da loja
-- cnpj: CNPJ da loja
+### 3. Total e Info para Cupons
+Para cupons fiscais:
+- **NÃO preencha card_info** (deixe null ou omita)
+- **OBRIGATÓRIO: inclua total_amount no nível raiz do JSON** (não dentro de card_info!)
+- Opcionalmente: estabelecimento (nome da loja), cnpj (CNPJ da loja)
 
 ### 4. Validação CRÍTICA para Cupons
 **A soma dos amounts de TODOS os items DEVE ser igual a total_amount!**
@@ -176,12 +176,7 @@ Se não bater:
 ```json
 {
   "document_type": "cupom_fiscal",
-  "card_info": {
-    "total_amount": 39.25,
-    "invoice_month": 1,
-    "invoice_year": 2026,
-    "closing_date": "2026-01-15"
-  },
+  "total_amount": 39.25,
   "items": [
     {
       "description": "REFR 2L S A",

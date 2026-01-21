@@ -104,7 +104,8 @@ class LLMOCRService:
             items = result.get('items', [])
             card_info = result.get('card_info')
             document_type = result.get('document_type')
-            total_amount = result.get('total_amount')  # Total do cupom (se cupom_fiscal)
+            # Total pode vir no root ou dentro de card_info (cupom_fiscal)
+            total_amount = result.get('total_amount') or (card_info.get('total_amount') if card_info else None)
 
             if items:
                 items = self.validator.validate_and_clean(items, card_info, document_type, total_amount)
@@ -218,7 +219,8 @@ class LLMOCRService:
                 items = result.get('items', [])
                 card_info = result.get('card_info')
                 document_type = result.get('document_type')
-                total_amount = result.get('total_amount')  # Total do cupom (se cupom_fiscal)
+                # Total pode vir no root ou dentro de card_info (cupom_fiscal)
+                total_amount = result.get('total_amount') or (card_info.get('total_amount') if card_info else None)
 
                 if items:
                     items = self.validator.validate_and_clean(items, card_info, document_type, total_amount)
