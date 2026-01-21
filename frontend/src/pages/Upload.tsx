@@ -1182,6 +1182,31 @@ export default function Upload() {
                   </span>
                 </div>
               )}
+
+              {/* Formas de Pagamento Detectadas */}
+              {document.payment_info?.payments && document.payment_info.payments.length > 0 && (
+                <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-3 mt-3 space-y-2 border border-amber-100 dark:border-amber-800">
+                  <div className="flex items-center gap-2">
+                    <CreditCard className="w-4 h-4 text-amber-600" />
+                    <span className="font-medium text-sm text-amber-800 dark:text-amber-300">Formas de Pagamento</span>
+                  </div>
+                  <div className="space-y-1">
+                    {document.payment_info.payments.map((payment, idx) => (
+                      <div key={idx} className="flex justify-between items-center text-sm">
+                        <span className="text-gray-600 dark:text-gray-400">{payment.label || payment.method}</span>
+                        <span className="text-gray-900 dark:text-white font-medium">
+                          {payment.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  {document.payment_info.payments.length > 1 && (
+                    <p className="text-xs text-amber-600 dark:text-amber-400 pt-1 border-t border-amber-100 dark:border-amber-800">
+                      Pagamento dividido em {document.payment_info.payments.length} formas
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           )
         })()}

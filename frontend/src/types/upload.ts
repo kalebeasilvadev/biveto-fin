@@ -81,6 +81,20 @@ export interface CardInfo {
   credit_available?: number  // Limite disponivel
 }
 
+export interface DetectedPayment {
+  method: string  // voucher_va, debit_card, pix, etc.
+  amount: number
+  label: string   // Label original do OCR
+  sequence: number
+}
+
+export interface PaymentInfo {
+  total: number | null
+  subtotal: number | null
+  discount: number | null
+  payments: DetectedPayment[]
+}
+
 export interface Document {
   id: number
   status: 'pending' | 'processing' | 'completed' | 'failed'
@@ -88,6 +102,7 @@ export interface Document {
   is_duplicate?: boolean
   document_type?: 'cupom_fiscal' | 'fatura_cartao' | 'comprovante' | 'extrato'
   card_info?: CardInfo
+  payment_info?: PaymentInfo
 }
 
 export type UploadMode = 'select' | 'upload' | 'camera' | 'camera-multi' | 'gallery-multi' | 'manual' | 'confirm'

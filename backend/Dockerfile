@@ -61,5 +61,5 @@ RUN mkdir -p uploads data
 # Expose port
 EXPOSE 8080
 
-# Run migrations and start server
-CMD ["sh", "-c", "echo 'Running database migrations...' && alembic upgrade head && echo 'Migrations completed!' || echo 'Migration failed, continuing anyway...' ; uvicorn app.main:app --host 0.0.0.0 --port 8080"]
+# Start server (migrations run via fly.toml release_command)
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]

@@ -7,6 +7,9 @@ primary_region = "gru"  # Sao Paulo, Brazil
 [build]
   dockerfile = "backend/Dockerfile"
 
+[deploy]
+  release_command = "alembic upgrade head"
+
 [env]
   ENVIRONMENT = "production"
   DEBUG = "false"

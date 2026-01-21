@@ -193,6 +193,25 @@ class DocumentService:
                 credit_available=card_info.get('credit_available'),
             )
 
+        # Incluir informacoes de pagamento (para cupom fiscal)
+        if extraction_data and extraction_data.get('payment_info'):
+            from app.modules.documents.schemas.document import PaymentInfoResponse, DetectedPaymentResponse
+            payment_info = extraction_data['payment_info']
+            payments = []
+            for p in payment_info.get('payments', []):
+                payments.append(DetectedPaymentResponse(
+                    method=p.get('method', ''),
+                    amount=p.get('amount', 0),
+                    label=p.get('label', ''),
+                    sequence=p.get('sequence', 0),
+                ))
+            response.payment_info = PaymentInfoResponse(
+                total=payment_info.get('total'),
+                subtotal=payment_info.get('subtotal'),
+                discount=payment_info.get('discount'),
+                payments=payments,
+            )
+
         return response
 
     async def upload_batch(self, user: User, files: list) -> Document:
@@ -391,6 +410,25 @@ class DocumentService:
                 credit_limit=card_info.get('credit_limit'),
                 credit_used=card_info.get('credit_used'),
                 credit_available=card_info.get('credit_available'),
+            )
+
+        # Incluir informacoes de pagamento (para cupom fiscal)
+        if extraction_data and extraction_data.get('payment_info'):
+            from app.modules.documents.schemas.document import PaymentInfoResponse, DetectedPaymentResponse
+            payment_info = extraction_data['payment_info']
+            payments = []
+            for p in payment_info.get('payments', []):
+                payments.append(DetectedPaymentResponse(
+                    method=p.get('method', ''),
+                    amount=p.get('amount', 0),
+                    label=p.get('label', ''),
+                    sequence=p.get('sequence', 0),
+                ))
+            response.payment_info = PaymentInfoResponse(
+                total=payment_info.get('total'),
+                subtotal=payment_info.get('subtotal'),
+                discount=payment_info.get('discount'),
+                payments=payments,
             )
 
         return response
@@ -624,14 +662,16 @@ class DocumentService:
         if doc_type:
             document.document_type = doc_type
 
-        # Retornar itens individuais com categoria e info do cartao
+        # Retornar itens individuais com categoria, info do cartao e info de pagamento
         items = result.get('items', [])
         card_info = result.get('card_info')
+        payment_info = result.get('payment_info')
 
         return {
             'items': items,
             'document_type': doc_type,
             'card_info': card_info,
+            'payment_info': payment_info,
         }
 
     async def _check_duplicate_transaction(

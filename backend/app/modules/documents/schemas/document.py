@@ -115,6 +115,22 @@ class CardInfoResponse(BaseModel):
     credit_available: float | None = None  # Limite disponivel
 
 
+class DetectedPaymentResponse(BaseModel):
+    """Pagamento detectado no cupom fiscal"""
+    method: str  # voucher_va, debit_card, pix, etc.
+    amount: float
+    label: str  # Label original do OCR (ex: "CARTAO ALIMENTACAO")
+    sequence: int
+
+
+class PaymentInfoResponse(BaseModel):
+    """Informacoes de pagamento extraidas do cupom"""
+    total: float | None = None
+    subtotal: float | None = None
+    discount: float | None = None
+    payments: list[DetectedPaymentResponse] = []
+
+
 class DocumentResponse(BaseModel):
     id: int
     file_hash: str
@@ -134,6 +150,9 @@ class DocumentResponse(BaseModel):
 
     # Informacoes do cartao (apenas para fatura_cartao)
     card_info: CardInfoResponse | None = None
+
+    # Informacoes de pagamento (apenas para cupom_fiscal)
+    payment_info: PaymentInfoResponse | None = None
 
     class Config:
         from_attributes = True
