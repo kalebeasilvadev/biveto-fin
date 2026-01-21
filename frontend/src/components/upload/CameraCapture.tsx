@@ -59,10 +59,20 @@ export default function CameraCapture({
           width: { ideal: 1920, min: 1280 },
           height: { ideal: 1080, min: 720 },
           aspectRatio: { ideal: 16 / 9 },
-          focusMode: { ideal: 'continuous' },
         },
         audio: false
       })
+
+      // Aplicar foco contínuo se suportado pelo dispositivo
+      const videoTrack = stream.getVideoTracks()[0]
+      if (videoTrack) {
+        const capabilities = videoTrack.getCapabilities() as MediaTrackCapabilities & { focusMode?: string[] }
+        if (capabilities.focusMode?.includes('continuous')) {
+          await videoTrack.applyConstraints({
+            advanced: [{ focusMode: 'continuous' } as MediaTrackConstraintSet]
+          })
+        }
+      }
 
       setCameraStream(stream)
 
