@@ -7,6 +7,7 @@ interface UsePullToRefreshOptions {
   disabled?: boolean
   minStartDistance?: number // minimum distance to consider as intentional pull
   scrollTolerance?: number // tolerance for scrollTop check
+  triggerZoneHeight?: number // height of the trigger zone from top (in pixels)
 }
 
 interface UsePullToRefreshReturn {
@@ -23,6 +24,7 @@ export function usePullToRefresh({
   disabled = false,
   minStartDistance = 15,
   scrollTolerance = 5,
+  triggerZoneHeight = 120, // Only trigger if touch starts within this height from container top
 }: UsePullToRefreshOptions): UsePullToRefreshReturn {
   const [pullDistance, setPullDistance] = useState(0)
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -45,9 +47,17 @@ export function usePullToRefresh({
     // Only start pull if at top of scroll (with tolerance)
     if (container.scrollTop > scrollTolerance) return
 
-    startY.current = e.touches[0].clientY
+    // Get touch position relative to container
+    const containerRect = container.getBoundingClientRect()
+    const touchY = e.touches[0].clientY
+    const relativeY = touchY - containerRect.top
+
+    // Only activate if touch started in the trigger zone (top area of container)
+    if (relativeY > triggerZoneHeight) return
+
+    startY.current = touchY
     setIsPulling(true)
-  }, [disabled, isRefreshing, scrollTolerance])
+  }, [disabled, isRefreshing, scrollTolerance, triggerZoneHeight])
 
   const handleTouchMove = useCallback((e: TouchEvent) => {
     if (!isPulling || disabled || isRefreshing) return

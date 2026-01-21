@@ -307,7 +307,9 @@ export default function Layout() {
     containerRef,
   } = usePullToRefresh({
     onRefresh: handleRefresh,
-    threshold: 80,
+    threshold: 100,
+    minStartDistance: 30, // Aumentado para reduzir sensibilidade
+    triggerZoneHeight: 150, // Só ativa se puxar dos primeiros 150px do topo
     disabled: mobileMenuOpen || fabMenuOpen || isUploadPage,
   })
 
@@ -354,7 +356,7 @@ export default function Layout() {
       <PullToRefreshIndicator
         pullDistance={pullDistance}
         isRefreshing={isRefreshing}
-        threshold={80}
+        threshold={100}
       />
 
       {/* Mobile header */}

@@ -54,7 +54,13 @@ export default function CameraCapture({
       }
 
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' },
+        video: {
+          facingMode: 'environment',
+          width: { ideal: 1920, min: 1280 },
+          height: { ideal: 1080, min: 720 },
+          aspectRatio: { ideal: 16 / 9 },
+          focusMode: { ideal: 'continuous' },
+        },
         audio: false
       })
 
@@ -126,7 +132,7 @@ export default function CameraCapture({
       const ctx = canvas.getContext('2d')
       if (ctx) {
         ctx.drawImage(video, 0, 0)
-        const imageData = canvas.toDataURL('image/jpeg', 0.8)
+        const imageData = canvas.toDataURL('image/jpeg', 0.95)
 
         if (allowMultiple) {
           // Multi-capture mode: add to array
@@ -145,6 +151,9 @@ export default function CameraCapture({
   const uploadCapturedImage = async () => {
     if (!capturedImage) return
 
+    // Para a câmera para economizar bateria durante o upload
+    stopCamera()
+
     const response = await fetch(capturedImage)
     const blob = await response.blob()
     const file = new File([blob], 'camera-capture.jpg', { type: 'image/jpeg' })
@@ -153,6 +162,10 @@ export default function CameraCapture({
 
   const uploadBatchImages = () => {
     if (capturedImages.length === 0) return
+
+    // Para a câmera para economizar bateria durante o upload
+    stopCamera()
+
     if (onCaptureBatch) {
       const files = capturedImages.map(img => img.file)
       onCaptureBatch(files)
