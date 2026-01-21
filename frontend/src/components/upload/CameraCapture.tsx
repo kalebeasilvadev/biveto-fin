@@ -15,6 +15,9 @@ interface CapturedPhoto {
   file: File
 }
 
+// Detectar iOS para usar câmera nativa (melhor qualidade)
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+
 export default function CameraCapture({
   onCapture,
   onCaptureBatch,
@@ -30,11 +33,15 @@ export default function CameraCapture({
   const [cameraError, setCameraError] = useState<string | null>(null)
   const [showGhostOverlay, setShowGhostOverlay] = useState(true)
   const [showPreview, setShowPreview] = useState(false)
+  const [videoResolution, setVideoResolution] = useState<{ width: number; height: number } | null>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const MAX_PHOTOS = 10
+
+  // iOS Safari limita getUserMedia a 720p - usar câmera nativa para melhor qualidade
+  const useNativeCamera = isIOS
 
   const stopCamera = useCallback(() => {
     if (cameraStream) {
@@ -45,6 +52,12 @@ export default function CameraCapture({
   }, [cameraStream])
 
   const startCamera = useCallback(async () => {
+    // No iOS, usar câmera nativa para melhor qualidade (getUserMedia limita a 720p)
+    if (useNativeCamera) {
+      setCameraError('USE_NATIVE')
+      return
+    }
+
     try {
       setCameraLoading(true)
 
@@ -71,6 +84,13 @@ export default function CameraCapture({
           await videoTrack.applyConstraints({
             advanced: [{ focusMode: 'continuous' } as MediaTrackConstraintSet]
           })
+        }
+
+        // Salvar resolução real do vídeo para debug
+        const settings = videoTrack.getSettings()
+        if (settings.width && settings.height) {
+          setVideoResolution({ width: settings.width, height: settings.height })
+          console.log(`Camera resolution: ${settings.width}x${settings.height}`)
         }
       }
 
@@ -109,7 +129,6 @@ export default function CameraCapture({
       stopCamera()
       // Mostrar erro ao invés de cancelar silenciosamente
       const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido'
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
       if (errorMessage === 'API_NOT_AVAILABLE' && isIOS) {
         // iOS com certificado não confiável - mostrar instruções
         setCameraError('IOS_CERT_REQUIRED')
@@ -124,7 +143,7 @@ export default function CameraCapture({
         setCameraError(`Erro ao acessar câmera: ${errorMessage}`)
       }
     }
-  }, [stopCamera])
+  }, [stopCamera, useNativeCamera])
 
   useEffect(() => {
     startCamera()
@@ -356,19 +375,23 @@ export default function CameraCapture({
     return (
       <div className="fixed inset-0 bg-black z-50 flex flex-col items-center justify-center p-6">
         <div className="bg-gray-900 rounded-2xl p-6 max-w-sm w-full text-center space-y-4">
-          <div className={`w-16 h-16 mx-auto rounded-full flex items-center justify-center ${isNativeFallback ? 'bg-primary-500/20' : 'bg-red-500/20'}`}>
+          <div className={`w-16 h-16 mx-auto rounded-full flex items-center justify-center ${isNativeFallback ? 'bg-green-500/20' : 'bg-red-500/20'}`}>
             {isNativeFallback ? (
-              <Camera className="text-primary-500" size={32} />
+              <Camera className="text-green-500" size={32} />
             ) : (
               <AlertCircle className="text-red-500" size={32} />
             )}
           </div>
           <h2 className="text-white text-lg font-semibold">
-            {isNativeFallback ? 'Usar Câmera do Dispositivo' : 'Câmera indisponível'}
+            {isNativeFallback
+              ? (isIOS ? 'Câmera em Alta Resolução' : 'Usar Câmera do Dispositivo')
+              : 'Câmera indisponível'}
           </h2>
           <p className="text-gray-400 text-sm">
             {isNativeFallback
-              ? 'Toque no botão abaixo para tirar fotos usando a câmera nativa.'
+              ? (isIOS
+                  ? 'Para melhor qualidade de OCR, usaremos a câmera nativa do iPhone que captura em alta resolução.'
+                  : 'Toque no botão abaixo para tirar fotos usando a câmera nativa.')
               : cameraError}
           </p>
 
@@ -563,6 +586,13 @@ export default function CameraCapture({
             alt="Captured"
             className="absolute inset-0 w-full h-full object-cover"
           />
+        )}
+
+        {/* Resolution indicator */}
+        {!capturedImage && videoResolution && (
+          <div className="absolute bottom-3 left-3 bg-black/60 text-white text-xs px-2 py-1 rounded z-10">
+            {videoResolution.width}x{videoResolution.height}
+          </div>
         )}
 
         {/* Single capture overlay guide */}

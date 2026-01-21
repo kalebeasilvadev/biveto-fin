@@ -104,9 +104,10 @@ class LLMOCRService:
             items = result.get('items', [])
             card_info = result.get('card_info')
             document_type = result.get('document_type')
+            total_amount = result.get('total_amount')  # Total do cupom (se cupom_fiscal)
 
             if items:
-                items = self.validator.validate_and_clean(items, card_info, document_type)
+                items = self.validator.validate_and_clean(items, card_info, document_type, total_amount)
                 result['items'] = items
 
                 # Validar resultado final
@@ -217,9 +218,10 @@ class LLMOCRService:
                 items = result.get('items', [])
                 card_info = result.get('card_info')
                 document_type = result.get('document_type')
+                total_amount = result.get('total_amount')  # Total do cupom (se cupom_fiscal)
 
                 if items:
-                    items = self.validator.validate_and_clean(items, card_info, document_type)
+                    items = self.validator.validate_and_clean(items, card_info, document_type, total_amount)
                     result['items'] = items
 
                     validation = self.validator.validate_extraction(items, card_info)

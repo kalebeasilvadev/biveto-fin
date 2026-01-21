@@ -32,6 +32,7 @@ class ResponseParser:
             result = {
                 'items': items,
                 'document_type': data.get('document_type'),
+                'total_amount': data.get('total_amount'),  # Total do cupom fiscal
             }
 
             card_info = data.get('card_info')

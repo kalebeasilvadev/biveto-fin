@@ -44,13 +44,14 @@ PAYMENT_PATTERNS = [
 class ExtractionValidator:
     """Valida e corrige dados extraidos de faturas"""
 
-    def validate_and_clean(self, items: list, card_info: dict | None, document_type: str | None = None) -> list:
+    def validate_and_clean(self, items: list, card_info: dict | None, document_type: str | None = None, total_amount: float | None = None) -> list:
         """Aplica todas as validacoes e limpezas nos itens extraidos
 
         Args:
             items: Lista de itens extraidos
             card_info: Informacoes do cartao/documento
             document_type: Tipo do documento ('fatura_cartao' ou 'cupom_fiscal')
+            total_amount: Total do cupom fiscal (para diluicao de desconto)
         """
         if not items:
             return items
@@ -60,7 +61,10 @@ class ExtractionValidator:
         # Pipeline de validacao
         items = self.fix_payment_amounts(items)
 
-        if not is_cupom_fiscal:
+        if is_cupom_fiscal:
+            # Diluir desconto em cupons fiscais
+            items = self.dilute_discount_to_items(items, total_amount)
+        else:
             # Validacoes especificas de faturas de cartao
             items = self.fix_inverted_sign_convention(items, card_info)
             items = self.fix_bradesco_installments(items, card_info)
@@ -71,8 +75,46 @@ class ExtractionValidator:
         items = self.remove_total_items(items, card_info)
         items = self.fix_suspicious_installments(items)
 
-        total_amount = card_info.get('total_amount') if card_info else None
-        items = self.filter_summary_items(items, total_amount)
+        total_for_filter = card_info.get('total_amount') if card_info else total_amount
+        items = self.filter_summary_items(items, total_for_filter)
+
+        return items
+
+    def dilute_discount_to_items(self, items: list, total_amount: float | None) -> list:
+        """Dilui desconto proporcionalmente entre itens de cupom fiscal."""
+        if not total_amount or total_amount <= 0:
+            return items
+
+        # Filtrar itens de compra (positivos)
+        compra_items = [i for i in items if i.get('amount', 0) > 0]
+        if not compra_items:
+            return items
+
+        soma_items = sum(i.get('amount', 0) for i in compra_items)
+        diferenca = soma_items - total_amount
+
+        # Se diferenca <= 0.01, nao ha desconto
+        if diferenca <= 0.01:
+            return items
+
+        print(f"[Validator] Desconto detectado: soma={soma_items:.2f}, total={total_amount:.2f}, desconto={diferenca:.2f}")
+
+        # Distribuir proporcionalmente
+        for item in compra_items:
+            amount = item.get('amount', 0)
+            if amount > 0 and soma_items > 0:
+                proporcao = amount / soma_items
+                desconto_item = round(diferenca * proporcao, 2)
+
+                # Garantir amount >= 0.01
+                novo_amount = max(0.01, round(amount - desconto_item, 2))
+                desconto_real = round(amount - novo_amount, 2)
+
+                item['original_amount'] = amount
+                item['discount_amount'] = desconto_real
+                item['amount'] = novo_amount
+
+                print(f"[Validator] {item['description'][:30]}: {amount:.2f} -> {novo_amount:.2f} (desc: {desconto_real:.2f})")
 
         return items
 

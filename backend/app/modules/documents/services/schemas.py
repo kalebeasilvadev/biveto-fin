@@ -44,6 +44,8 @@ class FaturaItem(BaseModel):
         default=None,
         description="Tipo de necessidade: essential (basico) ou non_essential (superfluo)"
     )
+    discount_amount: Optional[float] = Field(default=None, description="Valor do desconto aplicado neste item")
+    original_amount: Optional[float] = Field(default=None, description="Valor original antes do desconto")
 
 
 class CardInfo(BaseModel):

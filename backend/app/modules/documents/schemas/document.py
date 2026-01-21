@@ -44,6 +44,8 @@ class ExtractedItemResponse(BaseModel):
     unit_price: float | None = None  # Preco unitario
     grocery_category: str | None = None  # Categoria de mercado detalhada
     necessity_type: str | None = None  # essential ou non_essential
+    discount_amount: float | None = None  # Valor do desconto aplicado neste item
+    original_amount: float | None = None  # Valor original antes do desconto
 
     class Config:
         from_attributes = True
