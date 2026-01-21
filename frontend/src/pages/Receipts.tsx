@@ -8,11 +8,53 @@ import {
   CreditCard,
   ChevronRight,
   SplitSquareVertical,
+  X,
+  ShoppingBag,
+  Wallet,
 } from 'lucide-react'
 import { HelpButton } from '../components/help'
 import { clsx } from 'clsx'
 import EmptyState from '../components/EmptyState'
 import { Link } from 'react-router-dom'
+
+interface ReceiptPayment {
+  id: number
+  payment_method: string
+  amount: number
+  account_id: number
+  account_name: string | null
+  benefit_card_id: number | null
+  benefit_card_name: string | null
+  sequence: number
+  original_label: string | null
+}
+
+interface ReceiptDetail {
+  id: number
+  document_id: number | null
+  store_name: string
+  store_cnpj: string | null
+  purchase_date: string
+  total_amount: number
+  subtotal: number | null
+  discount: number | null
+  status: string
+  status_display: string
+  items_count: number
+  payments_count: number
+  has_split_payment: boolean
+  payments: ReceiptPayment[]
+  created_at: string
+  confirmed_at: string | null
+}
+
+interface ReceiptItemTransaction {
+  id: number
+  description: string
+  amount: number
+  category_id: number | null
+  date: string
+}
 
 interface ReceiptItem {
   id: number
@@ -70,11 +112,29 @@ function formatCompactCurrency(value: number): string {
 
 export default function Receipts() {
   const [statusFilter, setStatusFilter] = useState<string | undefined>(undefined)
+  const [selectedReceiptId, setSelectedReceiptId] = useState<number | null>(null)
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['receipts', statusFilter],
     queryFn: () => receiptsApi.list({ status: statusFilter, limit: 50 }),
   })
+
+  // Query para detalhes do receipt selecionado
+  const { data: receiptDetail, isLoading: isLoadingDetail } = useQuery({
+    queryKey: ['receipt', selectedReceiptId],
+    queryFn: () => receiptsApi.get(selectedReceiptId!),
+    enabled: !!selectedReceiptId,
+  })
+
+  // Query para itens do receipt selecionado
+  const { data: receiptItems } = useQuery({
+    queryKey: ['receipt-items', selectedReceiptId],
+    queryFn: () => receiptsApi.getItems(selectedReceiptId!),
+    enabled: !!selectedReceiptId,
+  })
+
+  const detail: ReceiptDetail | null = receiptDetail?.data || null
+  const items: ReceiptItemTransaction[] = receiptItems?.data || []
 
   const receipts: ReceiptItem[] = data?.data || []
 
@@ -192,6 +252,7 @@ export default function Receipts() {
           {receipts.map((receipt) => (
             <div
               key={receipt.id}
+              onClick={() => setSelectedReceiptId(receipt.id)}
               className="card p-4 hover:shadow-md transition-all cursor-pointer"
             >
               <div className="flex items-center justify-between">
@@ -248,6 +309,123 @@ export default function Receipts() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Modal de Detalhes */}
+      {selectedReceiptId && (
+        <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50" onClick={() => setSelectedReceiptId(null)}>
+          <div
+            className="bg-white dark:bg-slate-800 w-full sm:max-w-lg sm:rounded-xl rounded-t-xl max-h-[85vh] overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-slate-700">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Detalhes da Compra
+              </h2>
+              <button
+                onClick={() => setSelectedReceiptId(null)}
+                className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg"
+              >
+                <X size={20} className="text-gray-500" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-4 overflow-y-auto max-h-[calc(85vh-60px)] space-y-4">
+              {isLoadingDetail ? (
+                <div className="flex justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
+                </div>
+              ) : detail ? (
+                <>
+                  {/* Store Info */}
+                  <div className="flex items-center gap-3">
+                    <div className="w-14 h-14 rounded-xl bg-gray-100 dark:bg-slate-700 flex items-center justify-center">
+                      <Store size={28} className="text-gray-600 dark:text-gray-300" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-lg text-gray-900 dark:text-white">
+                        {detail.store_name}
+                      </h3>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        {formatDate(detail.purchase_date)}
+                        {detail.store_cnpj && ` • CNPJ: ${detail.store_cnpj}`}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Totals */}
+                  <div className="bg-gray-50 dark:bg-slate-700/50 rounded-xl p-4 space-y-2">
+                    {detail.subtotal && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500 dark:text-gray-400">Subtotal</span>
+                        <span className="text-gray-700 dark:text-gray-300">{formatCurrency(detail.subtotal)}</span>
+                      </div>
+                    )}
+                    {detail.discount && detail.discount > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500 dark:text-gray-400">Desconto</span>
+                        <span className="text-green-600">-{formatCurrency(detail.discount)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between font-bold pt-2 border-t border-gray-200 dark:border-slate-600">
+                      <span className="text-gray-900 dark:text-white">Total</span>
+                      <span className="text-gray-900 dark:text-white">{formatCurrency(detail.total_amount)}</span>
+                    </div>
+                  </div>
+
+                  {/* Payments */}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                      <Wallet size={16} />
+                      <span>Formas de Pagamento</span>
+                    </div>
+                    <div className="space-y-2">
+                      {detail.payments.map((payment) => (
+                        <div key={payment.id} className="flex justify-between items-center bg-gray-50 dark:bg-slate-700/50 rounded-lg p-3">
+                          <div>
+                            <p className="font-medium text-gray-900 dark:text-white">
+                              {payment.benefit_card_name || payment.account_name || 'Conta'}
+                            </p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                              {payment.original_label || payment.payment_method}
+                            </p>
+                          </div>
+                          <span className="font-bold text-gray-900 dark:text-white">
+                            {formatCurrency(payment.amount)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Items */}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                      <ShoppingBag size={16} />
+                      <span>Itens ({items.length})</span>
+                    </div>
+                    <div className="space-y-1 max-h-48 overflow-y-auto">
+                      {items.map((item) => (
+                        <div key={item.id} className="flex justify-between items-center py-2 border-b border-gray-100 dark:border-slate-700 last:border-0">
+                          <span className="text-sm text-gray-700 dark:text-gray-300 truncate flex-1 mr-2">
+                            {item.description}
+                          </span>
+                          <span className="text-sm font-medium text-gray-900 dark:text-white whitespace-nowrap">
+                            {formatCurrency(item.amount)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <p className="text-center text-gray-500 py-8">Erro ao carregar detalhes</p>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>

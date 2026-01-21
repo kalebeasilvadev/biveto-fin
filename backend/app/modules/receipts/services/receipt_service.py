@@ -11,6 +11,7 @@ from app.models.document import Document
 from app.models.account import Account
 from app.models.benefit_card import BenefitCard
 from app.models.user import User
+from app.models.grocery import GroceryPurchase, GroceryCategory, NecessityType
 from app.modules.receipts.schemas.receipt import (
     ReceiptConfirmRequest,
     ReceiptPaymentResponse,
@@ -105,7 +106,7 @@ class ReceiptService:
         self.db.add(receipt)
         await self.db.flush()  # Para obter o ID
 
-        # 6. Criar os ReceiptPayments
+        # 6. Criar os ReceiptPayments e atualizar saldos das contas
         for idx, payment_data in enumerate(data.payments, 1):
             payment = ReceiptPayment(
                 receipt_id=receipt.id,
@@ -117,6 +118,10 @@ class ReceiptService:
                 original_label=payment_data.original_label,
             )
             self.db.add(payment)
+
+            # Atualizar saldo da conta (deduzir o valor do pagamento)
+            account = valid_accounts[payment_data.account_id]
+            account.balance = float(account.balance) - float(payment_data.amount)
 
         # 7. Criar as Transactions vinculadas ao receipt
         # Transações de receipt NÃO têm account_id - o saldo vem dos ReceiptPayments
@@ -133,6 +138,29 @@ class ReceiptService:
                 category_id=item.category_id or data.default_category_id,
             )
             self.db.add(transaction)
+
+        # 8. Criar GroceryPurchases para cada item (para tela de Mercado)
+        for item in data.items:
+            quantity = float(item.quantity) if item.quantity else 1.0
+            unit = item.unit or "un"
+            unit_price = float(item.unit_price) if item.unit_price else float(item.amount)
+            total_price = float(item.amount)
+
+            grocery_purchase = GroceryPurchase(
+                user_id=user.id,
+                receipt_id=receipt.id,
+                document_id=data.document_id,
+                product_name=item.description,
+                quantity=quantity,
+                unit=unit,
+                unit_price=unit_price,
+                total_price=total_price,
+                category=GroceryCategory.OTHER.value,  # Pode ser melhorado com classificação
+                necessity_type=NecessityType.ESSENTIAL.value,
+                purchase_date=data.purchase_date,
+                ownership_type="household",
+            )
+            self.db.add(grocery_purchase)
 
         await self.db.commit()
         await self.db.refresh(receipt)
