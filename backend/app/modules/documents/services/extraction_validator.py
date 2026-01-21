@@ -64,6 +64,8 @@ class ExtractionValidator:
         if is_cupom_fiscal:
             # Remover duplicatas de overlap de páginas do OCR
             items = self.deduplicate_consecutive_items(items)
+            # Remover duplicatas não-consecutivas usando o total como validação
+            items = self.deduplicate_by_total(items, total_amount)
             # Diluir desconto em cupons fiscais
             items = self.dilute_discount_to_items(items, total_amount)
         else:
@@ -112,6 +114,81 @@ class ExtractionValidator:
             print(f"[Validator] Deduplicação consecutiva: {len(items)} -> {len(result)} itens")
 
         return result
+
+    def deduplicate_by_total(self, items: list, total_amount: float | None) -> list:
+        """
+        Remove duplicatas de overlap usando o total como validação.
+
+        Algoritmo:
+        1. Calcular soma atual dos itens
+        2. Se soma > total (com tolerância), há duplicatas de overlap
+        3. Agrupar itens por (descrição, valor, data)
+        4. Para grupos com >1 item, remover extras até soma ≈ total
+        """
+        if not items or len(items) < 2 or not total_amount:
+            return items
+
+        soma_atual = sum(item.get('amount', 0) for item in items)
+        diferenca = soma_atual - total_amount
+
+        # Se soma está próxima do total (±1%), não há duplicatas significativas
+        if abs(diferenca) <= total_amount * 0.01:
+            print(f"[Validator] Soma ({soma_atual:.2f}) próxima do total ({total_amount:.2f}), sem dedup necessária")
+            return items
+
+        # Se soma < total, não há duplicatas (pode haver itens faltando)
+        if diferenca < 0:
+            print(f"[Validator] Soma ({soma_atual:.2f}) menor que total ({total_amount:.2f}), itens podem estar faltando")
+            return items
+
+        print(f"[Validator] Possíveis duplicatas: soma={soma_atual:.2f}, total={total_amount:.2f}, excesso={diferenca:.2f}")
+
+        # Agrupar itens por (descrição, valor, data)
+        from collections import defaultdict
+        groups = defaultdict(list)
+        for idx, item in enumerate(items):
+            key = (
+                item.get('description', ''),
+                item.get('amount', 0),
+                item.get('date', '')
+            )
+            groups[key].append(idx)
+
+        # Identificar grupos com duplicatas (>1 item)
+        duplicates_candidates = []
+        for key, indices in groups.items():
+            if len(indices) > 1:
+                # Adicionar índices extras (exceto o primeiro)
+                for idx in indices[1:]:
+                    duplicates_candidates.append((idx, items[idx].get('amount', 0)))
+
+        if not duplicates_candidates:
+            return items
+
+        # Ordenar por valor (remover duplicatas maiores primeiro para aproximar do total mais rápido)
+        duplicates_candidates.sort(key=lambda x: -x[1])
+
+        # Remover duplicatas até soma ≈ total
+        indices_to_remove = set()
+        soma_removida = 0
+
+        for idx, amount in duplicates_candidates:
+            if soma_atual - soma_removida - amount >= total_amount - (total_amount * 0.01):
+                indices_to_remove.add(idx)
+                soma_removida += amount
+                print(f"[Validator] Removendo duplicata: {items[idx].get('description', '')[:40]} R${amount:.2f}")
+
+            # Parar se já removemos o suficiente
+            if abs((soma_atual - soma_removida) - total_amount) <= total_amount * 0.01:
+                break
+
+        if indices_to_remove:
+            result = [item for idx, item in enumerate(items) if idx not in indices_to_remove]
+            nova_soma = sum(item.get('amount', 0) for item in result)
+            print(f"[Validator] Deduplicação por total: {len(items)} -> {len(result)} itens (soma: {soma_atual:.2f} -> {nova_soma:.2f})")
+            return result
+
+        return items
 
     def dilute_discount_to_items(self, items: list, total_amount: float | None) -> list:
         """Dilui desconto proporcionalmente entre itens de cupom fiscal."""
