@@ -13,6 +13,7 @@ import Insights from './pages/Insights'
 import Chat from './pages/Chat'
 import Accounts from './pages/Accounts'
 import CreditCards from './pages/CreditCards'
+import BenefitCards from './pages/BenefitCards'
 import IncomeSources from './pages/IncomeSources'
 import Invoices from './pages/Invoices'
 import AdminDashboard from './pages/admin/AdminDashboard'
@@ -102,6 +103,7 @@ function App() {
         <Route path="chat" element={<Chat />} />
         <Route path="accounts" element={<Accounts />} />
         <Route path="credit-cards" element={<CreditCards />} />
+        <Route path="benefit-cards" element={<BenefitCards />} />
         <Route path="income-sources" element={<IncomeSources />} />
         <Route path="invoices" element={<Invoices />} />
         <Route path="settings" element={<Settings />} />

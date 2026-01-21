@@ -72,6 +72,9 @@ class User(Base):
     credit_cards: Mapped[list["CreditCard"]] = relationship(
         back_populates="user", lazy="noload", cascade="all, delete-orphan"
     )
+    benefit_cards: Mapped[list["BenefitCard"]] = relationship(
+        back_populates="user", lazy="noload", cascade="all, delete-orphan"
+    )
     income_sources: Mapped[list["IncomeSource"]] = relationship(
         back_populates="user", lazy="noload", cascade="all, delete-orphan"
     )
@@ -133,6 +136,7 @@ from .invitation import Invitation
 from .recurring import RecurringTransaction
 from .household import HouseholdMember
 from .credit_card import CreditCard
+from .benefit_card import BenefitCard
 from .income_source import IncomeSource
 from .credit_card_invoice import CreditCardInvoice
 from .api_key import APIKey

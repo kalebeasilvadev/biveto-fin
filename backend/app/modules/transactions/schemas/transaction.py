@@ -201,3 +201,72 @@ class BatchConfirmResponse(BaseModel):
     duplicate_count: int
     error_count: int
     results: list[BatchConfirmItemResult]
+
+
+# ============================================
+# Schemas para Split Payment (pagamento dividido)
+# ============================================
+
+class SplitPaymentItem(BaseModel):
+    """Item de pagamento em uma transacao com pagamento dividido"""
+    payment_method: PaymentMethod
+    amount: float = Field(gt=0)
+    account_id: int
+    benefit_card_id: int | None = None  # Se for pagamento com VA/VR
+    credit_card_id: int | None = None   # Se for pagamento com cartao de credito
+
+
+class SplitPaymentRequest(BaseModel):
+    """Request para criar transacao com pagamento dividido"""
+    document_id: int | None = None
+    date: date_type
+    total_amount: float = Field(gt=0)
+    description: str | None = None
+    merchant_name: str | None = None
+    category_id: int | None = None
+    ownership_type: OwnershipType = OwnershipType.PERSONAL
+    tags: list[str] | None = None
+    is_fixed: bool = False
+    payments: list[SplitPaymentItem] = Field(min_length=2)  # Minimo 2 para ser split
+
+    # Campos para cupom fiscal (grocery tracking)
+    quantity: float | None = None
+    unit: str | None = None
+    unit_price: float | None = None
+    grocery_category: str | None = None
+    necessity_type: str | None = None
+
+
+class SplitPaymentResponse(BaseModel):
+    """Resposta de transacao com pagamento dividido"""
+    transaction_id: int
+    total_amount: float
+    payments: list["TransactionPaymentResponse"]
+
+
+class TransactionPaymentResponse(BaseModel):
+    """Resposta de um pagamento individual"""
+    id: int
+    payment_method: str
+    payment_method_display: str
+    amount: float
+    account_id: int
+    account_name: str | None = None
+    benefit_card_id: int | None = None
+    credit_card_id: int | None = None
+    sequence: int
+
+
+class DetectedPaymentMethod(BaseModel):
+    """Metodo de pagamento detectado pelo OCR"""
+    payment_method: str  # voucher_va, debit_card, etc.
+    amount: float
+    label: str  # Label original do cupom: "CARTAO ALIMENTACAO", "DEBITO"
+
+
+class SuggestSplitResponse(BaseModel):
+    """Sugestao de split baseada em deteccao do OCR"""
+    detected_payments: list[DetectedPaymentMethod]
+    total_detected: float
+    suggested_benefit_card_id: int | None = None  # Se detectou VA/VR, sugere cartao cadastrado
+    suggested_benefit_card_name: str | None = None

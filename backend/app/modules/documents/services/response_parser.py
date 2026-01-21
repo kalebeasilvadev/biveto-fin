@@ -12,6 +12,41 @@ class ResponseParser:
     def __init__(self):
         self.validator = ExtractionValidator()
 
+    # Valores placeholder que indicam que o LLM não conseguiu extrair dados reais
+    PLACEHOLDER_VALUES = [
+        'NOME DO ESTABELECIMENTO',
+        'YYYY-MM-DD',
+        'Nome do Banco',
+        'codigo_banco',
+        'Nome Completo do Cartão',
+        'visa|mastercard|elo|amex|hipercard',
+    ]
+
+    def _is_placeholder_response(self, data: dict) -> bool:
+        """Detecta se a resposta contém valores placeholder do prompt"""
+        # Verificar card_info
+        card_info = data.get('card_info', {})
+        if card_info:
+            for field in ['card_issuer', 'card_bank', 'card_name', 'card_brand', 'due_date', 'closing_date']:
+                value = card_info.get(field)
+                if value and any(ph in str(value) for ph in self.PLACEHOLDER_VALUES):
+                    print(f"[Parser] AVISO: Detectado placeholder em card_info.{field}: {value}")
+                    return True
+
+        # Verificar items
+        items = data.get('items', [])
+        for item in items:
+            desc = item.get('description', '')
+            date = item.get('date', '')
+            if any(ph in str(desc) for ph in self.PLACEHOLDER_VALUES):
+                print(f"[Parser] AVISO: Detectado placeholder em item.description: {desc}")
+                return True
+            if date and 'YYYY' in str(date):
+                print(f"[Parser] AVISO: Detectado placeholder em item.date: {date}")
+                return True
+
+        return False
+
     def parse(self, content: str) -> dict:
         """Parseia a resposta JSON da LLM"""
         try:
@@ -22,6 +57,13 @@ class ResponseParser:
                     content = match.group(1)
 
             data = json.loads(content)
+
+            # Verificar se é resposta placeholder
+            if self._is_placeholder_response(data):
+                return {
+                    'items': [],
+                    'error': 'LLM não conseguiu extrair dados do documento. O documento pode estar ilegível ou em formato não suportado.',
+                }
 
             items = []
             for item in data.get('items', []):
@@ -51,6 +93,16 @@ class ResponseParser:
             card_info = data.get('card_info')
             if card_info and isinstance(card_info, dict):
                 result['card_info'] = self._normalize_card_info(card_info)
+
+            # Parse payment_info for cupom fiscal
+            payment_info = data.get('payment_info')
+            if payment_info and isinstance(payment_info, dict):
+                result['payment_info'] = self._normalize_payment_info(payment_info)
+
+            # Parse merchant_info for cupom fiscal
+            merchant_info = data.get('merchant_info')
+            if merchant_info and isinstance(merchant_info, dict):
+                result['merchant_info'] = merchant_info
 
             return result
 
@@ -267,3 +319,141 @@ class ResponseParser:
             return ' '.join(parts)
 
         return None
+
+    # Mapeamento de labels de pagamento do OCR para PaymentMethod
+    PAYMENT_METHOD_MAP = {
+        # Vale Alimentação
+        'cartao alimentacao': 'voucher_va',
+        'vale alimentacao': 'voucher_va',
+        'alimentacao': 'voucher_va',
+        'alelo alimentacao': 'voucher_va',
+        'sodexo alimentacao': 'voucher_va',
+        'ticket alimentacao': 'voucher_va',
+        'va': 'voucher_va',
+
+        # Vale Refeição
+        'cartao refeicao': 'voucher_vr',
+        'vale refeicao': 'voucher_vr',
+        'refeicao': 'voucher_vr',
+        'alelo refeicao': 'voucher_vr',
+        'sodexo refeicao': 'voucher_vr',
+        'ticket refeicao': 'voucher_vr',
+        'vr': 'voucher_vr',
+
+        # Flex
+        'flex': 'voucher_flex',
+        'cartao flex': 'voucher_flex',
+        'caju': 'voucher_flex',
+        'flash': 'voucher_flex',
+        'ifood beneficios': 'voucher_flex',
+        'swile': 'voucher_flex',
+
+        # Vale Transporte
+        'vale transporte': 'voucher_vt',
+        'vt': 'voucher_vt',
+
+        # Outros benefícios
+        'alelo': 'voucher_other',
+        'sodexo': 'voucher_other',
+        'ticket': 'voucher_other',
+        'voucher': 'voucher_other',
+        'vale': 'voucher_other',
+        'beneficio': 'voucher_other',
+
+        # Débito
+        'debito': 'debit_card',
+        'cartao debito': 'debit_card',
+        'debit': 'debit_card',
+        'debito a vista': 'debit_card',
+
+        # Crédito
+        'credito': 'credit_card',
+        'cartao credito': 'credit_card',
+        'cartao de credito': 'credit_card',
+        'credit': 'credit_card',
+        'credito a vista': 'credit_card',
+        'credito parcelado': 'credit_card',
+
+        # Dinheiro
+        'dinheiro': 'cash',
+        'especie': 'cash',
+        'cash': 'cash',
+
+        # PIX
+        'pix': 'pix',
+
+        # Transferência
+        'transferencia': 'bank_transfer',
+        'ted': 'bank_transfer',
+        'doc': 'bank_transfer',
+    }
+
+    def _normalize_payment_info(self, payment_info: dict) -> dict:
+        """Normaliza informacoes de pagamento do cupom fiscal"""
+        result = {
+            'total': None,
+            'subtotal': None,
+            'discount': None,
+            'payments': [],
+        }
+
+        # Valores totais
+        total = payment_info.get('total') or payment_info.get('total_amount')
+        if total:
+            result['total'] = float(total)
+
+        subtotal = payment_info.get('subtotal')
+        if subtotal:
+            result['subtotal'] = float(subtotal)
+
+        discount = payment_info.get('discount') or payment_info.get('desconto')
+        if discount:
+            result['discount'] = float(discount)
+
+        # Parse pagamentos
+        payments = payment_info.get('payments', [])
+        if payments and isinstance(payments, list):
+            for i, payment in enumerate(payments):
+                if not isinstance(payment, dict):
+                    continue
+
+                method_label = payment.get('method', '').lower().strip()
+                amount = payment.get('amount', 0)
+
+                if not method_label or not amount:
+                    continue
+
+                # Mapear para PaymentMethod enum
+                payment_method = self._map_payment_method(method_label)
+
+                result['payments'].append({
+                    'method': payment_method,
+                    'amount': float(amount),
+                    'label': payment.get('method', ''),  # Label original
+                    'sequence': i + 1,
+                })
+
+        print(f"[Parser] DEBUG: payment_info normalized: {result}")
+        return result
+
+    def _map_payment_method(self, label: str) -> str:
+        """Mapeia label de pagamento do OCR para PaymentMethod enum value"""
+        label_lower = label.lower().strip()
+
+        # Remove acentos para facilitar match
+        import unicodedata
+        label_normalized = unicodedata.normalize('NFD', label_lower)
+        label_normalized = label_normalized.encode('ascii', 'ignore').decode('utf-8')
+
+        # Busca match direto
+        if label_normalized in self.PAYMENT_METHOD_MAP:
+            return self.PAYMENT_METHOD_MAP[label_normalized]
+
+        # Busca match parcial
+        for key, value in self.PAYMENT_METHOD_MAP.items():
+            if key in label_normalized or label_normalized in key:
+                return value
+
+        # Default para débito se não reconhecido
+        print(f"[Parser] AVISO: Método de pagamento não reconhecido: '{label}', usando debit_card")
+        return 'debit_card'

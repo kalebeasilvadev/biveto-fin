@@ -80,6 +80,37 @@ class ExtractionValidator:
 
         return items
 
+    def deduplicate_consecutive_items(self, items: list) -> list:
+        """
+        Remove itens consecutivos idênticos (causados por overlap na divisão de páginas longas).
+        Mantém duplicatas não consecutivas (compras reais do mesmo produto).
+        """
+        if not items or len(items) < 2:
+            return items
+
+        result = [items[0]]
+
+        for i in range(1, len(items)):
+            current = items[i]
+            previous = items[i - 1]
+
+            # Verificar se é duplicata consecutiva (mesma descrição, valor e data)
+            is_duplicate = (
+                current.get('description') == previous.get('description') and
+                current.get('amount') == previous.get('amount') and
+                current.get('date') == previous.get('date')
+            )
+
+            if is_duplicate:
+                print(f"[Validator] Removendo item duplicado consecutivo: {current.get('description', '')[:30]}")
+            else:
+                result.append(current)
+
+        if len(result) < len(items):
+            print(f"[Validator] Deduplicação consecutiva: {len(items)} -> {len(result)} itens")
+
+        return result
+
     def dilute_discount_to_items(self, items: list, total_amount: float | None) -> list:
         """Dilui desconto proporcionalmente entre itens de cupom fiscal."""
         if not total_amount or total_amount <= 0:

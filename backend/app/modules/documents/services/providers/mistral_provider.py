@@ -139,9 +139,35 @@ class MistralProvider(BaseProvider):
         return await self._images_to_pdf([(image_content, mime_type)])
 
     async def _images_to_pdf(self, images: list[tuple[bytes, str]]) -> bytes:
-        """Converte multiplas imagens para um unico PDF"""
+        """Converte multiplas imagens para um unico PDF, dividindo páginas muito longas"""
         import io
         from PIL import Image
+
+        def _split_long_image(img: Image.Image, max_ratio: float = 3.0) -> list[Image.Image]:
+            """Divide uma imagem muito longa em seções verticais menores"""
+            width, height = img.size
+            ratio = height / width
+
+            if ratio <= max_ratio:
+                return [img]
+
+            # Calcular quantas seções precisamos
+            num_sections = int(ratio / max_ratio) + 1
+            section_height = height // num_sections
+
+            # Overlap de 10% da altura da seção para não cortar texto
+            overlap = max(100, int(section_height * 0.10))
+            sections = []
+
+            for i in range(num_sections):
+                top = max(0, i * section_height - (overlap if i > 0 else 0))
+                bottom = min(height, (i + 1) * section_height + (overlap if i < num_sections - 1 else 0))
+
+                section = img.crop((0, top, width, bottom))
+                sections.append(section)
+
+            print(f"[MistralProvider] Imagem longa detectada (ratio={ratio:.1f}), dividida em {len(sections)} seções")
+            return sections
 
         def _convert():
             pdf_images = []
@@ -149,7 +175,10 @@ class MistralProvider(BaseProvider):
                 img = Image.open(io.BytesIO(img_content))
                 if img.mode in ('RGBA', 'P'):
                     img = img.convert('RGB')
-                pdf_images.append(img)
+
+                # Dividir se for muito longa
+                sections = _split_long_image(img)
+                pdf_images.extend(sections)
 
             output = io.BytesIO()
             if len(pdf_images) == 1:
@@ -160,6 +189,79 @@ class MistralProvider(BaseProvider):
 
         return await asyncio.to_thread(_convert)
 
+    async def _split_long_pdf(self, pdf_content: bytes, max_ratio: float = 3.0) -> bytes:
+        """Detecta e divide PDFs com páginas muito longas"""
+        import io
+        from PIL import Image
+
+        try:
+            import fitz  # PyMuPDF
+        except ImportError:
+            print("[MistralProvider] PyMuPDF não instalado, não é possível dividir PDF longo")
+            return pdf_content
+
+        def _process():
+            doc = fitz.open(stream=pdf_content, filetype="pdf")
+            needs_split = False
+            all_images = []
+
+            for page_num in range(len(doc)):
+                page = doc[page_num]
+                # Renderizar página como imagem
+                mat = fitz.Matrix(2, 2)  # 2x zoom para melhor qualidade
+                pix = page.get_pixmap(matrix=mat)
+
+                # Verificar proporção
+                ratio = pix.height / pix.width
+                if ratio > max_ratio:
+                    needs_split = True
+
+                # Converter para PIL Image
+                img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+                all_images.append(img)
+
+            doc.close()
+
+            if not needs_split:
+                return pdf_content
+
+            print(f"[MistralProvider] PDF com página longa detectado, processando {len(all_images)} página(s)...")
+
+            # Dividir imagens longas
+            final_images = []
+            for img in all_images:
+                width, height = img.size
+                ratio = height / width
+
+                if ratio <= max_ratio:
+                    final_images.append(img)
+                else:
+                    # Dividir a imagem
+                    num_sections = int(ratio / max_ratio) + 1
+                    section_height = height // num_sections
+                    # Overlap de 10% da altura da seção para não cortar texto
+                    overlap = max(100, int(section_height * 0.10))
+
+                    for i in range(num_sections):
+                        top = max(0, i * section_height - (overlap if i > 0 else 0))
+                        bottom = min(height, (i + 1) * section_height + (overlap if i < num_sections - 1 else 0))
+                        section = img.crop((0, top, width, bottom))
+                        final_images.append(section)
+
+                    print(f"[MistralProvider] Página dividida em {num_sections} seções")
+
+            # Reconverter para PDF
+            output = io.BytesIO()
+            if len(final_images) == 1:
+                final_images[0].save(output, format='PDF')
+            else:
+                final_images[0].save(output, format='PDF', save_all=True, append_images=final_images[1:])
+
+            print(f"[MistralProvider] PDF recriado com {len(final_images)} páginas")
+            return output.getvalue()
+
+        return await asyncio.to_thread(_process)
+
     async def extract_from_pdf(self, pdf_content: bytes, filename: str = "document.pdf") -> dict:
         """
         Extrai dados de um PDF usando Mistral OCR + LLM (processo em 2 etapas).
@@ -169,6 +271,9 @@ class MistralProvider(BaseProvider):
         2. Mistral OCR extrai texto/tabelas em markdown (via thread)
         3. Mistral LLM estrutura os dados em JSON (via thread)
         """
+        # Pré-processar PDF para dividir páginas muito longas
+        pdf_content = await self._split_long_pdf(pdf_content)
+
         api_key = settings.mistral_api_key
         if not api_key:
             return {
@@ -217,6 +322,8 @@ class MistralProvider(BaseProvider):
                 ocr_text = json.dumps(ocr_dict, indent=2)
 
             print(f"[MistralProvider] OCR extraiu {len(ocr_text)} caracteres")
+            # Log do texto para debug
+            print(f"[MistralProvider] OCR texto preview: {ocr_text[:500]}")
 
             if not ocr_text.strip():
                 return {

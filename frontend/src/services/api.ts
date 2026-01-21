@@ -513,6 +513,14 @@ export const creditCardsApi = {
     }),
 }
 
+export const benefitCardsApi = {
+  list: () => api.get('/benefit-cards'),
+  get: (id: number) => api.get(`/benefit-cards/${id}`),
+  create: (data: unknown) => api.post('/benefit-cards', data),
+  update: (id: number, data: unknown) => api.patch(`/benefit-cards/${id}`, data),
+  delete: (id: number) => api.delete(`/benefit-cards/${id}`),
+}
+
 export const incomeSourcesApi = {
   list: () => api.get('/income-sources'),
   get: (id: number) => api.get(`/income-sources/${id}`),

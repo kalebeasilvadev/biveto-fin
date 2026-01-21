@@ -10,6 +10,7 @@ class AccountType(str, Enum):
     BANK = "bank"
     CREDIT_CARD = "credit_card"
     INVESTMENT = "investment"
+    BENEFIT_CARD = "benefit_card"  # VA, VR, VT, Flex, etc.
 
 
 class Account(Base):
@@ -40,6 +41,9 @@ class Account(Base):
     credit_card_details: Mapped["CreditCard | None"] = relationship(
         back_populates="account", uselist=False, lazy="noload"
     )
+    benefit_card_details: Mapped["BenefitCard | None"] = relationship(
+        back_populates="account", uselist=False, lazy="noload"
+    )
     income_sources: Mapped[list["IncomeSource"]] = relationship(
         back_populates="account", lazy="noload"
     )
@@ -49,4 +53,5 @@ from .user import User
 from .transaction import Transaction
 from .installment import InstallmentSeries
 from .credit_card import CreditCard
+from .benefit_card import BenefitCard
 from .income_source import IncomeSource

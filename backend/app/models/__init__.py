@@ -14,6 +14,8 @@ from .debt import Debt, DebtPayment, DebtType, DebtStatus, PayoffStrategy
 from .invitation import Invitation, InvitationStatus
 from .recurring import RecurringTransaction, RecurrenceFrequency, RecurringStatus
 from .credit_card import CreditCard, PointsProgram
+from .benefit_card import BenefitCard, BenefitCardType, BenefitCardProvider
+from .transaction_payment import TransactionPayment
 from .income_source import IncomeSource, IncomeType, IncomeFrequency
 from .credit_card_invoice import CreditCardInvoice, InvoiceStatus
 from .api_key import APIKey, APIKeyStatus
@@ -95,6 +97,10 @@ __all__ = [
     "RecurringStatus",
     "CreditCard",
     "PointsProgram",
+    "BenefitCard",
+    "BenefitCardType",
+    "BenefitCardProvider",
+    "TransactionPayment",
     "IncomeSource",
     "IncomeType",
     "IncomeFrequency",

@@ -19,7 +19,13 @@ class PaymentMethod(str, Enum):
     BANK_TRANSFER = "bank_transfer"   # TED/DOC (transferencia bancaria)
     BOLETO = "boleto"                 # Boleto bancario
     CASH = "cash"                     # Dinheiro
-    VOUCHER = "voucher"               # Vale alimentacao/refeicao/transporte
+    VOUCHER = "voucher"               # Vale generico (legado)
+    # Tipos especificos de voucher (novos)
+    VOUCHER_VA = "voucher_va"         # Vale Alimentacao
+    VOUCHER_VR = "voucher_vr"         # Vale Refeicao
+    VOUCHER_FLEX = "voucher_flex"     # Cartao Flex (VA + VR)
+    VOUCHER_VT = "voucher_vt"         # Vale Transporte
+    VOUCHER_OTHER = "voucher_other"   # Outros beneficios
 
 
 class RecurrenceType(str, Enum):
@@ -121,6 +127,11 @@ class Transaction(Base):
         foreign_keys=[invoice_id],
         lazy="noload"
     )
+    payments: Mapped[list["TransactionPayment"]] = relationship(
+        back_populates="transaction",
+        lazy="noload",
+        order_by="TransactionPayment.sequence"
+    )
 
     # Computed properties for API responses
     @property
@@ -185,8 +196,18 @@ class Transaction(Base):
             PaymentMethod.BOLETO.value: "Boleto",
             PaymentMethod.CASH.value: "Dinheiro",
             PaymentMethod.VOUCHER.value: "Vale",
+            PaymentMethod.VOUCHER_VA.value: "Vale Alimentacao",
+            PaymentMethod.VOUCHER_VR.value: "Vale Refeicao",
+            PaymentMethod.VOUCHER_FLEX.value: "Vale Flex",
+            PaymentMethod.VOUCHER_VT.value: "Vale Transporte",
+            PaymentMethod.VOUCHER_OTHER.value: "Outro Beneficio",
         }
         return display_names.get(self.payment_method, self.payment_method)
+
+    @property
+    def has_split_payment(self) -> bool:
+        """Retorna True se a transacao tem pagamento dividido"""
+        return len(self.payments) > 1 if self.payments else False
 
     @property
     def is_transfer_out(self) -> bool:
@@ -235,3 +256,4 @@ from .document import Document
 from .installment import InstallmentSeries
 from .recurring import RecurringTransaction
 from .credit_card_invoice import CreditCardInvoice
+from .transaction_payment import TransactionPayment

@@ -119,6 +119,16 @@ NÃO inclua como items:
 - Informações fiscais (chave de acesso, protocolo)
 - Formas de pagamento (vão em payment_info)
 
+## ATENÇÃO: TEXTO DUPLICADO DO OCR
+
+O documento pode ter sido dividido em seções para processamento, causando **sobreposição de texto**.
+Se você perceber que o MESMO item aparece DUAS VEZES no texto OCR (mesma descrição, mesmo código, mesmo valor):
+- **EXTRAIA APENAS UMA VEZ** - é duplicação do processamento, não compra duplicada
+- Use o **número sequencial do item** (1, 2, 3...) para identificar itens únicos
+- Se o item 15 aparece duas vezes no texto, extraia apenas uma vez
+
+**PORÉM**: Se o cliente comprou o mesmo produto 2x (números sequenciais diferentes, ex: item 15 e item 16 iguais), extraia os DOIS - são compras reais diferentes.
+
 ## VALIDAÇÃO FINAL (CRÍTICO!)
 
 Antes de retornar, verifique:

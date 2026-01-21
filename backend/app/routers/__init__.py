@@ -24,6 +24,7 @@ from app.modules.recurring.routers.recurring import router as recurring_router
 from app.modules.household.routers.family import router as family_router
 from app.modules.household.routers.migration import router as migration_router
 from app.modules.credit_cards.routers.credit_cards import router as credit_cards_router
+from app.modules.benefit_cards.routers.benefit_cards import router as benefit_cards_router
 from app.modules.income.routers.income_sources import router as income_sources_router
 from app.modules.credit_cards.routers.invoices import router as invoices_router
 from app.modules.api_keys.routers.api_keys import router as api_keys_router
@@ -84,6 +85,9 @@ api_router.include_router(admin_router, prefix="/admin", tags=["Admin - Gestao"]
 # Credit Cards module
 api_router.include_router(credit_cards_router, prefix="/credit-cards", tags=["Cartões de Crédito"])
 api_router.include_router(invoices_router, prefix="/invoices", tags=["Faturas"])
+
+# Benefit Cards module
+api_router.include_router(benefit_cards_router, prefix="/benefit-cards", tags=["Cartões de Benefício"])
 
 # Income module
 api_router.include_router(income_sources_router, prefix="/income-sources", tags=["Fontes de Receita"])
