@@ -13,14 +13,14 @@ DEFAULT_RETRY_DELAY = 2.0
 # Tamanho maximo para imagens antes de comprimir (2MB)
 MAX_IMAGE_SIZE_MB = 2.0
 
-# Singleton Mistral client para connection pooling
+# Singleton Mistral client para reutilização
 _mistral_client = None
 _mistral_client_lock = asyncio.Lock()
 
 
 async def get_mistral_client():
     """
-    Retorna um cliente Mistral singleton com connection pooling.
+    Retorna um cliente Mistral singleton.
     Evita criar novo cliente a cada requisicao.
     """
     global _mistral_client
@@ -39,20 +39,10 @@ async def get_mistral_client():
 
         try:
             from mistralai import Mistral
-            import httpx
 
-            # Criar cliente com timeout e limites de conexao customizados
-            http_client = httpx.Client(
-                timeout=httpx.Timeout(120.0, connect=10.0),  # 120s total, 10s connect
-                limits=httpx.Limits(
-                    max_connections=10,
-                    max_keepalive_connections=5,
-                    keepalive_expiry=300.0  # 5 minutos
-                )
-            )
-
-            _mistral_client = Mistral(api_key=api_key, http_client=http_client)
-            print("[MistralProvider] Cliente Mistral inicializado com connection pooling")
+            # Cliente singleton - a biblioteca Mistral gerencia conexoes internamente
+            _mistral_client = Mistral(api_key=api_key)
+            print("[MistralProvider] Cliente Mistral singleton inicializado")
             return _mistral_client
 
         except ImportError:
