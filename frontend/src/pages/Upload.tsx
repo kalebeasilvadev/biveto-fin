@@ -248,16 +248,10 @@ export default function Upload() {
     return found ? String(found.id) : ''
   }
 
-  // Mutations - use async upload for better UX
+  // Mutations
   const uploadMutation = useMutation({
-    mutationFn: (file: File) => documentsApi.uploadAsync(file),
-    onSuccess: (response) => {
-      const data = response.data as { id: number; status: string; message: string }
-      setUploadError(null)
-      // Set document id to start polling
-      setProcessingDocumentId(data.id)
-      setMode('confirm')
-    },
+    mutationFn: (file: File) => documentsApi.upload(file),
+    onSuccess: handleUploadSuccess,
     onError: (error: unknown) => {
       setUploadError(getApiErrorMessage(error, 'Erro ao processar documento'))
     },

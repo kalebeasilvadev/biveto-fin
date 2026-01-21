@@ -62,6 +62,8 @@ class ExtractionValidator:
         items = self.fix_payment_amounts(items)
 
         if is_cupom_fiscal:
+            # Remover duplicatas de overlap de páginas do OCR
+            items = self.deduplicate_consecutive_items(items)
             # Diluir desconto em cupons fiscais
             items = self.dilute_discount_to_items(items, total_amount)
         else:
