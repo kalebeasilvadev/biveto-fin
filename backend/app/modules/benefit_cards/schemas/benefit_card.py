@@ -34,6 +34,7 @@ class BenefitCardUpdate(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=100)
     color: str | None = None
     icon: str | None = None
+    initial_balance: float | None = None  # Update account balance
 
 
 class BenefitCardResponse(BenefitCardBase):

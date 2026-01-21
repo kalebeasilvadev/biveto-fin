@@ -264,6 +264,10 @@ async def update_benefit_card(
         if field in update_data:
             setattr(account, field, update_data[field])
 
+    # Update account balance if initial_balance is provided
+    if "initial_balance" in update_data:
+        account.balance = update_data["initial_balance"]
+
     await db.commit()
     await db.refresh(card)
     await db.refresh(account)
