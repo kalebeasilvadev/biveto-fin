@@ -7,6 +7,7 @@ from app.core.deps import CurrentUser, DbSession
 from app.models.account import Account
 from app.models.transaction import Transaction, TransactionType
 from app.models.household import HouseholdMember
+from app.models.receipt import Receipt, ReceiptPayment, ReceiptStatus
 from app.modules.accounts.schemas.account import AccountCreate, AccountResponse, AccountUpdate
 
 router = APIRouter()
@@ -27,14 +28,17 @@ async def get_household_user_ids(db, user) -> list[int]:
 
 async def calculate_account_balance(db, account_id: int) -> Decimal:
     """
-    Calcula o saldo real da conta baseado nas transações.
-    Saldo = saldo_inicial + receitas - despesas + transfers_in - transfers_out
+    Calcula o saldo real da conta baseado nas transações e pagamentos de receipts.
 
-    Para transfers:
-    - Se id < linked_transaction_id → saída (subtrair do saldo)
-    - Se id > linked_transaction_id → entrada (somar ao saldo)
+    Saldo =
+        (Transações normais sem receipt: receitas - despesas + transfers)
+      + (ReceiptPayments desta conta - sempre despesas)
+
+    Regra: Transações com receipt_id NÃO afetam saldo diretamente
+    O saldo de compras vem dos ReceiptPayments.
     """
-    result = await db.execute(
+    # 1. Saldo de transações normais (sem receipt_id)
+    transactions_result = await db.execute(
         select(
             func.coalesce(
                 func.sum(
@@ -64,9 +68,28 @@ async def calculate_account_balance(db, account_id: int) -> Decimal:
                 ),
                 0
             )
-        ).where(Transaction.account_id == account_id)
+        ).where(
+            Transaction.account_id == account_id,
+            Transaction.receipt_id.is_(None)  # Apenas transações sem receipt
+        )
     )
-    return result.scalar() or Decimal(0)
+    transactions_balance = transactions_result.scalar() or Decimal(0)
+
+    # 2. Total de ReceiptPayments (sempre despesas)
+    receipt_payments_result = await db.execute(
+        select(
+            func.coalesce(func.sum(ReceiptPayment.amount), 0)
+        ).select_from(ReceiptPayment)
+        .join(Receipt)
+        .where(
+            ReceiptPayment.account_id == account_id,
+            Receipt.status == ReceiptStatus.CONFIRMED.value
+        )
+    )
+    receipt_payments_total = receipt_payments_result.scalar() or Decimal(0)
+
+    # Saldo = transações normais - pagamentos de receipts
+    return Decimal(str(transactions_balance)) - Decimal(str(receipt_payments_total))
 
 
 @router.get("", response_model=list[AccountResponse])
@@ -74,8 +97,8 @@ async def list_accounts(current_user: CurrentUser, db: DbSession):
     """Lista todas as contas do usuário (pessoais + household) com saldos atualizados"""
     household_user_ids = await get_household_user_ids(db, current_user)
 
-    # Subquery para calcular saldo de transacoes por conta
-    balance_subquery = (
+    # Subquery para calcular saldo de transacoes por conta (excluindo transações de receipt)
+    transactions_balance_subquery = (
         select(
             Transaction.account_id,
             func.coalesce(
@@ -107,17 +130,33 @@ async def list_accounts(current_user: CurrentUser, db: DbSession):
                 0
             ).label('transaction_balance')
         )
+        .where(Transaction.receipt_id.is_(None))  # Excluir transações de receipt
         .group_by(Transaction.account_id)
         .subquery()
     )
 
-    # Query otimizada com JOIN para pegar saldo das transacoes
+    # Subquery para calcular total de receipt payments por conta (sempre despesas)
+    receipt_payments_subquery = (
+        select(
+            ReceiptPayment.account_id,
+            func.coalesce(func.sum(ReceiptPayment.amount), 0).label('receipt_payments_total')
+        )
+        .select_from(ReceiptPayment)
+        .join(Receipt)
+        .where(Receipt.status == ReceiptStatus.CONFIRMED.value)
+        .group_by(ReceiptPayment.account_id)
+        .subquery()
+    )
+
+    # Query otimizada com JOIN para pegar saldo das transacoes e receipt payments
     base_query = (
         select(
             Account,
-            func.coalesce(balance_subquery.c.transaction_balance, 0).label('tx_balance')
+            func.coalesce(transactions_balance_subquery.c.transaction_balance, 0).label('tx_balance'),
+            func.coalesce(receipt_payments_subquery.c.receipt_payments_total, 0).label('receipt_total')
         )
-        .outerjoin(balance_subquery, balance_subquery.c.account_id == Account.id)
+        .outerjoin(transactions_balance_subquery, transactions_balance_subquery.c.account_id == Account.id)
+        .outerjoin(receipt_payments_subquery, receipt_payments_subquery.c.account_id == Account.id)
     )
 
     if household_user_ids:
@@ -143,11 +182,13 @@ async def list_accounts(current_user: CurrentUser, db: DbSession):
     rows = result.all()
 
     # Construir resposta com saldo calculado
+    # Saldo = saldo_inicial + transações_normais - receipt_payments
     accounts_with_balance = []
     for row in rows:
         account = row[0]
         tx_balance = row[1] or Decimal(0)
-        computed_balance = float(account.balance) + float(tx_balance)
+        receipt_total = row[2] or Decimal(0)
+        computed_balance = float(account.balance) + float(tx_balance) - float(receipt_total)
 
         account_dict = {
             "id": account.id,

@@ -61,6 +61,11 @@ class Transaction(Base):
         ForeignKey("credit_card_invoices.id", ondelete="SET NULL"), index=True
     )
 
+    # Receipt link (for fiscal receipt transactions)
+    receipt_id: Mapped[int | None] = mapped_column(
+        ForeignKey("receipts.id", ondelete="SET NULL"), index=True
+    )
+
     type: Mapped[str] = mapped_column(String(10))  # TransactionType
     payment_method: Mapped[str | None] = mapped_column(String(20), index=True)  # PaymentMethod
     amount: Mapped[float] = mapped_column(Numeric(12, 2))
@@ -125,6 +130,11 @@ class Transaction(Base):
     invoice: Mapped["CreditCardInvoice | None"] = relationship(
         back_populates="transactions",
         foreign_keys=[invoice_id],
+        lazy="noload"
+    )
+    receipt: Mapped["Receipt | None"] = relationship(
+        back_populates="items",
+        foreign_keys=[receipt_id],
         lazy="noload"
     )
     payments: Mapped[list["TransactionPayment"]] = relationship(
@@ -257,3 +267,4 @@ from .installment import InstallmentSeries
 from .recurring import RecurringTransaction
 from .credit_card_invoice import CreditCardInvoice
 from .transaction_payment import TransactionPayment
+from .receipt import Receipt

@@ -848,3 +848,49 @@ export const groceryApi = {
   backfillPurchases: (data: { dry_run?: boolean; category_names?: string[] }) =>
     api.post('/grocery/backfill', data),
 }
+
+export const receiptsApi = {
+  // Confirm receipt from document extraction
+  confirm: (data: {
+    document_id: number
+    store_name: string
+    store_cnpj?: string
+    purchase_date: string
+    total_amount: number
+    subtotal?: number
+    discount?: number
+    items: Array<{
+      description: string
+      amount: number
+      category_id?: number
+      quantity?: number
+      unit?: string
+      unit_price?: number
+    }>
+    payments: Array<{
+      payment_method: string
+      amount: number
+      account_id: number
+      benefit_card_id?: number
+      original_label?: string
+    }>
+    default_category_id?: number
+  }) => api.post('/receipts/confirm', data),
+
+  // List receipts
+  list: (params?: { limit?: number; offset?: number; status?: string }) =>
+    api.get('/receipts', { params }),
+
+  // Get receipt details
+  get: (id: number) => api.get(`/receipts/${id}`),
+
+  // Get receipt items (transactions)
+  getItems: (id: number) => api.get(`/receipts/${id}/items`),
+
+  // Update receipt
+  update: (id: number, data: { store_name?: string; store_cnpj?: string; purchase_date?: string }) =>
+    api.patch(`/receipts/${id}`, data),
+
+  // Cancel receipt
+  cancel: (id: number) => api.delete(`/receipts/${id}`),
+}

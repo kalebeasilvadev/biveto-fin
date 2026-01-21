@@ -102,6 +102,9 @@ class User(Base):
     automation_rules: Mapped[list["AutomationRule"]] = relationship(
         back_populates="user", lazy="noload", cascade="all, delete-orphan"
     )
+    receipts: Mapped[list["Receipt"]] = relationship(
+        back_populates="user", lazy="noload", cascade="all, delete-orphan"
+    )
 
     @property
     def household_role(self) -> str | None:
@@ -143,3 +146,4 @@ from .api_key import APIKey
 from .notification import Notification, NotificationPreference, NotificationSettings, PushSubscription
 from .envelope import SpendingEnvelope
 from .automation_rule import AutomationRule
+from .receipt import Receipt

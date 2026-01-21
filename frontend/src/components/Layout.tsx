@@ -35,6 +35,7 @@ import {
   Camera,
   ShoppingCart,
   Ticket,
+  Store,
 } from 'lucide-react'
 import { useState, useEffect, useCallback } from 'react'
 import { clsx } from 'clsx'
@@ -96,6 +97,7 @@ const menuGroups: NavGroup[] = [
     icon: ArrowLeftRight,
     items: [
       { to: '/transactions', icon: Receipt, label: 'Transações' },
+      { to: '/receipts', icon: Store, label: 'Compras' },
       { to: '/recurring', icon: Repeat, label: 'Recorrentes' },
       { to: '/income-sources', icon: Briefcase, label: 'Receitas' },
     ],

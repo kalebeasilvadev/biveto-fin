@@ -58,6 +58,12 @@ from .grocery import (
     GROCERY_CATEGORY_DISPLAY,
     NECESSITY_TYPE_DISPLAY,
 )
+from .receipt import (
+    Receipt,
+    ReceiptPayment,
+    ReceiptStatus,
+    RECEIPT_STATUS_DISPLAY,
+)
 from app.modules.known_services.models.known_service import KnownRecurringService
 
 __all__ = [
@@ -140,4 +146,8 @@ __all__ = [
     "ShoppingListSource",
     "GROCERY_CATEGORY_DISPLAY",
     "NECESSITY_TYPE_DISPLAY",
+    "Receipt",
+    "ReceiptPayment",
+    "ReceiptStatus",
+    "RECEIPT_STATUS_DISPLAY",
 ]

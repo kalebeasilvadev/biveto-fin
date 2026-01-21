@@ -35,6 +35,7 @@ from app.modules.envelopes.routers.envelopes import router as envelopes_router
 from app.modules.automations.routers.automations import router as automations_router
 from app.modules.review.routers.review import router as review_router
 from app.modules.grocery.routers.grocery import router as grocery_router
+from app.modules.receipts.routers.receipts import router as receipts_router
 
 api_router = APIRouter()
 
@@ -115,3 +116,6 @@ api_router.include_router(review_router, prefix="/review", tags=["Revisão Seman
 
 # Grocery module
 api_router.include_router(grocery_router, prefix="/grocery", tags=["Mercado"])
+
+# Receipts module
+api_router.include_router(receipts_router, prefix="/receipts", tags=["Compras"])

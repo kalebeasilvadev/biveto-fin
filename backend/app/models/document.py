@@ -47,6 +47,7 @@ class Document(Base):
     )
     transaction: Mapped["Transaction | None"] = relationship(back_populates="document", uselist=False)
     invoice: Mapped["CreditCardInvoice | None"] = relationship(back_populates="document", uselist=False)
+    receipt: Mapped["Receipt | None"] = relationship(back_populates="document", uselist=False)
 
 
 class DocumentExtraction(Base):
@@ -88,3 +89,4 @@ class DocumentExtraction(Base):
 from .user import User
 from .transaction import Transaction
 from .credit_card_invoice import CreditCardInvoice
+from .receipt import Receipt

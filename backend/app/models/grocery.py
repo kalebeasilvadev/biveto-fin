@@ -127,6 +127,9 @@ class GroceryPurchase(Base):
     document_id: Mapped[int | None] = mapped_column(
         ForeignKey("documents.id", ondelete="SET NULL"), index=True
     )
+    receipt_id: Mapped[int | None] = mapped_column(
+        ForeignKey("receipts.id", ondelete="CASCADE"), index=True
+    )
     product_id: Mapped[int | None] = mapped_column(
         ForeignKey("grocery_products.id", ondelete="SET NULL"), index=True
     )
@@ -154,6 +157,7 @@ class GroceryPurchase(Base):
     user: Mapped["User"] = relationship(lazy="noload")
     transaction: Mapped["Transaction | None"] = relationship(lazy="noload")
     document: Mapped["Document | None"] = relationship(lazy="noload")
+    receipt: Mapped["Receipt | None"] = relationship(back_populates="grocery_purchase", lazy="noload")
     product: Mapped["GroceryProduct | None"] = relationship(
         back_populates="purchases", lazy="noload"
     )
@@ -309,3 +313,4 @@ from .transaction import Transaction
 from .document import Document
 from .merchant import Merchant
 from .license import License
+from .receipt import Receipt
