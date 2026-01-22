@@ -18,11 +18,13 @@ class GroceryCategory(str, Enum):
     FROZEN = "frozen"                        # Congelados
     CANNED = "canned"                        # Enlatados
     GRAINS_PASTA = "grains_pasta"            # Grãos e Massas
+    GRAINS = "grains"                        # Grãos (arroz, feijão)
     CONDIMENTS = "condiments"                # Temperos
 
     # Não-Alimentos
     CLEANING = "cleaning"                    # Limpeza
     HYGIENE = "hygiene"                      # Higiene Pessoal
+    PERSONAL_CARE = "personal_care"          # Cuidados Pessoais
     BABY = "baby"                            # Bebê
     PET = "pet"                              # Pet
     HOUSEHOLD = "household"                  # Utilidades
@@ -61,9 +63,11 @@ GROCERY_CATEGORY_DISPLAY = {
     GroceryCategory.FROZEN.value: "Congelados",
     GroceryCategory.CANNED.value: "Enlatados",
     GroceryCategory.GRAINS_PASTA.value: "Grãos e Massas",
+    GroceryCategory.GRAINS.value: "Grãos",
     GroceryCategory.CONDIMENTS.value: "Temperos",
     GroceryCategory.CLEANING.value: "Limpeza",
     GroceryCategory.HYGIENE.value: "Higiene",
+    GroceryCategory.PERSONAL_CARE.value: "Cuidados Pessoais",
     GroceryCategory.BABY.value: "Bebê",
     GroceryCategory.PET.value: "Pet",
     GroceryCategory.HOUSEHOLD.value: "Utilidades",
