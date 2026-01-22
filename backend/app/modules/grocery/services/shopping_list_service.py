@@ -383,10 +383,10 @@ class ShoppingListService:
                 ]
                 avg_cycle = sum(intervals) / len(intervals)
                 # Avoid division by zero and very short cycles
-                avg_cycle = max(avg_cycle, 1)
+                avg_cycle = max(avg_cycle, 3)  # Minimum 3 days to avoid same-day duplicates skewing
             else:
-                # If only 1 purchase, assume 30-day cycle
-                avg_cycle = 30
+                # If only 1 purchase, use configurable default cycle
+                avg_cycle = request.default_cycle_days
 
             # Calculate urgency score
             urgency_score = days_since_last / avg_cycle
