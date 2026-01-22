@@ -30,12 +30,33 @@ def _read_file_sync(file_path: str) -> bytes:
         return f.read()
 
 
-async def process_document_background(document_id: int, user_id: int, file_bytes: bytes, mime_type: str, filename: str):
+async def process_document_background(document_id: int, user_id: int, file_path: str, mime_type: str, filename: str):
     """
     Processa documento em background (fora do request context).
     Cria sua propria sessao do banco.
+    Recebe file_path ao inves de bytes para economizar memoria.
     """
+    import gc
+
     print(f"[DOC_BG] Iniciando processamento background: document_id={document_id}")
+
+    file_bytes = None
+    try:
+        # Ler arquivo do disco (em thread para nao bloquear)
+        file_bytes = await asyncio.to_thread(_read_file_sync, file_path)
+        print(f"[DOC_BG] Arquivo lido: {len(file_bytes)} bytes")
+    except Exception as e:
+        print(f"[DOC_BG] Erro ao ler arquivo {file_path}: {e}")
+        async with async_session_maker() as db:
+            result = await db.execute(
+                select(Document).where(Document.id == document_id)
+            )
+            document = result.scalar_one_or_none()
+            if document:
+                document.status = DocumentStatus.FAILED
+                document.error_message = f"Erro ao ler arquivo: {e}"
+                await db.commit()
+        return
 
     async with async_session_maker() as db:
         try:
@@ -70,20 +91,13 @@ async def process_document_background(document_id: int, user_id: int, file_bytes
             # Determinar se e PDF ou imagem
             is_pdf = mime_type == 'application/pdf' or filename.lower().endswith('.pdf')
 
-            if is_pdf:
-                from app.modules.documents.services.llm_ocr_service import LLMOCRService
-                if settings.mistral_api_key:
-                    llm_service = LLMOCRService(provider='mistral', model=settings.mistral_llm_model)
-                else:
-                    llm_service = LLMOCRService(provider='google', model=settings.vision_model or 'gemini-2.0-flash')
-                extraction_data = await llm_service.extract_from_image(file_bytes, mime_type, filename=filename)
+            from app.modules.documents.services.llm_ocr_service import LLMOCRService
+            if settings.mistral_api_key:
+                llm_service = LLMOCRService(provider='mistral', model=settings.mistral_llm_model)
             else:
-                from app.modules.documents.services.llm_ocr_service import LLMOCRService
-                if settings.mistral_api_key:
-                    llm_service = LLMOCRService(provider='mistral', model=settings.mistral_llm_model)
-                else:
-                    llm_service = LLMOCRService(provider='google', model=settings.vision_model or 'gemini-2.0-flash')
-                extraction_data = await llm_service.extract_from_image(file_bytes, mime_type, filename=filename)
+                llm_service = LLMOCRService(provider='google', model=settings.vision_model or 'gemini-2.0-flash')
+
+            extraction_data = await llm_service.extract_from_image(file_bytes, mime_type, filename=filename)
 
             # Verificar se houve erro
             if extraction_data is None or extraction_data.get('error'):
@@ -116,6 +130,11 @@ async def process_document_background(document_id: int, user_id: int, file_bytes
                     await db.commit()
             except Exception:
                 pass
+
+        finally:
+            # Cleanup explicito para liberar memoria
+            del file_bytes
+            gc.collect()
 
 
 class DocumentService:
@@ -167,12 +186,15 @@ class DocumentService:
         file_path = upload_dir / f"{file_hash}.{ext}"
         await asyncio.to_thread(_write_file_sync, file_path, content)
 
+        # Guardar tamanho antes de limpar content
+        content_size = len(content)
+
         # Criar registro com status PROCESSING
         document = Document(
             user_id=user.id,
             file_path=str(file_path),
             file_hash=file_hash,
-            file_size=len(content),
+            file_size=content_size,
             mime_type=file.content_type or f"application/{ext}",
             original_filename=file.filename or "unknown",
             status=DocumentStatus.PROCESSING,  # Ja marca como processing
@@ -181,12 +203,15 @@ class DocumentService:
         await self.db.flush()
         await self.db.refresh(document)
 
-        # Agendar processamento em background
+        # Limpar content da memoria - arquivo ja esta no disco
+        del content
+
+        # Agendar processamento em background (passa file_path ao inves de bytes)
         background_tasks.add_task(
             process_document_background,
             document.id,
             user.id,
-            content,
+            str(file_path),  # Passa path ao inves de bytes para economizar memoria
             file.content_type or f"application/{ext}",
             file.filename or "unknown",
         )

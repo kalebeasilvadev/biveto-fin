@@ -53,11 +53,15 @@ def compress_image_sync(image_bytes: bytes, max_size_mb: float = MAX_IMAGE_SIZE_
     """
     Comprime imagem se exceder tamanho maximo.
     Mantém qualidade aceitavel para OCR.
+    Otimizado para memoria: reutiliza buffer e fecha imagens explicitamente.
     """
+    import gc
+
     max_size = int(max_size_mb * 1024 * 1024)
     if len(image_bytes) <= max_size:
         return image_bytes
 
+    img = None
     try:
         from PIL import Image
 
@@ -65,41 +69,54 @@ def compress_image_sync(image_bytes: bytes, max_size_mb: float = MAX_IMAGE_SIZE_
 
         # Converter para RGB se necessario
         if img.mode in ('RGBA', 'P'):
+            old_img = img
             img = img.convert('RGB')
+            old_img.close()
+
+        # Usar um unico buffer reutilizado
+        buffer = io.BytesIO()
 
         # Tentar comprimir reduzindo qualidade
-        quality = 85
-        while quality >= 30:
-            buffer = io.BytesIO()
+        for quality in range(85, 25, -10):
+            buffer.seek(0)
+            buffer.truncate()
             img.save(buffer, format='JPEG', quality=quality, optimize=True)
-            compressed = buffer.getvalue()
-            if len(compressed) <= max_size:
-                print(f"[MistralProvider] Imagem comprimida: {len(image_bytes)} -> {len(compressed)} bytes (quality={quality})")
-                return compressed
-            quality -= 10
+            if buffer.tell() <= max_size:
+                result = buffer.getvalue()
+                print(f"[MistralProvider] Imagem comprimida: {len(image_bytes)} -> {len(result)} bytes (quality={quality})")
+                return result
 
         # Se ainda muito grande, redimensionar
         width, height = img.size
-        scale = 0.8
-        while scale >= 0.3:
-            new_width = int(width * scale)
-            new_height = int(height * scale)
-            resized = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
-            buffer = io.BytesIO()
+        for scale in [0.8, 0.7, 0.6, 0.5, 0.4, 0.3]:
+            new_size = (int(width * scale), int(height * scale))
+            resized = img.resize(new_size, Image.Resampling.LANCZOS)
+            buffer.seek(0)
+            buffer.truncate()
             resized.save(buffer, format='JPEG', quality=70, optimize=True)
-            compressed = buffer.getvalue()
-            if len(compressed) <= max_size:
-                print(f"[MistralProvider] Imagem redimensionada e comprimida: {len(image_bytes)} -> {len(compressed)} bytes (scale={scale})")
-                return compressed
-            scale -= 0.1
+            resized.close()  # Fechar imagem redimensionada imediatamente
+            if buffer.tell() <= max_size:
+                result = buffer.getvalue()
+                print(f"[MistralProvider] Imagem redimensionada e comprimida: {len(image_bytes)} -> {len(result)} bytes (scale={scale})")
+                return result
 
         # Retornar ultima tentativa mesmo se ainda grande
-        print(f"[MistralProvider] AVISO: Imagem ainda grande apos compressao: {len(compressed)} bytes")
-        return compressed
+        result = buffer.getvalue()
+        print(f"[MistralProvider] AVISO: Imagem ainda grande apos compressao: {len(result)} bytes")
+        return result
 
     except Exception as e:
         print(f"[MistralProvider] Erro ao comprimir imagem: {e}")
         return image_bytes
+
+    finally:
+        # Fechar imagem e forcar GC
+        if img is not None:
+            try:
+                img.close()
+            except Exception:
+                pass
+        gc.collect()
 
 
 class MistralProvider(BaseProvider):
@@ -230,16 +247,23 @@ class MistralProvider(BaseProvider):
         return await self._images_to_pdf([(image_content, mime_type)])
 
     async def _images_to_pdf(self, images: list[tuple[bytes, str]]) -> bytes:
-        """Converte multiplas imagens para um unico PDF, dividindo páginas muito longas"""
+        """
+        Converte multiplas imagens para um unico PDF, dividindo páginas muito longas.
+        Otimizado para memoria: fecha imagens explicitamente e roda gc.collect() periodicamente.
+        """
+        import gc
         from PIL import Image
 
-        def _split_long_image(img: Image.Image, max_ratio: float = 3.0) -> list[Image.Image]:
-            """Divide uma imagem muito longa em seções verticais menores"""
+        def _split_long_image(img: Image.Image, max_ratio: float = 3.0) -> tuple[list[Image.Image], bool]:
+            """
+            Divide uma imagem muito longa em seções verticais menores.
+            Retorna (sections, was_split) para saber se deve fechar a imagem original.
+            """
             width, height = img.size
             ratio = height / width
 
             if ratio <= max_ratio:
-                return [img]
+                return [img], False
 
             # Calcular quantas seções precisamos
             num_sections = int(ratio / max_ratio) + 1
@@ -257,33 +281,68 @@ class MistralProvider(BaseProvider):
                 sections.append(section)
 
             print(f"[MistralProvider] Imagem longa detectada (ratio={ratio:.1f}), dividida em {len(sections)} seções")
-            return sections
+            return sections, True
 
         def _convert():
             pdf_images = []
-            for img_content, _ in images:
-                # Comprimir imagem antes de converter para PDF
-                img_content = compress_image_sync(img_content)
 
-                img = Image.open(io.BytesIO(img_content))
-                if img.mode in ('RGBA', 'P'):
-                    img = img.convert('RGB')
+            for idx, (img_content, _) in enumerate(images):
+                img = None
+                try:
+                    # Comprimir imagem antes de converter para PDF
+                    img_content = compress_image_sync(img_content)
 
-                # Dividir se for muito longa
-                sections = _split_long_image(img)
-                pdf_images.extend(sections)
+                    img = Image.open(io.BytesIO(img_content))
+                    if img.mode in ('RGBA', 'P'):
+                        old_img = img
+                        img = img.convert('RGB')
+                        old_img.close()
 
+                    # Dividir se for muito longa
+                    sections, was_split = _split_long_image(img)
+                    pdf_images.extend(sections)
+
+                    # Se foi dividido, fechar a imagem original (as sections sao novas)
+                    if was_split:
+                        img.close()
+                        img = None  # Evitar fechar novamente no finally
+
+                finally:
+                    # Liberar referencia dos bytes da imagem
+                    del img_content
+
+                # GC a cada 3 imagens para evitar pico de memoria
+                if (idx + 1) % 3 == 0:
+                    gc.collect()
+
+            # Criar PDF
             output = io.BytesIO()
-            if len(pdf_images) == 1:
-                pdf_images[0].save(output, format='PDF')
-            else:
-                pdf_images[0].save(output, format='PDF', save_all=True, append_images=pdf_images[1:])
-            return output.getvalue()
+            try:
+                if len(pdf_images) == 1:
+                    pdf_images[0].save(output, format='PDF')
+                else:
+                    pdf_images[0].save(output, format='PDF', save_all=True, append_images=pdf_images[1:])
+                result = output.getvalue()
+            finally:
+                # Fechar todas as imagens do PDF
+                for img in pdf_images:
+                    try:
+                        img.close()
+                    except Exception:
+                        pass
+                pdf_images.clear()
+                gc.collect()
+
+            return result
 
         return await asyncio.to_thread(_convert)
 
     async def _split_long_pdf(self, pdf_content: bytes, max_ratio: float = 3.0) -> bytes:
-        """Detecta e divide PDFs com páginas muito longas"""
+        """
+        Detecta e divide PDFs com páginas muito longas.
+        Otimizado para memoria: processa pagina por pagina e libera recursos imediatamente.
+        """
+        import gc
         import io
         from PIL import Image
 
@@ -295,63 +354,85 @@ class MistralProvider(BaseProvider):
 
         def _process():
             doc = fitz.open(stream=pdf_content, filetype="pdf")
-            needs_split = False
-            all_images = []
 
+            # Primeira passagem: apenas verificar se precisa dividir (sem armazenar imagens)
+            needs_split = False
             for page_num in range(len(doc)):
                 page = doc[page_num]
-                # Renderizar página como imagem
-                mat = fitz.Matrix(2, 2)  # 2x zoom para melhor qualidade
-                pix = page.get_pixmap(matrix=mat)
-
-                # Verificar proporção
-                ratio = pix.height / pix.width
+                rect = page.rect
+                ratio = rect.height / rect.width
                 if ratio > max_ratio:
                     needs_split = True
-
-                # Converter para PIL Image
-                img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-                all_images.append(img)
-
-            doc.close()
+                    break
 
             if not needs_split:
+                doc.close()
                 return pdf_content
 
-            print(f"[MistralProvider] PDF com página longa detectado, processando {len(all_images)} página(s)...")
+            print(f"[MistralProvider] PDF com página longa detectado, processando {len(doc)} página(s)...")
 
-            # Dividir imagens longas
+            # Segunda passagem: processar pagina por pagina
             final_images = []
-            for img in all_images:
-                width, height = img.size
-                ratio = height / width
 
-                if ratio <= max_ratio:
-                    final_images.append(img)
+            try:
+                for page_num in range(len(doc)):
+                    page = doc[page_num]
+                    mat = fitz.Matrix(2, 2)  # 2x zoom para melhor qualidade
+                    pix = page.get_pixmap(matrix=mat)
+
+                    # Converter para PIL Image
+                    img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+
+                    # Liberar pixmap imediatamente
+                    del pix
+
+                    width, height = img.size
+                    ratio = height / width
+
+                    if ratio <= max_ratio:
+                        final_images.append(img)
+                    else:
+                        # Dividir a imagem
+                        num_sections = int(ratio / max_ratio) + 1
+                        section_height = height // num_sections
+                        overlap = max(100, int(section_height * 0.10))
+
+                        for i in range(num_sections):
+                            top = max(0, i * section_height - (overlap if i > 0 else 0))
+                            bottom = min(height, (i + 1) * section_height + (overlap if i < num_sections - 1 else 0))
+                            section = img.crop((0, top, width, bottom))
+                            final_images.append(section)
+
+                        # Fechar imagem original apos dividir (as sections sao novas)
+                        img.close()
+                        print(f"[MistralProvider] Página {page_num + 1} dividida em {num_sections} seções")
+
+                    # GC periodico
+                    if (page_num + 1) % 3 == 0:
+                        gc.collect()
+
+                doc.close()
+
+                # Reconverter para PDF
+                output = io.BytesIO()
+                if len(final_images) == 1:
+                    final_images[0].save(output, format='PDF')
                 else:
-                    # Dividir a imagem
-                    num_sections = int(ratio / max_ratio) + 1
-                    section_height = height // num_sections
-                    # Overlap de 10% da altura da seção para não cortar texto
-                    overlap = max(100, int(section_height * 0.10))
+                    final_images[0].save(output, format='PDF', save_all=True, append_images=final_images[1:])
 
-                    for i in range(num_sections):
-                        top = max(0, i * section_height - (overlap if i > 0 else 0))
-                        bottom = min(height, (i + 1) * section_height + (overlap if i < num_sections - 1 else 0))
-                        section = img.crop((0, top, width, bottom))
-                        final_images.append(section)
+                result = output.getvalue()
+                print(f"[MistralProvider] PDF recriado com {len(final_images)} páginas")
+                return result
 
-                    print(f"[MistralProvider] Página dividida em {num_sections} seções")
-
-            # Reconverter para PDF
-            output = io.BytesIO()
-            if len(final_images) == 1:
-                final_images[0].save(output, format='PDF')
-            else:
-                final_images[0].save(output, format='PDF', save_all=True, append_images=final_images[1:])
-
-            print(f"[MistralProvider] PDF recriado com {len(final_images)} páginas")
-            return output.getvalue()
+            finally:
+                # Cleanup: fechar todas as imagens
+                for img in final_images:
+                    try:
+                        img.close()
+                    except Exception:
+                        pass
+                final_images.clear()
+                gc.collect()
 
         return await asyncio.to_thread(_process)
 
