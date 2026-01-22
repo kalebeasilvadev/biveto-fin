@@ -1,7 +1,7 @@
 import secrets
 from datetime import date, datetime, timedelta
 from fastapi import APIRouter, HTTPException, status
-from sqlalchemy import select, func
+from sqlalchemy import select, func, delete
 
 from app.core.deps import CurrentUser, DbSession
 from app.core.config import settings
@@ -502,8 +502,78 @@ async def delete_license(
             detail=f"Nao e possivel deletar. {user_count} usuario(s) vinculado(s)."
         )
 
+    # Delete related invitations first
+    await db.execute(
+        delete(Invitation).where(Invitation.license_id == license.id)
+    )
+
     await db.delete(license)
     await db.commit()
+
+
+@router.post("/licenses/{license_id}/resend-invitation", status_code=status.HTTP_200_OK)
+async def resend_license_invitation(
+    license_id: int,
+    current_user: CurrentUser,
+    db: DbSession,
+):
+    """Reenvia o convite de uma licenca e reseta a expiracao"""
+    require_admin(current_user)
+
+    # Verificar se licenca existe
+    result = await db.execute(select(License).where(License.id == license_id))
+    license = result.scalar_one_or_none()
+
+    if not license:
+        raise HTTPException(status_code=404, detail="Licenca nao encontrada")
+
+    if not license.owner_email:
+        raise HTTPException(status_code=400, detail="Licenca nao tem email de proprietario")
+
+    # Verificar se ja existe usuario cadastrado
+    if license.owner_user_id:
+        raise HTTPException(status_code=400, detail="Proprietario ja cadastrado")
+
+    # Buscar convite pendente/expirado para esta licenca
+    invitation = await db.scalar(
+        select(Invitation).where(
+            Invitation.license_id == license_id,
+            Invitation.status.in_([InvitationStatus.PENDING, InvitationStatus.EXPIRED])
+        )
+    )
+
+    if not invitation:
+        # Criar novo convite se nao existir
+        invitation = Invitation(
+            email=license.owner_email,
+            license_id=license_id,
+            invited_by_id=current_user.id,
+        )
+        db.add(invitation)
+    else:
+        # Reset expiracao
+        invitation.expires_at = utc_now() + timedelta(hours=48)
+        if invitation.status == InvitationStatus.EXPIRED:
+            invitation.status = InvitationStatus.PENDING
+
+    await db.commit()
+    await db.refresh(invitation)
+
+    # Enviar email
+    invite_url = f"{settings.frontend_url}/invite/{invitation.token}"
+    email_sent = email_service.send_invitation(
+        to_email=invitation.email,
+        invite_url=invite_url,
+        inviter_name=current_user.name,
+    )
+
+    if not email_sent:
+        raise HTTPException(status_code=500, detail="Falha ao enviar email")
+
+    return {
+        "message": "Convite reenviado com sucesso",
+        "expires_at": invitation.expires_at.isoformat()
+    }
 
 
 # ========== Users ==========
@@ -849,7 +919,7 @@ async def resend_invitation(
     current_user: CurrentUser,
     db: DbSession,
 ):
-    """Reenvia email de convite"""
+    """Reenvia email de convite e reseta a expiracao"""
     require_admin(current_user)
 
     result = await db.execute(select(Invitation).where(Invitation.id == invitation_id))
@@ -858,8 +928,20 @@ async def resend_invitation(
     if not invitation:
         raise HTTPException(status_code=404, detail="Convite nao encontrado")
 
-    if invitation.status != InvitationStatus.PENDING:
-        raise HTTPException(status_code=400, detail="Convite nao esta pendente")
+    if invitation.status == InvitationStatus.ACCEPTED:
+        raise HTTPException(status_code=400, detail="Convite ja foi aceito")
+
+    if invitation.status == InvitationStatus.CANCELLED:
+        raise HTTPException(status_code=400, detail="Convite foi cancelado")
+
+    # Reset expiration to 48 hours from now
+    invitation.expires_at = utc_now() + timedelta(hours=48)
+
+    # If expired, set back to pending
+    if invitation.status == InvitationStatus.EXPIRED:
+        invitation.status = InvitationStatus.PENDING
+
+    await db.commit()
 
     # Enviar email novamente
     invite_url = f"{settings.frontend_url}/invite/{invitation.token}"
@@ -872,7 +954,10 @@ async def resend_invitation(
     if not email_sent:
         raise HTTPException(status_code=500, detail="Falha ao enviar email")
 
-    return {"message": "Email reenviado com sucesso"}
+    return {
+        "message": "Email reenviado e expiracao resetada",
+        "expires_at": invitation.expires_at.isoformat()
+    }
 
 
 @router.delete("/invitations/{invitation_id}", status_code=status.HTTP_204_NO_CONTENT)

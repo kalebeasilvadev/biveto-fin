@@ -109,7 +109,7 @@ export interface Document {
   payment_info?: PaymentInfo
 }
 
-export type UploadMode = 'select' | 'upload' | 'camera' | 'camera-multi' | 'gallery-multi' | 'manual' | 'confirm'
+export type UploadMode = 'select' | 'upload' | 'camera' | 'manual' | 'confirm'
 
 export interface TransactionFormData {
   amount: string

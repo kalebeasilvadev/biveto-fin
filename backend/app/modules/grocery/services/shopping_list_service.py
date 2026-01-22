@@ -311,10 +311,10 @@ class ShoppingListService:
     async def generate_from_history(
         self, user: User, request: ShoppingListGenerateRequest
     ) -> ShoppingList:
-        """Generate shopping list based on purchase history"""
+        """Generate shopping list based on purchase history with urgency score"""
         household_user_ids = await get_household_user_ids(self.db, user)
 
-        # Get purchases from the specified period
+        # Get purchases from the specified period (90 days by default)
         start_date = date.today() - timedelta(days=request.period_days)
 
         query = select(GroceryPurchase).where(
@@ -334,9 +334,9 @@ class ShoppingListService:
         result = await self.db.execute(query)
         purchases = result.scalars().all()
 
-        # Group by product name and calculate frequency
+        # Group by product and collect purchase dates for cycle calculation
         product_stats: dict[str, dict] = defaultdict(lambda: {
-            "count": 0,
+            "purchases": [],  # List of purchases to calculate cycle
             "total_quantity": 0,
             "category": GroceryCategory.OTHER.value,
             "necessity_type": NecessityType.ESSENTIAL.value,
@@ -348,7 +348,10 @@ class ShoppingListService:
         for purchase in purchases:
             name = purchase.product_name.lower().strip()
             stats = product_stats[name]
-            stats["count"] += 1
+            stats["purchases"].append({
+                "date": purchase.purchase_date,
+                "quantity": float(purchase.quantity),
+            })
             stats["total_quantity"] += float(purchase.quantity)
             stats["category"] = purchase.category
             stats["necessity_type"] = purchase.necessity_type
@@ -356,32 +359,69 @@ class ShoppingListService:
             stats["product_id"] = purchase.product_id
             stats["last_price"] = float(purchase.unit_price)
 
-        # Filter by minimum frequency and calculate average quantity
+        # Calculate urgency score for each product
         items_to_add = []
-        for name, stats in product_stats.items():
-            if stats["count"] >= request.min_frequency:
-                avg_quantity = stats["total_quantity"] / stats["count"]
-                items_to_add.append({
-                    "name": name.title(),
-                    "quantity": round(avg_quantity, 2),
-                    "unit": stats["unit"],
-                    "category": stats["category"],
-                    "necessity_type": stats["necessity_type"],
-                    "product_id": stats["product_id"],
-                    "estimated_price": stats["last_price"],
-                    "frequency": stats["count"],
-                })
+        today = date.today()
 
-        # Sort by frequency (most frequent first), then by necessity (essential first)
+        for name, stats in product_stats.items():
+            purchase_count = len(stats["purchases"])
+
+            # Filter by minimum frequency
+            if purchase_count < request.min_frequency:
+                continue
+
+            # Sort purchases by date
+            purchase_dates = sorted([p["date"] for p in stats["purchases"]])
+            last_purchase_date = purchase_dates[-1]
+            days_since_last = (today - last_purchase_date).days
+
+            # Calculate average repurchase cycle
+            if purchase_count >= 2:
+                intervals = [
+                    (purchase_dates[i + 1] - purchase_dates[i]).days
+                    for i in range(len(purchase_dates) - 1)
+                ]
+                avg_cycle = sum(intervals) / len(intervals)
+                # Avoid division by zero and very short cycles
+                avg_cycle = max(avg_cycle, 1)
+            else:
+                # If only 1 purchase, assume 30-day cycle
+                avg_cycle = 30
+
+            # Calculate urgency score
+            urgency_score = days_since_last / avg_cycle
+
+            # Filter by minimum urgency (exclude recent purchases)
+            if urgency_score < request.min_urgency:
+                continue
+
+            # Calculate average quantity
+            avg_quantity = stats["total_quantity"] / purchase_count
+
+            items_to_add.append({
+                "name": name.title(),
+                "quantity": round(avg_quantity, 2),
+                "unit": stats["unit"],
+                "category": stats["category"],
+                "necessity_type": stats["necessity_type"],
+                "product_id": stats["product_id"],
+                "estimated_price": stats["last_price"],
+                "frequency": purchase_count,
+                "urgency_score": urgency_score,
+                "avg_cycle_days": round(avg_cycle, 1),
+                "days_since_last": days_since_last,
+            })
+
+        # Sort by: essentials first, then urgency (highest first)
         items_to_add.sort(
             key=lambda x: (
                 x["necessity_type"] != NecessityType.ESSENTIAL.value,
-                -x["frequency"],
+                -x["urgency_score"],  # Higher urgency first
             )
         )
 
         # Create the shopping list
-        list_name = request.name or f"Lista Sugerida - {date.today().strftime('%d/%m/%Y')}"
+        list_name = request.name or f"Lista Sugerida - {today.strftime('%d/%m/%Y')}"
 
         shopping_list = ShoppingList(
             user_id=user.id,
@@ -390,14 +430,19 @@ class ShoppingListService:
             status=ShoppingListStatus.DRAFT.value,
             source=ShoppingListSource.AI_GENERATED.value,
             ownership_type="household",
-            notes=f"Gerada automaticamente com base nos últimos {request.period_days} dias de compras.",
+            notes=f"Gerada com base nos últimos {request.period_days} dias. "
+                  f"Itens ordenados por urgência de recompra. "
+                  f"Total: {len(items_to_add)} itens.",
         )
         self.db.add(shopping_list)
         await self.db.flush()
 
-        # Add items with priority based on necessity
-        for idx, item_data in enumerate(items_to_add):
+        # Add items with priority based on necessity and urgency
+        for item_data in items_to_add:
             priority = 2 if item_data["necessity_type"] == NecessityType.ESSENTIAL.value else 0
+            # Increase priority for very urgent items
+            if item_data["urgency_score"] > 1.5:
+                priority += 1
 
             item = ShoppingListItem(
                 list_id=shopping_list.id,
@@ -409,6 +454,7 @@ class ShoppingListService:
                 category=item_data["category"],
                 necessity_type=item_data["necessity_type"],
                 priority=priority,
+                notes=f"Ciclo: ~{item_data['avg_cycle_days']}d | Última compra: {item_data['days_since_last']}d atrás",
             )
             self.db.add(item)
 

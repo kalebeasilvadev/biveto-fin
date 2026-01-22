@@ -490,6 +490,12 @@ export const adminApi = {
   createLicense: (data: unknown) => api.post('/admin/licenses', data),
   updateLicense: (id: number, data: unknown) => api.patch(`/admin/licenses/${id}`, data),
   deleteLicense: (id: number) => api.delete(`/admin/licenses/${id}`),
+  resendLicenseInvitation: (licenseId: number) => api.post(`/admin/licenses/${licenseId}/resend-invitation`),
+
+  // Invitations
+  listInvitations: () => api.get('/admin/invitations'),
+  resendInvitation: (id: number) => api.post(`/admin/invitations/${id}/resend`),
+  cancelInvitation: (id: number) => api.delete(`/admin/invitations/${id}`),
 }
 
 export const familyApi = {

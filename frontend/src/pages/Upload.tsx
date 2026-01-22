@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { documentsApi, transactionsApi, accountsApi, categoriesApi, familyApi, creditCardsApi, invoicesApi, recurringApi, benefitCardsApi, receiptsApi, getApiErrorMessage } from '../services/api'
+import { useUploadStore } from '../stores/uploadStore'
 import { X, CreditCard, Repeat, Plus, AlertCircle, Check, Wallet } from 'lucide-react'
 import {
   Document,
@@ -32,6 +33,11 @@ export default function Upload() {
   const [searchParams, setSearchParams] = useSearchParams()
   const queryClient = useQueryClient()
 
+  // Pending file from FAB
+  const pendingFile = useUploadStore((state) => state.pendingFile)
+  const clearPendingFile = useUploadStore((state) => state.clearPendingFile)
+  const pendingFileProcessed = useRef(false)
+
   // Initialize mode from URL parameter and track if came directly from URL
   const initialMode = searchParams.get('mode') === 'manual' ? 'manual' : 'select'
   const [cameFromUrl] = useState(() => searchParams.get('mode') === 'manual')
@@ -43,6 +49,18 @@ export default function Upload() {
       setSearchParams({}, { replace: true })
     }
   }, [mode, searchParams, setSearchParams])
+
+  // Process pending file from FAB on mount
+  useEffect(() => {
+    if (pendingFile && !pendingFileProcessed.current) {
+      pendingFileProcessed.current = true
+      // Clear the pending file from store
+      clearPendingFile()
+      // Trigger upload
+      handleFileUpload(pendingFile)
+    }
+  }, [pendingFile]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const [document, setDocument] = useState<Document | null>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [formData, setFormData] = useState<TransactionFormData>(initialFormData)
@@ -254,14 +272,6 @@ export default function Upload() {
     onSuccess: handleUploadSuccess,
     onError: (error: unknown) => {
       setUploadError(getApiErrorMessage(error, 'Erro ao processar documento'))
-    },
-  })
-
-  const uploadBatchMutation = useMutation({
-    mutationFn: (files: File[]) => documentsApi.uploadBatch(files),
-    onSuccess: handleUploadSuccess,
-    onError: (error: unknown) => {
-      setUploadError(getApiErrorMessage(error, 'Erro ao processar documentos'))
     },
   })
 
@@ -708,10 +718,6 @@ export default function Upload() {
   // Handlers
   const handleFileUpload = (file: File) => {
     uploadMutation.mutate(file)
-  }
-
-  const handleBatchUpload = (files: File[]) => {
-    uploadBatchMutation.mutate(files)
   }
 
   const handleManualSubmit = () => {
@@ -1207,30 +1213,14 @@ export default function Upload() {
     )
   }
 
-  // Render camera-multi mode (multiple photos for large receipts)
-  if (mode === 'camera-multi') {
-    return (
-      <CameraCapture
-        onCapture={handleFileUpload}
-        onCaptureBatch={handleBatchUpload}
-        onCancel={() => setMode('select')}
-        isUploading={uploadBatchMutation.isPending}
-        uploadError={uploadError}
-        allowMultiple={true}
-      />
-    )
-  }
-
-  // Render selection screen
+  // Render selection screen (fallback for desktop)
   if (mode === 'select') {
     return (
       <UploadSelector
         onCameraClick={() => setMode('camera')}
-        onCameraMultiClick={() => setMode('camera-multi')}
         onFileSelect={handleFileUpload}
-        onFilesSelect={handleBatchUpload}
         onManualClick={() => setMode('manual')}
-        isUploading={uploadMutation.isPending || uploadBatchMutation.isPending}
+        isUploading={uploadMutation.isPending}
         uploadError={uploadError}
       />
     )

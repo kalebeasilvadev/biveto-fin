@@ -32,7 +32,6 @@ import {
   ArrowLeftRight,
   Wrench,
   LucideIcon,
-  Camera,
   ShoppingCart,
   Ticket,
   Store,
@@ -42,6 +41,8 @@ import { clsx } from 'clsx'
 import api from '../services/api'
 import FloatingAssistant from './FloatingAssistant'
 import ToastContainer from './shared/ToastContainer'
+import SemicircleFAB from './SemicircleFAB'
+import { useUploadStore } from '../stores/uploadStore'
 import InstallPromptBanner from './InstallPromptBanner'
 import IOSInstallModal from './IOSInstallModal'
 import { usePWAInstall } from '../hooks/usePWAInstall'
@@ -275,6 +276,7 @@ function NavGroupComponent({ group, isOpen, onToggle, isMobile = false, currentP
 export default function Layout() {
   const [showIOSInstallModal, setShowIOSInstallModal] = useState(false)
   const [fabMenuOpen, setFabMenuOpen] = useState(false)
+  const setPendingFile = useUploadStore((state) => state.setPendingFile)
   const logout = useAuthStore((state) => state.logout)
   const user = useAuthStore((state) => state.user)
   const setUser = useAuthStore((state) => state.setUser)
@@ -352,6 +354,12 @@ export default function Layout() {
   const handleLogout = () => {
     logout()
     navigate('/login')
+  }
+
+  // Handle file selection from SemicircleFAB
+  const handleFabFileSelect = (file: File) => {
+    setPendingFile(file)
+    navigate('/upload')
   }
 
   return (
@@ -663,74 +671,18 @@ export default function Layout() {
         onClose={() => setShowIOSInstallModal(false)}
       />
 
-      {/* FAB Menu Overlay */}
-      {fabMenuOpen && (
-        <div
-          className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40 lg:hidden"
-          onClick={() => setFabMenuOpen(false)}
-        />
-      )}
-
       {/* Mobile Bottom Navigation */}
       <nav className="bottom-nav" role="navigation" aria-label="Navegação principal mobile">
         {bottomNavItems.map((item, index) => {
-          // FAB Primary Button
+          // FAB Primary Button - Use SemicircleFAB
           if (item.primary) {
             return (
-              <div key={item.to || index} className="relative -mt-5 flex-1 flex justify-center">
-                {/* FAB Expanded Menu */}
-                <div
-                  className={clsx(
-                    'absolute bottom-full mb-3 left-1/2 -translate-x-1/2 flex flex-col gap-2 transition-all duration-200',
-                    fabMenuOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'
-                  )}
-                >
-                  {/* Importar Option */}
-                  <NavLink
-                    to="/upload"
-                    onClick={() => setFabMenuOpen(false)}
-                    className="flex items-center gap-3 px-4 py-3 bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-gray-100 dark:border-slate-700 min-w-[160px]"
-                  >
-                    <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
-                      <Camera size={20} className="text-amber-600 dark:text-amber-400" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-gray-900 dark:text-white text-sm">Importar</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">Foto ou arquivo</p>
-                    </div>
-                  </NavLink>
-
-                  {/* Nova Transação Option */}
-                  <NavLink
-                    to="/upload?mode=manual"
-                    onClick={() => setFabMenuOpen(false)}
-                    className="flex items-center gap-3 px-4 py-3 bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-gray-100 dark:border-slate-700 min-w-[160px]"
-                  >
-                    <div className="w-10 h-10 rounded-xl bg-biveto-light dark:bg-biveto/20 flex items-center justify-center">
-                      <Plus size={20} className="text-biveto" />
-                    </div>
-                    <div className="text-left">
-                      <p className="font-medium text-gray-900 dark:text-white text-sm">Nova Transação</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">Adicionar manual</p>
-                    </div>
-                  </NavLink>
-                </div>
-
-                {/* Main FAB Button */}
-                <button
-                  onClick={() => setFabMenuOpen(!fabMenuOpen)}
-                  aria-label="Adicionar"
-                  aria-expanded={fabMenuOpen}
-                  className="relative"
-                >
-                  <div className={clsx(
-                    'w-14 h-14 rounded-2xl gradient-biveto shadow-lg shadow-biveto/30 flex items-center justify-center text-white transition-all duration-200',
-                    fabMenuOpen ? 'rotate-45 scale-95' : 'active:scale-95'
-                  )}>
-                    <Plus size={26} strokeWidth={2.5} aria-hidden="true" />
-                  </div>
-                </button>
-              </div>
+              <SemicircleFAB
+                key={item.to || index}
+                onFileSelect={handleFabFileSelect}
+                isOpen={fabMenuOpen}
+                onToggle={setFabMenuOpen}
+              />
             )
           }
 

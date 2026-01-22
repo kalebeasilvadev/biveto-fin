@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { adminApi } from '../../services/api'
-import { Plus, Trash2, Edit2, Copy, X, Check, AlertCircle, Mail, UserMinus } from 'lucide-react'
+import { Plus, Trash2, Edit2, Copy, X, Check, AlertCircle, Mail, UserMinus, RefreshCw } from 'lucide-react'
 import { clsx } from 'clsx'
 
 interface ExistingUserInfo {
@@ -115,6 +115,18 @@ export default function AdminLicenses() {
     mutationFn: (id: number) => adminApi.deleteLicense(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-licenses'] })
+    },
+  })
+
+  const resendInvitationMutation = useMutation({
+    mutationFn: (licenseId: number) => adminApi.resendLicenseInvitation(licenseId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-licenses'] })
+      alert('Convite reenviado com sucesso!')
+    },
+    onError: (error: unknown) => {
+      const err = error as { response?: { data?: { detail?: string } } }
+      alert(err.response?.data?.detail || 'Erro ao reenviar convite')
     },
   })
 
@@ -267,9 +279,24 @@ export default function AdminLicenses() {
                     <span className="text-sm text-gray-500">({license.owner_name})</span>
                   )}
                   {!license.owner_name && license.owner_email && (
-                    <span className="text-xs px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full">
-                      pendente
-                    </span>
+                    <>
+                      <span className="text-xs px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full">
+                        pendente
+                      </span>
+                      <button
+                        onClick={() => {
+                          if (confirm('Reenviar convite e resetar expiração?')) {
+                            resendInvitationMutation.mutate(license.id)
+                          }
+                        }}
+                        disabled={resendInvitationMutation.isPending}
+                        className="text-xs px-2 py-0.5 bg-primary-100 dark:bg-primary-900/50 text-primary-700 dark:text-primary-300 rounded-full hover:bg-primary-200 dark:hover:bg-primary-900/70 flex items-center gap-1"
+                        title="Reenviar convite e resetar expiração"
+                      >
+                        <RefreshCw size={12} className={resendInvitationMutation.isPending ? 'animate-spin' : ''} />
+                        Reenviar
+                      </button>
+                    </>
                   )}
                 </div>
 
