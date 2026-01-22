@@ -823,8 +823,8 @@ export const groceryApi = {
     api.get('/grocery/lists', { params }),
   createShoppingList: (data: { name: string; notes?: string; items?: unknown[] }) =>
     api.post('/grocery/lists', data),
-  generateShoppingList: (data: { period_days?: number; min_frequency?: number; include_non_essential?: boolean; name?: string }) =>
-    api.post('/grocery/lists/generate', data),
+  generateShoppingList: (data: { period_days?: number; include_non_essential?: boolean; filter_non_grocery?: boolean; name?: string }) =>
+    api.post('/grocery/lists/generate-smart', data),
   getShoppingList: (id: number) =>
     api.get(`/grocery/lists/${id}`),
   updateShoppingList: (id: number, data: unknown) =>

@@ -195,7 +195,7 @@ export default function Market() {
   })
 
   const generateListMutation = useMutation({
-    mutationFn: (data: { period_days?: number; min_frequency?: number; include_non_essential?: boolean }) =>
+    mutationFn: (data: { period_days?: number; include_non_essential?: boolean; filter_non_grocery?: boolean }) =>
       groceryApi.generateShoppingList(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['shopping-lists'] })

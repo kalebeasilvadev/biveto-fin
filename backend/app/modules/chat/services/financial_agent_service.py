@@ -21,8 +21,8 @@ from app.models.user import User
 from app.models.transaction import Transaction, TransactionType
 from app.models.category import Category
 from app.models.merchant import Merchant
-from app.models.debt import Debt, DebtStatus
-from app.models.goal import Goal
+from app.models.debt import Debt, DebtStatus, DebtPayment
+from app.models.goal import Goal, GoalContribution
 from app.models.budget import Budget, BudgetItem
 from app.models.account import Account
 from app.models.household import HouseholdMember
@@ -30,6 +30,9 @@ from app.models.credit_card import CreditCard
 from app.models.credit_card_invoice import CreditCardInvoice, InvoiceStatus
 from app.models.income_source import IncomeSource
 from app.models.chat import ChatConversation, ChatMessage, MessageRole
+from app.models.installment import InstallmentSeries, InstallmentSeriesStatus
+from app.models.recurring import RecurringTransaction, RecurringStatus
+from app.models.benefit_card import BenefitCard
 from app.modules.chat.schemas.chat import ChatResponse
 
 # Limite de mensagens por conversa para evitar vazamento de memória
@@ -634,115 +637,348 @@ class FinancialAgentService:
 
         context["fontes_receita"] = fontes_receita
 
+        # 14. Parcelas ativas (InstallmentSeries)
+        context["parcelas_ativas"] = await self._get_installment_series(user)
+
+        # 15. Despesas recorrentes (assinaturas)
+        context["recorrentes"] = await self._get_recurring_transactions(user)
+
+        # 16. Projecao de faturas futuras
+        context["faturas_futuras"] = await self._get_future_invoices(user, context)
+
+        # 17. Cartoes de beneficio (VA/VR/VT)
+        context["beneficios"] = await self._get_benefit_cards(user)
+
+        # 18. Health score do orcamento
+        context["saude_financeira"] = await self._get_budget_health(user)
+
+        # 19. Estrategia de dividas (se houver dividas)
+        if context.get("dividas"):
+            context["estrategia_dividas"] = await self._get_debt_strategy(user)
+
         return context
 
+    async def _get_installment_series(self, user: User) -> list[dict]:
+        """Busca parcelas ativas com projecao"""
+        result = await self.db.execute(
+            select(InstallmentSeries).where(
+                InstallmentSeries.user_id == user.id,
+                InstallmentSeries.status == InstallmentSeriesStatus.ACTIVE.value
+            ).order_by(InstallmentSeries.installment_amount.desc())
+        )
+        series_list = result.scalars().all()
+
+        parcelas = []
+        today = date.today()
+        for s in series_list:
+            # Calcular data de termino estimada
+            remaining = s.installment_count - s.paid_count
+            end_date = today + relativedelta(months=remaining)
+
+            parcelas.append({
+                "descricao": s.description,
+                "estabelecimento": s.merchant_name,
+                "valor_parcela": float(s.installment_amount),
+                "valor_total": float(s.total_amount),
+                "parcelas_totais": s.installment_count,
+                "parcelas_pagas": s.paid_count,
+                "parcelas_restantes": remaining,
+                "valor_restante": float(s.installment_amount * remaining),
+                "termino_previsto": end_date.strftime("%m/%Y")
+            })
+
+        return parcelas
+
+    async def _get_recurring_transactions(self, user: User) -> list[dict]:
+        """Busca despesas recorrentes/assinaturas ativas"""
+        result = await self.db.execute(
+            select(RecurringTransaction).where(
+                RecurringTransaction.user_id == user.id,
+                RecurringTransaction.status == RecurringStatus.ACTIVE.value,
+                RecurringTransaction.type == "expense"
+            ).order_by(RecurringTransaction.amount.desc())
+        )
+        recurring_list = result.scalars().all()
+
+        # Buscar categorias
+        category_ids = [r.category_id for r in recurring_list if r.category_id]
+        categories: dict[int | None, str] = {}
+        if category_ids:
+            cat_result = await self.db.execute(
+                select(Category).where(Category.id.in_(category_ids))
+            )
+            categories = {c.id: c.name for c in cat_result.scalars().all()}
+
+        recorrentes = []
+        for r in recurring_list:
+            freq_display = {
+                "daily": "diario",
+                "weekly": "semanal",
+                "monthly": "mensal",
+                "yearly": "anual"
+            }.get(r.frequency, r.frequency)
+
+            recorrentes.append({
+                "nome": r.name,
+                "valor": float(r.amount),
+                "frequencia": freq_display,
+                "categoria": categories.get(r.category_id, "Sem categoria"),
+                "proximo_vencimento": r.next_due_date.strftime("%d/%m/%Y") if r.next_due_date else None,
+                "dia_do_mes": r.day_of_month
+            })
+
+        return recorrentes
+
+    async def _get_future_invoices(self, user: User, context: dict) -> list[dict]:
+        """Projeta faturas dos proximos 3 meses baseado em parcelas e recorrentes"""
+        today = date.today()
+        projecao = []
+
+        # Soma de parcelas ativas por mes
+        parcelas = context.get("parcelas_ativas", [])
+        total_parcelas_mes = sum(p.get("valor_parcela", 0) for p in parcelas)
+
+        # Soma de recorrentes mensais
+        recorrentes = context.get("recorrentes", [])
+        total_recorrentes_mes = sum(
+            r.get("valor", 0) for r in recorrentes
+            if r.get("frequencia") == "mensal"
+        )
+
+        for i in range(1, 4):
+            mes_futuro = today + relativedelta(months=i)
+
+            # Contar quantas parcelas ainda estarao ativas nesse mes
+            parcelas_ativas_mes = 0
+            for p in parcelas:
+                if p.get("parcelas_restantes", 0) > i:
+                    parcelas_ativas_mes += p.get("valor_parcela", 0)
+
+            projecao.append({
+                "mes": mes_futuro.strftime("%B/%Y"),
+                "mes_numero": mes_futuro.month,
+                "ano": mes_futuro.year,
+                "parcelas_previstas": parcelas_ativas_mes,
+                "recorrentes_previstas": total_recorrentes_mes,
+                "total_projetado": parcelas_ativas_mes + total_recorrentes_mes
+            })
+
+        return projecao
+
+    async def _get_benefit_cards(self, user: User) -> list[dict]:
+        """Busca cartoes de beneficio VA/VR/VT"""
+        result = await self.db.execute(
+            select(BenefitCard).where(
+                BenefitCard.user_id == user.id,
+                BenefitCard.is_active == True
+            )
+        )
+        benefit_cards = result.scalars().all()
+
+        # Buscar contas vinculadas para obter saldos
+        account_ids = [b.account_id for b in benefit_cards]
+        accounts: dict[int, Account] = {}
+        if account_ids:
+            acc_result = await self.db.execute(
+                select(Account).where(Account.id.in_(account_ids))
+            )
+            accounts = {a.id: a for a in acc_result.scalars().all()}
+
+        beneficios = []
+        for b in benefit_cards:
+            account = accounts.get(b.account_id)
+            beneficios.append({
+                "tipo": b.card_type_display,
+                "operadora": b.provider_display,
+                "ultimos_digitos": b.last_four_digits,
+                "saldo_atual": float(account.balance) if account else 0,
+                "recarga_esperada": float(b.expected_monthly_recharge) if b.expected_monthly_recharge else None,
+                "dia_recarga": b.recharge_day
+            })
+
+        return beneficios
+
+    async def _get_budget_health(self, user: User) -> dict:
+        """Calcula health score do orcamento do mes atual"""
+        today = date.today()
+
+        # Buscar orcamento do mes
+        budget_result = await self.db.execute(
+            select(Budget).where(
+                Budget.user_id == user.id,
+                Budget.year == today.year,
+                Budget.month == today.month
+            )
+        )
+        budget = budget_result.scalar_one_or_none()
+
+        if not budget:
+            return {
+                "tem_orcamento": False,
+                "score": None,
+                "mensagem": "Sem orcamento definido para este mes"
+            }
+
+        # Buscar itens do orcamento
+        items_result = await self.db.execute(
+            select(BudgetItem).where(BudgetItem.budget_id == budget.id)
+        )
+        budget_items = items_result.scalars().all()
+
+        # Buscar categorias
+        category_ids = [b.category_id for b in budget_items if b.category_id]
+        categories: dict[int | None, str] = {}
+        if category_ids:
+            cat_result = await self.db.execute(
+                select(Category).where(Category.id.in_(category_ids))
+            )
+            categories = {c.id: c.name for c in cat_result.scalars().all()}
+
+        # Buscar gastos reais do mes
+        start_date = date(today.year, today.month, 1)
+        result = await self.db.execute(
+            select(
+                Transaction.category_id,
+                func.sum(Transaction.amount).label('total')
+            ).where(
+                Transaction.user_id == user.id,
+                Transaction.type == TransactionType.EXPENSE.value,
+                Transaction.date >= start_date,
+                Transaction.date <= today
+            ).group_by(Transaction.category_id)
+        )
+        gastos_por_categoria = {row.category_id: float(row.total) for row in result.all()}
+
+        # Calcular categorias em alerta (>80% do orcamento)
+        categorias_alerta = []
+        total_planejado = 0
+        total_gasto = 0
+
+        for item in budget_items:
+            planejado = float(item.planned_amount)
+            gasto = gastos_por_categoria.get(item.category_id, 0)
+            total_planejado += planejado
+            total_gasto += gasto
+
+            if planejado > 0:
+                percentual = (gasto / planejado) * 100
+                if percentual >= 80:
+                    cat_name = categories.get(item.category_id, "Categoria")
+                    categorias_alerta.append({
+                        "categoria": cat_name,
+                        "planejado": planejado,
+                        "gasto": gasto,
+                        "percentual": round(percentual, 1)
+                    })
+
+        # Calcular score (0-100)
+        score = 100.0
+        if total_planejado > 0:
+            percentual_total = (total_gasto / total_planejado) * 100
+            if percentual_total > 100:
+                score = max(0, 100 - (percentual_total - 100) * 2)
+            elif percentual_total > 80:
+                score = 100 - (percentual_total - 80)
+
+        return {
+            "tem_orcamento": True,
+            "score": round(score, 1),
+            "total_planejado": total_planejado,
+            "total_gasto": total_gasto,
+            "percentual_usado": round((total_gasto / total_planejado * 100), 1) if total_planejado > 0 else 0,
+            "categorias_alerta": categorias_alerta[:5]  # Top 5 em alerta
+        }
+
+    async def _get_debt_strategy(self, user: User) -> dict:
+        """Calcula estrategia de quitacao de dividas (snowball vs avalanche)"""
+        result = await self.db.execute(
+            select(Debt).where(
+                Debt.user_id == user.id,
+                Debt.status == DebtStatus.ACTIVE.value
+            ).order_by(Debt.current_balance.asc())
+        )
+        debts = result.scalars().all()
+
+        if not debts:
+            return {"tem_dividas": False}
+
+        # Calcular totais
+        total_dividas = sum(float(d.current_balance) for d in debts)
+        total_minimo = sum(float(d.minimum_payment) for d in debts)
+        total_juros_mensal = sum(
+            float(d.current_balance) * (float(d.interest_rate) / 100)
+            for d in debts
+            if d.interest_type == "monthly"
+        )
+
+        # Identificar divida de menor saldo (snowball)
+        menor_saldo = min(debts, key=lambda d: d.current_balance)
+
+        # Identificar divida de maior juros (avalanche)
+        maior_juros = max(debts, key=lambda d: d.interest_rate)
+
+        # Estimar meses para quitar (simplificado)
+        meses_estimados = int(total_dividas / total_minimo) + 1 if total_minimo > 0 else 0
+
+        return {
+            "tem_dividas": True,
+            "total_dividas": total_dividas,
+            "total_pagamento_minimo": total_minimo,
+            "juros_mensal_estimado": round(total_juros_mensal, 2),
+            "quantidade_dividas": len(debts),
+            "estrategia_snowball": {
+                "primeira_divida": menor_saldo.name,
+                "saldo": float(menor_saldo.current_balance),
+                "descricao": "Quitar a menor divida primeiro para ganhar motivacao"
+            },
+            "estrategia_avalanche": {
+                "primeira_divida": maior_juros.name,
+                "taxa_juros": float(maior_juros.interest_rate),
+                "descricao": "Quitar a de maior juros primeiro para economizar dinheiro"
+            },
+            "meses_para_quitar": meses_estimados,
+            "recomendacao": "avalanche" if float(maior_juros.interest_rate) > 5 else "snowball"
+        }
+
     def _build_enhanced_system_prompt(self, context: dict, user_message: str) -> str:
-        """Constroi prompt do sistema otimizado para respostas precisas"""
-        context_json = json.dumps(context, cls=DecimalEncoder, ensure_ascii=False, indent=2)
+        """Constroi prompt do sistema otimizado para respostas concisas e conversacionais"""
+        context_json = json.dumps(context, cls=DecimalEncoder, ensure_ascii=False)
 
-        return f"""Voce e o Fin, um consultor financeiro pessoal especializado em analise comportamental de gastos.
-Voce TEM ACESSO COMPLETO aos dados financeiros do usuario e DEVE usa-los para fornecer analises ricas e acionaveis.
+        return f"""Voce e o Fin, assistente financeiro pessoal.
 
-DADOS FINANCEIROS REAIS DO USUARIO (USE ESTES DADOS!):
+REGRAS DE RESPOSTA (CRITICAS!):
+1. Seja DIRETO e CONVERSACIONAL - como um amigo que entende de financas
+2. Respostas CURTAS: 2-4 frases para perguntas simples
+3. Use numeros reais dos dados, mas NAO liste tudo - destaque os principais
+4. Ofereca aprofundar no final: "Quer que eu detalhe X?"
+5. So expanda se o usuario pedir explicitamente detalhes
+
+DADOS DO USUARIO:
 {context_json}
 
-PERGUNTA DO USUARIO: "{user_message}"
+EXEMPLOS DE RESPOSTAS:
 
-EXPERTISE E ANALISES QUE VOCE DOMINA:
-1. Analise de padroes de comportamento financeiro
-2. Identificacao de oportunidades de economia ESPECIFICAS (nao genericas)
-3. Estrategias de quitacao de dividas (snowball/avalanche)
-4. Otimizacao de uso de cartoes de credito (utilizacao de limite, juros)
-5. Analise de tendencias (crescimento/reducao por categoria ao longo do tempo)
-6. Identificacao de gastos recorrentes e assinaturas
-7. Renegociacao de contratos e reducao de custos fixos
+Para "quanto gastei esse mes":
+❌ Ruim: [lista de 10 categorias com percentuais, analises e sugestoes]
+✅ Bom: "Voce gastou R$ 25.273 em janeiro. Os maiores: Fatura (R$ 17k), Outros (R$ 4.3k), Mercado (R$ 1.5k). Quer ver alguma categoria em detalhe?"
 
-INSTRUCOES CRITICAS PARA RESPOSTAS RICAS:
-1. SEMPRE use dados REAIS e especificos dos dados acima
-2. Forneca numeros EXATOS e calculos detalhados
-3. Ofereça 2-3 opcoes de acao com pros/contras quando relevante
-4. Inclua simulacoes de impacto: "Se fizer X, economizara Y" ou "Em 12 meses isso representa Z"
-5. Seja empatico mas DIRETO sobre a situacao financeira
-6. Identifique padroes: crescimento de gastos, sazonalidade, vazamentos
-7. Priorize insights ACIONAVEIS em vez de observacoes genericas
+Para "como estao meus cartoes":
+❌ Ruim: [analise completa de cada cartao com estrategias]
+✅ Bom: "Seus cartoes tem R$ 24.500 em aberto. O Carrefour esta com 85% do limite usado - atencao! Quer ver estrategia de pagamento?"
 
-COMO USAR OS DADOS:
-- gastos_por_categoria: analise tendencias, compare valores, identifique maiores categorias
-- gastos_por_estabelecimento: detecte frequencia, gastos recorrentes, vazamentos
-- maiores_gastos: identifique compras atipicas ou oportunidades de negociacao
-- cartoes_credito: calcule utilizacao de limite (saldo/limite), alerte se >70%, sugira pagamentos estrategicos
-- faturas: identifique faturas vencidas, calcule juros potenciais, sugira priorizacao
-- fontes_receita: compare receitas vs despesas, calcule sobra/deficit mensal
-- saldo_contas: avalie liquidez, sugira alocacao estrategica de recursos
+Para "tenho parcelas":
+❌ Ruim: [lista completa de todas as parcelas]
+✅ Bom: "Suas parcelas somam R$ 3.200/mes pelos proximos 8 meses. A maior e a TV em 10x de R$ 450. Quer ver a projecao completa?"
 
-FORMATO DE RESPOSTAS DETALHADAS:
+Para "assinaturas":
+❌ Ruim: [analise de cada assinatura com sugestoes]
+✅ Bom: "Encontrei 4 recorrentes (R$ 340/mes): Netflix R$ 55, Spotify R$ 34, iCloud R$ 21, Academia R$ 150. Quer que eu analise quais cortar?"
 
-Sobre reducao de gastos (SEMPRE ESPECIFICO):
-❌ Ruim: "Corte despesas desnecessarias"
-✅ Bom: "Analisando seus dados, identifiquei 3 oportunidades:
-
-1. **Delivery/Restaurantes (R$ 1.450/mes)**
-   - Cresceu 40% nos ultimos meses
-   - Frequencia: 18x/mes (media R$ 80/pedido)
-   - Reducao sugerida: 2x/semana = economia de R$ 600/mes
-
-2. **Assinaturas (R$ 340/mes)**
-   - Detectei X assinaturas recorrentes
-   - Oportunidade: cancelar servicos pouco usados = R$ 175/mes
-
-3. **Cartao com maior saldo (R$ X)**
-   - Juros estimados: R$ Y/mes
-   - Usando R$ 10k para quitar: economia de R$ Z/mes
-
-**Total de economia potencial: R$ X/mes (R$ Y/ano)**"
-
-Sobre cartoes de credito (CALCULE TUDO):
-✅ "Analisando seus 3 cartoes:
-
-1. **Carrefour** - ATENCAO!
-   - Saldo em aberto: R$ 9.392,07
-   - Limite total: R$ 11.000
-   - Utilizacao: 85% (ALTO RISCO para score de credito!)
-   - Juros estimados se pagar minimo: R$ 1.127/mes
-   - **Acao urgente**: Pague R$ 4.000 para reduzir para 50% e proteger seu score
-
-2. **Sam's Club**
-   - Saldo: R$ 4.904,53 | Limite: R$ 11.000 (45% usado - OK)
-   - Vencimento: [data]
-
-3. **Itau Pao de Acucar**
-   - Saldo: R$ 10.206,69 | Limite: R$ 12.000 (85% - ALERTA!)
-
-**Total em divida:** R$ 24.503,29
-**Juros mensais projetados:** ~R$ 2.940 (taxa media 12% a.m.)
-
-**Estrategia sugerida com seus R$ 45.000 disponiveis:**
-- Use R$ 10.000 para quitar Carrefour e reduzir Itau
-- Isso eliminaria R$ 1.800/mes em juros
-- Libera R$ 21.000 em limite para emergencias"
-
-Sobre analise de tendencias:
-✅ "Comparando ultimos 3 meses:
-- Alimentacao: R$ 800 → R$ 950 → R$ 1.200 (+50% em 3 meses!)
-- Transporte: R$ 450 → R$ 420 → R$ 380 (reducao de 15% - parabens!)
-- Lazer: Estavel em ~R$ 300/mes
-
-**Alerta:** Alimentacao crescendo R$ 200/mes. Se continuar, chegara a R$ 1.600 em 3 meses.
-**Acao:** Revisar compras de supermercado e delivery. Reduzir delivery para 2x/semana economizaria R$ 400/mes."
-
-NUNCA faca respostas genericas como:
-❌ "Voce deveria economizar mais"
-❌ "Tente reduzir gastos com restaurantes"
-❌ "Seus cartoes estao altos"
-
-SEMPRE inclua:
-✅ Valores especificos dos dados reais
-✅ Calculos e impacto financeiro
-✅ Opcoes de acao concretas
-✅ Simulacoes de economia
-✅ Priorizacao (o que fazer primeiro)
-
-Termine sempre com uma pergunta ou proxima acao especifica."""
+PONTOS IMPORTANTES:
+- Se o usuario pedir "detalhe", "explique", "analise", ai sim responda de forma mais completa
+- Use emojis com moderacao (maximo 1-2 por resposta)
+- Sempre ofereça uma proxima acao ou pergunta de follow-up
+- Nao repita dados que o usuario ja viu na mesma conversa"""
 
     async def _call_llm(self, system_prompt: str, messages: list[dict]) -> str:
         """Chama o LLM configurado (Google ou Mistral)"""
@@ -788,7 +1024,7 @@ Termine sempre com uma pergunta ou proxima acao especifica."""
                     "contents": contents,
                     "generationConfig": {
                         "temperature": 0.4,
-                        "maxOutputTokens": 2000,
+                        "maxOutputTokens": 600,
                     }
                 },
             )
@@ -822,7 +1058,7 @@ Termine sempre com uma pergunta ou proxima acao especifica."""
                 json={
                     "model": "mistral-small-latest",
                     "messages": mistral_messages,
-                    "max_tokens": 2000,
+                    "max_tokens": 600,
                     "temperature": 0.4,
                 },
             )
