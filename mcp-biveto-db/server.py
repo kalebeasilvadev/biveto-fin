@@ -210,6 +210,163 @@ TABLE_DOCS = {
             "cnpj": "CNPJ",
         }
     },
+    "receipts": {
+        "description": "Cupons fiscais/recibos de compras",
+        "columns": {
+            "id": "ID único",
+            "document_id": "ID do documento (se importado)",
+            "store_name": "Nome do estabelecimento",
+            "store_cnpj": "CNPJ do estabelecimento",
+            "total_amount": "Valor total",
+            "subtotal": "Subtotal",
+            "discount": "Desconto",
+            "purchase_date": "Data da compra",
+            "status": "pending, confirmed, cancelled",
+            "created_at": "Data de criação",
+        }
+    },
+    "receipt_payments": {
+        "description": "Pagamentos de recibos (split payment)",
+        "columns": {
+            "id": "ID único",
+            "receipt_id": "ID do recibo",
+            "account_id": "ID da conta",
+            "benefit_card_id": "ID do cartão de benefício",
+            "payment_method": "Método: voucher_va, debit_card, pix, etc",
+            "amount": "Valor pago",
+            "sequence": "Sequência do pagamento",
+        }
+    },
+    "benefit_cards": {
+        "description": "Cartões de benefício (VA/VR/Flex)",
+        "columns": {
+            "id": "ID único",
+            "account_id": "ID da conta vinculada",
+            "card_type": "Tipo: va, vr, flex, vt, cultura, combustivel",
+            "provider": "Operadora: alelo, sodexo, vr, ticket, flash, etc",
+            "last_four_digits": "Últimos 4 dígitos",
+            "expected_monthly_recharge": "Recarga mensal esperada",
+            "recharge_day": "Dia da recarga (1-31)",
+            "is_active": "Se está ativo",
+        }
+    },
+    "grocery_products": {
+        "description": "Catálogo de produtos de mercado",
+        "columns": {
+            "id": "ID único",
+            "name": "Nome do produto",
+            "normalized_name": "Nome normalizado",
+            "category": "Categoria: fruits_vegetables, meat_fish, dairy, etc",
+            "necessity_type": "Tipo: essential, non_essential",
+            "default_unit": "Unidade padrão (kg, un, L)",
+            "is_system": "Se é produto do sistema",
+        }
+    },
+    "grocery_purchases": {
+        "description": "Compras de supermercado (itens)",
+        "columns": {
+            "id": "ID único",
+            "transaction_id": "ID da transação",
+            "receipt_id": "ID do recibo",
+            "product_id": "ID do produto",
+            "merchant_id": "ID do comerciante",
+            "product_name": "Nome original do cupom",
+            "quantity": "Quantidade",
+            "unit": "Unidade",
+            "unit_price": "Preço unitário",
+            "total_price": "Preço total",
+            "category": "Categoria do produto",
+            "necessity_type": "Tipo de necessidade",
+            "purchase_date": "Data da compra",
+        }
+    },
+    "grocery_price_history": {
+        "description": "Histórico de preços de produtos",
+        "columns": {
+            "id": "ID único",
+            "product_id": "ID do produto",
+            "merchant_id": "ID do comerciante",
+            "price": "Preço",
+            "unit": "Unidade",
+            "recorded_at": "Data do registro",
+        }
+    },
+    "shopping_lists": {
+        "description": "Listas de compras",
+        "columns": {
+            "id": "ID único",
+            "name": "Nome da lista",
+            "status": "draft, active, completed, archived",
+            "source": "Origem: manual, ai_generated, history",
+            "notes": "Observações",
+            "created_at": "Data de criação",
+            "completed_at": "Data de conclusão",
+        }
+    },
+    "shopping_list_items": {
+        "description": "Itens da lista de compras",
+        "columns": {
+            "id": "ID único",
+            "list_id": "ID da lista",
+            "product_id": "ID do produto",
+            "product_name": "Nome do produto",
+            "quantity": "Quantidade",
+            "unit": "Unidade",
+            "estimated_price": "Preço estimado",
+            "category": "Categoria",
+            "is_checked": "Se foi marcado",
+            "priority": "Prioridade",
+        }
+    },
+    "spending_envelopes": {
+        "description": "Envelopes de gastos (YNAB style)",
+        "columns": {
+            "id": "ID único",
+            "category_id": "ID da categoria",
+            "name": "Nome",
+            "period_type": "Período: daily, weekly, biweekly, monthly",
+            "limit_amount": "Valor limite",
+            "current_balance": "Saldo atual",
+            "period_start_date": "Início do período",
+            "period_end_date": "Fim do período",
+            "allow_rollover": "Permite acumular",
+            "status": "available, depleted, overspent",
+            "is_active": "Se está ativo",
+        }
+    },
+    "envelope_history": {
+        "description": "Histórico de envelopes",
+        "columns": {
+            "id": "ID único",
+            "envelope_id": "ID do envelope",
+            "transaction_id": "ID da transação",
+            "change_type": "Tipo: refill, spend, refund, rollover, adjustment, transfer",
+            "amount": "Valor",
+            "balance_before": "Saldo antes",
+            "balance_after": "Saldo depois",
+            "period_start": "Início do período",
+            "period_end": "Fim do período",
+        }
+    },
+    "chat_conversations": {
+        "description": "Conversas do chat com assistente financeiro",
+        "columns": {
+            "id": "ID único (UUID)",
+            "title": "Título da conversa",
+            "created_at": "Data de criação",
+            "updated_at": "Data de atualização",
+        }
+    },
+    "chat_messages": {
+        "description": "Mensagens do chat",
+        "columns": {
+            "id": "ID único",
+            "conversation_id": "ID da conversa",
+            "role": "user ou assistant",
+            "content": "Conteúdo da mensagem",
+            "created_at": "Data de criação",
+        }
+    },
 }
 
 # Server instance

@@ -12,6 +12,12 @@ from ....models import (
     CreditCardInvoice, InstallmentSeries, Budget, BudgetItem,
     Goal, GoalContribution, Debt, DebtPayment, RecurringTransaction,
     IncomeSource, Document, Merchant,
+    Receipt, ReceiptPayment,
+    BenefitCard,
+    GroceryProduct, GroceryPurchase, GroceryPriceHistory,
+    ShoppingList, ShoppingListItem,
+    SpendingEnvelope, EnvelopeHistory,
+    ChatConversation, ChatMessage,
 )
 from ....models.transaction import TransactionType
 from ....models.credit_card_invoice import InvoiceStatus
@@ -281,6 +287,197 @@ ALLOWED_TABLES = {
             "normalized_name": "Nome normalizado",
             "cnpj": "CNPJ",
             "category_id": "Categoria sugerida",
+            "created_at": "Data de criação",
+        }
+    },
+    "receipts": {
+        "model": Receipt,
+        "description": "Cupons fiscais/recibos de compras",
+        "columns": {
+            "id": "ID único",
+            "document_id": "ID do documento (se importado)",
+            "store_name": "Nome do estabelecimento",
+            "store_cnpj": "CNPJ do estabelecimento",
+            "total_amount": "Valor total",
+            "subtotal": "Subtotal",
+            "discount": "Desconto",
+            "purchase_date": "Data da compra",
+            "status": "pending, confirmed, cancelled",
+            "created_at": "Data de criação",
+            "confirmed_at": "Data de confirmação",
+        }
+    },
+    "receipt_payments": {
+        "model": ReceiptPayment,
+        "description": "Pagamentos de recibos (split payment)",
+        "columns": {
+            "id": "ID único",
+            "receipt_id": "ID do recibo",
+            "account_id": "ID da conta",
+            "benefit_card_id": "ID do cartão de benefício (se usado)",
+            "payment_method": "Método: voucher_va, debit_card, pix, etc",
+            "amount": "Valor pago",
+            "sequence": "Sequência do pagamento",
+            "original_label": "Label original do OCR",
+            "created_at": "Data de criação",
+        }
+    },
+    "benefit_cards": {
+        "model": BenefitCard,
+        "description": "Cartões de benefício (VA/VR/Flex)",
+        "columns": {
+            "id": "ID único",
+            "account_id": "ID da conta vinculada",
+            "card_type": "Tipo: va, vr, flex, vt, cultura, combustivel",
+            "provider": "Operadora: alelo, sodexo, vr, ticket, flash, etc",
+            "last_four_digits": "Últimos 4 dígitos",
+            "expected_monthly_recharge": "Recarga mensal esperada",
+            "recharge_day": "Dia da recarga (1-31)",
+            "is_active": "Se está ativo",
+            "created_at": "Data de criação",
+        }
+    },
+    "grocery_products": {
+        "model": GroceryProduct,
+        "description": "Catálogo de produtos de mercado",
+        "columns": {
+            "id": "ID único",
+            "name": "Nome do produto",
+            "normalized_name": "Nome normalizado",
+            "category": "Categoria: fruits_vegetables, meat_fish, dairy, etc",
+            "necessity_type": "Tipo: essential, non_essential",
+            "default_unit": "Unidade padrão (kg, un, L)",
+            "is_system": "Se é produto do sistema",
+            "created_at": "Data de criação",
+        }
+    },
+    "grocery_purchases": {
+        "model": GroceryPurchase,
+        "description": "Compras de supermercado (itens)",
+        "columns": {
+            "id": "ID único",
+            "transaction_id": "ID da transação",
+            "document_id": "ID do documento",
+            "receipt_id": "ID do recibo",
+            "product_id": "ID do produto",
+            "merchant_id": "ID do comerciante",
+            "product_name": "Nome original do cupom",
+            "quantity": "Quantidade",
+            "unit": "Unidade",
+            "unit_price": "Preço unitário",
+            "total_price": "Preço total",
+            "category": "Categoria do produto",
+            "necessity_type": "Tipo de necessidade",
+            "purchase_date": "Data da compra",
+            "ownership_type": "personal ou household",
+            "created_at": "Data de criação",
+        }
+    },
+    "grocery_price_history": {
+        "model": GroceryPriceHistory,
+        "description": "Histórico de preços de produtos",
+        "columns": {
+            "id": "ID único",
+            "product_id": "ID do produto",
+            "merchant_id": "ID do comerciante",
+            "price": "Preço",
+            "unit": "Unidade",
+            "recorded_at": "Data do registro",
+            "created_at": "Data de criação",
+        }
+    },
+    "shopping_lists": {
+        "model": ShoppingList,
+        "description": "Listas de compras",
+        "columns": {
+            "id": "ID único",
+            "license_id": "ID da licença (household)",
+            "name": "Nome da lista",
+            "status": "draft, active, completed, archived",
+            "source": "Origem: manual, ai_generated, history",
+            "ownership_type": "personal ou household",
+            "notes": "Observações",
+            "created_at": "Data de criação",
+            "completed_at": "Data de conclusão",
+        }
+    },
+    "shopping_list_items": {
+        "model": ShoppingListItem,
+        "description": "Itens da lista de compras",
+        "columns": {
+            "id": "ID único",
+            "list_id": "ID da lista",
+            "product_id": "ID do produto",
+            "product_name": "Nome do produto",
+            "quantity": "Quantidade",
+            "unit": "Unidade",
+            "estimated_price": "Preço estimado",
+            "category": "Categoria",
+            "necessity_type": "Tipo de necessidade",
+            "is_checked": "Se foi marcado",
+            "priority": "Prioridade",
+            "notes": "Observações",
+            "created_at": "Data de criação",
+        }
+    },
+    "spending_envelopes": {
+        "model": SpendingEnvelope,
+        "description": "Envelopes de gastos (YNAB style)",
+        "columns": {
+            "id": "ID único",
+            "category_id": "ID da categoria",
+            "name": "Nome",
+            "description": "Descrição",
+            "period_type": "Período: daily, weekly, biweekly, monthly",
+            "limit_amount": "Valor limite",
+            "current_balance": "Saldo atual",
+            "period_start_date": "Início do período",
+            "period_end_date": "Fim do período",
+            "allow_rollover": "Permite acumular",
+            "rollover_balance": "Saldo acumulado",
+            "refill_schedule": "Agenda de recarga",
+            "auto_refill": "Recarga automática",
+            "status": "available, depleted, overspent",
+            "is_active": "Se está ativo",
+            "ownership_type": "personal ou household",
+            "created_at": "Data de criação",
+        }
+    },
+    "envelope_history": {
+        "model": EnvelopeHistory,
+        "description": "Histórico de envelopes",
+        "columns": {
+            "id": "ID único",
+            "envelope_id": "ID do envelope",
+            "transaction_id": "ID da transação",
+            "change_type": "Tipo: refill, spend, refund, rollover, adjustment, transfer",
+            "amount": "Valor",
+            "balance_before": "Saldo antes",
+            "balance_after": "Saldo depois",
+            "period_start": "Início do período",
+            "period_end": "Fim do período",
+            "notes": "Observações",
+            "created_at": "Data de criação",
+        }
+    },
+    "chat_conversations": {
+        "model": ChatConversation,
+        "description": "Conversas do chat com assistente financeiro",
+        "columns": {
+            "id": "ID único (UUID)",
+            "title": "Título da conversa",
+            "created_at": "Data de criação",
+            "updated_at": "Data de atualização",
+        }
+    },
+    "chat_messages": {
+        "model": ChatMessage,
+        "description": "Mensagens do chat",
+        "columns": {
+            "id": "ID único",
+            "conversation_id": "ID da conversa",
+            "role": "user ou assistant",
+            "content": "Conteúdo da mensagem",
             "created_at": "Data de criação",
         }
     },

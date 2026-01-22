@@ -19,6 +19,7 @@ import {
   DollarSign,
   Search,
   X,
+  Pencil,
 } from 'lucide-react'
 import { HelpButton } from '../components/help'
 import { clsx } from 'clsx'
@@ -144,6 +145,9 @@ export default function Market() {
   const [selectedList, setSelectedList] = useState<ShoppingList | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null)
+  const [showEditItemModal, setShowEditItemModal] = useState(false)
+  const [showAddItemModal, setShowAddItemModal] = useState(false)
+  const [selectedItem, setSelectedItem] = useState<ShoppingListItem | null>(null)
 
   // Queries
   const { data: summaryData, isLoading: summaryLoading } = useQuery({
@@ -218,6 +222,45 @@ export default function Market() {
       setSelectedList(null)
     },
   })
+
+  const addItemMutation = useMutation({
+    mutationFn: ({ listId, data }: { listId: number; data: any }) =>
+      groceryApi.addListItem(listId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shopping-lists'] })
+      refreshSelectedList()
+      setShowAddItemModal(false)
+    },
+  })
+
+  const updateItemMutation = useMutation({
+    mutationFn: ({ listId, itemId, data }: { listId: number; itemId: number; data: any }) =>
+      groceryApi.updateListItem(listId, itemId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shopping-lists'] })
+      refreshSelectedList()
+      setShowEditItemModal(false)
+      setSelectedItem(null)
+    },
+  })
+
+  const deleteItemMutation = useMutation({
+    mutationFn: ({ listId, itemId }: { listId: number; itemId: number }) =>
+      groceryApi.deleteListItem(listId, itemId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shopping-lists'] })
+      refreshSelectedList()
+    },
+  })
+
+  // Helper to refresh selected list
+  const refreshSelectedList = () => {
+    if (selectedList) {
+      groceryApi.getShoppingList(selectedList.id).then((res) => {
+        setSelectedList(res.data)
+      })
+    }
+  }
 
   const summary: PurchaseSummary | null = summaryData?.data || null
   const comparison: Comparison | null = comparisonData?.data || null
@@ -576,16 +619,25 @@ export default function Market() {
                       </p>
                     </div>
                   </div>
-                  <button
-                    onClick={() => {
-                      if (confirm('Tem certeza que deseja excluir esta lista?')) {
-                        deleteListMutation.mutate(selectedList.id)
-                      }
-                    }}
-                    className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                  >
-                    <Trash2 size={20} />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setShowAddItemModal(true)}
+                      className="flex items-center gap-1 px-3 py-1.5 bg-biveto text-white rounded-lg text-sm font-medium hover:bg-biveto-dark transition-colors"
+                    >
+                      <Plus size={16} />
+                      Adicionar
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (confirm('Tem certeza que deseja excluir esta lista?')) {
+                          deleteListMutation.mutate(selectedList.id)
+                        }
+                      }}
+                      className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                    >
+                      <Trash2 size={20} />
+                    </button>
+                  </div>
                 </div>
 
                 {/* Progress */}
@@ -642,10 +694,36 @@ export default function Market() {
                       </p>
                     </div>
                     {item.estimated_price && (
-                      <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
+                      <span className="text-sm font-medium text-gray-600 dark:text-gray-300 mr-2">
                         {formatCurrency(item.estimated_total || 0)}
                       </span>
                     )}
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setSelectedItem(item)
+                          setShowEditItemModal(true)
+                        }}
+                        className="p-1.5 text-gray-400 hover:text-biveto hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                      >
+                        <Pencil size={16} />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          if (confirm('Remover este item da lista?')) {
+                            deleteItemMutation.mutate({
+                              listId: selectedList.id,
+                              itemId: item.id,
+                            })
+                          }
+                        }}
+                        className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1028,6 +1106,325 @@ export default function Market() {
                     className="flex-1 px-4 py-2 bg-biveto text-white rounded-xl font-medium hover:bg-biveto-dark disabled:opacity-50"
                   >
                     {createListMutation.isPending ? 'Criando...' : 'Criar Lista'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Item Modal */}
+      {showEditItemModal && selectedItem && selectedList && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => {
+              setShowEditItemModal(false)
+              setSelectedItem(null)
+            }}
+          />
+          <div className="flex min-h-full items-center justify-center p-4">
+            <div className="relative bg-white dark:bg-slate-800 rounded-2xl shadow-xl max-w-md w-full p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Editar Item
+                </h3>
+                <button
+                  onClick={() => {
+                    setShowEditItemModal(false)
+                    setSelectedItem(null)
+                  }}
+                  className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  const formData = new FormData(e.currentTarget)
+                  updateItemMutation.mutate({
+                    listId: selectedList.id,
+                    itemId: selectedItem.id,
+                    data: {
+                      product_name: formData.get('product_name'),
+                      quantity: parseFloat(formData.get('quantity') as string),
+                      unit: formData.get('unit'),
+                      category: formData.get('category'),
+                      estimated_price: formData.get('estimated_price')
+                        ? parseFloat(formData.get('estimated_price') as string)
+                        : null,
+                    },
+                  })
+                }}
+                className="space-y-4"
+              >
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Nome do Produto
+                  </label>
+                  <input
+                    type="text"
+                    name="product_name"
+                    defaultValue={selectedItem.product_name}
+                    required
+                    className="w-full px-4 py-2 bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-biveto"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Quantidade
+                    </label>
+                    <input
+                      type="number"
+                      name="quantity"
+                      step="0.1"
+                      min="0.1"
+                      defaultValue={selectedItem.quantity}
+                      required
+                      className="w-full px-4 py-2 bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-biveto"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Unidade
+                    </label>
+                    <select
+                      name="unit"
+                      defaultValue={selectedItem.unit}
+                      className="w-full px-4 py-2 bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-biveto"
+                    >
+                      <option value="un">Unidade</option>
+                      <option value="kg">Kg</option>
+                      <option value="g">Gramas</option>
+                      <option value="L">Litros</option>
+                      <option value="ml">ml</option>
+                      <option value="pct">Pacote</option>
+                      <option value="cx">Caixa</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Categoria
+                  </label>
+                  <select
+                    name="category"
+                    defaultValue={selectedItem.category}
+                    className="w-full px-4 py-2 bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-biveto"
+                  >
+                    <option value="fruits_vegetables">Frutas e Verduras</option>
+                    <option value="meat_fish">Carnes e Peixes</option>
+                    <option value="dairy">Laticínios</option>
+                    <option value="bakery">Padaria</option>
+                    <option value="beverages">Bebidas</option>
+                    <option value="snacks">Lanches</option>
+                    <option value="frozen">Congelados</option>
+                    <option value="canned">Enlatados</option>
+                    <option value="grains_pasta">Grãos e Massas</option>
+                    <option value="grains">Grãos</option>
+                    <option value="condiments">Temperos</option>
+                    <option value="cleaning">Limpeza</option>
+                    <option value="hygiene">Higiene</option>
+                    <option value="personal_care">Cuidados Pessoais</option>
+                    <option value="baby">Bebê</option>
+                    <option value="pet">Pet</option>
+                    <option value="household">Utilidades</option>
+                    <option value="other">Outros</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Preço Estimado (opcional)
+                  </label>
+                  <input
+                    type="number"
+                    name="estimated_price"
+                    step="0.01"
+                    min="0"
+                    defaultValue={selectedItem.estimated_price || ''}
+                    placeholder="0,00"
+                    className="w-full px-4 py-2 bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-biveto"
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowEditItemModal(false)
+                      setSelectedItem(null)
+                    }}
+                    className="flex-1 px-4 py-2 border border-gray-200 dark:border-slate-600 rounded-xl font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={updateItemMutation.isPending}
+                    className="flex-1 px-4 py-2 bg-biveto text-white rounded-xl font-medium hover:bg-biveto-dark disabled:opacity-50"
+                  >
+                    {updateItemMutation.isPending ? 'Salvando...' : 'Salvar'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Item Modal */}
+      {showAddItemModal && selectedList && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => setShowAddItemModal(false)}
+          />
+          <div className="flex min-h-full items-center justify-center p-4">
+            <div className="relative bg-white dark:bg-slate-800 rounded-2xl shadow-xl max-w-md w-full p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Adicionar Item
+                </h3>
+                <button
+                  onClick={() => setShowAddItemModal(false)}
+                  className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  const formData = new FormData(e.currentTarget)
+                  addItemMutation.mutate({
+                    listId: selectedList.id,
+                    data: {
+                      product_name: formData.get('product_name'),
+                      quantity: parseFloat(formData.get('quantity') as string),
+                      unit: formData.get('unit'),
+                      category: formData.get('category'),
+                      estimated_price: formData.get('estimated_price')
+                        ? parseFloat(formData.get('estimated_price') as string)
+                        : null,
+                    },
+                  })
+                }}
+                className="space-y-4"
+              >
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Nome do Produto
+                  </label>
+                  <input
+                    type="text"
+                    name="product_name"
+                    required
+                    placeholder="Ex: Arroz"
+                    className="w-full px-4 py-2 bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-biveto"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Quantidade
+                    </label>
+                    <input
+                      type="number"
+                      name="quantity"
+                      step="0.1"
+                      min="0.1"
+                      defaultValue={1}
+                      required
+                      className="w-full px-4 py-2 bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-biveto"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Unidade
+                    </label>
+                    <select
+                      name="unit"
+                      defaultValue="un"
+                      className="w-full px-4 py-2 bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-biveto"
+                    >
+                      <option value="un">Unidade</option>
+                      <option value="kg">Kg</option>
+                      <option value="g">Gramas</option>
+                      <option value="L">Litros</option>
+                      <option value="ml">ml</option>
+                      <option value="pct">Pacote</option>
+                      <option value="cx">Caixa</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Categoria
+                  </label>
+                  <select
+                    name="category"
+                    defaultValue="other"
+                    className="w-full px-4 py-2 bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-biveto"
+                  >
+                    <option value="fruits_vegetables">Frutas e Verduras</option>
+                    <option value="meat_fish">Carnes e Peixes</option>
+                    <option value="dairy">Laticínios</option>
+                    <option value="bakery">Padaria</option>
+                    <option value="beverages">Bebidas</option>
+                    <option value="snacks">Lanches</option>
+                    <option value="frozen">Congelados</option>
+                    <option value="canned">Enlatados</option>
+                    <option value="grains_pasta">Grãos e Massas</option>
+                    <option value="grains">Grãos</option>
+                    <option value="condiments">Temperos</option>
+                    <option value="cleaning">Limpeza</option>
+                    <option value="hygiene">Higiene</option>
+                    <option value="personal_care">Cuidados Pessoais</option>
+                    <option value="baby">Bebê</option>
+                    <option value="pet">Pet</option>
+                    <option value="household">Utilidades</option>
+                    <option value="other">Outros</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Preço Estimado (opcional)
+                  </label>
+                  <input
+                    type="number"
+                    name="estimated_price"
+                    step="0.01"
+                    min="0"
+                    placeholder="0,00"
+                    className="w-full px-4 py-2 bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-biveto"
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddItemModal(false)}
+                    className="flex-1 px-4 py-2 border border-gray-200 dark:border-slate-600 rounded-xl font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={addItemMutation.isPending}
+                    className="flex-1 px-4 py-2 bg-biveto text-white rounded-xl font-medium hover:bg-biveto-dark disabled:opacity-50"
+                  >
+                    {addItemMutation.isPending ? 'Adicionando...' : 'Adicionar'}
                   </button>
                 </div>
               </form>
