@@ -811,6 +811,8 @@ export default function Upload() {
           quantity: item.quantity || undefined,
           unit: item.unit || undefined,
           unit_price: item.unit_price || undefined,
+          grocery_category: item.grocery_category || undefined,
+          necessity_type: item.necessity_type || undefined,
         }
       })
 
@@ -819,12 +821,12 @@ export default function Upload() {
 
       receiptConfirmMutation.mutate({
         document_id: document.id,
-        store_name: document.payment_info.store_name || document.extracted_items[0]?.description || 'Loja',
-        store_cnpj: document.payment_info.store_cnpj || undefined,
+        store_name: document.payment_info?.store_name || 'Estabelecimento não identificado',
+        store_cnpj: document.payment_info?.store_cnpj || undefined,
         purchase_date: document.extracted_items[0]?.date || formData.date,
         total_amount: totalAmount,
-        subtotal: document.payment_info.subtotal || undefined,
-        discount: document.payment_info.discount || undefined,
+        subtotal: document.payment_info?.subtotal || undefined,
+        discount: document.payment_info?.discount || undefined,
         items,
         payments,
         default_category_id: undefined,
@@ -905,6 +907,8 @@ export default function Upload() {
         quantity: item.quantity || undefined,
         unit: item.unit || undefined,
         unit_price: item.unit_price || undefined,
+        grocery_category: item.grocery_category || undefined,
+        necessity_type: item.necessity_type || undefined,
       }))
 
       const totalAmount = document.payment_info.total_amount ||
@@ -912,12 +916,12 @@ export default function Upload() {
 
       receiptConfirmMutation.mutate({
         document_id: document.id,
-        store_name: document.payment_info.store_name || document.extracted_items[0]?.description || 'Loja',
-        store_cnpj: document.payment_info.store_cnpj || undefined,
+        store_name: document.payment_info?.store_name || 'Estabelecimento não identificado',
+        store_cnpj: document.payment_info?.store_cnpj || undefined,
         purchase_date: document.extracted_items[0]?.date || formData.date,
         total_amount: totalAmount,
-        subtotal: document.payment_info.subtotal || undefined,
-        discount: document.payment_info.discount || undefined,
+        subtotal: document.payment_info?.subtotal || undefined,
+        discount: document.payment_info?.discount || undefined,
         items,
         payments,
         default_category_id: undefined,

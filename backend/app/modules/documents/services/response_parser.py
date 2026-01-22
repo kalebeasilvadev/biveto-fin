@@ -94,15 +94,15 @@ class ResponseParser:
             if card_info and isinstance(card_info, dict):
                 result['card_info'] = self._normalize_card_info(card_info)
 
-            # Parse payment_info for cupom fiscal
-            payment_info = data.get('payment_info')
-            if payment_info and isinstance(payment_info, dict):
-                result['payment_info'] = self._normalize_payment_info(payment_info)
-
-            # Parse merchant_info for cupom fiscal
+            # Parse merchant_info for cupom fiscal (needed for payment_info)
             merchant_info = data.get('merchant_info')
             if merchant_info and isinstance(merchant_info, dict):
                 result['merchant_info'] = merchant_info
+
+            # Parse payment_info for cupom fiscal (pass merchant_info for store_name extraction)
+            payment_info = data.get('payment_info')
+            if payment_info and isinstance(payment_info, dict):
+                result['payment_info'] = self._normalize_payment_info(payment_info, merchant_info)
 
             return result
 
@@ -388,13 +388,15 @@ class ResponseParser:
         'doc': 'bank_transfer',
     }
 
-    def _normalize_payment_info(self, payment_info: dict) -> dict:
+    def _normalize_payment_info(self, payment_info: dict, merchant_info: dict = None) -> dict:
         """Normaliza informacoes de pagamento do cupom fiscal"""
         result = {
             'total': None,
             'subtotal': None,
             'discount': None,
             'payments': [],
+            'store_name': None,
+            'store_cnpj': None,
         }
 
         # Valores totais
@@ -409,6 +411,17 @@ class ResponseParser:
         discount = payment_info.get('discount') or payment_info.get('desconto')
         if discount:
             result['discount'] = float(discount)
+
+        # Extrair store_name do merchant_info ou payment_info
+        if merchant_info:
+            result['store_name'] = merchant_info.get('estabelecimento') or merchant_info.get('store_name') or merchant_info.get('name')
+            result['store_cnpj'] = merchant_info.get('cnpj') or merchant_info.get('store_cnpj')
+
+        # Fallback do próprio payment_info
+        if not result['store_name']:
+            result['store_name'] = payment_info.get('estabelecimento') or payment_info.get('store_name')
+        if not result['store_cnpj']:
+            result['store_cnpj'] = payment_info.get('cnpj') or payment_info.get('store_cnpj')
 
         # Parse pagamentos
         payments = payment_info.get('payments', [])

@@ -21,6 +21,8 @@ class ReceiptItemCreate(BaseModel):
     quantity: float | None = None
     unit: str | None = None
     unit_price: Decimal | None = None
+    grocery_category: str | None = None  # Categoria de mercado (dairy, cleaning, etc)
+    necessity_type: str | None = None    # essential ou non_essential
 
 
 class ReceiptConfirmRequest(BaseModel):

@@ -129,6 +129,8 @@ class PaymentInfoResponse(BaseModel):
     subtotal: float | None = None
     discount: float | None = None
     payments: list[DetectedPaymentResponse] = []
+    store_name: str | None = None  # Nome do estabelecimento
+    store_cnpj: str | None = None  # CNPJ do estabelecimento
 
 
 class DocumentResponse(BaseModel):

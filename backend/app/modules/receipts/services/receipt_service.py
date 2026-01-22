@@ -155,8 +155,8 @@ class ReceiptService:
                 unit=unit,
                 unit_price=unit_price,
                 total_price=total_price,
-                category=GroceryCategory.OTHER.value,  # Pode ser melhorado com classificação
-                necessity_type=NecessityType.ESSENTIAL.value,
+                category=item.grocery_category or GroceryCategory.OTHER.value,
+                necessity_type=item.necessity_type or NecessityType.ESSENTIAL.value,
                 purchase_date=data.purchase_date,
                 ownership_type="household",
             )
