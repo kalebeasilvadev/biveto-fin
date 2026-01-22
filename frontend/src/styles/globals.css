@@ -286,12 +286,12 @@
 
   @screen lg {
     .chat-container {
-      position: absolute;
+      position: fixed;
       top: 0;
       bottom: 0;
-      left: 0;
+      left: 16rem; /* w-64 sidebar width */
       right: 0;
-      height: 100%;
+      height: auto;
       margin: 0;
     }
   }
