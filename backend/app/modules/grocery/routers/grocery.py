@@ -32,6 +32,10 @@ from app.modules.grocery.schemas.shopping_list import (
     ShoppingListItemResponse,
     ShoppingListGenerateRequest,
 )
+from app.modules.grocery.schemas.smart_list import (
+    SmartListGenerateRequest,
+    SmartListFullResponse,
+)
 from app.modules.grocery.schemas.analytics import (
     GroceryAnalyticsSpending,
     GroceryAnalyticsByCategory,
@@ -46,6 +50,7 @@ from app.modules.grocery.services import (
     ShoppingListService,
     GroceryAnalyticsService,
     PriceTrackingService,
+    SmartListService,
 )
 
 router = APIRouter()
@@ -275,6 +280,26 @@ async def generate_shopping_list(
     service = ShoppingListService(db)
     lst = await service.generate_from_history(current_user, data)
     return await service.get_shopping_list(current_user, lst.id)
+
+
+@router.post("/lists/generate-smart", response_model=SmartListFullResponse, status_code=201)
+async def generate_smart_shopping_list(
+    data: SmartListGenerateRequest,
+    current_user: CurrentUser,
+    db: DbSession,
+):
+    """
+    Gera lista de compras inteligente usando IA (LLM).
+
+    A IA analisa o historico de compras e:
+    - Agrupa produtos similares por tipo (ignora marca)
+    - Normaliza nomes abreviados de cupons fiscais
+    - Filtra itens que nao sao de supermercado (restaurantes, delivery)
+    - Calcula urgencia de recompra baseada na frequencia
+    - Gera insights sobre habitos de compra
+    """
+    service = SmartListService(db)
+    return await service.generate_smart_list(current_user, data)
 
 
 @router.get("/lists/{list_id}", response_model=ShoppingListResponse)
