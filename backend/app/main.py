@@ -156,6 +156,9 @@ async def migrate_credit_card_transactions():
 
             print(f"Migração concluída: {len(transactions)} transações, {len(invoice_cache)} faturas.")
 
+            # Liberar memória do cache após uso
+            invoice_cache.clear()
+
     except Exception as e:
         print(f"Aviso: Migração de transações de cartão falhou: {e}")
 

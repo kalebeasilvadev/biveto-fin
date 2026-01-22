@@ -142,15 +142,20 @@ class DocumentService:
                 detail=f"Extensao nao permitida. Use: {', '.join(settings.allowed_extensions)}",
             )
 
-        # Ler conteudo
-        content = await file.read()
+        # Validar tamanho ANTES de ler o conteudo (economia de memoria)
+        file.file.seek(0, 2)  # Vai para o final
+        file_size = file.file.tell()
+        file.file.seek(0)  # Volta para o início
 
-        # Validar tamanho
-        if len(content) > settings.max_upload_size_mb * 1024 * 1024:
+        max_size = settings.max_upload_size_mb * 1024 * 1024
+        if file_size > max_size:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Arquivo muito grande. Maximo: {settings.max_upload_size_mb}MB",
             )
+
+        # Ler conteudo (tamanho já validado)
+        content = await file.read()
 
         # Calcular hash para dedupe
         file_hash = hashlib.sha256(content).hexdigest()
@@ -203,15 +208,20 @@ class DocumentService:
                 detail=f"Extensao nao permitida. Use: {', '.join(settings.allowed_extensions)}",
             )
 
-        # Ler conteudo
-        content = await file.read()
+        # Validar tamanho ANTES de ler o conteudo (economia de memoria)
+        file.file.seek(0, 2)  # Vai para o final
+        file_size = file.file.tell()
+        file.file.seek(0)  # Volta para o início
 
-        # Validar tamanho
-        if len(content) > settings.max_upload_size_mb * 1024 * 1024:
+        max_size = settings.max_upload_size_mb * 1024 * 1024
+        if file_size > max_size:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Arquivo muito grande. Maximo: {settings.max_upload_size_mb}MB",
             )
+
+        # Ler conteudo (tamanho já validado)
+        content = await file.read()
 
         # Calcular hash para dedupe
         file_hash = hashlib.sha256(content).hexdigest()

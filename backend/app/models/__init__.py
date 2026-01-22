@@ -64,6 +64,11 @@ from .receipt import (
     ReceiptStatus,
     RECEIPT_STATUS_DISPLAY,
 )
+from .chat import (
+    ChatConversation,
+    ChatMessage,
+    MessageRole,
+)
 from app.modules.known_services.models.known_service import KnownRecurringService
 
 __all__ = [
@@ -150,4 +155,7 @@ __all__ = [
     "ReceiptPayment",
     "ReceiptStatus",
     "RECEIPT_STATUS_DISPLAY",
+    "ChatConversation",
+    "ChatMessage",
+    "MessageRole",
 ]

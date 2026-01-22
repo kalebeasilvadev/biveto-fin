@@ -15,8 +15,14 @@ def get_user_identifier(request: Request) -> str:
     return get_remote_address(request)
 
 
-# Create limiter instance
-limiter = Limiter(key_func=get_user_identifier)
+# Create limiter instance with in-memory storage
+# storage_uri="memory://" usa dict com cleanup automático baseado nos limites definidos
+# Para produção com múltiplos workers, considerar usar Redis: storage_uri="redis://localhost:6379"
+limiter = Limiter(
+    key_func=get_user_identifier,
+    storage_uri="memory://",
+    default_limits=["100/minute"],
+)
 
 
 def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):

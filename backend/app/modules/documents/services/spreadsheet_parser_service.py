@@ -227,7 +227,7 @@ class SpreadsheetParserService:
             return {'items': [], 'error': 'Biblioteca openpyxl nao instalada'}
 
         try:
-            workbook = openpyxl.load_workbook(io.BytesIO(content), data_only=True)
+            workbook = openpyxl.load_workbook(io.BytesIO(content), data_only=True, read_only=True)
             sheet = workbook.active
 
             # Extrair headers

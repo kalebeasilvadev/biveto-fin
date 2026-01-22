@@ -13,7 +13,7 @@ from typing import Any
 from dateutil.relativedelta import relativedelta
 from decimal import Decimal
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_, or_
+from sqlalchemy import select, func, and_, or_, delete
 from collections import defaultdict
 
 from app.core.config import settings
@@ -29,7 +29,11 @@ from app.models.household import HouseholdMember
 from app.models.credit_card import CreditCard
 from app.models.credit_card_invoice import CreditCardInvoice, InvoiceStatus
 from app.models.income_source import IncomeSource
+from app.models.chat import ChatConversation, ChatMessage, MessageRole
 from app.modules.chat.schemas.chat import ChatResponse
+
+# Limite de mensagens por conversa para evitar vazamento de memória
+MAX_MESSAGES_PER_CONVERSATION = 10
 
 
 class DecimalEncoder(json.JSONEncoder):
@@ -56,17 +60,80 @@ class FinancialAgentService:
     def __init__(self, db: AsyncSession):
         self.db = db
         self.provider = settings.vision_provider
-        self.conversations: dict[str, list[dict]] = {}
+
+    async def _get_or_create_conversation(self, user: User, conversation_id: str | None) -> tuple[str, ChatConversation]:
+        """Busca ou cria uma conversa no banco de dados"""
+        if conversation_id:
+            result = await self.db.execute(
+                select(ChatConversation).where(
+                    ChatConversation.id == conversation_id,
+                    ChatConversation.user_id == user.id
+                )
+            )
+            conversation = result.scalar_one_or_none()
+            if conversation:
+                return conversation_id, conversation
+
+        # Criar nova conversa
+        new_id = str(uuid.uuid4())
+        conversation = ChatConversation(
+            id=new_id,
+            user_id=user.id
+        )
+        self.db.add(conversation)
+        await self.db.flush()
+        return new_id, conversation
+
+    async def _get_conversation_history(self, conversation_id: str) -> list[dict]:
+        """Busca as últimas mensagens da conversa do banco"""
+        result = await self.db.execute(
+            select(ChatMessage)
+            .where(ChatMessage.conversation_id == conversation_id)
+            .order_by(ChatMessage.created_at.desc())
+            .limit(MAX_MESSAGES_PER_CONVERSATION)
+        )
+        messages = result.scalars().all()
+        # Reverter ordem (mais antigas primeiro)
+        return [{"role": m.role.value, "content": m.content} for m in reversed(messages)]
+
+    async def _save_message(self, conversation_id: str, role: str, content: str):
+        """Salva mensagem e remove antigas se > limite"""
+        # Criar mensagem
+        message = ChatMessage(
+            conversation_id=conversation_id,
+            role=MessageRole(role),
+            content=content
+        )
+        self.db.add(message)
+        await self.db.flush()
+
+        # Contar mensagens
+        count_result = await self.db.execute(
+            select(func.count(ChatMessage.id))
+            .where(ChatMessage.conversation_id == conversation_id)
+        )
+        count = count_result.scalar()
+
+        # Se > limite, deletar as mais antigas
+        if count and count > MAX_MESSAGES_PER_CONVERSATION:
+            excess = count - MAX_MESSAGES_PER_CONVERSATION
+            oldest = await self.db.execute(
+                select(ChatMessage.id)
+                .where(ChatMessage.conversation_id == conversation_id)
+                .order_by(ChatMessage.created_at.asc())
+                .limit(excess)
+            )
+            old_ids = [row[0] for row in oldest.fetchall()]
+            if old_ids:
+                await self.db.execute(
+                    delete(ChatMessage).where(ChatMessage.id.in_(old_ids))
+                )
 
     async def chat(self, user: User, message: str, conversation_id: str | None = None) -> ChatResponse:
         """Processa mensagem do usuario e retorna resposta do agente"""
 
-        if not conversation_id:
-            conversation_id = str(uuid.uuid4())
-            self.conversations[conversation_id] = []
-
-        if conversation_id not in self.conversations:
-            self.conversations[conversation_id] = []
+        # Buscar ou criar conversa no banco
+        conversation_id, conversation = await self._get_or_create_conversation(user, conversation_id)
 
         # Analisar a pergunta para extrair periodo e filtros
         query_context = self._parse_query(message)
@@ -78,20 +145,28 @@ class FinancialAgentService:
         # Montar prompt do sistema
         system_prompt = self._build_enhanced_system_prompt(context, message)
 
-        # Adicionar mensagem ao historico
-        self.conversations[conversation_id].append({
+        # Buscar histórico do banco
+        history = await self._get_conversation_history(conversation_id)
+
+        # Adicionar mensagem do usuário ao histórico (em memória para chamar LLM)
+        history.append({
             "role": "user",
             "content": message
         })
 
         # Chamar LLM
-        response_text = await self._call_llm(system_prompt, self.conversations[conversation_id])
+        response_text = await self._call_llm(system_prompt, history)
 
-        # Adicionar resposta ao historico
-        self.conversations[conversation_id].append({
-            "role": "assistant",
-            "content": response_text
-        })
+        # Salvar mensagens no banco (user e assistant)
+        await self._save_message(conversation_id, "user", message)
+        await self._save_message(conversation_id, "assistant", response_text)
+
+        # Atualizar título da conversa se for a primeira mensagem
+        if not conversation.title:
+            conversation.title = message[:100] if len(message) <= 100 else message[:97] + "..."
+            conversation.updated_at = datetime.utcnow()
+
+        await self.db.commit()
 
         # Gerar sugestoes de follow-up
         suggestions = self._generate_smart_suggestions(message, context)

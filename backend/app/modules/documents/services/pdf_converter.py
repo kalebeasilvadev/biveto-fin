@@ -21,10 +21,14 @@ def convert_pdf_to_images_sync(pdf_content: bytes) -> tuple[list[tuple[bytes, st
         for page_num in range(len(pdf_doc)):
             page = pdf_doc[page_num]
             # Renderizar pagina como imagem com boa resolucao
-            mat = fitz.Matrix(2.0, 2.0)  # 2x zoom para melhor qualidade
+            mat = fitz.Matrix(1.5, 1.5)  # 1.5x zoom - boa qualidade para OCR com menor uso de memória
             pix = page.get_pixmap(matrix=mat)
             img_bytes = pix.tobytes("png")
             images.append((img_bytes, 'image/png'))
+
+            # Liberar memória da página imediatamente após processá-la
+            del pix
+            del page
 
         pdf_doc.close()
         return images, None
