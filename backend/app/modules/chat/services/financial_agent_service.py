@@ -89,32 +89,53 @@ class FinancialAgentService:
 
     # ========== ROUTER/COORDENADOR: Classificação de Intent ==========
 
-    async def _classify_intent_with_llm(self, message: str) -> list[str]:
-        """Usa LLM para classificar domínios relevantes da pergunta do usuário"""
+    async def _classify_intent_with_llm(self, message: str, history: list[dict] | None = None) -> list[str]:
+        """Usa LLM para classificar domínios relevantes da pergunta do usuário
+
+        Args:
+            message: Mensagem atual do usuário
+            history: Histórico da conversa (últimas mensagens) para contexto
+        """
+        # Construir contexto do histórico se disponível
+        history_context = ""
+        if history and len(history) > 0:
+            # Pegar últimas 4 mensagens (2 trocas user/assistant)
+            recent_messages = history[-4:]
+            history_lines = []
+            for msg in recent_messages:
+                role = "Usuário" if msg.get("role") == "user" else "Assistente"
+                content = msg.get("content", "")[:300]  # Limitar tamanho
+                history_lines.append(f"{role}: {content}")
+            history_context = "\n".join(history_lines)
 
         classification_prompt = f"""Classifique a pergunta do usuário nos domínios financeiros relevantes.
 
 DOMÍNIOS DISPONÍVEIS:
-- cartoes: cartões de crédito, faturas, limites, parcelas no cartão, fatura vencida
+- cartoes: cartões de crédito, faturas, limites, parcelas no cartão, fatura vencida, quitar cartão
 - mercado: compras de supermercado, produtos, preços, listas de compras, mercado
 - dividas: dívidas, empréstimos, financiamentos, juros, quitação, snowball, avalanche
 - orcamento: orçamento mensal, limites por categoria, gastos vs planejado, estourou
 - metas: metas financeiras, objetivos, PNIF, fundo de emergência, guardar dinheiro
 - recorrentes: assinaturas, Netflix, Spotify, contas fixas mensais, recorrentes
-- fluxo: fluxo de caixa, quando recebo, saldo futuro, projeções de receita
+- fluxo: fluxo de caixa, quando recebo, saldo futuro, projeções de receita, saldo disponível
 - beneficios: VA, VR, VT, vale alimentação, vale refeição, benefício
 - envelopes: envelope budgeting, limite diário, quanto posso gastar hoje, envelopes
 - calendario: calendário financeiro, vencimentos futuros, próximos pagamentos, agenda
 - revisao: review semanal, análise da semana, transações sem categoria, o que mudou
 - automacoes: automações, regras automáticas, transferências programadas, robôs
-- geral: visão geral, resumo, saúde financeira, como estou, minhas finanças
+- geral: visão geral, resumo, saúde financeira, impacto financeiro, planejamento
 
-PERGUNTA: "{message}"
+{"CONTEXTO DA CONVERSA (mensagens anteriores):" + chr(10) + history_context + chr(10) if history_context else ""}
+MENSAGEM ATUAL DO USUÁRIO: "{message}"
+
+REGRAS DE CLASSIFICAÇÃO:
+1. Se a mensagem for curta (sim, não, quero, ok, etc.), USE O CONTEXTO DA CONVERSA para entender o assunto
+2. Se a conversa anterior falava de cartões e o usuário confirma algo, mantenha "cartoes"
+3. Se o usuário quer "avaliar impacto" ou "planejamento", adicione "fluxo" e/ou "geral" junto com o domínio principal
+4. Se envolver múltiplos domínios específicos, liste todos (máximo 3)
 
 Responda APENAS com os domínios separados por vírgula, sem explicação.
-Exemplos de resposta: "cartoes,dividas" ou "geral" ou "mercado" ou "envelopes"
-Se a pergunta for ampla ou sobre resumo geral, use "geral".
-Se envolver múltiplos domínios específicos, liste todos (máximo 3)."""
+Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
 
         try:
             response = await self._call_classification_llm(classification_prompt)
@@ -128,7 +149,20 @@ Se envolver múltiplos domínios específicos, liste todos (máximo 3)."""
             return domains if domains else ["geral"]
         except Exception:
             # Fallback para classificação por keywords se LLM falhar
+            # Se mensagem é curta e temos histórico, tentar extrair domínio do histórico
+            if history and len(message.strip()) < 15:
+                return self._classify_from_history(history)
             return self._classify_intent_by_keywords(message)
+
+    def _classify_from_history(self, history: list[dict]) -> list[str]:
+        """Extrai domínios do histórico quando a mensagem atual é muito curta"""
+        # Concatenar últimas mensagens do histórico
+        recent_text = " ".join([
+            msg.get("content", "")
+            for msg in history[-4:]
+            if msg.get("role") == "user"
+        ])
+        return self._classify_intent_by_keywords(recent_text)
 
     async def _call_classification_llm(self, prompt: str) -> str:
         """Chama LLM pequeno para classificação (baixo custo, rápido)"""
@@ -1718,11 +1752,15 @@ COMO RESPONDER:
         # Buscar ou criar conversa no banco
         conversation_id, conversation = await self._get_or_create_conversation(user, conversation_id)
 
+        # Buscar histórico do banco ANTES de classificar (para contexto)
+        history = await self._get_conversation_history(conversation_id)
+
         # Analisar a pergunta para extrair periodo e filtros
         query_context = self._parse_query(message)
 
         # ========== ROUTER: Classificar domínios relevantes ==========
-        domains = await self._classify_intent_with_llm(message)
+        # Passa o histórico para o classificador entender o contexto da conversa
+        domains = await self._classify_intent_with_llm(message, history)
 
         # ========== BUSCAR CONTEXTO ESPECÍFICO DOS DOMÍNIOS ==========
         # Isso busca apenas os dados necessários, não todos os 20+ contextos
@@ -1731,9 +1769,6 @@ COMO RESPONDER:
 
         # ========== MONTAR PROMPT ESPECIALIZADO ==========
         system_prompt = self._build_expert_system_prompt(context, domains, message)
-
-        # Buscar histórico do banco
-        history = await self._get_conversation_history(conversation_id)
 
         # Adicionar mensagem do usuário ao histórico (em memória para chamar LLM)
         history.append({

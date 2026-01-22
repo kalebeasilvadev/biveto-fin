@@ -230,7 +230,7 @@ export default function Chat() {
       <div
         className={clsx(
           'w-72 lg:w-80 border-r border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/50 flex-shrink-0 flex flex-col transition-transform duration-300 z-50',
-          'fixed lg:relative inset-y-0 left-0 lg:translate-x-0',
+          'fixed inset-y-0 left-0',
           showSidebar ? 'translate-x-0' : '-translate-x-full'
         )}
       >
