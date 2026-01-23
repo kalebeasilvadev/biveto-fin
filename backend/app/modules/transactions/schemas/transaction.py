@@ -33,6 +33,17 @@ class TransactionCreate(TransactionBase):
     recurring_day_of_month: int | None = None  # Para frequencia mensal
     recurring_day_of_week: int | None = None  # Para frequencia semanal (0-6)
 
+    # Campos de parcelamento
+    is_installment: bool = False
+    installment_current: int | None = None  # Numero da parcela atual (1-based)
+    installment_total: int | None = None  # Total de parcelas
+    installment_series_id: int | None = None  # Vincular a serie existente (opcional)
+    create_future_installments: bool = False  # Criar parcelas futuras automaticamente
+
+    # Campos de fatura (quando cartao de credito)
+    invoice_month: int | None = None  # Mes de referencia da fatura (1-12)
+    invoice_year: int | None = None   # Ano de referencia da fatura
+
 
 class TransactionConfirm(BaseModel):
     """Confirmacao de transacao a partir de documento processado"""
