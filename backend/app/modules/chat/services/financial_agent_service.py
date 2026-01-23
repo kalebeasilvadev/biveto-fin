@@ -278,7 +278,11 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
     # ========== CONTEXTOS ESPECIALIZADOS POR DOMÍNIO ==========
 
     async def _get_credit_card_expert_context(self, user: User) -> dict[str, Any]:
-        """Contexto detalhado para o especialista de cartões"""
+        """Contexto detalhado para o especialista de cartões com análise completa de faturas e parcelas"""
+        today = date.today()
+        mes_atual = today.month
+        ano_atual = today.year
+
         # Buscar cartões ativos
         credit_cards_result = await self.db.execute(
             select(CreditCard).where(
@@ -288,7 +292,7 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
         )
         credit_cards_list = credit_cards_result.scalars().all()
 
-        # Buscar parcelas ativas para vincular aos cartões
+        # Buscar todas as parcelas ativas
         installments_result = await self.db.execute(
             select(InstallmentSeries).where(
                 InstallmentSeries.user_id == user.id,
@@ -297,97 +301,272 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
         )
         all_installments = installments_result.scalars().all()
 
+        # Buscar nomes das contas (cartões)
+        account_ids = [card.account_id for card in credit_cards_list]
+        accounts_dict: dict[int, str] = {}
+        if account_ids:
+            accounts_result = await self.db.execute(
+                select(Account).where(Account.id.in_(account_ids))
+            )
+            accounts_dict = {a.id: a.name for a in accounts_result.scalars().all()}
+
         cartoes_info = []
-        total_em_aberto = 0
+        total_faturas_abertas = 0
+        total_parcelas_mensais = 0
+        total_parcelas_restantes = 0
 
         for card in credit_cards_list:
-            # Buscar faturas abertas (OPEN) e próximas a vencer (CLOSED)
+            card_name = accounts_dict.get(card.account_id, "Cartão")
+
+            # Buscar TODAS as faturas (não apenas abertas) para projeção
             invoices_result = await self.db.execute(
                 select(CreditCardInvoice).where(
-                    CreditCardInvoice.credit_card_id == card.id,
-                    or_(
-                        CreditCardInvoice.status == InvoiceStatus.OPEN.value,
-                        CreditCardInvoice.status == InvoiceStatus.CLOSED.value,
-                        CreditCardInvoice.status == InvoiceStatus.PARTIAL.value,
-                        CreditCardInvoice.status == InvoiceStatus.OVERDUE.value
-                    )
+                    CreditCardInvoice.credit_card_id == card.id
                 ).order_by(
-                    CreditCardInvoice.reference_year.desc(),
-                    CreditCardInvoice.reference_month.desc()
+                    CreditCardInvoice.reference_year.asc(),
+                    CreditCardInvoice.reference_month.asc()
                 )
             )
-            invoices_list = invoices_result.scalars().all()
+            all_invoices = invoices_result.scalars().all()
 
-            # Calcular saldo em aberto
-            saldo_em_aberto = sum(
-                float(inv.remaining_amount)
-                for inv in invoices_list
-                if inv.status != InvoiceStatus.PAID.value
-            )
-            total_em_aberto += saldo_em_aberto
+            # Separar faturas por status e período
+            faturas_abertas = []
+            fatura_mes_atual = None
+            fatura_proximo_mes = None
 
-            # Buscar conta vinculada para pegar o nome
-            account_result = await self.db.execute(
-                select(Account).where(Account.id == card.account_id)
-            )
-            account = account_result.scalar_one_or_none()
-            card_name = account.name if account else "Cartão"
+            for inv in all_invoices:
+                remaining = float(inv.total_amount) - float(inv.paid_amount or 0)
 
-            # Filtrar parcelas vinculadas a este cartão
-            parcelas_do_cartao = [
-                {
-                    "descricao": s.description,
-                    "valor_parcela": float(s.installment_amount),
-                    "parcelas_restantes": s.installment_count - s.paid_count,
-                    "valor_restante_total": float(s.installment_amount * (s.installment_count - s.paid_count))
-                }
-                for s in all_installments
-                if s.credit_card_id == card.id
-            ]
+                if inv.status not in (InvoiceStatus.PAID.value,) and remaining > 0:
+                    fatura_info = {
+                        "periodo": f"{inv.reference_month:02d}/{inv.reference_year}",
+                        "mes": inv.reference_month,
+                        "ano": inv.reference_year,
+                        "status": inv.status,
+                        "valor_total": float(inv.total_amount),
+                        "valor_pago": float(inv.paid_amount or 0),
+                        "valor_restante": remaining,
+                        "vencimento": inv.due_date.strftime("%d/%m/%Y") if inv.due_date else None,
+                        "vencida": inv.due_date < today if inv.due_date else False
+                    }
+                    faturas_abertas.append(fatura_info)
 
-            # Calcular impacto mensal = fatura atual + parcelas do cartão
-            fatura_atual = invoices_list[0].remaining_amount if invoices_list else 0
-            parcelas_mes = sum(p["valor_parcela"] for p in parcelas_do_cartao)
-            impacto_mensal = float(fatura_atual) + parcelas_mes
+                    # Identificar fatura do mês atual e próximo
+                    if inv.reference_month == mes_atual and inv.reference_year == ano_atual:
+                        fatura_mes_atual = fatura_info
+                    elif (inv.reference_month == mes_atual + 1 and inv.reference_year == ano_atual) or \
+                         (inv.reference_month == 1 and mes_atual == 12 and inv.reference_year == ano_atual + 1):
+                        fatura_proximo_mes = fatura_info
 
-            faturas_info = []
-            for inv in invoices_list[:3]:
-                faturas_info.append({
-                    "periodo": inv.period_display,
-                    "status": inv.status,
-                    "valor_total": float(inv.total_amount),
-                    "valor_restante": float(inv.remaining_amount),
-                    "vencimento": inv.due_date.strftime("%d/%m/%Y"),
-                    "vencida": inv.is_overdue
+            # Calcular total de faturas abertas deste cartão
+            saldo_faturas = sum(f["valor_restante"] for f in faturas_abertas)
+            total_faturas_abertas += saldo_faturas
+
+            # Filtrar parcelas deste cartão e calcular projeção por mês
+            parcelas_do_cartao = []
+            parcelas_mes_valor = 0
+            parcelas_total_valor = 0
+            projecao_por_mes: dict[str, dict] = {}  # "MM/YYYY" -> {valor, itens}
+
+            for s in all_installments:
+                if s.credit_card_id == card.id:
+                    restantes = (s.installment_count or 0) - (s.paid_count or 0)
+                    if restantes > 0:
+                        valor_parcela = float(s.installment_amount or 0)
+                        valor_total = valor_parcela * restantes
+                        parcelas_pagas = s.paid_count or 0
+                        parcelas_total = s.installment_count or 0
+
+                        parcelas_do_cartao.append({
+                            "descricao": s.description,
+                            "valor_parcela": valor_parcela,
+                            "parcelas_pagas": parcelas_pagas,
+                            "parcelas_total": parcelas_total,
+                            "parcelas_restantes": restantes,
+                            "valor_total_restante": valor_total
+                        })
+
+                        parcelas_mes_valor += valor_parcela
+                        parcelas_total_valor += valor_total
+
+                        # Calcular em quais meses futuras esta parcela vai cair
+                        if s.first_installment_date:
+                            for i in range(restantes):
+                                # Número da parcela futura (ex: se pagou 3, próxima é 4)
+                                num_parcela = parcelas_pagas + i + 1
+                                # Meses desde a primeira parcela
+                                meses_offset = num_parcela - 1
+                                # Data desta parcela
+                                ano_parcela = s.first_installment_date.year + (s.first_installment_date.month + meses_offset - 1) // 12
+                                mes_parcela = (s.first_installment_date.month + meses_offset - 1) % 12 + 1
+
+                                chave_mes = f"{mes_parcela:02d}/{ano_parcela}"
+
+                                if chave_mes not in projecao_por_mes:
+                                    projecao_por_mes[chave_mes] = {
+                                        "mes": mes_parcela,
+                                        "ano": ano_parcela,
+                                        "valor_total": 0,
+                                        "itens": []
+                                    }
+
+                                projecao_por_mes[chave_mes]["valor_total"] += valor_parcela
+                                projecao_por_mes[chave_mes]["itens"].append({
+                                    "descricao": s.description,
+                                    "parcela": f"{num_parcela}/{parcelas_total}",
+                                    "valor": valor_parcela
+                                })
+
+            total_parcelas_mensais += parcelas_mes_valor
+            total_parcelas_restantes += parcelas_total_valor
+
+            # Ordenar projeção por data (mais próximo primeiro)
+            projecao_faturas_futuras = []
+            for chave in sorted(projecao_por_mes.keys(), key=lambda x: (int(x.split("/")[1]), int(x.split("/")[0]))):
+                dados = projecao_por_mes[chave]
+                projecao_faturas_futuras.append({
+                    "periodo": chave,
+                    "mes": dados["mes"],
+                    "ano": dados["ano"],
+                    "valor_total": round(dados["valor_total"], 2),
+                    "quantidade_itens": len(dados["itens"]),
+                    "itens": dados["itens"]
                 })
 
+            # IMPACTO MENSAL = soma das parcelas mensais (isso é o que vai compor as faturas futuras)
+            # Nota: a fatura atual já contém as parcelas do mês, então o impacto futuro são as parcelas
+            impacto_mensal = parcelas_mes_valor
+
+            # VALOR PARA ZERAR O CARTÃO = total de todas as parcelas restantes
+            # (pagar antecipado elimina o impacto mensal)
+            valor_para_zerar = parcelas_total_valor
+
             # Calcular utilização do limite
-            utilizacao_limite = round((saldo_em_aberto / float(card.credit_limit)) * 100, 1) if card.credit_limit > 0 else 0
+            limite = float(card.credit_limit) if card.credit_limit else 0
+            utilizacao = round((saldo_faturas / limite) * 100, 1) if limite > 0 else 0
 
             cartoes_info.append({
                 "nome": card_name,
                 "bandeira": card.card_brand,
                 "ultimos_digitos": card.last_four_digits,
-                "limite_total": float(card.credit_limit),
-                "saldo_em_aberto": saldo_em_aberto,
-                "limite_disponivel": float(card.credit_limit) - saldo_em_aberto,
-                "utilizacao_limite_percentual": utilizacao_limite,
+                "limite_total": limite,
+                "limite_disponivel": limite - saldo_faturas,
+                "utilizacao_limite_percentual": utilizacao,
                 "dia_fechamento": card.closing_day,
                 "dia_vencimento": card.due_day,
-                "faturas": faturas_info,
-                "parcelas_vinculadas": parcelas_do_cartao,
-                "impacto_mensal": impacto_mensal
+                # Faturas existentes (já abertas no sistema)
+                "faturas_abertas": faturas_abertas,
+                "total_faturas_abertas": saldo_faturas,
+                "fatura_mes_atual": fatura_mes_atual,
+                "fatura_proximo_mes": fatura_proximo_mes,
+                # Parcelas ativas
+                "parcelas": parcelas_do_cartao,
+                "parcelas_por_mes": parcelas_mes_valor,
+                "total_parcelas_restantes": parcelas_total_valor,
+                "quantidade_parcelas_ativas": len(parcelas_do_cartao),
+                # PROJEÇÃO DE FATURAS FUTURAS - mês a mês com itens detalhados
+                "projecao_faturas_futuras": projecao_faturas_futuras,
+                # Impacto e estratégia
+                "impacto_mensal": impacto_mensal,
+                "valor_para_zerar_cartao": valor_para_zerar,
+                # Meses até zerar (se não pagar antecipado)
+                "meses_para_zerar": max([p["parcelas_restantes"] for p in parcelas_do_cartao]) if parcelas_do_cartao else 0
             })
 
         # Ordenar por impacto mensal (maior primeiro)
         cartoes_info.sort(key=lambda c: c["impacto_mensal"], reverse=True)
 
+        # Calcular estratégias de redução
+        estrategias_reducao = self._calcular_estrategias_reducao(cartoes_info, total_parcelas_mensais)
+
         return {
             "cartoes": cartoes_info,
-            "total_em_aberto": total_em_aberto,
-            "cartao_maior_impacto": cartoes_info[0] if cartoes_info else None,
             "quantidade_cartoes": len(cartoes_info),
-            "cartoes_com_limite_apertado": [c for c in cartoes_info if c["utilizacao_limite_percentual"] > 70]
+            # Totais
+            "total_faturas_abertas": total_faturas_abertas,
+            "total_parcelas_mensais": total_parcelas_mensais,
+            "total_parcelas_restantes": total_parcelas_restantes,
+            # Destaques
+            "cartao_maior_impacto": cartoes_info[0] if cartoes_info else None,
+            "cartoes_com_limite_apertado": [c for c in cartoes_info if c["utilizacao_limite_percentual"] > 70],
+            # Estratégias para reduzir custo mensal
+            "estrategias_reducao": estrategias_reducao,
+            # Resumo
+            "resumo": {
+                "impacto_mensal_total": total_parcelas_mensais,
+                "valor_para_zerar_todos": total_parcelas_restantes,
+                "faturas_em_aberto": total_faturas_abertas
+            }
+        }
+
+    def _calcular_estrategias_reducao(self, cartoes: list[dict], total_mensal: float) -> dict:
+        """Calcula estratégias para reduzir o custo mensal de cartões"""
+        if not cartoes or total_mensal == 0:
+            return {}
+
+        # Ordenar por impacto mensal (maior primeiro) para estratégia de redução
+        cartoes_ordenados = sorted(cartoes, key=lambda c: c["impacto_mensal"], reverse=True)
+
+        # Estratégia 1: Reduzir para 50% do atual
+        meta_50 = total_mensal * 0.5
+        estrategia_50 = self._calcular_cartoes_para_meta(cartoes_ordenados, meta_50, total_mensal)
+
+        # Estratégia 2: Reduzir para R$ 3.000
+        estrategia_3k = self._calcular_cartoes_para_meta(cartoes_ordenados, 3000, total_mensal)
+
+        # Estratégia 3: Reduzir para R$ 5.000
+        estrategia_5k = self._calcular_cartoes_para_meta(cartoes_ordenados, 5000, total_mensal)
+
+        # Estratégia 4: Zerar tudo
+        estrategia_zerar = {
+            "meta_mensal": 0,
+            "valor_necessario": sum(c["valor_para_zerar_cartao"] for c in cartoes),
+            "cartoes_a_quitar": [{"nome": c["nome"], "valor": c["valor_para_zerar_cartao"], "impacto_eliminado": c["impacto_mensal"]} for c in cartoes if c["valor_para_zerar_cartao"] > 0],
+            "impacto_mensal_restante": 0
+        }
+
+        return {
+            "atual": {
+                "impacto_mensal": total_mensal,
+                "total_parcelas": sum(c["total_parcelas_restantes"] for c in cartoes)
+            },
+            "reduzir_para_metade": estrategia_50,
+            "reduzir_para_3k": estrategia_3k,
+            "reduzir_para_5k": estrategia_5k,
+            "zerar_tudo": estrategia_zerar
+        }
+
+    def _calcular_cartoes_para_meta(self, cartoes: list[dict], meta: float, total_atual: float) -> dict:
+        """Calcula quais cartões quitar para atingir uma meta de custo mensal"""
+        if total_atual <= meta:
+            return {
+                "meta_mensal": meta,
+                "valor_necessario": 0,
+                "cartoes_a_quitar": [],
+                "impacto_mensal_restante": total_atual,
+                "ja_atingida": True
+            }
+
+        impacto_restante = total_atual
+        valor_necessario = 0
+        cartoes_a_quitar = []
+
+        for card in cartoes:
+            if impacto_restante > meta and card["valor_para_zerar_cartao"] > 0:
+                impacto_restante -= card["impacto_mensal"]
+                valor_necessario += card["valor_para_zerar_cartao"]
+                cartoes_a_quitar.append({
+                    "nome": card["nome"],
+                    "valor": card["valor_para_zerar_cartao"],
+                    "impacto_eliminado": card["impacto_mensal"]
+                })
+
+        return {
+            "meta_mensal": meta,
+            "valor_necessario": round(valor_necessario, 2),
+            "cartoes_a_quitar": cartoes_a_quitar,
+            "impacto_mensal_restante": round(impacto_restante, 2),
+            "ja_atingida": False
         }
 
     async def _get_grocery_expert_context(self, user: User, period_start: date, period_end: date, household_user_ids: list[int]) -> dict[str, Any]:
@@ -1457,20 +1636,85 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
             "cartoes": """## ESPECIALISTA EM CARTÕES DE CRÉDITO 💳
 
 DADOS DISPONÍVEIS EM context["cartoes"]:
-- cartoes: lista de cartões com limite, saldo_em_aberto, faturas, parcelas_vinculadas
-- Para cada cartão: faturas (valor_total, valor_restante, vencimento, vencida)
-- parcelas_vinculadas: parcelas ativas DESTE cartão específico
-- impacto_mensal: fatura atual + parcelas (JÁ CALCULADO para você!)
-- cartao_maior_impacto: cartão com maior impacto mensal
+
+### ESTRUTURA PRINCIPAL:
+- cartoes: lista de cartões ordenados por impacto_mensal (maior primeiro)
+- quantidade_cartoes: total de cartões ativos
+- cartao_maior_impacto: cartão com maior impacto mensal (JÁ IDENTIFICADO!)
 - cartoes_com_limite_apertado: cartões com >70% do limite usado
 
-COMO RESPONDER PERGUNTAS DE CARTÃO:
-1. "qual cartão tem maior impacto?" → Use cartao_maior_impacto, mostre impacto_mensal
-2. "como estão meus cartões?" → Liste resumo de cada cartão com utilizacao_limite_percentual
-3. "faturas vencidas?" → Procure faturas com vencida=true
-4. "limite disponível?" → Mostre limite_disponivel de cada cartão
+### TOTAIS GERAIS:
+- total_faturas_abertas: soma das faturas NÃO PAGAS (dívida atual)
+- total_parcelas_mensais: quanto cai TODO MÊS em parcelas (impacto recorrente)
+- total_parcelas_restantes: soma de TODAS as parcelas futuras (para quitar tudo)
 
-NUNCA confunda faturas_futuras (projeção GERAL) com faturas de cartão específico!""",
+### PARA CADA CARTÃO:
+- nome, bandeira, ultimos_digitos
+- limite_total, limite_disponivel, utilizacao_limite_percentual
+- dia_fechamento, dia_vencimento
+- faturas_abertas: lista de faturas com valor_total, valor_restante, vencimento, vencida
+- total_faturas_abertas: total das faturas deste cartão
+- parcelas: lista detalhada (descricao, valor_parcela, parcelas_restantes, valor_total_restante)
+- parcelas_por_mes: valor mensal das parcelas DESTE cartão
+- total_parcelas_restantes: soma de todas as parcelas restantes DESTE cartão
+- impacto_mensal: quanto este cartão impacta TODO MÊS (parcelas mensais)
+- valor_para_zerar_cartao: quanto precisa pagar para ELIMINAR o impacto mensal deste cartão
+- meses_para_zerar: em quantos meses as parcelas terminam naturalmente
+- projecao_faturas_futuras: PROJEÇÃO MÊS A MÊS com itens detalhados
+
+### PROJEÇÃO DE FATURAS FUTURAS (projecao_faturas_futuras):
+Para cada cartão, há uma lista de faturas futuras mês a mês:
+```
+[
+  {
+    "periodo": "02/2026",
+    "mes": 2, "ano": 2026,
+    "valor_total": 2632.21,
+    "quantidade_itens": 5,
+    "itens": [
+      {"descricao": "TV Samsung", "parcela": "3/10", "valor": 500.00},
+      {"descricao": "iPhone", "parcela": "5/12", "valor": 800.00},
+      ...
+    ]
+  },
+  ...
+]
+```
+Use para mostrar ao usuário EXATAMENTE o que vai cair em cada fatura futura!
+
+### ESTRATÉGIAS DE REDUÇÃO PRÉ-CALCULADAS (estrategias_reducao):
+- atual: impacto_mensal atual e total_parcelas
+- reduzir_para_metade: quais cartões quitar para reduzir 50%
+- reduzir_para_3k: quais cartões quitar para chegar a R$3.000/mês
+- reduzir_para_5k: quais cartões quitar para chegar a R$5.000/mês
+- zerar_tudo: quanto pagar para eliminar todas as parcelas
+
+Cada estratégia contém:
+  - valor_necessario: quanto precisa pagar
+  - cartoes_a_quitar: lista de cartões a pagar com nome, valor e impacto_eliminado
+  - impacto_mensal_restante: quanto ficará o custo mensal após pagar
+
+COMO RESPONDER:
+1. "qual cartão tem maior impacto?" → Use cartao_maior_impacto, mostre impacto_mensal e valor_para_zerar_cartao
+2. "como reduzir meu custo mensal para X?" → Use estrategias_reducao, mostre cartoes_a_quitar e valor_necessario
+3. "quanto preciso para zerar?" → Use estrategias_reducao["zerar_tudo"]["valor_necessario"]
+4. "como estão meus cartões?" → Liste resumo com impacto_mensal e utilizacao_limite_percentual
+5. "faturas vencidas?" → Procure faturas com vencida=true em faturas_abertas
+6. "limite disponível?" → Mostre limite_disponivel de cada cartão
+7. "o que vai cair na fatura de X?" → Use projecao_faturas_futuras, liste os itens do mês solicitado
+8. "quero antecipar parcelas" → Use projecao_faturas_futuras para mostrar quais itens podem ser antecipados
+9. "detalhe as parcelas do cartão X" → Use parcelas e projecao_faturas_futuras do cartão específico
+
+PARA ANTECIPAR PARCELAS:
+- Mostre projecao_faturas_futuras do cartão com os itens detalhados
+- Explique que antecipar a parcela X eliminará R$Y das próximas Z faturas
+- Use valor_total_restante de cada parcela para mostrar quanto custa antecipar
+
+DIFERENÇA IMPORTANTE:
+- total_faturas_abertas = dívida atual (faturas a pagar agora)
+- total_parcelas_restantes = tudo que ainda vai cair nas faturas futuras
+- impacto_mensal = quanto cai por mês de parcelas (recorrente)
+- valor_para_zerar_cartao = pagar antecipado para eliminar o impacto mensal""",
 
             "mercado": """## ESPECIALISTA EM MERCADO/COMPRAS 🛒
 
