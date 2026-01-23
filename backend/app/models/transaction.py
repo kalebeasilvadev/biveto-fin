@@ -113,7 +113,9 @@ class Transaction(Base):
     merchant: Mapped["Merchant | None"] = relationship(back_populates="transactions", lazy="noload")
     document: Mapped["Document | None"] = relationship(back_populates="transaction", lazy="noload")
     installment_series: Mapped["InstallmentSeries | None"] = relationship(
-        back_populates="transactions", lazy="noload"
+        back_populates="transactions",
+        foreign_keys=[installment_series_id],
+        lazy="noload"
     )
     recurring_source: Mapped["RecurringTransaction | None"] = relationship(
         back_populates="generated_transactions",

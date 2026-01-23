@@ -75,7 +75,14 @@ class InstallmentSeries(Base):
     merchant: Mapped["Merchant | None"] = relationship()
     credit_card: Mapped["CreditCard | None"] = relationship()
     transactions: Mapped[list["Transaction"]] = relationship(
-        back_populates="installment_series", lazy="noload"
+        back_populates="installment_series",
+        foreign_keys="Transaction.installment_series_id",
+        lazy="noload"
+    )
+    # Relacionamento com a transação que originou a série
+    first_transaction: Mapped["Transaction | None"] = relationship(
+        foreign_keys=[first_transaction_id],
+        lazy="noload"
     )
 
     @property
