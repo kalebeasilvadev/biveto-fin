@@ -25,23 +25,46 @@ class InstallmentService:
     async def find_matching_series(
         self,
         user: User,
-        merchant_name: str,
-        installment_amount: float,
-        installment_total: int,
+        first_transaction_id: int | None = None,
+        # Parâmetros legados mantidos para compatibilidade (depreciar no futuro)
+        merchant_name: str | None = None,
+        installment_amount: float | None = None,
+        installment_total: int | None = None,
         account_id: int | None = None,
         transaction_date: date | None = None,
         installment_number: int | None = None,
     ) -> InstallmentSeries | None:
         """
-        Busca uma série de parcelas existente que corresponda aos critérios.
+        Busca uma série de parcelas existente.
 
-        Critérios de match:
+        NOVA LÓGICA (preferencial):
+        - Se first_transaction_id fornecido, busca série vinculada a essa transação
+        - Isso garante que cada compra tenha sua própria série
+
+        LÓGICA LEGADA (fallback para compatibilidade):
         - Mesmo merchant (normalizado)
         - Valor similar (±5%)
         - Mesmo total de parcelas
         - Série ainda ativa
         - Data da primeira parcela compatível (se fornecida data e número da parcela)
         """
+        # Nova lógica: buscar por first_transaction_id (preferencial)
+        if first_transaction_id:
+            result = await self.db.execute(
+                select(InstallmentSeries).where(
+                    and_(
+                        InstallmentSeries.user_id == user.id,
+                        InstallmentSeries.first_transaction_id == first_transaction_id,
+                        InstallmentSeries.status == InstallmentSeriesStatus.ACTIVE,
+                    )
+                )
+            )
+            return result.scalar_one_or_none()
+
+        # Fallback: lógica legada para compatibilidade
+        if not merchant_name or not installment_amount or not installment_total:
+            return None
+
         normalized_merchant = merchant_name.lower().strip()
 
         # Calcular range de valor
@@ -173,11 +196,18 @@ class InstallmentService:
         installment_count: int,
         first_installment_date: date,
         account_id: int,
+        first_transaction_id: int | None = None,  # NOVO: vincula à transação que originou a série
         category_id: int | None = None,
         purchase_date: date | None = None,
         credit_card_id: int | None = None,
     ) -> InstallmentSeries:
-        """Cria uma nova série de parcelas"""
+        """
+        Cria uma nova série de parcelas.
+
+        Args:
+            first_transaction_id: ID da transação que originou esta série.
+                                  Garante unicidade - uma transação só pode ser origem de uma série.
+        """
         # Obter ou criar merchant
         merchant_id = await self._get_or_create_merchant(merchant_name)
 
@@ -196,6 +226,7 @@ class InstallmentService:
             account_id=account_id,
             category_id=category_id,
             credit_card_id=credit_card_id,
+            first_transaction_id=first_transaction_id,  # NOVO
             status=InstallmentSeriesStatus.ACTIVE,
             paid_count=0,
         )

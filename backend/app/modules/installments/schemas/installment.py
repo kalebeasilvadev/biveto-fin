@@ -38,6 +38,7 @@ class InstallmentSeriesResponse(BaseModel):
     purchase_date: date_type | None
     account_id: int
     category_id: int | None
+    first_transaction_id: int | None  # ID da transação que originou a série
     status: InstallmentSeriesStatus
     created_at: datetime
     updated_at: datetime

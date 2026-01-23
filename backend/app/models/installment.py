@@ -52,6 +52,15 @@ class InstallmentSeries(Base):
     )
     paid_count: Mapped[int] = mapped_column(default=0)  # Quantas parcelas foram pagas
 
+    # Vínculo à transação que originou a série
+    # Isso garante que cada compra tenha sua própria série, mesmo com mesmo merchant/valor
+    first_transaction_id: Mapped[int | None] = mapped_column(
+        ForeignKey('transactions.id', ondelete='SET NULL'),
+        nullable=True,
+        unique=True,  # Uma transação só pode ser origem de uma série
+        index=True
+    )
+
     # Metadados
     notes: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

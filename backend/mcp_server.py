@@ -805,7 +805,21 @@ async def _listar_parcelas(session: AsyncSession, user: User, args: dict) -> lis
 
 
 async def _criar_transacao_parcelada(session: AsyncSession, user: User, args: dict) -> list[TextContent]:
-    """Cria uma transação parcelada"""
+    """
+    Cria uma transação parcelada - NOVO FLUXO.
+
+    Fluxo corrigido:
+    1. Criar transação primeiro (sem série)
+    2. Criar série vinculada a esta transação
+    3. Vincular transação à série
+    4. Criar parcelas futuras se solicitado
+
+    Isso garante que cada compra tenha sua própria série, mesmo quando
+    têm mesmo merchant, valor e total de parcelas.
+    """
+    from dateutil.relativedelta import relativedelta
+    from app.models.transaction import Transaction, TransactionType
+
     installment_service = InstallmentService(session)
 
     # Validar conta
@@ -834,32 +848,49 @@ async def _criar_transacao_parcelada(session: AsyncSession, user: User, args: di
     marcar_anteriores = args.get("marcar_anteriores_pagas", True)
     criar_futuras = args.get("criar_futuras", False)
 
-    # Verificar se já existe série similar
-    series = await installment_service.find_matching_series(
-        user=user,
-        merchant_name=merchant_name,
-        installment_amount=valor_parcela,
-        installment_total=total_parcelas,
-        account_id=args["conta_id"],
-    )
-
-    created_series = False
-    if not series:
-        # Criar nova série
-        series = await installment_service.create_series(
-            user=user,
-            description=descricao,
-            merchant_name=merchant_name,
-            installment_amount=valor_parcela,
-            installment_count=total_parcelas,
-            first_installment_date=transaction_date,
-            account_id=args["conta_id"],
-            category_id=category_id,
-        )
-        created_series = True
-
     output = ""
     transactions_created = []
+
+    # NOVO FLUXO: Criar transação primeiro, depois criar série vinculada a ela
+
+    # PASSO 1: Criar a transação primeiro (sem série)
+    transaction = Transaction(
+        user_id=user.id,
+        account_id=args["conta_id"],
+        category_id=category_id,
+        type=TransactionType.EXPENSE,
+        amount=valor_parcela,
+        date=transaction_date,
+        description=descricao,
+        installment_number=parcela_atual,
+        installment_total=total_parcelas,
+        is_paid=True,
+        is_fixed=True,
+    )
+    session.add(transaction)
+    await session.flush()
+    await session.refresh(transaction)
+
+    # PASSO 2: Criar série vinculada a ESTA transação
+    first_installment_date = transaction_date - relativedelta(months=parcela_atual - 1)
+
+    series = await installment_service.create_series(
+        user=user,
+        description=descricao,
+        merchant_name=merchant_name,
+        installment_amount=valor_parcela,
+        installment_count=total_parcelas,
+        first_installment_date=first_installment_date,
+        account_id=args["conta_id"],
+        category_id=category_id,
+        first_transaction_id=transaction.id,  # VINCULA À TRANSAÇÃO
+    )
+
+    # PASSO 3: Vincular transação à série e incrementar paid_count
+    transaction.installment_series_id = series.id
+    series.paid_count += 1
+
+    transactions_created.append(transaction)
 
     # Marcar anteriores como pagas
     if marcar_anteriores and parcela_atual > 1:
@@ -870,24 +901,9 @@ async def _criar_transacao_parcelada(session: AsyncSession, user: User, args: di
         )
         transactions_created.extend(previous)
         if previous:
-            output += f"📝 Parcelas 1 a {parcela_atual - 1} marcadas como pagas (retroativamente)\n"
+            output += f"Parcelas 1 a {parcela_atual - 1} marcadas como pagas (retroativamente)\n"
 
-    # Criar transação da parcela atual
-    try:
-        transaction = await installment_service.create_installment_transaction(
-            user=user,
-            series=series,
-            installment_number=parcela_atual,
-            transaction_date=transaction_date,
-            is_paid=True,
-        )
-        transactions_created.append(transaction)
-    except Exception as e:
-        if "já cadastrada" in str(e):
-            return [TextContent(type="text", text=f"⚠️ Parcela {parcela_atual}/{total_parcelas} já foi cadastrada anteriormente.")]
-        raise
-
-    # Criar futuras se solicitado
+    # PASSO 4: Criar futuras se solicitado
     if criar_futuras:
         future = await installment_service.create_future_installments(
             user=user,
@@ -896,23 +912,20 @@ async def _criar_transacao_parcelada(session: AsyncSession, user: User, args: di
         )
         transactions_created.extend(future)
         if future:
-            output += f"📅 Criadas {len(future)} parcelas futuras como pendentes\n"
+            output += f"Criadas {len(future)} parcelas futuras como pendentes\n"
 
     await session.commit()
 
-    output = f"✅ **Parcela {parcela_atual}/{total_parcelas} cadastrada!**\n\n"
-    output += f"📦 **{descricao}**\n"
+    output = f"**Parcela {parcela_atual}/{total_parcelas} cadastrada!**\n\n"
+    output += f"**{descricao}**\n"
     output += f"- Valor da parcela: R$ {valor_parcela:,.2f}\n"
     output += f"- Conta: {account.name}\n"
     output += f"- Data: {transaction_date.strftime('%d/%m/%Y')}\n"
-    output += f"- Série ID: {series.id}\n\n"
+    output += f"- Serie ID: {series.id}\n\n"
 
-    if created_series:
-        output += f"🆕 Nova série de parcelas criada\n"
-    else:
-        output += f"🔗 Vinculada à série existente\n"
+    output += f"Nova serie de parcelas criada (vinculada a transacao {transaction.id})\n"
 
-    output += f"\n**Status da série:**\n"
+    output += f"\n**Status da serie:**\n"
     output += f"- Pagas: {series.paid_count}/{series.installment_count}\n"
     output += f"- Valor restante: R$ {series.remaining_amount:,.2f}\n"
     output += f"- Total da compra: R$ {series.total_amount:,.2f}\n"
