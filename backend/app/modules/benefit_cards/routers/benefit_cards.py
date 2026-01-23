@@ -1,11 +1,14 @@
 from __future__ import annotations
+from decimal import Decimal
 from fastapi import APIRouter, HTTPException
-from sqlalchemy import select, or_, and_
+from sqlalchemy import select, or_, and_, func, case
 
 from app.core.deps import CurrentUser, DbSession
 from app.models.benefit_card import BenefitCard, BenefitCardType, BenefitCardProvider
 from app.models.account import Account, AccountType
 from app.models.household import HouseholdMember
+from app.models.transaction import Transaction, TransactionType
+from app.models.receipt import Receipt, ReceiptPayment, ReceiptStatus
 from app.modules.benefit_cards.schemas.benefit_card import (
     BenefitCardCreate,
     BenefitCardUpdate,
@@ -64,35 +67,94 @@ def get_provider_display(provider: str | None) -> str | None:
 
 @router.get("", response_model=list[BenefitCardListResponse])
 async def list_benefit_cards(current_user: CurrentUser, db: DbSession):
-    """Lista todos os cartoes de beneficio do usuario"""
+    """Lista todos os cartoes de beneficio do usuario com saldo calculado dinamicamente"""
     household_user_ids = await get_household_user_ids(db, current_user)
 
-    if household_user_ids:
-        result = await db.execute(
-            select(BenefitCard, Account)
-            .join(Account, BenefitCard.account_id == Account.id)
-            .where(
-                or_(
-                    and_(
-                        BenefitCard.user_id == current_user.id,
-                        Account.ownership_type == "personal"
-                    ),
-                    and_(
-                        BenefitCard.user_id.in_(household_user_ids),
-                        Account.ownership_type == "household"
+    # Subquery para calcular saldo de transacoes por conta (excluindo transações de receipt)
+    transactions_balance_subquery = (
+        select(
+            Transaction.account_id,
+            func.coalesce(
+                func.sum(
+                    case(
+                        (Transaction.type == TransactionType.INCOME.value, Transaction.amount),
+                        (Transaction.type == TransactionType.EXPENSE.value, -Transaction.amount),
+                        # Transfer: saída (id menor que linked) = subtrai
+                        (
+                            and_(
+                                Transaction.type == TransactionType.TRANSFER.value,
+                                Transaction.linked_transaction_id.isnot(None),
+                                Transaction.id < Transaction.linked_transaction_id
+                            ),
+                            -Transaction.amount
+                        ),
+                        # Transfer: entrada (id maior que linked) = soma
+                        (
+                            and_(
+                                Transaction.type == TransactionType.TRANSFER.value,
+                                Transaction.linked_transaction_id.isnot(None),
+                                Transaction.id > Transaction.linked_transaction_id
+                            ),
+                            Transaction.amount
+                        ),
+                        else_=0
                     )
+                ),
+                0
+            ).label('transaction_balance')
+        )
+        .where(Transaction.receipt_id.is_(None))  # Excluir transações de receipt
+        .group_by(Transaction.account_id)
+        .subquery()
+    )
+
+    # Subquery para calcular total de receipt payments por conta (sempre despesas)
+    receipt_payments_subquery = (
+        select(
+            ReceiptPayment.account_id,
+            func.coalesce(func.sum(ReceiptPayment.amount), 0).label('receipt_payments_total')
+        )
+        .select_from(ReceiptPayment)
+        .join(Receipt)
+        .where(Receipt.status == ReceiptStatus.CONFIRMED.value)
+        .group_by(ReceiptPayment.account_id)
+        .subquery()
+    )
+
+    # Query base com JOIN para pegar saldo das transacoes e receipt payments
+    base_query = (
+        select(
+            BenefitCard,
+            Account,
+            func.coalesce(transactions_balance_subquery.c.transaction_balance, 0).label('tx_balance'),
+            func.coalesce(receipt_payments_subquery.c.receipt_payments_total, 0).label('receipt_total')
+        )
+        .join(Account, BenefitCard.account_id == Account.id)
+        .outerjoin(transactions_balance_subquery, transactions_balance_subquery.c.account_id == Account.id)
+        .outerjoin(receipt_payments_subquery, receipt_payments_subquery.c.account_id == Account.id)
+    )
+
+    if household_user_ids:
+        base_query = base_query.where(
+            or_(
+                and_(
+                    BenefitCard.user_id == current_user.id,
+                    Account.ownership_type == "personal"
+                ),
+                and_(
+                    BenefitCard.user_id.in_(household_user_ids),
+                    Account.ownership_type == "household"
                 )
             )
         )
     else:
-        result = await db.execute(
-            select(BenefitCard, Account)
-            .join(Account, BenefitCard.account_id == Account.id)
-            .where(BenefitCard.user_id == current_user.id)
-        )
+        base_query = base_query.where(BenefitCard.user_id == current_user.id)
 
-    cards = result.all()
+    result = await db.execute(base_query)
+    rows = result.all()
 
+    # Construir resposta com saldo calculado dinamicamente
+    # Saldo = saldo_inicial + transações_normais - receipt_payments
     return [
         BenefitCardListResponse(
             id=card.id,
@@ -103,14 +165,14 @@ async def list_benefit_cards(current_user: CurrentUser, db: DbSession):
             provider=card.provider,
             provider_display=get_provider_display(card.provider),
             last_four_digits=card.last_four_digits,
-            current_balance=float(account.balance),
+            current_balance=float(account.balance) + float(tx_balance or Decimal(0)) - float(receipt_total or Decimal(0)),
             expected_monthly_recharge=float(card.expected_monthly_recharge) if card.expected_monthly_recharge else None,
             recharge_day=card.recharge_day,
             color=account.color,
             icon=account.icon,
             is_active=card.is_active,
         )
-        for card, account in cards
+        for card, account, tx_balance, receipt_total in rows
     ]
 
 
@@ -182,10 +244,68 @@ async def get_benefit_card(
     current_user: CurrentUser,
     db: DbSession,
 ):
-    """Retorna um cartao de beneficio especifico"""
+    """Retorna um cartao de beneficio especifico com saldo calculado dinamicamente"""
+    # Subquery para calcular saldo de transacoes por conta (excluindo transações de receipt)
+    transactions_balance_subquery = (
+        select(
+            Transaction.account_id,
+            func.coalesce(
+                func.sum(
+                    case(
+                        (Transaction.type == TransactionType.INCOME.value, Transaction.amount),
+                        (Transaction.type == TransactionType.EXPENSE.value, -Transaction.amount),
+                        # Transfer: saída (id menor que linked) = subtrai
+                        (
+                            and_(
+                                Transaction.type == TransactionType.TRANSFER.value,
+                                Transaction.linked_transaction_id.isnot(None),
+                                Transaction.id < Transaction.linked_transaction_id
+                            ),
+                            -Transaction.amount
+                        ),
+                        # Transfer: entrada (id maior que linked) = soma
+                        (
+                            and_(
+                                Transaction.type == TransactionType.TRANSFER.value,
+                                Transaction.linked_transaction_id.isnot(None),
+                                Transaction.id > Transaction.linked_transaction_id
+                            ),
+                            Transaction.amount
+                        ),
+                        else_=0
+                    )
+                ),
+                0
+            ).label('transaction_balance')
+        )
+        .where(Transaction.receipt_id.is_(None))
+        .group_by(Transaction.account_id)
+        .subquery()
+    )
+
+    # Subquery para calcular total de receipt payments por conta
+    receipt_payments_subquery = (
+        select(
+            ReceiptPayment.account_id,
+            func.coalesce(func.sum(ReceiptPayment.amount), 0).label('receipt_payments_total')
+        )
+        .select_from(ReceiptPayment)
+        .join(Receipt)
+        .where(Receipt.status == ReceiptStatus.CONFIRMED.value)
+        .group_by(ReceiptPayment.account_id)
+        .subquery()
+    )
+
     result = await db.execute(
-        select(BenefitCard, Account)
+        select(
+            BenefitCard,
+            Account,
+            func.coalesce(transactions_balance_subquery.c.transaction_balance, 0).label('tx_balance'),
+            func.coalesce(receipt_payments_subquery.c.receipt_payments_total, 0).label('receipt_total')
+        )
         .join(Account, BenefitCard.account_id == Account.id)
+        .outerjoin(transactions_balance_subquery, transactions_balance_subquery.c.account_id == Account.id)
+        .outerjoin(receipt_payments_subquery, receipt_payments_subquery.c.account_id == Account.id)
         .where(
             BenefitCard.id == card_id,
             BenefitCard.user_id == current_user.id,
@@ -195,7 +315,8 @@ async def get_benefit_card(
     if not row:
         raise HTTPException(status_code=404, detail="Cartao de beneficio nao encontrado")
 
-    card, account = row
+    card, account, tx_balance, receipt_total = row
+    computed_balance = float(account.balance) + float(tx_balance or Decimal(0)) - float(receipt_total or Decimal(0))
 
     return BenefitCardResponse(
         id=card.id,
@@ -211,7 +332,7 @@ async def get_benefit_card(
         created_at=card.created_at,
         updated_at=card.updated_at,
         account_name=account.name,
-        account_balance=float(account.balance),
+        account_balance=computed_balance,
         account_color=account.color,
         account_icon=account.icon,
         card_type_display=get_card_type_display(card.card_type),

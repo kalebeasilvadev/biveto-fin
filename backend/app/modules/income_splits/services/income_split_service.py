@@ -210,9 +210,7 @@ class IncomeSplitService:
         Returns:
             List of created expense transactions
         """
-        print(f"[SPLIT_SVC] apply_splits chamado: rule_ids={rule_ids}, income_tx_id={income_transaction.id}, user_id={user.id}")
         if not rule_ids:
-            print("[SPLIT_SVC] rule_ids vazio, retornando")
             return []
 
         # Fetch the selected rules
@@ -224,7 +222,6 @@ class IncomeSplitService:
             )
         )
         rules = list(result.scalars().all())
-        print(f"[SPLIT_SVC] rules encontradas: {len(rules)}")
 
         created_expenses = []
         income_amount = float(income_transaction.amount)
@@ -239,7 +236,7 @@ class IncomeSplitService:
             # Format description
             description = rule.format_description(income_transaction.description)
 
-            # Create pending expense transaction
+            # Create expense transaction (already paid - money is committed)
             expense = Transaction(
                 user_id=user.id,
                 account_id=income_transaction.account_id,
@@ -248,7 +245,7 @@ class IncomeSplitService:
                 amount=split_amount,
                 date=income_transaction.date,
                 description=description,
-                is_paid=False,  # Pending expense as per user decision
+                is_paid=True,  # Already paid - money is committed from income
                 source_transaction_id=income_transaction.id,
                 ownership_type=income_transaction.ownership_type,
             )

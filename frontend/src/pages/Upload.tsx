@@ -763,6 +763,10 @@ export default function Upload() {
       // Campos de recorrência
       create_recurring: formData.create_recurring,
       recurring_frequency: formData.create_recurring ? formData.recurring_frequency : null,
+      // Income split rules - para receitas
+      split_rule_ids: formData.type === 'income' && formData.split_rule_ids?.length > 0
+        ? formData.split_rule_ids
+        : undefined,
     })
   }
 

@@ -31,13 +31,13 @@ Voce pode configurar dois tipos de divisao:
     {
       title: 'Despesas Geradas',
       content: `
-As divisoes criam **despesas pendentes** (nao pagas):
+As divisoes criam **despesas automaticas**:
 
 - Vinculadas a receita original
 - Na categoria configurada (ex: Dizimo/Ofertas)
-- Voce marca como paga quando efetuar o pagamento
+- Ja marcadas como pagas (dinheiro comprometido)
 
-*Isso ajuda a controlar se voce realmente pagou o dizimo, transferiu para poupanca, etc.*
+*As despesas aparecem no mesmo dia da receita e afetam o saldo imediatamente.*
       `
     },
     {
@@ -58,7 +58,7 @@ Regras comuns que usuarios configuram:
     'Comece com poucas regras e ajuste conforme necessario',
     'A soma das porcentagens nao precisa ser 100%',
     'Ative/desative regras temporariamente sem excluir',
-    'Marque as despesas como pagas quando efetuar cada compromisso'
+    'As despesas sao criadas na mesma conta da receita'
   ],
   relatedPages: [
     { title: 'Fontes de Receita', path: '/income-sources' },

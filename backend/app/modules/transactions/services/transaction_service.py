@@ -139,12 +139,9 @@ class TransactionService:
 
         # Aplicar income splits se solicitado (gera despesas pendentes)
         split_rule_ids = getattr(data, 'split_rule_ids', None)
-        print(f"[TX_SVC] split_rule_ids={split_rule_ids}, data.type={data.type}, is_income={data.type == TransactionType.INCOME}")
         if split_rule_ids and data.type == TransactionType.INCOME:
-            print(f"[TX_SVC] Aplicando splits para transaction_id={transaction.id}")
             income_split_service = IncomeSplitService(self.db)
-            split_txs = await income_split_service.apply_splits(user, transaction, split_rule_ids)
-            print(f"[TX_SVC] Splits criados: {len(split_txs)}")
+            await income_split_service.apply_splits(user, transaction, split_rule_ids)
 
         return transaction
 
@@ -1332,7 +1329,20 @@ class TransactionService:
             "transactions_deleted": 0,
             "invoices_deleted": 0,
             "series_deleted": False,
+            "splits_deleted": 0,
         }
+
+        # Deletar transacoes de split vinculadas (despesas geradas por income splits)
+        splits_result = await self.db.execute(
+            select(Transaction).where(
+                Transaction.source_transaction_id == transaction_id,
+                Transaction.user_id == user.id,
+            )
+        )
+        split_transactions = splits_result.scalars().all()
+        for split_tx in split_transactions:
+            await self.db.delete(split_tx)
+            result["splits_deleted"] += 1
 
         # Se é uma transferência, deletar ambas as transações linkadas
         if transaction.type == TransactionType.TRANSFER.value and transaction.linked_transaction_id:
