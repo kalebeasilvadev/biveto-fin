@@ -210,7 +210,9 @@ class IncomeSplitService:
         Returns:
             List of created expense transactions
         """
+        print(f"[SPLIT_SVC] apply_splits chamado: rule_ids={rule_ids}, income_tx_id={income_transaction.id}, user_id={user.id}")
         if not rule_ids:
+            print("[SPLIT_SVC] rule_ids vazio, retornando")
             return []
 
         # Fetch the selected rules
@@ -222,6 +224,7 @@ class IncomeSplitService:
             )
         )
         rules = list(result.scalars().all())
+        print(f"[SPLIT_SVC] rules encontradas: {len(rules)}")
 
         created_expenses = []
         income_amount = float(income_transaction.amount)

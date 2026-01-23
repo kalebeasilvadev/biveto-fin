@@ -9,6 +9,7 @@ import { goalsHelp } from './goals'
 import { debtsHelp } from './debts'
 import { recurringHelp } from './recurring'
 import { incomeSourcesHelp } from './income-sources'
+import { incomeSplitRulesHelp } from './income-split-rules'
 import { envelopesHelp } from './envelopes'
 import { calendarHelp } from './calendar'
 import { simulatorsHelp } from './simulators'
@@ -36,6 +37,7 @@ const helpContentRegistry: Record<string, HelpContent> = {
   debts: debtsHelp,
   recurring: recurringHelp,
   'income-sources': incomeSourcesHelp,
+  'income-split-rules': incomeSplitRulesHelp,
   envelopes: envelopesHelp,
   calendar: calendarHelp,
   simulators: simulatorsHelp,

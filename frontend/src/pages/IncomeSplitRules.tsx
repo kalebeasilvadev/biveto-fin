@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import EmptyState from '../components/EmptyState'
+import { HelpButton } from '../components/help'
 
 interface IncomeSplitRule {
   id: number
@@ -214,7 +215,10 @@ export default function IncomeSplitRules() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Divisao de Receitas</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Divisao de Receitas</h1>
+            <HelpButton pageId="income-split-rules" />
+          </div>
           <p className="text-sm text-gray-500 dark:text-gray-400">
             Configure regras para dividir suas receitas automaticamente (dizimo, poupanca, etc.)
           </p>
