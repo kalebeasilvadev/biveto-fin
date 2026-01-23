@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { X, Check, User, Users, ArrowRightLeft } from 'lucide-react'
 import { clsx } from 'clsx'
 import { transactionsApi, accountsApi, categoriesApi, familyApi } from '../services/api'
+import SplitRuleSelector from './income-splits/SplitRuleSelector'
 
 interface Account {
   id: number
@@ -41,6 +42,7 @@ export default function QuickTransactionModal({ isOpen, onClose }: QuickTransact
     category_id: '',
     description: '',
     ownership_type: 'personal' as 'personal' | 'household',
+    split_rule_ids: [] as number[],  // For income split rules
   })
 
   // Lock body scroll and notify FAB when modal is open
@@ -120,6 +122,7 @@ export default function QuickTransactionModal({ isOpen, onClose }: QuickTransact
       category_id: '',
       description: '',
       ownership_type: 'personal',
+      split_rule_ids: [],
     })
     onClose()
   }
@@ -144,6 +147,10 @@ export default function QuickTransactionModal({ isOpen, onClose }: QuickTransact
       createMutation.mutate({
         ...baseData,
         category_id: formData.category_id ? parseInt(formData.category_id) : null,
+        // Include split_rule_ids for income transactions
+        split_rule_ids: formData.type === 'income' && formData.split_rule_ids.length > 0
+          ? formData.split_rule_ids
+          : undefined,
       })
     }
   }
@@ -376,6 +383,16 @@ export default function QuickTransactionModal({ isOpen, onClose }: QuickTransact
                 </button>
               </div>
             </div>
+          )}
+
+          {/* Income Split Rules - only for income transactions */}
+          {formData.type === 'income' && (
+            <SplitRuleSelector
+              selectedRuleIds={formData.split_rule_ids}
+              onChange={(ruleIds) => setFormData(prev => ({ ...prev, split_rule_ids: ruleIds }))}
+              amount={parseFloat(formData.amount) || 0}
+              disabled={createMutation.isPending}
+            />
           )}
 
           {/* Error message */}

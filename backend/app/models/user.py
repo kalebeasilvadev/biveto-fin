@@ -78,6 +78,9 @@ class User(Base):
     income_sources: Mapped[list["IncomeSource"]] = relationship(
         back_populates="user", lazy="noload", cascade="all, delete-orphan"
     )
+    income_split_rules: Mapped[list["IncomeSplitRule"]] = relationship(
+        back_populates="user", lazy="noload", cascade="all, delete-orphan"
+    )
     credit_card_invoices: Mapped[list["CreditCardInvoice"]] = relationship(
         back_populates="user", lazy="noload", cascade="all, delete-orphan"
     )
@@ -141,6 +144,7 @@ from .household import HouseholdMember
 from .credit_card import CreditCard
 from .benefit_card import BenefitCard
 from .income_source import IncomeSource
+from .income_split_rule import IncomeSplitRule
 from .credit_card_invoice import CreditCardInvoice
 from .api_key import APIKey
 from .notification import Notification, NotificationPreference, NotificationSettings, PushSubscription

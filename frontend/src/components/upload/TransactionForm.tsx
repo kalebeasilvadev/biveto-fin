@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { Check, AlertCircle, User, Users, Repeat, Wallet, Building, CreditCard, ArrowRightLeft } from 'lucide-react'
 import { clsx } from 'clsx'
 import { TransactionFormData } from '../../types/upload'
+import SplitRuleSelector from '../income-splits/SplitRuleSelector'
 
 interface Account {
   id: number
@@ -428,7 +429,7 @@ export default function TransactionForm({
       )}
 
       {/* Recurring section - only for manual mode and NOT installments */}
-      {isManual && !formData.is_installment && (
+      {isManual && !formData.is_installment && formData.type !== 'income' && (
         <div className="bg-purple-50 dark:bg-purple-900/30 rounded-xl p-4 space-y-3">
           <label className="flex items-center gap-2 cursor-pointer">
             <input
@@ -462,6 +463,16 @@ export default function TransactionForm({
             </div>
           )}
         </div>
+      )}
+
+      {/* Income Split Rules - only for income transactions in manual mode */}
+      {isManual && formData.type === 'income' && (
+        <SplitRuleSelector
+          selectedRuleIds={formData.split_rule_ids || []}
+          onChange={(ruleIds) => onChange({ split_rule_ids: ruleIds })}
+          amount={parseFloat(formData.amount) || 0}
+          disabled={isPending}
+        />
       )}
 
       {/* Submit button */}

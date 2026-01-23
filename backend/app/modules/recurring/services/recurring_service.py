@@ -9,7 +9,10 @@ from app.models import (
     RecurringTransaction, RecurrenceFrequency, RecurringStatus,
     Transaction, User, Account, Category
 )
+from app.models.credit_card import CreditCard
+from app.models.credit_card_invoice import CreditCardInvoice
 from app.modules.recurring.schemas.recurring import RecurringCreate, RecurringUpdate, RecurringResponse, RecurringSummary
+from app.modules.credit_cards.services.invoice_service import InvoiceService
 from app.modules.household.utils import (
     get_household_user_ids,
     get_household_member,
@@ -71,6 +74,21 @@ class RecurringTransactionService:
                 next_date += relativedelta(years=1)
 
         return next_date
+
+    async def _get_credit_card_from_account(self, user_id: int, account_id: int) -> CreditCard | None:
+        """Verifica se a conta e do tipo credit_card e retorna o CreditCard."""
+        account_result = await self.db.execute(
+            select(Account).where(Account.id == account_id)
+        )
+        account = account_result.scalar_one_or_none()
+
+        if not account or account.type != "credit_card":
+            return None
+
+        cc_result = await self.db.execute(
+            select(CreditCard).where(CreditCard.account_id == account_id)
+        )
+        return cc_result.scalar_one_or_none()
 
     async def create(self, user: User, data: RecurringCreate) -> RecurringTransaction:
         """Cria uma nova transação recorrente"""
@@ -290,13 +308,45 @@ class RecurringTransactionService:
         await self.db.commit()
         return True
 
-    async def pause(self, user: User, recurring_id: int) -> RecurringTransaction | None:
-        """Pausa uma transação recorrente"""
+    async def pause(
+        self,
+        user: User,
+        recurring_id: int,
+        remove_projected: bool = True,
+    ) -> RecurringTransaction | None:
+        """Pausa uma recorrencia e opcionalmente remove transacoes projetadas."""
         recurring = await self.get_by_id(user, recurring_id)
         if not recurring:
             return None
 
         recurring.status = RecurringStatus.PAUSED.value
+
+        # Remover transacoes projetadas futuras
+        if remove_projected:
+            proj_result = await self.db.execute(
+                select(Transaction).where(
+                    Transaction.recurring_id == recurring_id,
+                    Transaction.is_paid == False,
+                    Transaction.date >= date.today(),
+                )
+            )
+            projected = proj_result.scalars().all()
+
+            invoice_ids = set()
+            for tx in projected:
+                if tx.invoice_id:
+                    invoice_ids.add(tx.invoice_id)
+                await self.db.delete(tx)
+
+            # Atualizar faturas
+            if invoice_ids:
+                invoice_service = InvoiceService(self.db)
+                inv_result = await self.db.execute(
+                    select(CreditCardInvoice).where(CreditCardInvoice.id.in_(invoice_ids))
+                )
+                for invoice in inv_result.scalars().all():
+                    await invoice_service.update_invoice_total(invoice)
+
         await self.db.commit()
         await self.db.refresh(recurring)
         return recurring
@@ -366,6 +416,7 @@ class RecurringTransactionService:
         """Gera transações para recorrências pendentes até hoje"""
         today = date.today()
         generated = []
+        invoice_ids_to_update = set()
 
         result = await self.db.execute(
             select(RecurringTransaction)
@@ -383,11 +434,40 @@ class RecurringTransactionService:
                 recurring.status = RecurringStatus.CANCELLED.value
                 continue
 
+            # Verificar se a conta é de cartão de crédito
+            credit_card = await self._get_credit_card_from_account(user.id, recurring.account_id)
+            credit_card_id = None
+            invoice_id = None
+            is_paid = True  # Default: transação paga (contas normais)
+
+            if credit_card:
+                # Conta é de cartão de crédito - vincular à fatura
+                credit_card_id = credit_card.id
+                is_paid = False  # Transações de cartão são "não pagas" até pagar a fatura
+
+                # Calcular período da fatura
+                invoice_service = InvoiceService(self.db)
+                period = invoice_service.calculate_invoice_period(credit_card, recurring.next_due_date)
+
+                # Obter ou criar fatura
+                invoice = await invoice_service.get_or_create_invoice(
+                    user=user,
+                    credit_card=credit_card,
+                    reference_month=period['reference_month'],
+                    reference_year=period['reference_year'],
+                    closing_date=period['closing_date'],
+                    due_date=period['due_date'],
+                )
+                invoice_id = invoice.id
+                invoice_ids_to_update.add(invoice_id)
+
             # Criar transação herdando ownership_type da recorrência
             transaction = Transaction(
                 user_id=user.id,
                 account_id=recurring.account_id,
                 category_id=recurring.category_id,
+                credit_card_id=credit_card_id,
+                invoice_id=invoice_id,
                 type=recurring.type,
                 payment_method=recurring.payment_method,
                 amount=recurring.amount,
@@ -396,6 +476,7 @@ class RecurringTransactionService:
                 notes=f"Gerado automaticamente de: {recurring.name}",
                 is_recurring=True,
                 is_fixed=True,
+                is_paid=is_paid,
                 recurring_id=recurring.id,
                 ownership_type=recurring.ownership_type,
             )
@@ -412,5 +493,108 @@ class RecurringTransactionService:
                 recurring.day_of_week,
             )
 
+        await self.db.flush()
+
+        # Atualizar totais das faturas afetadas
+        if invoice_ids_to_update:
+            invoice_service = InvoiceService(self.db)
+            inv_result = await self.db.execute(
+                select(CreditCardInvoice).where(CreditCardInvoice.id.in_(invoice_ids_to_update))
+            )
+            for invoice in inv_result.scalars().all():
+                await invoice_service.update_invoice_total(invoice)
+
         await self.db.commit()
         return generated
+
+    async def cancel(
+        self,
+        user: User,
+        recurring_id: int,
+        cancel_from_month: int | None = None,
+        cancel_from_year: int | None = None,
+        remove_projected: bool = True,
+    ) -> dict | None:
+        """
+        Cancela uma recorrencia e opcionalmente remove transacoes projetadas.
+
+        Args:
+            user: Usuario
+            recurring_id: ID da recorrencia
+            cancel_from_month: Mes a partir do qual cancelar (None = imediato)
+            cancel_from_year: Ano a partir do qual cancelar
+            remove_projected: Se True, remove transacoes projetadas (is_paid=False)
+
+        Returns:
+            Dict com estatisticas do cancelamento ou None se nao encontrada
+        """
+        recurring = await self.get_by_id(user, recurring_id)
+        if not recurring:
+            return None
+
+        await validate_edit_permission(self.db, user, recurring.user_id, recurring.ownership_type)
+
+        result = {
+            "recurring_id": recurring_id,
+            "status": "cancelled",
+            "projected_removed": 0,
+            "invoices_updated": [],
+        }
+
+        # Definir end_date se especificado
+        if cancel_from_month and cancel_from_year:
+            # Cancelar a partir de uma data especifica
+            end_date = date(cancel_from_year, cancel_from_month, 1) - timedelta(days=1)
+            recurring.end_date = end_date
+
+            # Se a data de termino ja passou, marcar como cancelado
+            if end_date < date.today():
+                recurring.status = RecurringStatus.CANCELLED.value
+        else:
+            # Cancelamento imediato
+            recurring.status = RecurringStatus.CANCELLED.value
+            recurring.end_date = date.today()
+
+        # Remover transacoes projetadas (is_paid=False)
+        if remove_projected:
+            # Determinar data de corte
+            if cancel_from_month and cancel_from_year:
+                cutoff_date = date(cancel_from_year, cancel_from_month, 1)
+            else:
+                cutoff_date = date.today()
+
+            # Buscar transacoes projetadas desta recorrencia
+            proj_result = await self.db.execute(
+                select(Transaction).where(
+                    Transaction.recurring_id == recurring_id,
+                    Transaction.is_paid == False,
+                    Transaction.date >= cutoff_date,
+                )
+            )
+            projected_transactions = proj_result.scalars().all()
+
+            # Coletar invoice_ids afetados
+            invoice_ids = set()
+            for tx in projected_transactions:
+                if tx.invoice_id:
+                    invoice_ids.add(tx.invoice_id)
+                await self.db.delete(tx)
+
+            result["projected_removed"] = len(projected_transactions)
+
+            # Atualizar totais das faturas afetadas
+            if invoice_ids:
+                invoice_service = InvoiceService(self.db)
+                inv_result = await self.db.execute(
+                    select(CreditCardInvoice).where(CreditCardInvoice.id.in_(invoice_ids))
+                )
+                for invoice in inv_result.scalars().all():
+                    await invoice_service.update_invoice_total(invoice)
+                    result["invoices_updated"].append({
+                        "id": invoice.id,
+                        "month": invoice.reference_month,
+                        "year": invoice.reference_year,
+                    })
+
+        await self.db.commit()
+        return result

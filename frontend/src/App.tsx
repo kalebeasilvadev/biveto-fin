@@ -15,6 +15,7 @@ import Accounts from './pages/Accounts'
 import CreditCards from './pages/CreditCards'
 import BenefitCards from './pages/BenefitCards'
 import IncomeSources from './pages/IncomeSources'
+import IncomeSplitRules from './pages/IncomeSplitRules'
 import Invoices from './pages/Invoices'
 import AdminDashboard from './pages/admin/AdminDashboard'
 import AdminUsers from './pages/admin/AdminUsers'
@@ -107,6 +108,7 @@ function App() {
         <Route path="credit-cards" element={<CreditCards />} />
         <Route path="benefit-cards" element={<BenefitCards />} />
         <Route path="income-sources" element={<IncomeSources />} />
+        <Route path="income-split-rules" element={<IncomeSplitRules />} />
         <Route path="invoices" element={<Invoices />} />
         <Route path="settings" element={<Settings />} />
         <Route path="family" element={<Family />} />

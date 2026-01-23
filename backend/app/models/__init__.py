@@ -17,6 +17,7 @@ from .credit_card import CreditCard, PointsProgram
 from .benefit_card import BenefitCard, BenefitCardType, BenefitCardProvider
 from .transaction_payment import TransactionPayment
 from .income_source import IncomeSource, IncomeType, IncomeFrequency
+from .income_split_rule import IncomeSplitRule, SplitType
 from .credit_card_invoice import CreditCardInvoice, InvoiceStatus
 from .api_key import APIKey, APIKeyStatus
 from .notification import (
@@ -115,6 +116,8 @@ __all__ = [
     "IncomeSource",
     "IncomeType",
     "IncomeFrequency",
+    "IncomeSplitRule",
+    "SplitType",
     "CreditCardInvoice",
     "InvoiceStatus",
     "APIKey",

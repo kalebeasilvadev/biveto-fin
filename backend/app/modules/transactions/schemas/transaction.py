@@ -44,6 +44,10 @@ class TransactionCreate(TransactionBase):
     invoice_month: int | None = None  # Mes de referencia da fatura (1-12)
     invoice_year: int | None = None   # Ano de referencia da fatura
 
+    # Income split rules - IDs das regras a serem aplicadas (ex: dizimo, poupanca)
+    # Apenas usado quando type=income. Gera despesas pendentes vinculadas.
+    split_rule_ids: list[int] | None = None
+
 
 class TransactionConfirm(BaseModel):
     """Confirmacao de transacao a partir de documento processado"""
@@ -88,6 +92,9 @@ class TransactionConfirm(BaseModel):
     grocery_category: str | None = None  # Categoria de mercado detalhada
     necessity_type: str | None = None  # essential ou non_essential
 
+    # Income split rules - IDs das regras a serem aplicadas (ex: dizimo, poupanca)
+    split_rule_ids: list[int] | None = None
+
 
 class TransactionUpdate(BaseModel):
     amount: float | None = Field(None, gt=0)
@@ -127,6 +134,9 @@ class TransactionResponse(TransactionBase):
     linked_transaction_id: int | None = None
     is_transfer_out: bool = False  # True se é a saída de uma transferência
     is_transfer_in: bool = False   # True se é a entrada de uma transferência
+
+    # Income split support
+    source_transaction_id: int | None = None  # ID da receita que gerou esta despesa
 
     # Dados relacionados
     category_name: str | None = None
@@ -185,6 +195,8 @@ class BatchConfirmItem(BaseModel):
     unit_price: float | None = None
     grocery_category: str | None = None
     necessity_type: str | None = None
+    # Income split rules
+    split_rule_ids: list[int] | None = None
 
 
 class BatchConfirmRequest(BaseModel):

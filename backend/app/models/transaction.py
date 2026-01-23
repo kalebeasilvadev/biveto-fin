@@ -95,6 +95,11 @@ class Transaction(Base):
     installment_total: Mapped[int | None] = mapped_column()   # Total de parcelas (ex: 12)
     is_paid: Mapped[bool] = mapped_column(default=True)       # Se a parcela foi paga
 
+    # Income split support - links split-generated expenses back to original income
+    source_transaction_id: Mapped[int | None] = mapped_column(
+        ForeignKey("transactions.id", ondelete="SET NULL"), index=True
+    )
+
     # Tags (lista de strings)
     tags: Mapped[list | None] = mapped_column(JSON)
 
@@ -143,6 +148,19 @@ class Transaction(Base):
         back_populates="transaction",
         lazy="noload",
         order_by="TransactionPayment.sequence"
+    )
+    # Split transactions - expenses generated from this income
+    split_transactions: Mapped[list["Transaction"]] = relationship(
+        back_populates="source_transaction",
+        foreign_keys="Transaction.source_transaction_id",
+        lazy="noload"
+    )
+    # Source income that generated this split expense
+    source_transaction: Mapped["Transaction | None"] = relationship(
+        back_populates="split_transactions",
+        foreign_keys=[source_transaction_id],
+        remote_side=[id],
+        lazy="noload"
     )
 
     # Computed properties for API responses

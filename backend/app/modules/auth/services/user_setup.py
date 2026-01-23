@@ -56,6 +56,7 @@ DEFAULT_CATEGORIES = [
     {"name": "Pet", "type": CategoryType.EXPENSE, "icon": "paw-print", "color": "#84cc16"},
     {"name": "Filhos", "type": CategoryType.EXPENSE, "icon": "baby", "color": "#fbbf24"},
     {"name": "Presentes e Doações", "type": CategoryType.EXPENSE, "icon": "gift", "color": "#fb7185"},
+    {"name": "Dízimo/Ofertas", "type": CategoryType.EXPENSE, "icon": "heart-handshake", "color": "#8b5cf6"},
     {"name": "Impostos e Taxas", "type": CategoryType.EXPENSE, "icon": "landmark", "color": "#94a3b8"},
     {"name": "Viagens", "type": CategoryType.EXPENSE, "icon": "plane", "color": "#38bdf8"},
     {"name": "Outros", "type": CategoryType.EXPENSE, "icon": "more-horizontal", "color": "#64748b"},

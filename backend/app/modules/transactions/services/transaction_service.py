@@ -15,6 +15,7 @@ from app.models.credit_card import CreditCard
 from app.modules.transactions.schemas.transaction import TransactionCreate, TransactionUpdate, TransactionConfirm
 from app.modules.installments.services.installment_service import InstallmentService
 from app.modules.credit_cards.services.invoice_service import InvoiceService
+from app.modules.income_splits.services.income_split_service import IncomeSplitService
 
 
 class TransactionService:
@@ -135,6 +136,12 @@ class TransactionService:
         # Criar recorrencia se solicitado
         if data.create_recurring and data.recurring_frequency:
             await self._create_recurring_from_transaction(user, data, transaction)
+
+        # Aplicar income splits se solicitado (gera despesas pendentes)
+        split_rule_ids = getattr(data, 'split_rule_ids', None)
+        if split_rule_ids and data.type == TransactionType.INCOME:
+            income_split_service = IncomeSplitService(self.db)
+            await income_split_service.apply_splits(user, transaction, split_rule_ids)
 
         return transaction
 
@@ -871,6 +878,25 @@ class TransactionService:
         # Atualizar total da fatura se houver
         if invoice and invoice_service:
             await invoice_service.update_invoice_total(invoice)
+
+        # Aplicar income splits se solicitado (gera despesas pendentes)
+        # Apenas para receitas simples (nao parceladas)
+        transaction = result.get("transaction")
+        split_rule_ids = getattr(data, 'split_rule_ids', None)
+        if transaction and split_rule_ids:
+            # Verificar se a transacao eh uma receita
+            is_income = (
+                transaction.type == TransactionType.INCOME.value or
+                (hasattr(data, 'extracted_transaction_type') and
+                 data.extracted_transaction_type and
+                 data.extracted_transaction_type.lower() in self.INCOME_TRANSACTION_TYPES)
+            )
+            if is_income:
+                income_split_service = IncomeSplitService(self.db)
+                split_expenses = await income_split_service.apply_splits(
+                    user, transaction, split_rule_ids
+                )
+                result["split_transactions"] = split_expenses
 
         return result
 

@@ -127,6 +127,8 @@ export interface TransactionFormData {
   // Campos para criar recorrência
   create_recurring: boolean
   recurring_frequency: 'daily' | 'weekly' | 'monthly' | 'yearly'
+  // Income split rules - IDs das regras de divisão selecionadas
+  split_rule_ids: number[]
 }
 
 export const CATEGORY_MAP: Record<string, string> = {
@@ -178,4 +180,5 @@ export const initialFormData: TransactionFormData = {
   ownership_type: 'personal',
   create_recurring: false,
   recurring_frequency: 'monthly',
+  split_rule_ids: [],
 }

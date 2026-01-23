@@ -35,6 +35,7 @@ import {
   ShoppingCart,
   Ticket,
   Store,
+  Percent,
 } from 'lucide-react'
 import { useState, useEffect, useCallback } from 'react'
 import { clsx } from 'clsx'
@@ -101,6 +102,7 @@ const menuGroups: NavGroup[] = [
       { to: '/receipts', icon: Store, label: 'Compras' },
       { to: '/recurring', icon: Repeat, label: 'Recorrentes' },
       { to: '/income-sources', icon: Briefcase, label: 'Receitas' },
+      { to: '/income-split-rules', icon: Percent, label: 'Divisao' },
     ],
   },
   {

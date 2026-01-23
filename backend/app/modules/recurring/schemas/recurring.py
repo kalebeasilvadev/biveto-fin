@@ -1,5 +1,5 @@
 from datetime import date, datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from typing import Optional
 from enum import Enum
 from app.models.household import OwnershipType
@@ -141,3 +141,17 @@ class BatchRecurringResponse(BaseModel):
     duplicate_count: int
     error_count: int
     results: list[BatchRecurringItemResult]
+
+
+class RecurringCancelRequest(BaseModel):
+    """Schema para cancelamento de recorrencia"""
+    cancel_from_month: int | None = Field(None, ge=1, le=12, description="Mes a partir do qual cancelar (1-12)")
+    cancel_from_year: int | None = Field(None, ge=2020, le=2100, description="Ano a partir do qual cancelar")
+    remove_projected: bool = Field(True, description="Remover transacoes projetadas?")
+
+    @model_validator(mode='after')
+    def validate_dates(self):
+        # Se um for fornecido, ambos devem ser
+        if (self.cancel_from_month is None) != (self.cancel_from_year is None):
+            raise ValueError("cancel_from_month e cancel_from_year devem ser fornecidos juntos")
+        return self

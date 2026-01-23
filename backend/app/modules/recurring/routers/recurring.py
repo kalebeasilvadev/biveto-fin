@@ -10,6 +10,7 @@ from app.modules.recurring.schemas.recurring import (
     BatchRecurringFromSuggestionRequest,
     BatchRecurringItemResult,
     BatchRecurringResponse,
+    RecurringCancelRequest,
 )
 from app.modules.recurring.services.recurring_service import RecurringTransactionService
 
@@ -197,6 +198,34 @@ async def pause_recurring(
         created_at=result.created_at,
         updated_at=result.updated_at,
     )
+
+
+@router.post("/{recurring_id}/cancel", response_model=dict)
+async def cancel_recurring(
+    recurring_id: int,
+    data: RecurringCancelRequest,
+    current_user: CurrentUser,
+    db: DbSession,
+):
+    """
+    Cancela uma recorrencia.
+
+    - Se `cancel_from_month` e `cancel_from_year` forem fornecidos,
+      a recorrencia sera cancelada a partir daquele mes
+    - Se `remove_projected=True` (default), remove transacoes projetadas
+      das faturas futuras e atualiza os totais
+    """
+    service = RecurringTransactionService(db)
+    result = await service.cancel(
+        current_user,
+        recurring_id,
+        cancel_from_month=data.cancel_from_month,
+        cancel_from_year=data.cancel_from_year,
+        remove_projected=data.remove_projected,
+    )
+    if not result:
+        raise HTTPException(status_code=404, detail="Recorrencia nao encontrada")
+    return result
 
 
 @router.post("/{recurring_id}/resume", response_model=RecurringResponse)

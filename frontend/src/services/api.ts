@@ -549,6 +549,35 @@ export const incomeSourcesApi = {
     api.post(`/income-sources/${sourceId}/generate-transaction`, data),
 }
 
+// Income Split Rules - Regras de divisão de receita (Dízimo, Poupança, etc)
+export const incomeSplitRulesApi = {
+  list: (activeOnly: boolean = true) =>
+    api.get('/income-split-rules', { params: { active_only: activeOnly } }),
+  get: (id: number) => api.get(`/income-split-rules/${id}`),
+  create: (data: {
+    name: string
+    split_type: 'percentage' | 'fixed'
+    percentage?: number
+    fixed_amount?: number
+    category_id?: number
+    description_template?: string
+    priority?: number
+  }) => api.post('/income-split-rules', data),
+  update: (id: number, data: {
+    name?: string
+    split_type?: 'percentage' | 'fixed'
+    percentage?: number
+    fixed_amount?: number
+    category_id?: number
+    description_template?: string
+    is_active?: boolean
+    priority?: number
+  }) => api.patch(`/income-split-rules/${id}`, data),
+  delete: (id: number) => api.delete(`/income-split-rules/${id}`),
+  preview: (data: { amount: number; rule_ids?: number[]; description?: string }) =>
+    api.post('/income-split-rules/preview', data),
+}
+
 export const invoicesApi = {
   list: (params?: {
     credit_card_id?: number
