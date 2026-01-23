@@ -2939,7 +2939,7 @@ PONTOS IMPORTANTES:
                     "contents": contents,
                     "generationConfig": {
                         "temperature": 0.4,
-                        "maxOutputTokens": 600,
+                        "maxOutputTokens": 2500,  # Aumentado para respostas detalhadas
                     }
                 },
             )
@@ -2973,7 +2973,7 @@ PONTOS IMPORTANTES:
                 json={
                     "model": "mistral-small-latest",
                     "messages": mistral_messages,
-                    "max_tokens": 600,
+                    "max_tokens": 2500,  # Aumentado para respostas detalhadas
                     "temperature": 0.4,
                 },
             )
