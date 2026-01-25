@@ -18,6 +18,9 @@ import {
   Eye,
   MoreVertical,
   RefreshCw,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import EmptyState from '../components/EmptyState'
@@ -74,6 +77,9 @@ const statusConfig = {
 
 const MONTH_NAMES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
 
+type SortField = 'credit_card_name' | 'status' | 'total_amount' | 'paid_amount' | 'remaining_amount' | 'due_date' | 'transaction_count'
+type SortDirection = 'asc' | 'desc'
+
 // Helper to get current month/year
 const getCurrentPeriod = () => {
   const now = new Date()
@@ -104,6 +110,8 @@ export default function Invoices() {
   const [transactionToMove, setTransactionToMove] = useState<{ id: number; description: string } | null>(null)
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null)
+  const [sortField, setSortField] = useState<SortField>('total_amount')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
 
   const { data: cardsData } = useQuery({
     queryKey: ['credit-cards'],
@@ -271,12 +279,65 @@ export default function Invoices() {
     }
   }, [monthTabs, selectedYear])
 
-  // Filter invoices by selected tab
+  // Filter and sort invoices by selected tab
   const filteredInvoices = useMemo(() => {
     if (!selectedTab) return []
     const [year, month] = selectedTab.split('-').map(Number)
-    return invoices.filter(inv => inv.reference_month === month && inv.reference_year === year)
-  }, [invoices, selectedTab])
+    const filtered = invoices.filter(inv => inv.reference_month === month && inv.reference_year === year)
+
+    // Sort invoices
+    const statusOrder = { overdue: 0, closed: 1, open: 2, partial: 3, paid: 4 }
+
+    return [...filtered].sort((a, b) => {
+      let comparison = 0
+
+      switch (sortField) {
+        case 'credit_card_name':
+          comparison = (a.credit_card_name || '').localeCompare(b.credit_card_name || '')
+          break
+        case 'status':
+          comparison = statusOrder[a.status] - statusOrder[b.status]
+          break
+        case 'total_amount':
+          comparison = a.total_amount - b.total_amount
+          break
+        case 'paid_amount':
+          comparison = a.paid_amount - b.paid_amount
+          break
+        case 'remaining_amount':
+          comparison = a.remaining_amount - b.remaining_amount
+          break
+        case 'due_date':
+          comparison = new Date(a.due_date).getTime() - new Date(b.due_date).getTime()
+          break
+        case 'transaction_count':
+          comparison = a.transaction_count - b.transaction_count
+          break
+      }
+
+      return sortDirection === 'asc' ? comparison : -comparison
+    })
+  }, [invoices, selectedTab, sortField, sortDirection])
+
+  // Handle column header click for sorting
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortField(field)
+      setSortDirection('desc')
+    }
+  }
+
+  // Render sort icon
+  const renderSortIcon = (field: SortField) => {
+    if (sortField !== field) {
+      return <ArrowUpDown size={14} className="text-gray-400" />
+    }
+    return sortDirection === 'asc'
+      ? <ArrowUp size={14} className="text-primary-600 dark:text-primary-400" />
+      : <ArrowDown size={14} className="text-primary-600 dark:text-primary-400" />
+  }
 
   // Calculate summary for selected tab
   const tabSummary = useMemo(() => {
@@ -516,26 +577,68 @@ export default function Invoices() {
             <table className="w-full min-w-[700px] table-auto">
               <thead>
                 <tr className="border-b border-gray-200 dark:border-slate-700">
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Cartão
+                  <th
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-700 select-none"
+                    onClick={() => handleSort('credit_card_name')}
+                  >
+                    <div className="flex items-center gap-1">
+                      Cartão
+                      {renderSortIcon('credit_card_name')}
+                    </div>
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Status
+                  <th
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-700 select-none"
+                    onClick={() => handleSort('status')}
+                  >
+                    <div className="flex items-center gap-1">
+                      Status
+                      {renderSortIcon('status')}
+                    </div>
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Total
+                  <th
+                    className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-700 select-none"
+                    onClick={() => handleSort('total_amount')}
+                  >
+                    <div className="flex items-center justify-end gap-1">
+                      Total
+                      {renderSortIcon('total_amount')}
+                    </div>
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Pago
+                  <th
+                    className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-700 select-none"
+                    onClick={() => handleSort('paid_amount')}
+                  >
+                    <div className="flex items-center justify-end gap-1">
+                      Pago
+                      {renderSortIcon('paid_amount')}
+                    </div>
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Restante
+                  <th
+                    className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-700 select-none"
+                    onClick={() => handleSort('remaining_amount')}
+                  >
+                    <div className="flex items-center justify-end gap-1">
+                      Restante
+                      {renderSortIcon('remaining_amount')}
+                    </div>
                   </th>
-                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Vencimento
+                  <th
+                    className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-700 select-none"
+                    onClick={() => handleSort('due_date')}
+                  >
+                    <div className="flex items-center justify-center gap-1">
+                      Vencimento
+                      {renderSortIcon('due_date')}
+                    </div>
                   </th>
-                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Trans.
+                  <th
+                    className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-700 select-none"
+                    onClick={() => handleSort('transaction_count')}
+                  >
+                    <div className="flex items-center justify-center gap-1">
+                      Trans.
+                      {renderSortIcon('transaction_count')}
+                    </div>
                   </th>
                   <th className="px-4 py-3 w-12"></th>
                 </tr>
