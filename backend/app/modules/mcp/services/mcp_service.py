@@ -16,7 +16,6 @@ from ....models import (
     BenefitCard,
     GroceryProduct, GroceryPurchase, GroceryPriceHistory,
     ShoppingList, ShoppingListItem,
-    SpendingEnvelope, EnvelopeHistory,
     ChatConversation, ChatMessage,
 )
 from ....models.transaction import TransactionType
@@ -416,46 +415,6 @@ ALLOWED_TABLES = {
             "necessity_type": "Tipo de necessidade",
             "is_checked": "Se foi marcado",
             "priority": "Prioridade",
-            "notes": "Observações",
-            "created_at": "Data de criação",
-        }
-    },
-    "spending_envelopes": {
-        "model": SpendingEnvelope,
-        "description": "Envelopes de gastos (YNAB style)",
-        "columns": {
-            "id": "ID único",
-            "category_id": "ID da categoria",
-            "name": "Nome",
-            "description": "Descrição",
-            "period_type": "Período: daily, weekly, biweekly, monthly",
-            "limit_amount": "Valor limite",
-            "current_balance": "Saldo atual",
-            "period_start_date": "Início do período",
-            "period_end_date": "Fim do período",
-            "allow_rollover": "Permite acumular",
-            "rollover_balance": "Saldo acumulado",
-            "refill_schedule": "Agenda de recarga",
-            "auto_refill": "Recarga automática",
-            "status": "available, depleted, overspent",
-            "is_active": "Se está ativo",
-            "ownership_type": "personal ou household",
-            "created_at": "Data de criação",
-        }
-    },
-    "envelope_history": {
-        "model": EnvelopeHistory,
-        "description": "Histórico de envelopes",
-        "columns": {
-            "id": "ID único",
-            "envelope_id": "ID do envelope",
-            "transaction_id": "ID da transação",
-            "change_type": "Tipo: refill, spend, refund, rollover, adjustment, transfer",
-            "amount": "Valor",
-            "balance_before": "Saldo antes",
-            "balance_after": "Saldo depois",
-            "period_start": "Início do período",
-            "period_end": "Fim do período",
             "notes": "Observações",
             "created_at": "Data de criação",
         }
