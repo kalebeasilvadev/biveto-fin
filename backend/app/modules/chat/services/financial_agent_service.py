@@ -235,7 +235,7 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
 
         # Buscar contexto específico para cada domínio
         if "cartoes" in domains:
-            context["cartoes"] = await self._get_credit_card_expert_context(user)
+            context["cartoes"] = await self._get_credit_card_expert_context(user, query_context)
 
         if "mercado" in domains:
             context["mercado"] = await self._get_grocery_expert_context(user, period_start, period_end, household_user_ids)
@@ -277,8 +277,13 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
 
     # ========== CONTEXTOS ESPECIALIZADOS POR DOMÍNIO ==========
 
-    async def _get_credit_card_expert_context(self, user: User) -> dict[str, Any]:
-        """Contexto detalhado para o especialista de cartões com análise completa de faturas e parcelas"""
+    async def _get_credit_card_expert_context(self, user: User, query_context: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Contexto detalhado para o especialista de cartões com análise completa de faturas e parcelas
+
+        Args:
+            user: Usuário autenticado
+            query_context: Contexto da query, pode conter 'valor_disponivel' para estratégia dinâmica
+        """
         today = date.today()
         mes_atual = today.month
         ano_atual = today.year
@@ -479,6 +484,14 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
         # Calcular estratégias de redução
         estrategias_reducao = self._calcular_estrategias_reducao(cartoes_info, total_parcelas_mensais)
 
+        # Calcular estratégia dinâmica se usuário mencionou valor disponível
+        estrategia_com_orcamento = None
+        if query_context and query_context.get("valor_disponivel"):
+            valor_disponivel = query_context["valor_disponivel"]
+            estrategia_com_orcamento = self._calcular_estrategia_com_orcamento(
+                cartoes_info, valor_disponivel
+            )
+
         return {
             "cartoes": cartoes_info,
             "quantidade_cartoes": len(cartoes_info),
@@ -491,6 +504,8 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
             "cartoes_com_limite_apertado": [c for c in cartoes_info if c["utilizacao_limite_percentual"] > 70],
             # Estratégias para reduzir custo mensal
             "estrategias_reducao": estrategias_reducao,
+            # Estratégia dinâmica com orçamento específico (se valor foi mencionado)
+            "estrategia_com_orcamento": estrategia_com_orcamento,
             # Resumo
             "resumo": {
                 "impacto_mensal_total": total_parcelas_mensais,
@@ -567,6 +582,152 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
             "cartoes_a_quitar": cartoes_a_quitar,
             "impacto_mensal_restante": round(impacto_restante, 2),
             "ja_atingida": False
+        }
+
+    def _calcular_estrategia_com_orcamento(
+        self,
+        cartoes: list[dict],
+        orcamento: float
+    ) -> dict:
+        """Calcula quais cartões quitar com orçamento específico do usuário.
+
+        Baseado em literatura financeira:
+        - Avalanche: prioriza maior impacto mensal (economia financeira)
+        - Snowball: prioriza menor saldo (motivação psicológica)
+        - Por utilização: prioriza maior uso de limite (impacto no score)
+
+        Args:
+            cartoes: Lista de cartões com impacto_mensal e valor_para_zerar_cartao
+            orcamento: Valor disponível para quitação
+
+        Returns:
+            Dicionário com ordenações por diferentes métodos e recomendações
+        """
+        if not cartoes or orcamento <= 0:
+            return {
+                "orcamento_disponivel": orcamento,
+                "erro": "Sem cartões ou orçamento inválido"
+            }
+
+        # Filtrar apenas cartões com parcelas a pagar
+        cartoes_com_parcelas = [c for c in cartoes if c.get("valor_para_zerar_cartao", 0) > 0]
+
+        if not cartoes_com_parcelas:
+            return {
+                "orcamento_disponivel": orcamento,
+                "mensagem": "Nenhum cartão tem parcelas ativas para antecipar"
+            }
+
+        def calcular_alocacao(cartoes_ordenados: list[dict], orcamento_total: float) -> dict:
+            """Aloca orçamento nos cartões ordenados e calcula resultados"""
+            valor_restante = orcamento_total
+            cartoes_a_quitar = []
+            cartoes_parciais = []
+            economia_mensal = 0
+
+            for card in cartoes_ordenados:
+                valor_cartao = card.get("valor_para_zerar_cartao", 0)
+                impacto = card.get("impacto_mensal", 0)
+
+                if valor_restante >= valor_cartao and valor_cartao > 0:
+                    # Quita o cartão inteiro
+                    cartoes_a_quitar.append({
+                        "nome": card["nome"],
+                        "valor_a_pagar": round(valor_cartao, 2),
+                        "impacto_eliminado": round(impacto, 2),
+                        "utilizacao_atual": card.get("utilizacao_limite_percentual", 0),
+                        "quita_completo": True
+                    })
+                    valor_restante -= valor_cartao
+                    economia_mensal += impacto
+                elif valor_restante > 0 and valor_cartao > 0:
+                    # Pagamento parcial
+                    percentual_pago = (valor_restante / valor_cartao) * 100
+                    # Estimar redução proporcional do impacto mensal
+                    reducao_estimada = impacto * (valor_restante / valor_cartao)
+                    cartoes_parciais.append({
+                        "nome": card["nome"],
+                        "valor_total_cartao": round(valor_cartao, 2),
+                        "valor_possivel_pagar": round(valor_restante, 2),
+                        "percentual_quitado": round(percentual_pago, 1),
+                        "reducao_estimada_mensal": round(reducao_estimada, 2),
+                        "falta_para_quitar": round(valor_cartao - valor_restante, 2)
+                    })
+                    # Não zerar valor_restante aqui para mostrar opções
+
+            return {
+                "cartoes_a_quitar": cartoes_a_quitar,
+                "cartoes_parciais": cartoes_parciais,
+                "valor_utilizado": round(orcamento_total - valor_restante, 2),
+                "valor_restante": round(valor_restante, 2),
+                "economia_mensal": round(economia_mensal, 2),
+                "quantidade_cartoes_quitados": len(cartoes_a_quitar)
+            }
+
+        # 1. Ordenação AVALANCHE: maior impacto mensal primeiro (economia)
+        cartoes_avalanche = sorted(
+            cartoes_com_parcelas,
+            key=lambda c: c.get("impacto_mensal", 0),
+            reverse=True
+        )
+        resultado_avalanche = calcular_alocacao(cartoes_avalanche, orcamento)
+
+        # 2. Ordenação SNOWBALL: menor saldo primeiro (motivação)
+        cartoes_snowball = sorted(
+            cartoes_com_parcelas,
+            key=lambda c: c.get("valor_para_zerar_cartao", float('inf'))
+        )
+        resultado_snowball = calcular_alocacao(cartoes_snowball, orcamento)
+
+        # 3. Ordenação por UTILIZAÇÃO: maior uso de limite primeiro (score de crédito)
+        cartoes_utilizacao = sorted(
+            cartoes_com_parcelas,
+            key=lambda c: c.get("utilizacao_limite_percentual", 0),
+            reverse=True
+        )
+        resultado_utilizacao = calcular_alocacao(cartoes_utilizacao, orcamento)
+
+        # Determinar recomendação baseada nos resultados
+        recomendacao = "avalanche"  # Default: maior economia
+        motivo_recomendacao = "Maximiza economia eliminando maior impacto mensal primeiro"
+
+        # Se snowball quita mais cartões completos com mesmo orçamento
+        if (resultado_snowball["quantidade_cartoes_quitados"] >
+            resultado_avalanche["quantidade_cartoes_quitados"] and
+            resultado_snowball["economia_mensal"] >= resultado_avalanche["economia_mensal"] * 0.8):
+            recomendacao = "snowball"
+            motivo_recomendacao = "Elimina mais cartões, mantendo boa economia - motivação extra"
+
+        # Se tem cartões com utilização crítica (>80%)
+        cartoes_criticos = [c for c in cartoes_com_parcelas if c.get("utilizacao_limite_percentual", 0) > 80]
+        if cartoes_criticos and any(c["valor_para_zerar_cartao"] <= orcamento for c in cartoes_criticos):
+            recomendacao = "utilizacao"
+            motivo_recomendacao = "Prioriza liberar limite de cartões críticos (>80% usado) - melhora score"
+
+        # Total necessário para quitar todos
+        total_para_zerar_todos = sum(c.get("valor_para_zerar_cartao", 0) for c in cartoes_com_parcelas)
+
+        return {
+            "orcamento_disponivel": orcamento,
+            "total_para_zerar_todos": round(total_para_zerar_todos, 2),
+            "orcamento_suficiente_para_todos": orcamento >= total_para_zerar_todos,
+
+            # Resultados por método
+            "ordenacao_avalanche": resultado_avalanche,
+            "ordenacao_snowball": resultado_snowball,
+            "ordenacao_por_utilizacao": resultado_utilizacao,
+
+            # Recomendação
+            "metodo_recomendado": recomendacao,
+            "motivo_recomendacao": motivo_recomendacao,
+
+            # Observações sobre antecipação no Brasil
+            "observacoes_antecipacao": {
+                "desconto_disponivel": "Nubank e Itaú oferecem ~9% a.a. de desconto para antecipação",
+                "quando_antecipar": "Vale antecipar se: há desconto oferecido OU precisa liberar limite",
+                "quando_nao_antecipar": "Se não há desconto e não precisa de limite, pode ser melhor investir o dinheiro",
+                "juros_rotativo_medio": "Evite rotativo a todo custo (~423% a.a. no Brasil)"
+            }
         }
 
     async def _get_grocery_expert_context(self, user: User, period_start: date, period_end: date, household_user_ids: list[int]) -> dict[str, Any]:
@@ -1694,7 +1855,86 @@ Cada estratégia contém:
   - cartoes_a_quitar: lista de cartões a pagar com nome, valor e impacto_eliminado
   - impacto_mensal_restante: quanto ficará o custo mensal após pagar
 
-COMO RESPONDER:
+### ESTRATÉGIA COM ORÇAMENTO ESPECÍFICO (estrategia_com_orcamento):
+IMPORTANTE: Se o usuário mencionou um valor disponível (ex: "tenho 20k", "quero usar R$ 15.000"),
+este campo estará preenchido com cálculos específicos para aquele valor!
+
+Estrutura quando disponível:
+```
+{
+  "orcamento_disponivel": 20000.00,
+  "total_para_zerar_todos": 35000.00,
+  "orcamento_suficiente_para_todos": false,
+
+  "ordenacao_avalanche": {  // Maior impacto primeiro (economia)
+    "cartoes_a_quitar": [{"nome": "Nubank", "valor_a_pagar": 8000, "impacto_eliminado": 800}],
+    "cartoes_parciais": [{"nome": "Itaú", "valor_total_cartao": 15000, "falta_para_quitar": 3000}],
+    "economia_mensal": 1200.00,
+    "valor_utilizado": 17000.00,
+    "valor_restante": 3000.00
+  },
+  "ordenacao_snowball": {  // Menor saldo primeiro (motivação)
+    ...
+  },
+  "ordenacao_por_utilizacao": {  // Maior uso de limite (score)
+    ...
+  },
+
+  "metodo_recomendado": "avalanche",  // ou "snowball" ou "utilizacao"
+  "motivo_recomendacao": "Maximiza economia eliminando maior impacto mensal primeiro",
+
+  "observacoes_antecipacao": {
+    "desconto_disponivel": "Nubank e Itaú oferecem ~9% a.a. de desconto",
+    "quando_antecipar": "Vale se: há desconto OU precisa liberar limite",
+    "quando_nao_antecipar": "Se não há desconto, pode ser melhor investir"
+  }
+}
+```
+
+### QUANDO O USUÁRIO MENCIONAR UM VALOR DISPONÍVEL:
+SEMPRE use estrategia_com_orcamento que foi calculada especificamente para o valor dele!
+
+COMO RESPONDER COM ORÇAMENTO:
+1. Mostre qual método foi recomendado e por quê
+2. Liste os cartões a quitar em ordem de prioridade
+3. Mostre a economia mensal resultante
+4. Se sobrar valor, sugira próximo cartão ou reserva
+5. Mencione as observações sobre antecipação
+
+EXEMPLO DE RESPOSTA:
+"Com R$ 20.000, recomendo usar o método avalanche (maior economia):
+1. Quitar Nubank (R$ 8.000) → elimina R$ 800/mês
+2. Quitar C6 (R$ 5.000) → elimina R$ 400/mês
+
+Total: R$ 13.000 usados, sobram R$ 7.000
+Economia mensal: R$ 1.200/mês
+
+Com os R$ 7.000 restantes você pode:
+- Aplicar no Itaú (faltam R$ 3.000 para quitar)
+- Guardar como reserva
+
+💡 Se seu banco oferece desconto para antecipação (~9% a.a.), vale antecipar!"
+
+### ESCOLHA O MÉTODO BASEADO NA INTENÇÃO DO USUÁRIO:
+- "economizar", "reduzir custo", "pagar menos" → Use ordenacao_avalanche
+- "quitar logo", "eliminar", "zerar cartão" → Use ordenacao_snowball
+- "liberar limite", "score", "crédito" → Use ordenacao_por_utilizacao
+- Se não ficar claro, use metodo_recomendado e mencione a alternativa
+
+### SOBRE ANTECIPAÇÃO DE PARCELAS (CONTEXTO BRASIL):
+- Parcelas "sem juros" têm juros embutidos no preço original
+- Antecipar SÓ vale se: banco oferece desconto (~9% a.a.) OU precisa liberar limite
+- Nubank, Itaú, Inter oferecem desconto para antecipação
+- Se não há desconto e não precisa de limite, pode ser melhor investir o dinheiro
+- EVITE rotativo a todo custo (~423% a.a. no Brasil!)
+
+### PRIORIZAÇÃO GERAL DE DÍVIDAS:
+1. Dívidas com juros altos (rotativo, cheque especial) - URGENTE
+2. Faturas vencidas (podem ir para rotativo)
+3. Cartões com alta utilização de limite (>70%) - impacta score
+4. Aplicar método escolhido para parcelas normais
+
+COMO RESPONDER (GERAL):
 1. "qual cartão tem maior impacto?" → Use cartao_maior_impacto, mostre impacto_mensal e valor_para_zerar_cartao
 2. "como reduzir meu custo mensal para X?" → Use estrategias_reducao, mostre cartoes_a_quitar e valor_necessario
 3. "quanto preciso para zerar?" → Use estrategias_reducao["zerar_tudo"]["valor_necessario"]
@@ -1704,6 +1944,7 @@ COMO RESPONDER:
 7. "o que vai cair na fatura de X?" → Use projecao_faturas_futuras, liste os itens do mês solicitado
 8. "quero antecipar parcelas" → Use projecao_faturas_futuras para mostrar quais itens podem ser antecipados
 9. "detalhe as parcelas do cartão X" → Use parcelas e projecao_faturas_futuras do cartão específico
+10. "tenho X reais para quitar" → Use estrategia_com_orcamento com análise completa!
 
 PARA ANTECIPAR PARCELAS:
 - Mostre projecao_faturas_futuras do cartão com os itens detalhados
@@ -2086,6 +2327,116 @@ PONTOS IMPORTANTES:
 - Sempre ofereça uma próxima ação ou pergunta de follow-up
 - Use emojis com moderação (máximo 1-2 por resposta)"""
 
+    def _extract_monetary_value(self, message: str) -> float | None:
+        """Extrai valor monetário da mensagem do usuário.
+
+        Suporta formatos brasileiros:
+        - R$ 20.000, R$20000, R$ 20.000,00
+        - 20k, 20K
+        - 20 mil, 20.5 mil, vinte mil
+        - 20000 reais, 20.000 reais
+        - tenho 20k, com 20 mil, usar 20000
+
+        Returns:
+            Valor em float ou None se não encontrar
+        """
+        message_lower = message.lower()
+
+        # Mapeamento de números por extenso
+        extenso_map = {
+            "um": 1, "uma": 1, "dois": 2, "duas": 2, "tres": 3, "três": 3,
+            "quatro": 4, "cinco": 5, "seis": 6, "sete": 7, "oito": 8,
+            "nove": 9, "dez": 10, "onze": 11, "doze": 12, "treze": 13,
+            "quatorze": 14, "catorze": 14, "quinze": 15, "dezesseis": 16,
+            "dezessete": 17, "dezoito": 18, "dezenove": 19, "vinte": 20,
+            "trinta": 30, "quarenta": 40, "cinquenta": 50, "sessenta": 60,
+            "setenta": 70, "oitenta": 80, "noventa": 90, "cem": 100
+        }
+
+        def normalize_number(value_str: str) -> float | None:
+            """Converte string de número para float"""
+            if not value_str:
+                return None
+
+            value_str = value_str.strip().lower()
+
+            # Remover espaços
+            value_str = value_str.replace(" ", "")
+
+            # Verificar se é "k" (mil)
+            if value_str.endswith("k"):
+                num_part = value_str[:-1].replace(",", ".")
+                try:
+                    return float(num_part) * 1000
+                except ValueError:
+                    return None
+
+            # Formato brasileiro: 20.000,50 → 20000.50
+            # Detectar formato brasileiro vs americano
+            if "," in value_str and "." in value_str:
+                # Formato brasileiro: 20.000,50
+                value_str = value_str.replace(".", "").replace(",", ".")
+            elif "," in value_str:
+                # Pode ser 20,50 (centavos) ou 20,000 (milhares em EN)
+                # Se tem 3 dígitos depois da vírgula, é formato americano
+                parts = value_str.split(",")
+                if len(parts) == 2 and len(parts[1]) == 3:
+                    # Formato americano: 20,000
+                    value_str = value_str.replace(",", "")
+                else:
+                    # Formato brasileiro: 20,50
+                    value_str = value_str.replace(",", ".")
+            elif "." in value_str:
+                # Pode ser 20.50 (centavos) ou 20.000 (milhares em BR)
+                parts = value_str.split(".")
+                if len(parts) == 2 and len(parts[1]) == 3:
+                    # Formato brasileiro: 20.000
+                    value_str = value_str.replace(".", "")
+                # else: mantém como 20.50
+
+            try:
+                return float(value_str)
+            except ValueError:
+                return None
+
+        # Padrões ordenados por especificidade (mais específico primeiro)
+        patterns = [
+            # R$ 20.000,00 ou R$ 20000 ou R$20k
+            (r'R\$\s*([\d.,]+k?)', lambda m: normalize_number(m.group(1))),
+
+            # 20k ou 20K
+            (r'\b(\d+(?:[.,]\d+)?)\s*[kK]\b', lambda m: normalize_number(m.group(1) + "k")),
+
+            # 20 mil, 20.5 mil
+            (r'\b(\d+(?:[.,]\d+)?)\s*mil\b', lambda m: normalize_number(m.group(1)) * 1000 if normalize_number(m.group(1)) else None),
+
+            # vinte mil, trinta mil, etc
+            (r'\b(' + '|'.join(extenso_map.keys()) + r')\s+mil\b',
+             lambda m: extenso_map.get(m.group(1), 0) * 1000),
+
+            # 20000 reais, 20.000 reais
+            (r'\b([\d.,]+)\s*reais\b', lambda m: normalize_number(m.group(1))),
+
+            # tenho/com/usar seguido de valor
+            (r'(?:tenho|com|usar|usando|aplico|aplicar|invisto|investir|pago|pagar|quito|quitar)\s*([\d.,]+k?)',
+             lambda m: normalize_number(m.group(1))),
+
+            # Número grande isolado (>1000) que provavelmente é valor
+            (r'\b(\d{4,}(?:[.,]\d+)?)\b', lambda m: normalize_number(m.group(1))),
+        ]
+
+        for pattern, extractor in patterns:
+            match = re.search(pattern, message_lower)
+            if match:
+                try:
+                    value = extractor(match)
+                    if value and value >= 100:  # Ignorar valores muito pequenos
+                        return value
+                except (ValueError, TypeError):
+                    continue
+
+        return None
+
     def _parse_query(self, message: str) -> dict[str, Any]:
         """Analisa a mensagem para extrair periodo, categorias e filtros"""
         message_lower = message.lower()
@@ -2169,6 +2520,11 @@ PONTOS IMPORTANTES:
         # Detectar comparacao
         if "comparar" in message_lower or "versus" in message_lower or "vs" in message_lower:
             query["comparison"] = True
+
+        # Extrair valor monetário mencionado (para estratégias de quitação)
+        valor_disponivel = self._extract_monetary_value(message)
+        if valor_disponivel:
+            query["valor_disponivel"] = valor_disponivel
 
         return query
 
