@@ -24,7 +24,6 @@ import {
   BadgeDollarSign,
   FileText,
   Calendar,
-  Inbox,
   Calculator,
   Zap,
   ClipboardCheck,
@@ -112,7 +111,6 @@ const menuGroups: NavGroup[] = [
     items: [
       { to: '/budget', icon: Wallet, label: 'Orçamento' },
       { to: '/goals', icon: Target, label: 'Metas' },
-      { to: '/envelopes', icon: Inbox, label: 'Envelopes' },
       { to: '/debts', icon: BadgeDollarSign, label: 'Dívidas' },
       { to: '/market', icon: ShoppingCart, label: 'Mercado' },
     ],

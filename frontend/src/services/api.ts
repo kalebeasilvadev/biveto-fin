@@ -398,6 +398,10 @@ export const budgetsApi = {
   summary: (year: number) => api.get(`/budgets/summary/${year}`),
   comparison: (year: number, month: number) =>
     api.get(`/budgets/comparison/${year}/${month}`),
+  transfer: (year: number, month: number, data: { from_category_id: number; to_category_id: number; amount: number; notes?: string }) =>
+    api.post(`/budgets/transfer`, data, { params: { year, month } }),
+  getItemHistory: (year: number, month: number, categoryId: number, limit = 50) =>
+    api.get(`/budgets/items/${categoryId}/history`, { params: { year, month, limit } }),
 }
 
 export const goalsApi = {
@@ -687,49 +691,18 @@ export const simulatorsApi = {
     api.get(`/calendar/projections/${daysAhead}`),
 }
 
-export const envelopesApi = {
-  // Envelopes CRUD
-  list: (includeInactive: boolean = false) =>
-    api.get('/envelopes', { params: { include_inactive: includeInactive } }),
-  get: (id: number) => api.get(`/envelopes/${id}`),
-  create: (data: {
-    name: string
-    description?: string
-    category_id?: number
-    period_type?: string
-    limit_amount: number
-    allow_rollover?: boolean
-    max_rollover_amount?: number
-    refill_schedule?: string
-    custom_refill_day?: number
-    auto_refill?: boolean
-    priority?: number
-    color?: string
-    icon?: string
-    ownership_type?: string
-  }) => api.post('/envelopes', data),
-  update: (id: number, data: unknown) => api.patch(`/envelopes/${id}`, data),
-  delete: (id: number) => api.delete(`/envelopes/${id}`),
-
-  // Summary and allowance
-  getSummary: () => api.get('/envelopes/summary'),
-  getDailyAllowance: (id: number) => api.get(`/envelopes/${id}/daily-allowance`),
-  getHistory: (id: number, limit: number = 50) =>
-    api.get(`/envelopes/${id}/history`, { params: { limit } }),
-
-  // Actions
-  refill: (id: number) => api.post(`/envelopes/${id}/refill`),
-  transfer: (data: {
-    from_envelope_id: number
-    to_envelope_id: number
-    amount: number
-    notes?: string
-  }) => api.post('/envelopes/transfer', data),
-  autoAssign: (transactionId: number) =>
-    api.post('/envelopes/auto-assign', null, {
-      params: { transaction_id: transactionId },
-    }),
-}
+// Envelopes module removed - functionality merged into Budgets module
+// export const envelopesApi = {
+//   list: (includeInactive: boolean = false) =>
+//     api.get('/envelopes', { params: { include_inactive: includeInactive } }),
+//   get: (id: number) => api.get(`/envelopes/${id}`),
+//   create: (data: unknown) => api.post('/envelopes', data),
+//   update: (id: number, data: unknown) => api.patch(`/envelopes/${id}`, data),
+//   delete: (id: number) => api.delete(`/envelopes/${id}`),
+//   getSummary: () => api.get('/envelopes/summary'),
+//   refill: (id: number) => api.post(`/envelopes/${id}/refill`),
+//   transfer: (data: unknown) => api.post('/envelopes/transfer', data),
+// }
 
 export const calendarApi = {
   // Daily calendar with projections

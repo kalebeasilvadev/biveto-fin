@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { budgetsApi, categoriesApi, familyApi } from '../services/api'
-import { ChevronLeft, ChevronRight, Plus, Trash2, Copy, Wallet } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, Trash2, Copy, Wallet, ArrowRightLeft, Clock, AlertTriangle, CheckCircle, XCircle, MinusCircle } from 'lucide-react'
 import { HelpButton } from '../components/help'
 import { clsx } from 'clsx'
 import EmptyState from '../components/EmptyState'
 import OwnershipSelector from '../components/shared/OwnershipSelector'
+
+type BudgetItemStatus = 'on_track' | 'warning' | 'depleted' | 'overspent'
 
 interface BudgetItem {
   id: number
@@ -14,10 +16,13 @@ interface BudgetItem {
   category_icon: string | null
   planned_amount: number
   spent_amount: number
-  remaining_amount: number
+  available_amount: number
   percentage_used: number
   is_fixed: boolean
   priority: number
+  status: BudgetItemStatus
+  daily_allowance: number
+  days_remaining: number
 }
 
 interface Budget {
@@ -43,6 +48,22 @@ interface FamilyContext {
   max_members: number
 }
 
+// Helper function to get status badge
+const getStatusBadge = (status: BudgetItemStatus) => {
+  switch (status) {
+    case 'on_track':
+      return { icon: CheckCircle, label: 'No limite', color: 'text-green-500 bg-green-50 dark:bg-green-900/20' }
+    case 'warning':
+      return { icon: AlertTriangle, label: 'Atenção', color: 'text-yellow-500 bg-yellow-50 dark:bg-yellow-900/20' }
+    case 'depleted':
+      return { icon: MinusCircle, label: 'Esgotado', color: 'text-orange-500 bg-orange-50 dark:bg-orange-900/20' }
+    case 'overspent':
+      return { icon: XCircle, label: 'Excedido', color: 'text-red-500 bg-red-50 dark:bg-red-900/20' }
+    default:
+      return { icon: CheckCircle, label: 'Ok', color: 'text-gray-500 bg-gray-50 dark:bg-gray-900/20' }
+  }
+}
+
 export default function Budget() {
   const queryClient = useQueryClient()
   const now = new Date()
@@ -50,6 +71,7 @@ export default function Budget() {
   const [month, setMonth] = useState(now.getMonth() + 1)
   const [showAddModal, setShowAddModal] = useState(false)
   const [showCopyModal, setShowCopyModal] = useState(false)
+  const [showTransferModal, setShowTransferModal] = useState(false)
   const [ownershipType, setOwnershipType] = useState<'personal' | 'household'>('personal')
 
   const { data: budgetData, isLoading } = useQuery({
@@ -109,6 +131,15 @@ export default function Budget() {
     },
   })
 
+  const transferMutation = useMutation({
+    mutationFn: (data: { from_category_id: number; to_category_id: number; amount: number; notes?: string }) =>
+      budgetsApi.transfer(year, month, data),
+    onSuccess: () => {
+      invalidateBudgetCaches()
+      setShowTransferModal(false)
+    },
+  })
+
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -150,6 +181,16 @@ export default function Budget() {
           <HelpButton pageId="budget" />
         </div>
         <div className="flex gap-2 flex-shrink-0">
+          {budget?.items && budget.items.length >= 2 && (
+            <button
+              onClick={() => setShowTransferModal(true)}
+              className="btn-secondary flex items-center gap-2 whitespace-nowrap"
+              title="Transferir entre categorias"
+            >
+              <ArrowRightLeft size={18} />
+              <span className="hidden sm:inline">Transferir</span>
+            </button>
+          )}
           <button
             onClick={() => setShowCopyModal(true)}
             className="btn-secondary flex items-center gap-2 whitespace-nowrap"
@@ -215,53 +256,75 @@ export default function Budget() {
         />
       ) : (
         <div className="space-y-4">
-          {budget.items.map((item) => (
-            <div key={item.id} className="card">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-xl">{item.category_icon || '📁'}</span>
-                  <span className="font-medium dark:text-white">{item.category_name}</span>
-                  {item.is_fixed && (
-                    <span className="text-xs bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-300 px-2 py-1 rounded">
-                      Fixo
+          {budget.items.map((item) => {
+            const statusBadge = getStatusBadge(item.status)
+            const StatusIcon = statusBadge.icon
+            return (
+              <div key={item.id} className="card">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xl">{item.category_icon || '📁'}</span>
+                    <span className="font-medium dark:text-white">{item.category_name}</span>
+                    {item.is_fixed && (
+                      <span className="text-xs bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-300 px-2 py-1 rounded">
+                        Fixo
+                      </span>
+                    )}
+                    <span className={clsx('text-xs px-2 py-1 rounded flex items-center gap-1', statusBadge.color)}>
+                      <StatusIcon size={12} />
+                      {statusBadge.label}
                     </span>
+                  </div>
+                  <button
+                    onClick={() => deleteItemMutation.mutate(item.id)}
+                    className="p-1 text-gray-400 hover:text-red-500"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                </div>
+                <div className="flex justify-between text-sm text-gray-500 dark:text-gray-400 mb-2">
+                  <span>
+                    {formatCurrency(item.spent_amount)} de {formatCurrency(item.planned_amount)}
+                  </span>
+                  <span className={clsx(item.percentage_used > 100 ? 'text-expense' : 'text-gray-600 dark:text-gray-400')}>
+                    {item.percentage_used.toFixed(0)}%
+                  </span>
+                </div>
+                <div className="h-2 bg-gray-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                  <div
+                    className={clsx(
+                      'h-full rounded-full transition-all',
+                      item.status === 'overspent'
+                        ? 'bg-red-500'
+                        : item.status === 'depleted'
+                        ? 'bg-orange-500'
+                        : item.status === 'warning'
+                        ? 'bg-yellow-500'
+                        : 'bg-primary-500'
+                    )}
+                    style={{ width: `${Math.min(item.percentage_used, 100)}%` }}
+                  />
+                </div>
+                <div className="flex justify-between items-center mt-2">
+                  {item.available_amount < 0 ? (
+                    <p className="text-sm text-expense">
+                      Excedido em {formatCurrency(Math.abs(item.available_amount))}
+                    </p>
+                  ) : (
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      Disponível: {formatCurrency(item.available_amount)}
+                    </p>
+                  )}
+                  {item.days_remaining > 0 && item.available_amount > 0 && (
+                    <p className="text-xs text-gray-400 dark:text-gray-500 flex items-center gap-1">
+                      <Clock size={12} />
+                      {formatCurrency(item.daily_allowance)}/dia ({item.days_remaining} dias)
+                    </p>
                   )}
                 </div>
-                <button
-                  onClick={() => deleteItemMutation.mutate(item.id)}
-                  className="p-1 text-gray-400 hover:text-red-500"
-                >
-                  <Trash2 size={18} />
-                </button>
               </div>
-              <div className="flex justify-between text-sm text-gray-500 dark:text-gray-400 mb-2">
-                <span>
-                  {formatCurrency(item.spent_amount)} de {formatCurrency(item.planned_amount)}
-                </span>
-                <span className={clsx(item.percentage_used > 100 ? 'text-expense' : 'text-gray-600 dark:text-gray-400')}>
-                  {item.percentage_used.toFixed(0)}%
-                </span>
-              </div>
-              <div className="h-2 bg-gray-100 dark:bg-slate-700 rounded-full overflow-hidden">
-                <div
-                  className={clsx(
-                    'h-full rounded-full transition-all',
-                    item.percentage_used > 100
-                      ? 'bg-red-500'
-                      : item.percentage_used > 80
-                      ? 'bg-yellow-500'
-                      : 'bg-primary-500'
-                  )}
-                  style={{ width: `${Math.min(item.percentage_used, 100)}%` }}
-                />
-              </div>
-              {item.remaining_amount < 0 && (
-                <p className="text-sm text-expense mt-2">
-                  Excedido em {formatCurrency(Math.abs(item.remaining_amount))}
-                </p>
-              )}
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 
@@ -401,6 +464,106 @@ export default function Budget() {
                   disabled={copyBudgetMutation.isPending}
                 >
                   {copyBudgetMutation.isPending ? 'Copiando...' : 'Copiar'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Transfer Budget Modal */}
+      {showTransferModal && budget?.items && budget.items.length >= 2 && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white flex items-center gap-2">
+              <ArrowRightLeft size={20} />
+              Transferir entre Categorias
+            </h3>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault()
+                const formData = new FormData(e.currentTarget)
+                transferMutation.mutate({
+                  from_category_id: Number(formData.get('from_category_id')),
+                  to_category_id: Number(formData.get('to_category_id')),
+                  amount: Number(formData.get('amount')),
+                  notes: formData.get('notes')?.toString() || undefined,
+                })
+              }}
+            >
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                Mova orçamento de uma categoria para outra quando precisar de mais verba.
+              </p>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    De (origem)
+                  </label>
+                  <select name="from_category_id" className="input" required>
+                    <option value="">Selecione a categoria de origem</option>
+                    {budget.items
+                      .filter((item) => item.available_amount > 0)
+                      .map((item) => (
+                        <option key={item.category_id} value={item.category_id}>
+                          {item.category_name} (Disponível: {formatCurrency(item.available_amount)})
+                        </option>
+                      ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Para (destino)
+                  </label>
+                  <select name="to_category_id" className="input" required>
+                    <option value="">Selecione a categoria de destino</option>
+                    {budget.items.map((item) => (
+                      <option key={item.category_id} value={item.category_id}>
+                        {item.category_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Valor a transferir
+                  </label>
+                  <input
+                    type="number"
+                    name="amount"
+                    step="0.01"
+                    min="0.01"
+                    className="input"
+                    required
+                    placeholder="0,00"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Observação (opcional)
+                  </label>
+                  <input
+                    type="text"
+                    name="notes"
+                    className="input"
+                    placeholder="Ex: Sobrando em alimentação, precisando em lazer"
+                    maxLength={200}
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2 mt-6">
+                <button
+                  type="button"
+                  onClick={() => setShowTransferModal(false)}
+                  className="btn-secondary flex-1"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="btn-primary flex-1"
+                  disabled={transferMutation.isPending}
+                >
+                  {transferMutation.isPending ? 'Transferindo...' : 'Transferir'}
                 </button>
               </div>
             </form>

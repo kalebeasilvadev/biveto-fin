@@ -32,7 +32,7 @@ from app.modules.api_keys.routers.api_keys import router as api_keys_router
 from app.modules.mcp.routers.mcp import router as mcp_router
 from app.modules.notifications.routers.notifications import router as notifications_router
 from app.modules.calendar.routers.cash_calendar import router as calendar_router
-from app.modules.envelopes.routers.envelopes import router as envelopes_router
+# Envelopes module removed - functionality merged into Budgets module
 from app.modules.automations.routers.automations import router as automations_router
 from app.modules.review.routers.review import router as review_router
 from app.modules.grocery.routers.grocery import router as grocery_router
@@ -107,8 +107,7 @@ api_router.include_router(notifications_router, prefix="/notifications", tags=["
 # Calendar module
 api_router.include_router(calendar_router, prefix="/calendar", tags=["Calendário de Caixa"])
 
-# Envelopes module
-api_router.include_router(envelopes_router, prefix="/envelopes", tags=["Envelopes"])
+# Envelopes module removed - functionality merged into Budgets module
 
 # Automations module
 api_router.include_router(automations_router, prefix="/automations", tags=["Automações"])

@@ -3,6 +3,7 @@ from datetime import datetime
 from decimal import Decimal
 from pydantic import BaseModel, Field
 from app.models.household import OwnershipType
+from app.models.budget import BudgetItemStatus, BudgetHistoryChangeType
 
 
 class BudgetItemBase(BaseModel):
@@ -36,6 +37,29 @@ class BudgetItemResponse(BudgetItemBase):
     available_amount: Decimal = Decimal(0)
     percentage_used: float = 0.0
     category_name: str | None = None
+
+    # Novos campos (inspirados em Envelopes)
+    status: str = BudgetItemStatus.ON_TRACK.value  # Status dinâmico
+    daily_allowance: Decimal = Decimal(0)  # Subsídio diário restante
+    days_remaining: int = 0  # Dias restantes no mês
+
+    class Config:
+        from_attributes = True
+
+
+class BudgetItemHistoryResponse(BaseModel):
+    """Resposta de histórico de item de orçamento"""
+    id: int
+    budget_item_id: int
+    transaction_id: int | None
+    change_type: str
+    amount: Decimal
+    balance_before: Decimal
+    balance_after: Decimal
+    related_category_id: int | None = None
+    related_category_name: str | None = None
+    notes: str | None = None
+    created_at: datetime
 
     class Config:
         from_attributes = True
@@ -92,6 +116,8 @@ class BudgetSummary(BaseModel):
     daily_budget_remaining: Decimal
     categories_over_budget: int
     categories_on_track: int
+    categories_warning: int = 0  # Categorias acima de 80%
+    categories_depleted: int = 0  # Categorias atingiram 100%
 
 
 class BudgetCopyRequest(BaseModel):
@@ -110,3 +136,20 @@ class BudgetComparisonResponse(BaseModel):
     difference: Decimal
     percentage: float
     status: str  # "on_track", "over", "under"
+
+
+class BudgetTransferRequest(BaseModel):
+    """Request para transferir orçamento entre categorias (inspirado em Envelopes)"""
+    from_category_id: int = Field(..., description="Categoria de origem")
+    to_category_id: int = Field(..., description="Categoria de destino")
+    amount: Decimal = Field(..., gt=0, description="Valor a transferir")
+    notes: str | None = Field(None, max_length=200, description="Observações da transferência")
+
+
+class BudgetTransferResponse(BaseModel):
+    """Resposta de transferência entre categorias"""
+    from_item: BudgetItemResponse
+    to_item: BudgetItemResponse
+    amount: Decimal
+    notes: str | None = None
+    created_at: datetime

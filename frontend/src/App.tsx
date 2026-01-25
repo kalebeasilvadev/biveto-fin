@@ -28,7 +28,8 @@ import Invite from './pages/Invite'
 import ResetPassword from './pages/ResetPassword'
 import ShareTarget from './pages/ShareTarget'
 import CashCalendar from './pages/CashCalendar'
-import Envelopes from './pages/Envelopes'
+// Envelopes module removed - functionality merged into Budgets module
+// import Envelopes from './pages/Envelopes'
 import Simulators from './pages/Simulators'
 import Automations from './pages/Automations'
 import WeeklyReview from './pages/WeeklyReview'
@@ -95,7 +96,8 @@ function App() {
         <Route path="debts" element={<Debts />} />
         <Route path="recurring" element={<Recurring />} />
         <Route path="calendar" element={<CashCalendar />} />
-        <Route path="envelopes" element={<Envelopes />} />
+        {/* Envelopes removed - redirect to budget */}
+        <Route path="envelopes" element={<Navigate to="/budget" replace />} />
         <Route path="simulators" element={<Simulators />} />
         <Route path="automations" element={<Automations />} />
         <Route path="weekly-review" element={<WeeklyReview />} />

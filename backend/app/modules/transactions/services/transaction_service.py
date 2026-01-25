@@ -16,6 +16,7 @@ from app.modules.transactions.schemas.transaction import TransactionCreate, Tran
 from app.modules.installments.services.installment_service import InstallmentService
 from app.modules.credit_cards.services.invoice_service import InvoiceService
 from app.modules.income_splits.services.income_split_service import IncomeSplitService
+from app.modules.budgets.services.budget_service import BudgetService
 
 
 class TransactionService:
@@ -142,6 +143,17 @@ class TransactionService:
         if split_rule_ids and data.type == TransactionType.INCOME:
             income_split_service = IncomeSplitService(self.db)
             await income_split_service.apply_splits(user, transaction, split_rule_ids)
+
+        # Registrar gasto no orçamento se for despesa com categoria
+        if data.type == TransactionType.EXPENSE and data.category_id:
+            budget_service = BudgetService(self.db)
+            await budget_service.record_expense(
+                user=user,
+                category_id=data.category_id,
+                amount=data.amount,
+                transaction_date=data.date,
+                transaction_id=transaction.id
+            )
 
         return transaction
 
@@ -318,9 +330,11 @@ class TransactionService:
             first_transaction_id=transaction.id,  # VINCULA À TRANSAÇÃO
         )
 
-        # PASSO 3: Vincular transação à série e incrementar paid_count
+        # PASSO 3: Vincular transação à série e definir paid_count
+        # Considera que parcelas anteriores à atual foram implicitamente pagas
+        # antes do sistema (ex: importou 6/12, então 1-5 já foram pagas)
         transaction.installment_series_id = series.id
-        series.paid_count += 1
+        series.paid_count = installment_current
 
         # PASSO 4: Criar parcelas futuras se solicitado
         if create_future_installments:
@@ -767,9 +781,16 @@ class TransactionService:
                     first_transaction_id=transaction.id,  # VINCULA À TRANSAÇÃO
                 )
 
-                # PASSO 3: Vincular transação à série e incrementar paid_count
+                # PASSO 3: Vincular transação à série e definir paid_count
                 transaction.installment_series_id = series.id
-                series.paid_count += 1
+                if data.mark_previous_as_paid:
+                    # Parcelas anteriores serão criadas explicitamente
+                    # mark_previous_installments_as_paid incrementará paid_count para cada uma
+                    series.paid_count = 1
+                else:
+                    # Parcelas anteriores são implícitas (pagas antes do sistema)
+                    # Ex: importou 6/12, então 1-5 já foram pagas
+                    series.paid_count = data.installment_current
 
                 result["transaction"] = transaction
                 result["series"] = series
@@ -897,6 +918,25 @@ class TransactionService:
                     user, transaction, split_rule_ids
                 )
                 result["split_transactions"] = split_expenses
+
+        # Registrar gasto no orçamento se for despesa com categoria
+        transaction = result.get("transaction")
+        if transaction and transaction.category_id:
+            is_expense = (
+                transaction.type == TransactionType.EXPENSE.value or
+                (hasattr(data, 'extracted_transaction_type') and
+                 data.extracted_transaction_type and
+                 data.extracted_transaction_type.lower() not in self.INCOME_TRANSACTION_TYPES)
+            )
+            if is_expense:
+                budget_service = BudgetService(self.db)
+                await budget_service.record_expense(
+                    user=user,
+                    category_id=transaction.category_id,
+                    amount=transaction.amount,
+                    transaction_date=transaction.date,
+                    transaction_id=transaction.id
+                )
 
         return result
 
@@ -1331,6 +1371,17 @@ class TransactionService:
             "series_deleted": False,
             "splits_deleted": 0,
         }
+
+        # Registrar estorno no orçamento se for despesa com categoria
+        if transaction.type == TransactionType.EXPENSE.value and transaction.category_id:
+            budget_service = BudgetService(self.db)
+            await budget_service.record_refund(
+                user=user,
+                category_id=transaction.category_id,
+                amount=transaction.amount,
+                transaction_date=transaction.date,
+                transaction_id=transaction.id
+            )
 
         # Deletar transacoes de split vinculadas (despesas geradas por income splits)
         splits_result = await self.db.execute(

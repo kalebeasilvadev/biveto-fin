@@ -21,6 +21,7 @@ from app.modules.analytics.schemas.analytics import (
     PaymentMethodReport,
 )
 from app.models.transaction import PaymentMethod
+from app.models.budget import BudgetItemStatus
 
 
 class AnalyticsService:
@@ -354,6 +355,13 @@ class AnalyticsService:
                 insights.extend(credit_card_insights)
             except Exception as e:
                 print(f"Error analyzing credit cards: {e}")
+
+            # 5. Analise de orcamento
+            try:
+                budget_insights = await self._analyze_budget(user, start_date, end_date)
+                insights.extend(budget_insights)
+            except Exception as e:
+                print(f"Error analyzing budget: {e}")
 
             return insights[:5]  # Top 5 insights
         except Exception as e:
@@ -852,6 +860,108 @@ class AnalyticsService:
 
         except Exception as e:
             print(f"Error in _analyze_credit_cards: {e}")
+            import traceback
+            traceback.print_exc()
+
+        return insights
+
+    async def _analyze_budget(
+        self, user: User, start_date: date, end_date: date
+    ) -> list[InsightResponse]:
+        """
+        Gera insights relacionados ao orcamento.
+
+        Analisa:
+        - Categorias excedidas
+        - Categorias proximas do limite
+        - Oportunidades de rebalanceamento
+        """
+        from app.modules.budgets.services.budget_service import BudgetService
+
+        insights = []
+        year = start_date.year
+        month = start_date.month
+
+        try:
+            budget_service = BudgetService(self.db)
+            budget = await budget_service.get_budget(user, year, month)
+
+            if not budget or not budget.items:
+                return insights
+
+            # Categorias excedidas (overspent)
+            overspent_items = [
+                item for item in budget.items
+                if item.status == BudgetItemStatus.OVERSPENT.value
+            ]
+
+            if overspent_items:
+                total_overspent = sum(
+                    abs(item.available_amount) for item in overspent_items
+                )
+                category_names = ', '.join(
+                    item.category_name for item in overspent_items[:3]
+                )
+                insights.append(
+                    InsightResponse(
+                        type="budget_alert",
+                        title="⚠️ Orcamento Excedido",
+                        description=f"{len(overspent_items)} categoria(s) excedeu o limite: {category_names}",
+                        impact_value=float(total_overspent),
+                        calculation=f"Total excedido: R$ {total_overspent:,.2f}",
+                        action="Considere transferir de categorias com sobra ou ajustar o planejamento"
+                    )
+                )
+
+            # Categorias em alerta (warning - acima de 80%)
+            warning_items = [
+                item for item in budget.items
+                if item.status == BudgetItemStatus.WARNING.value
+            ]
+
+            if warning_items and not overspent_items:  # Nao duplicar alertas
+                category_names = ', '.join(
+                    f"{item.category_name} ({item.percentage_used:.0f}%)"
+                    for item in warning_items[:3]
+                )
+                insights.append(
+                    InsightResponse(
+                        type="budget_warning",
+                        title="📊 Categorias Proximas do Limite",
+                        description=f"{len(warning_items)} categoria(s) acima de 80%: {category_names}",
+                        impact_value=float(sum(item.available_amount for item in warning_items)),
+                        calculation=f"Saldo restante: R$ {sum(item.available_amount for item in warning_items):,.2f}",
+                        action="Monitore seus gastos nestas categorias para nao exceder o limite"
+                    )
+                )
+
+            # Oportunidade de rebalanceamento (categorias com muita sobra)
+            on_track_items = [
+                item for item in budget.items
+                if item.status == BudgetItemStatus.ON_TRACK.value
+                and item.percentage_used < 50
+                and item.days_remaining <= 10
+                and item.available_amount > 100  # Pelo menos R$ 100 sobrando
+            ]
+
+            if on_track_items and overspent_items:
+                total_available = sum(item.available_amount for item in on_track_items)
+                category_names = ', '.join(
+                    item.category_name for item in on_track_items[:3]
+                )
+                insights.append(
+                    InsightResponse(
+                        type="budget_opportunity",
+                        title="💡 Oportunidade de Rebalanceamento",
+                        description=f"Categorias com sobra: {category_names}",
+                        impact_value=float(total_available),
+                        calculation=f"Total disponivel para transferencia: R$ {total_available:,.2f}",
+                        action="Use a funcao 'Transferir' no Orcamento para mover verba entre categorias"
+                    )
+                )
+
+        except Exception as e:
+            print(f"Error in _analyze_budget: {e}")
             import traceback
             traceback.print_exc()
 

@@ -1,21 +1,29 @@
 """
 Serviço de Orçamento (Budget)
 Implementa funcionalidades baseadas em YNAB e Dave Ramsey
+
+Evolução: Incorpora funcionalidades de Envelopes (histórico, status dinâmico,
+transferências, subsídio diário) para uma experiência mais completa de orçamento.
 """
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from calendar import monthrange
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, func, or_
+from sqlalchemy.orm import selectinload
 from fastapi import HTTPException, status
 
-from app.models.budget import Budget, BudgetItem
+from app.models.budget import (
+    Budget, BudgetItem, BudgetItemHistory,
+    BudgetItemStatus, BudgetHistoryChangeType
+)
 from app.models.transaction import Transaction, TransactionType
 from app.models.category import Category
 from app.models.user import User
 from app.modules.budgets.schemas.budget import (
     BudgetCreate, BudgetUpdate, BudgetItemCreate, BudgetItemUpdate,
-    BudgetResponse, BudgetItemResponse, BudgetSummary, BudgetComparisonResponse
+    BudgetResponse, BudgetItemResponse, BudgetSummary, BudgetComparisonResponse,
+    BudgetTransferRequest, BudgetTransferResponse, BudgetItemHistoryResponse
 )
 from app.modules.household.utils import (
     get_household_user_ids,
@@ -102,11 +110,30 @@ class BudgetService:
             )
             category_names = {row[0]: row[1] for row in cat_result.all()}
 
+        # Calcular dias restantes no mês
+        today = date.today()
+        _, last_day = monthrange(year, month)
+        if today.year == year and today.month == month:
+            days_remaining = max(0, last_day - today.day)
+        elif date(year, month, 1) > today:
+            days_remaining = last_day
+        else:
+            days_remaining = 0
+
         # Montar itens com valores calculados
         items_response = []
         for item in budget.items:
             spent = expenses_by_category.get(item.category_id, Decimal(0))
             available = item.planned_amount + item.rollover_amount - spent
+            percentage_used = float(spent / item.planned_amount * 100) if item.planned_amount > 0 else 0
+
+            # Calcular status dinâmico (inspirado em Envelopes)
+            item_status = self._calculate_item_status(percentage_used, available)
+
+            # Calcular subsídio diário (inspirado em Envelopes)
+            daily_allowance = Decimal(0)
+            if days_remaining > 0 and available > 0:
+                daily_allowance = available / days_remaining
 
             items_response.append(BudgetItemResponse(
                 id=item.id,
@@ -121,8 +148,11 @@ class BudgetService:
                 updated_at=item.updated_at,
                 spent_amount=spent,
                 available_amount=available,
-                percentage_used=float(spent / item.planned_amount * 100) if item.planned_amount > 0 else 0,
-                category_name=category_names.get(item.category_id)
+                percentage_used=percentage_used,
+                category_name=category_names.get(item.category_id),
+                status=item_status,
+                daily_allowance=daily_allowance,
+                days_remaining=days_remaining
             ))
 
         total_planned = sum(item.planned_amount for item in budget.items)
@@ -422,9 +452,11 @@ class BudgetService:
         if days_remaining > 0 and budget_response.total_available > 0:
             daily_remaining = budget_response.total_available / days_remaining
 
-        # Contar categorias
-        over_budget = sum(1 for i in budget_response.items if i.available_amount < 0)
-        on_track = sum(1 for i in budget_response.items if i.available_amount >= 0)
+        # Contar categorias por status
+        over_budget = sum(1 for i in budget_response.items if i.status == BudgetItemStatus.OVERSPENT.value)
+        depleted = sum(1 for i in budget_response.items if i.status == BudgetItemStatus.DEPLETED.value)
+        warning = sum(1 for i in budget_response.items if i.status == BudgetItemStatus.WARNING.value)
+        on_track = sum(1 for i in budget_response.items if i.status == BudgetItemStatus.ON_TRACK.value)
 
         percentage_used = 0.0
         if budget_response.total_expense_planned > 0:
@@ -442,7 +474,9 @@ class BudgetService:
             days_remaining=days_remaining,
             daily_budget_remaining=daily_remaining,
             categories_over_budget=over_budget,
-            categories_on_track=on_track
+            categories_on_track=on_track,
+            categories_warning=warning,
+            categories_depleted=depleted
         )
 
     async def get_comparison(self, user: User, year: int, month: int) -> list[BudgetComparisonResponse]:
@@ -548,3 +582,276 @@ class BudgetService:
             score += bonus
 
         return max(0, min(100, score))
+
+    def _calculate_item_status(self, percentage_used: float, available: Decimal) -> str:
+        """
+        Calcula status dinâmico do item de orçamento (inspirado em Envelopes).
+
+        Returns:
+            str: Status do item (on_track, warning, depleted, overspent)
+        """
+        if available < 0:
+            return BudgetItemStatus.OVERSPENT.value
+        elif percentage_used >= 100:
+            return BudgetItemStatus.DEPLETED.value
+        elif percentage_used >= 80:
+            return BudgetItemStatus.WARNING.value
+        return BudgetItemStatus.ON_TRACK.value
+
+    # ============================================
+    # Novos métodos (inspirados em Envelopes)
+    # ============================================
+
+    async def transfer(
+        self, user: User, year: int, month: int, data: BudgetTransferRequest
+    ) -> BudgetTransferResponse:
+        """
+        Transfere orçamento entre categorias (inspirado em Envelopes).
+
+        "Roll with the Punches" - Ajustar orçamento movendo entre categorias
+        quando uma categoria precisa de mais verba.
+        """
+        if data.from_category_id == data.to_category_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Categoria de origem e destino devem ser diferentes"
+            )
+
+        budget = await self.get_or_create_budget(user, year, month)
+
+        # Buscar itens de origem e destino
+        from_item = None
+        to_item = None
+        for item in budget.items:
+            if item.category_id == data.from_category_id:
+                from_item = item
+            if item.category_id == data.to_category_id:
+                to_item = item
+
+        if not from_item:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Categoria de origem não encontrada no orçamento"
+            )
+        if not to_item:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Categoria de destino não encontrada no orçamento"
+            )
+
+        # Calcular saldo disponível da categoria de origem
+        start_date = date(year, month, 1)
+        _, last_day = monthrange(year, month)
+        end_date = date(year, month, last_day)
+        expenses_by_category = await self._get_expenses_by_category(user, start_date, end_date)
+
+        from_spent = expenses_by_category.get(from_item.category_id, Decimal(0))
+        from_available = from_item.planned_amount + from_item.rollover_amount - from_spent
+
+        if data.amount > from_available:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Saldo insuficiente. Disponível: R$ {from_available:.2f}"
+            )
+
+        # Registrar histórico na origem (saída)
+        from_history = BudgetItemHistory(
+            budget_item_id=from_item.id,
+            change_type=BudgetHistoryChangeType.TRANSFER.value,
+            amount=-data.amount,
+            balance_before=from_available,
+            balance_after=from_available - data.amount,
+            related_category_id=data.to_category_id,
+            notes=data.notes or f"Transferido para outra categoria"
+        )
+        self.db.add(from_history)
+
+        # Calcular saldo disponível da categoria de destino
+        to_spent = expenses_by_category.get(to_item.category_id, Decimal(0))
+        to_available = to_item.planned_amount + to_item.rollover_amount - to_spent
+
+        # Registrar histórico no destino (entrada)
+        to_history = BudgetItemHistory(
+            budget_item_id=to_item.id,
+            change_type=BudgetHistoryChangeType.TRANSFER.value,
+            amount=data.amount,
+            balance_before=to_available,
+            balance_after=to_available + data.amount,
+            related_category_id=data.from_category_id,
+            notes=data.notes or f"Recebido de outra categoria"
+        )
+        self.db.add(to_history)
+
+        # Atualizar planned_amount (a transferência afeta o planejado)
+        from_item.planned_amount -= data.amount
+        to_item.planned_amount += data.amount
+
+        # Atualizar total do orçamento (não muda, apenas redistribuição)
+        await self.db.flush()
+
+        # Retornar resposta com itens atualizados
+        budget_response = await self.get_budget(user, year, month)
+        from_item_response = next(
+            (i for i in budget_response.items if i.category_id == data.from_category_id), None
+        )
+        to_item_response = next(
+            (i for i in budget_response.items if i.category_id == data.to_category_id), None
+        )
+
+        return BudgetTransferResponse(
+            from_item=from_item_response,
+            to_item=to_item_response,
+            amount=data.amount,
+            notes=data.notes,
+            created_at=datetime.utcnow()
+        )
+
+    async def get_item_history(
+        self, user: User, year: int, month: int, category_id: int, limit: int = 50
+    ) -> list[BudgetItemHistoryResponse]:
+        """
+        Retorna histórico de mudanças de um item de orçamento.
+        """
+        budget = await self.get_or_create_budget(user, year, month)
+
+        # Encontrar o item
+        item = next((i for i in budget.items if i.category_id == category_id), None)
+        if not item:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Categoria não encontrada no orçamento"
+            )
+
+        # Buscar histórico com related_category
+        result = await self.db.execute(
+            select(BudgetItemHistory)
+            .options(selectinload(BudgetItemHistory.related_category))
+            .where(BudgetItemHistory.budget_item_id == item.id)
+            .order_by(BudgetItemHistory.created_at.desc())
+            .limit(limit)
+        )
+        history_items = result.scalars().all()
+
+        return [
+            BudgetItemHistoryResponse(
+                id=h.id,
+                budget_item_id=h.budget_item_id,
+                transaction_id=h.transaction_id,
+                change_type=h.change_type,
+                amount=h.amount,
+                balance_before=h.balance_before,
+                balance_after=h.balance_after,
+                related_category_id=h.related_category_id,
+                related_category_name=h.related_category.name if h.related_category else None,
+                notes=h.notes,
+                created_at=h.created_at
+            )
+            for h in history_items
+        ]
+
+    async def record_expense(
+        self,
+        user: User,
+        category_id: int,
+        amount: Decimal,
+        transaction_date: date,
+        transaction_id: int
+    ) -> BudgetItemHistory | None:
+        """
+        Registra gasto no orçamento quando transação é criada.
+
+        Chamado pelo TransactionService.create() para manter o histórico
+        de consumo do orçamento vinculado às transações.
+        """
+        year, month = transaction_date.year, transaction_date.month
+        budget = await self.get_or_create_budget(user, year, month)
+
+        # Encontrar item da categoria
+        item = next((i for i in budget.items if i.category_id == category_id), None)
+        if not item:
+            return None  # Categoria não tem limite definido
+
+        # Calcular saldo atual
+        start_date = date(year, month, 1)
+        _, last_day = monthrange(year, month)
+        end_date = date(year, month, last_day)
+        expenses = await self._get_expenses_by_category(user, start_date, end_date)
+        current_spent = expenses.get(category_id, Decimal(0))
+        balance_before = item.planned_amount + item.rollover_amount - current_spent
+
+        # Criar registro de histórico
+        history = BudgetItemHistory(
+            budget_item_id=item.id,
+            transaction_id=transaction_id,
+            change_type=BudgetHistoryChangeType.SPEND.value,
+            amount=-amount,
+            balance_before=balance_before,
+            balance_after=balance_before - amount,
+            notes=None
+        )
+        self.db.add(history)
+        await self.db.flush()
+
+        return history
+
+    async def record_refund(
+        self,
+        user: User,
+        category_id: int,
+        amount: Decimal,
+        transaction_date: date,
+        transaction_id: int
+    ) -> BudgetItemHistory | None:
+        """
+        Registra estorno no orçamento quando transação é deletada/editada.
+
+        Chamado pelo TransactionService.delete/update() para manter o histórico
+        de consumo do orçamento atualizado.
+        """
+        year, month = transaction_date.year, transaction_date.month
+
+        # Verificar se o orçamento existe (não criar se não existir)
+        result = await self.db.execute(
+            select(Budget).where(
+                Budget.user_id == user.id,
+                Budget.year == year,
+                Budget.month == month
+            )
+        )
+        budget = result.scalar_one_or_none()
+        if not budget:
+            return None
+
+        # Carregar itens do orçamento
+        items_result = await self.db.execute(
+            select(BudgetItem).where(BudgetItem.budget_id == budget.id)
+        )
+        items = items_result.scalars().all()
+
+        # Encontrar item da categoria
+        item = next((i for i in items if i.category_id == category_id), None)
+        if not item:
+            return None
+
+        # Calcular saldo atual
+        start_date = date(year, month, 1)
+        _, last_day = monthrange(year, month)
+        end_date = date(year, month, last_day)
+        expenses = await self._get_expenses_by_category(user, start_date, end_date)
+        current_spent = expenses.get(category_id, Decimal(0))
+        balance_before = item.planned_amount + item.rollover_amount - current_spent
+
+        # Criar registro de histórico
+        history = BudgetItemHistory(
+            budget_item_id=item.id,
+            transaction_id=transaction_id,
+            change_type=BudgetHistoryChangeType.REFUND.value,
+            amount=amount,
+            balance_before=balance_before,
+            balance_after=balance_before + amount,
+            notes="Estorno de transação"
+        )
+        self.db.add(history)
+        await self.db.flush()
+
+        return history

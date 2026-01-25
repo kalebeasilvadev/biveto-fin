@@ -6,7 +6,8 @@ from app.core.deps import CurrentUser, DbSession
 from app.modules.budgets.schemas.budget import (
     BudgetCreate, BudgetUpdate, BudgetItemCreate, BudgetItemUpdate,
     BudgetResponse, BudgetItemResponse, BudgetSummary,
-    BudgetCopyRequest, BudgetComparisonResponse
+    BudgetCopyRequest, BudgetComparisonResponse,
+    BudgetTransferRequest, BudgetTransferResponse, BudgetItemHistoryResponse
 )
 from app.modules.budgets.services.budget_service import BudgetService
 
@@ -132,3 +133,39 @@ async def delete_budget_item(
     """Remove item do orçamento"""
     service = BudgetService(db)
     await service.delete_budget_item(current_user, item_id)
+
+
+@router.post("/transfer", response_model=BudgetTransferResponse)
+async def transfer_budget(
+    data: BudgetTransferRequest,
+    current_user: CurrentUser,
+    db: DbSession,
+    year: int = Query(default_factory=lambda: date.today().year),
+    month: int = Query(default_factory=lambda: date.today().month, ge=1, le=12),
+):
+    """
+    Transfere orçamento entre categorias.
+
+    "Roll with the Punches" (YNAB) - Ajustar orçamento movendo entre categorias
+    quando uma categoria precisa de mais verba.
+    """
+    service = BudgetService(db)
+    return await service.transfer(current_user, year, month, data)
+
+
+@router.get("/items/{category_id}/history", response_model=list[BudgetItemHistoryResponse])
+async def get_budget_item_history(
+    category_id: int,
+    current_user: CurrentUser,
+    db: DbSession,
+    year: int = Query(default_factory=lambda: date.today().year),
+    month: int = Query(default_factory=lambda: date.today().month, ge=1, le=12),
+    limit: int = Query(default=50, ge=1, le=100),
+):
+    """
+    Retorna histórico de mudanças de um item de orçamento.
+
+    Inclui gastos, estornos, ajustes, transferências e rollovers.
+    """
+    service = BudgetService(db)
+    return await service.get_item_history(current_user, year, month, category_id, limit)

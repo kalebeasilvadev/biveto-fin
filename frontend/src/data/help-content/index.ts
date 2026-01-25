@@ -10,7 +10,8 @@ import { debtsHelp } from './debts'
 import { recurringHelp } from './recurring'
 import { incomeSourcesHelp } from './income-sources'
 import { incomeSplitRulesHelp } from './income-split-rules'
-import { envelopesHelp } from './envelopes'
+// Envelopes module removed - functionality merged into Budgets module
+// import { envelopesHelp } from './envelopes'
 import { calendarHelp } from './calendar'
 import { simulatorsHelp } from './simulators'
 import { automationsHelp } from './automations'
@@ -38,7 +39,7 @@ const helpContentRegistry: Record<string, HelpContent> = {
   recurring: recurringHelp,
   'income-sources': incomeSourcesHelp,
   'income-split-rules': incomeSplitRulesHelp,
-  envelopes: envelopesHelp,
+  // envelopes removed - functionality merged into budget
   calendar: calendarHelp,
   simulators: simulatorsHelp,
   automations: automationsHelp,

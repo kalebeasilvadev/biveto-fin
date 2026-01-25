@@ -29,14 +29,15 @@ from .notification import (
     NotificationPriority,
     NotificationFrequency,
 )
-from .envelope import (
-    SpendingEnvelope,
-    EnvelopeHistory,
-    EnvelopePeriodType,
-    EnvelopeStatus,
-    EnvelopeRefillSchedule,
-    EnvelopeChangeType,
-)
+# Envelope module removed - functionality merged into Budgets module
+# from .envelope import (
+#     SpendingEnvelope,
+#     EnvelopeHistory,
+#     EnvelopePeriodType,
+#     EnvelopeStatus,
+#     EnvelopeRefillSchedule,
+#     EnvelopeChangeType,
+# )
 from .automation_rule import (
     AutomationRule,
     AutomationExecution,
@@ -129,12 +130,13 @@ __all__ = [
     "NotificationType",
     "NotificationPriority",
     "NotificationFrequency",
-    "SpendingEnvelope",
-    "EnvelopeHistory",
-    "EnvelopePeriodType",
-    "EnvelopeStatus",
-    "EnvelopeRefillSchedule",
-    "EnvelopeChangeType",
+    # Envelope module removed - functionality merged into Budgets module
+    # "SpendingEnvelope",
+    # "EnvelopeHistory",
+    # "EnvelopePeriodType",
+    # "EnvelopeStatus",
+    # "EnvelopeRefillSchedule",
+    # "EnvelopeChangeType",
     "AutomationRule",
     "AutomationExecution",
     "TriggerType",

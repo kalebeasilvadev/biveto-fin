@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { analyticsApi } from '../services/api'
+import { analyticsApi, budgetsApi } from '../services/api'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import {
@@ -9,6 +9,8 @@ import {
   ArrowDownRight,
   CreditCard,
   PiggyBank,
+  Target,
+  AlertTriangle,
 } from 'lucide-react'
 import { HelpButton } from '../components/help'
 import {
@@ -18,6 +20,8 @@ import {
   ResponsiveContainer,
   Tooltip,
 } from 'recharts'
+import { Link } from 'react-router-dom'
+import { clsx } from 'clsx'
 
 const COLORS = [
   '#22c55e',
@@ -40,7 +44,13 @@ export default function Dashboard() {
     queryFn: () => analyticsApi.summary(year, month),
   })
 
+  const { data: budgetData } = useQuery({
+    queryKey: ['budget-summary', year, month],
+    queryFn: () => budgetsApi.get(year, month),
+  })
+
   const summary = data?.data
+  const budgetSummary = budgetData?.data
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat('pt-BR', {
@@ -178,6 +188,85 @@ export default function Dashboard() {
           </p>
         </div>
       </div>
+
+      {/* Card de Orçamento */}
+      {budgetSummary?.items && budgetSummary.items.length > 0 && (
+        <Link to="/budget" className="block">
+          <div className="card hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-full">
+                  <Target className="text-purple-600 w-5 h-5" />
+                </div>
+                <h2 className="text-base sm:text-lg font-semibold dark:text-white">Orçamento do Mês</h2>
+              </div>
+              {budgetSummary.items.some((item: { status: string }) => item.status === 'overspent' || item.status === 'warning') && (
+                <div className="flex items-center gap-1 text-amber-500">
+                  <AlertTriangle size={16} />
+                  <span className="text-xs sm:text-sm">Atenção</span>
+                </div>
+              )}
+            </div>
+
+            {/* Progress bar geral */}
+            <div className="mb-3">
+              <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400 mb-1">
+                <span>Gasto: {formatCurrency(budgetSummary.total_spent || 0)}</span>
+                <span>Planejado: {formatCurrency(budgetSummary.total_expense_planned || 0)}</span>
+              </div>
+              <div className="h-2 bg-gray-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                <div
+                  className={clsx(
+                    'h-full rounded-full transition-all',
+                    (budgetSummary.total_spent / budgetSummary.total_expense_planned * 100) > 100
+                      ? 'bg-red-500'
+                      : (budgetSummary.total_spent / budgetSummary.total_expense_planned * 100) > 80
+                      ? 'bg-yellow-500'
+                      : 'bg-purple-500'
+                  )}
+                  style={{
+                    width: `${Math.min((budgetSummary.total_spent / budgetSummary.total_expense_planned * 100) || 0, 100)}%`
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Categorias com alertas */}
+            <div className="space-y-2">
+              {budgetSummary.items
+                .filter((item: { status: string }) => item.status === 'overspent' || item.status === 'warning')
+                .slice(0, 3)
+                .map((item: { category_id: number; category_name: string; status: string; spent_amount: number; planned_amount: number; percentage_used: number }) => (
+                  <div key={item.category_id} className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                      <div className={clsx(
+                        'w-2 h-2 rounded-full',
+                        item.status === 'overspent' ? 'bg-red-500' : 'bg-yellow-500'
+                      )} />
+                      <span className="text-gray-700 dark:text-gray-300">{item.category_name}</span>
+                    </div>
+                    <span className={clsx(
+                      'font-medium',
+                      item.status === 'overspent' ? 'text-red-500' : 'text-yellow-500'
+                    )}>
+                      {item.percentage_used.toFixed(0)}%
+                    </span>
+                  </div>
+                ))}
+              {budgetSummary.items.filter((item: { status: string }) => item.status === 'overspent' || item.status === 'warning').length === 0 && (
+                <p className="text-sm text-green-600 dark:text-green-400 flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-green-500" />
+                  Todas as categorias dentro do limite
+                </p>
+              )}
+            </div>
+
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-3 text-right">
+              Clique para ver detalhes
+            </p>
+          </div>
+        </Link>
+      )}
 
       {/* Gastos por categoria */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
