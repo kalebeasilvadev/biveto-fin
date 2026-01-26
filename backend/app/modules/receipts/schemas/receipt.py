@@ -12,6 +12,23 @@ class ReceiptPaymentCreate(BaseModel):
     benefit_card_id: int | None = None
     original_label: str | None = None
 
+    # Campos de parcelamento (para pagamentos no crédito)
+    is_installment: bool = False
+    installment_count: int | None = None  # Total de parcelas (ex: 3)
+    credit_card_id: int | None = None
+
+    @model_validator(mode='after')
+    def validate_installment(self):
+        """Valida campos de parcelamento"""
+        if self.is_installment:
+            if not self.installment_count or self.installment_count < 2:
+                raise ValueError('Parcelamento requer pelo menos 2 parcelas')
+            if not self.credit_card_id:
+                raise ValueError('Parcelamento requer cartão de crédito selecionado')
+            if self.payment_method != 'credit_card':
+                raise ValueError('Parcelamento só é permitido para pagamentos no crédito')
+        return self
+
 
 class ReceiptItemCreate(BaseModel):
     """Item a ser convertido em Transaction"""
@@ -69,6 +86,12 @@ class ReceiptPaymentResponse(BaseModel):
     benefit_card_name: str | None = None
     sequence: int
     original_label: str | None = None
+
+    # Campos de parcelamento
+    is_installment: bool = False
+    installment_count: int | None = None
+    credit_card_id: int | None = None
+    installment_series_id: int | None = None
 
     class Config:
         from_attributes = True

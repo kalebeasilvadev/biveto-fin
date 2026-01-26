@@ -889,6 +889,10 @@ export const receiptsApi = {
       account_id: number
       benefit_card_id?: number
       original_label?: string
+      // Installment fields for credit card payments
+      is_installment?: boolean
+      installment_count?: number
+      credit_card_id?: number
     }>
     default_category_id?: number
   }) => api.post('/receipts/confirm', data),

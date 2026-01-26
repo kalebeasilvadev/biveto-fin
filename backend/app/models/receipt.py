@@ -127,12 +127,24 @@ class ReceiptPayment(Base):
     # Label original do OCR para debug
     original_label: Mapped[str | None] = mapped_column(String(200))
 
+    # Campos de parcelamento (para pagamentos no crédito)
+    is_installment: Mapped[bool] = mapped_column(default=False)
+    installment_count: Mapped[int | None] = mapped_column()  # Total de parcelas (ex: 3)
+    credit_card_id: Mapped[int | None] = mapped_column(
+        ForeignKey("credit_cards.id", ondelete="SET NULL"), index=True
+    )
+    installment_series_id: Mapped[int | None] = mapped_column(
+        ForeignKey("installment_series.id", ondelete="SET NULL"), index=True
+    )
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     # Relationships
     receipt: Mapped["Receipt"] = relationship(back_populates="payments")
     account: Mapped["Account"] = relationship(lazy="noload")
     benefit_card: Mapped["BenefitCard | None"] = relationship(lazy="noload")
+    credit_card: Mapped["CreditCard | None"] = relationship(lazy="noload")
+    installment_series: Mapped["InstallmentSeries | None"] = relationship(lazy="noload")
 
     @property
     def account_name(self) -> str | None:
@@ -154,3 +166,5 @@ from .transaction import Transaction
 from .account import Account
 from .benefit_card import BenefitCard
 from .grocery import GroceryPurchase
+from .credit_card import CreditCard
+from .installment import InstallmentSeries

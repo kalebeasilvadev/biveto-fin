@@ -82,8 +82,14 @@ export default function Upload() {
   const [isCreatingCard, setIsCreatingCard] = useState(false)
 
   // Payment mapping state for receipts with split payments
-  // Maps payment index to { account_id, benefit_card_id }
-  const [paymentMappings, setPaymentMappings] = useState<Record<number, { account_id: string; benefit_card_id: string }>>({})
+  // Maps payment index to { account_id, benefit_card_id, installment data }
+  const [paymentMappings, setPaymentMappings] = useState<Record<number, {
+    account_id: string
+    benefit_card_id: string
+    is_installment: boolean
+    installment_count: number
+    credit_card_id: string
+  }>>({})
   const [receiptConfirmError, setReceiptConfirmError] = useState<string | null>(null)
 
   // Parcelas projetadas state
@@ -194,11 +200,15 @@ export default function Upload() {
     document?.payment_info?.payments &&
     document.payment_info.payments.length > 0
 
-  // Check if all payments are mapped to accounts
+  // Check if all payments are mapped to accounts (and installment payments have credit card)
   const allPaymentsMapped = !isCupomFiscalWithSplitPayment ||
-    (document?.payment_info?.payments?.every((_p, idx) =>
-      paymentMappings[idx]?.account_id
-    ) ?? false)
+    (document?.payment_info?.payments?.every((_p, idx) => {
+      const mapping = paymentMappings[idx]
+      if (!mapping?.account_id && !mapping?.is_installment) return false
+      // If it's an installment payment, must have credit_card_id
+      if (mapping?.is_installment && !mapping?.credit_card_id) return false
+      return true
+    }) ?? false)
 
   // Verificar parcelas projetadas quando documento é carregado
   useEffect(() => {
@@ -804,13 +814,28 @@ export default function Upload() {
 
     // For cupom fiscal with split payments, use receipt confirmation API
     if (isCupomFiscalWithSplitPayment && document.payment_info?.payments) {
-      const payments = document.payment_info.payments.map((payment, idx) => ({
-        payment_method: payment.method || 'other',
-        amount: payment.amount,
-        account_id: parseInt(paymentMappings[idx]?.account_id || '0'),
-        benefit_card_id: paymentMappings[idx]?.benefit_card_id ? parseInt(paymentMappings[idx].benefit_card_id) : undefined,
-        original_label: payment.label || undefined,
-      }))
+      const payments = document.payment_info.payments.map((payment, idx) => {
+        const mapping = paymentMappings[idx]
+        const isInstallment = mapping?.is_installment || false
+
+        // For installment payments, get the account_id from the credit card
+        let accountId = parseInt(mapping?.account_id || '0')
+        if (isInstallment && mapping?.credit_card_id) {
+          const card = creditCards.find((c: { id: number; account_id?: number }) => c.id === parseInt(mapping.credit_card_id))
+          accountId = card?.account_id || accountId
+        }
+
+        return {
+          payment_method: isInstallment ? 'credit_card' : (payment.method || 'other'),
+          amount: payment.amount,
+          account_id: accountId,
+          benefit_card_id: mapping?.benefit_card_id ? parseInt(mapping.benefit_card_id) : undefined,
+          original_label: payment.label || undefined,
+          is_installment: isInstallment,
+          installment_count: isInstallment ? mapping.installment_count : undefined,
+          credit_card_id: isInstallment && mapping?.credit_card_id ? parseInt(mapping.credit_card_id) : undefined,
+        }
+      })
 
       const items = selectedItems.map(index => {
         const item = document.extracted_items[index]
@@ -902,13 +927,28 @@ export default function Upload() {
 
     // For cupom fiscal with split payments, use receipt confirmation API
     if (isCupomFiscalWithSplitPayment && document.payment_info?.payments) {
-      const payments = document.payment_info.payments.map((payment, idx) => ({
-        payment_method: payment.method || 'other',
-        amount: payment.amount,
-        account_id: parseInt(paymentMappings[idx]?.account_id || '0'),
-        benefit_card_id: paymentMappings[idx]?.benefit_card_id ? parseInt(paymentMappings[idx].benefit_card_id) : undefined,
-        original_label: payment.label || undefined,
-      }))
+      const payments = document.payment_info.payments.map((payment, idx) => {
+        const mapping = paymentMappings[idx]
+        const isInstallment = mapping?.is_installment || false
+
+        // For installment payments, get the account_id from the credit card
+        let accountId = parseInt(mapping?.account_id || '0')
+        if (isInstallment && mapping?.credit_card_id) {
+          const card = creditCards.find((c: { id: number; account_id?: number }) => c.id === parseInt(mapping.credit_card_id))
+          accountId = card?.account_id || accountId
+        }
+
+        return {
+          payment_method: isInstallment ? 'credit_card' : (payment.method || 'other'),
+          amount: payment.amount,
+          account_id: accountId,
+          benefit_card_id: mapping?.benefit_card_id ? parseInt(mapping.benefit_card_id) : undefined,
+          original_label: payment.label || undefined,
+          is_installment: isInstallment,
+          installment_count: isInstallment ? mapping.installment_count : undefined,
+          credit_card_id: isInstallment && mapping?.credit_card_id ? parseInt(mapping.credit_card_id) : undefined,
+        }
+      })
 
       const items = document.extracted_items.map(item => ({
         description: item.description || 'Item',
@@ -1367,11 +1407,16 @@ export default function Upload() {
                       // Filter benefit cards by payment method (VA cards for voucher_va, etc.)
                       const isVAPayment = payment.method === 'voucher_va' || payment.label?.toLowerCase().includes('vale alimenta')
                       const isVRPayment = payment.method === 'voucher_vr' || payment.label?.toLowerCase().includes('vale refei')
+                      const isCreditCardPayment = payment.method === 'credit_card' || payment.label?.toLowerCase().includes('crédito') || payment.label?.toLowerCase().includes('credito')
                       const relevantBenefitCards = benefitCards.filter((card: { card_type: string; account_id: number; id: number; current_balance: number }) => {
                         if (isVAPayment) return card.card_type === 'va' || card.card_type === 'flex'
                         if (isVRPayment) return card.card_type === 'vr' || card.card_type === 'flex'
                         return true
                       })
+
+                      const isInstallment = paymentMappings[idx]?.is_installment || false
+                      const installmentCount = paymentMappings[idx]?.installment_count || 2
+                      const installmentAmount = isInstallment ? payment.amount / installmentCount : payment.amount
 
                       return (
                         <div key={idx} className="bg-white dark:bg-slate-800 rounded-lg p-3 space-y-2">
@@ -1383,53 +1428,148 @@ export default function Upload() {
                               {payment.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                             </span>
                           </div>
-                          <div>
-                            <select
-                              value={paymentMappings[idx]?.benefit_card_id ? `bc_${paymentMappings[idx].benefit_card_id}` : paymentMappings[idx]?.account_id || ''}
-                              onChange={(e) => {
-                                const value = e.target.value
-                                // Check if it's a benefit card (prefixed with 'bc_')
-                                if (value.startsWith('bc_')) {
-                                  const bcId = value.replace('bc_', '')
-                                  const bc = benefitCards.find((c: { id: number; account_id: number }) => c.id === parseInt(bcId))
-                                  setPaymentMappings(prev => ({
-                                    ...prev,
-                                    [idx]: {
-                                      account_id: bc?.account_id?.toString() || '',
-                                      benefit_card_id: bcId
-                                    }
-                                  }))
-                                } else {
-                                  setPaymentMappings(prev => ({
-                                    ...prev,
-                                    [idx]: {
-                                      account_id: value,
-                                      benefit_card_id: ''
-                                    }
-                                  }))
-                                }
-                              }}
-                              className="input text-sm"
-                            >
-                              <option value="">Selecione a conta</option>
-                              {relevantBenefitCards.length > 0 && (
-                                <optgroup label="Cartoes de Beneficio">
-                                  {relevantBenefitCards.map((card: { id: number; name: string; current_balance: number; card_type_display?: string }) => (
-                                    <option key={`bc_${card.id}`} value={`bc_${card.id}`}>
-                                      {card.name} - Saldo: {card.current_balance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+
+                          {/* Opção de parcelamento para crédito */}
+                          {isCreditCardPayment && (
+                            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-2 space-y-2">
+                              <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={isInstallment}
+                                  onChange={(e) => {
+                                    setPaymentMappings(prev => ({
+                                      ...prev,
+                                      [idx]: {
+                                        ...prev[idx],
+                                        is_installment: e.target.checked,
+                                        installment_count: e.target.checked ? 2 : 0,
+                                        credit_card_id: e.target.checked ? prev[idx]?.credit_card_id || '' : '',
+                                      }
+                                    }))
+                                  }}
+                                  className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                                />
+                                <span className="text-sm text-blue-700 dark:text-blue-300">Parcelado no cartão</span>
+                              </label>
+
+                              {isInstallment && (
+                                <div className="space-y-2 pt-2 border-t border-blue-100 dark:border-blue-800">
+                                  <div className="flex items-center gap-2">
+                                    <label className="text-xs text-blue-600 dark:text-blue-400 whitespace-nowrap">Parcelas:</label>
+                                    <input
+                                      type="number"
+                                      min={2}
+                                      max={24}
+                                      value={installmentCount}
+                                      onChange={(e) => {
+                                        const count = Math.max(2, Math.min(24, parseInt(e.target.value) || 2))
+                                        setPaymentMappings(prev => ({
+                                          ...prev,
+                                          [idx]: {
+                                            ...prev[idx],
+                                            installment_count: count,
+                                          }
+                                        }))
+                                      }}
+                                      className="w-16 px-2 py-1 text-sm border rounded dark:bg-slate-700 dark:border-slate-600"
+                                    />
+                                    <span className="text-xs text-blue-600 dark:text-blue-400">x</span>
+                                    <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                                      {installmentAmount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                    </span>
+                                  </div>
+
+                                  <div>
+                                    <label className="text-xs text-blue-600 dark:text-blue-400 mb-1 block">Cartão de Crédito:</label>
+                                    <select
+                                      value={paymentMappings[idx]?.credit_card_id || ''}
+                                      onChange={(e) => {
+                                        const ccId = e.target.value
+                                        const card = creditCards.find((c: { id: number; account_id?: number }) => c.id === parseInt(ccId))
+                                        setPaymentMappings(prev => ({
+                                          ...prev,
+                                          [idx]: {
+                                            ...prev[idx],
+                                            credit_card_id: ccId,
+                                            account_id: card?.account_id?.toString() || prev[idx]?.account_id || '',
+                                          }
+                                        }))
+                                      }}
+                                      className="input text-sm"
+                                    >
+                                      <option value="">Selecione o cartão</option>
+                                      {creditCards.map((card: { id: number; name: string }) => (
+                                        <option key={card.id} value={card.id}>{card.name}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+
+                                  {!paymentMappings[idx]?.credit_card_id && (
+                                    <p className="text-xs text-red-500">Selecione o cartão para parcelamento</p>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Seletor de conta (para pagamentos não parcelados) */}
+                          {!isInstallment && (
+                            <div>
+                              <select
+                                value={paymentMappings[idx]?.benefit_card_id ? `bc_${paymentMappings[idx].benefit_card_id}` : paymentMappings[idx]?.account_id || ''}
+                                onChange={(e) => {
+                                  const value = e.target.value
+                                  // Check if it's a benefit card (prefixed with 'bc_')
+                                  if (value.startsWith('bc_')) {
+                                    const bcId = value.replace('bc_', '')
+                                    const bc = benefitCards.find((c: { id: number; account_id: number }) => c.id === parseInt(bcId))
+                                    setPaymentMappings(prev => ({
+                                      ...prev,
+                                      [idx]: {
+                                        ...prev[idx],
+                                        account_id: bc?.account_id?.toString() || '',
+                                        benefit_card_id: bcId,
+                                        is_installment: false,
+                                        installment_count: 0,
+                                        credit_card_id: '',
+                                      }
+                                    }))
+                                  } else {
+                                    setPaymentMappings(prev => ({
+                                      ...prev,
+                                      [idx]: {
+                                        ...prev[idx],
+                                        account_id: value,
+                                        benefit_card_id: '',
+                                        is_installment: false,
+                                        installment_count: 0,
+                                        credit_card_id: '',
+                                      }
+                                    }))
+                                  }
+                                }}
+                                className="input text-sm"
+                              >
+                                <option value="">Selecione a conta</option>
+                                {relevantBenefitCards.length > 0 && (
+                                  <optgroup label="Cartoes de Beneficio">
+                                    {relevantBenefitCards.map((card: { id: number; name: string; current_balance: number; card_type_display?: string }) => (
+                                      <option key={`bc_${card.id}`} value={`bc_${card.id}`}>
+                                        {card.name} - Saldo: {card.current_balance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                      </option>
+                                    ))}
+                                  </optgroup>
+                                )}
+                                <optgroup label="Outras Contas">
+                                  {accounts.map((acc: { id: number; name: string; type: string }) => (
+                                    <option key={acc.id} value={acc.id}>
+                                      {acc.name} ({accountTypeLabels[acc.type] || acc.type})
                                     </option>
                                   ))}
                                 </optgroup>
-                              )}
-                              <optgroup label="Outras Contas">
-                                {accounts.map((acc: { id: number; name: string; type: string }) => (
-                                  <option key={acc.id} value={acc.id}>
-                                    {acc.name} ({accountTypeLabels[acc.type] || acc.type})
-                                  </option>
-                                ))}
-                              </optgroup>
-                            </select>
-                          </div>
+                              </select>
+                            </div>
+                          )}
                         </div>
                       )
                     })}

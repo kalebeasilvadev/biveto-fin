@@ -12,6 +12,7 @@ from app.models.account import Account
 from app.models.benefit_card import BenefitCard
 from app.models.user import User
 from app.models.grocery import GroceryPurchase, GroceryCategory, NecessityType
+from app.models.credit_card import CreditCard
 from app.modules.receipts.schemas.receipt import (
     ReceiptConfirmRequest,
     ReceiptPaymentResponse,
@@ -19,6 +20,8 @@ from app.modules.receipts.schemas.receipt import (
     ReceiptListResponse,
     ReceiptUpdate,
 )
+from app.modules.installments.services.installment_service import InstallmentService
+from app.modules.credit_cards.services.invoice_service import InvoiceService
 
 
 class ReceiptService:
@@ -90,6 +93,24 @@ class ReceiptService:
                         detail=f"Cartão de benefício {card_id} não encontrado"
                     )
 
+        # 4.1. Validar credit cards (para pagamentos parcelados)
+        credit_card_ids = [p.credit_card_id for p in data.payments if p.credit_card_id]
+        valid_credit_cards: dict[int, CreditCard] = {}
+        if credit_card_ids:
+            cc_result = await self.db.execute(
+                select(CreditCard).where(
+                    CreditCard.id.in_(credit_card_ids),
+                    CreditCard.user_id == user.id,
+                )
+            )
+            valid_credit_cards = {c.id: c for c in cc_result.scalars().all()}
+            for cc_id in credit_card_ids:
+                if cc_id not in valid_credit_cards:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Cartão de crédito {cc_id} não encontrado ou não pertence ao usuário"
+                    )
+
         # 5. Criar o Receipt
         receipt = Receipt(
             user_id=user.id,
@@ -107,6 +128,10 @@ class ReceiptService:
         await self.db.flush()  # Para obter o ID
 
         # 6. Criar os ReceiptPayments e atualizar saldos das contas
+        # Inicializar serviços para parcelamento
+        installment_service = InstallmentService(self.db)
+        invoice_service = InvoiceService(self.db)
+
         for idx, payment_data in enumerate(data.payments, 1):
             payment = ReceiptPayment(
                 receipt_id=receipt.id,
@@ -116,12 +141,80 @@ class ReceiptService:
                 amount=payment_data.amount,
                 sequence=idx,
                 original_label=payment_data.original_label,
+                is_installment=payment_data.is_installment,
+                installment_count=payment_data.installment_count if payment_data.is_installment else None,
+                credit_card_id=payment_data.credit_card_id if payment_data.is_installment else None,
             )
             self.db.add(payment)
+            await self.db.flush()  # Para obter o ID do payment
 
-            # Atualizar saldo da conta (deduzir o valor do pagamento)
-            account = valid_accounts[payment_data.account_id]
-            account.balance = float(account.balance) - float(payment_data.amount)
+            # Se é pagamento parcelado, criar série de parcelas
+            if payment_data.is_installment and payment_data.credit_card_id:
+                credit_card = valid_credit_cards[payment_data.credit_card_id]
+                installment_amount = float(payment_data.amount) / payment_data.installment_count
+
+                # Criar a série de parcelas
+                series = await installment_service.create_series(
+                    user=user,
+                    description=f"{data.store_name} - Parcelado",
+                    merchant_name=data.store_name,
+                    installment_amount=installment_amount,
+                    installment_count=payment_data.installment_count,
+                    first_installment_date=data.purchase_date,
+                    account_id=credit_card.account_id,
+                    category_id=data.default_category_id,
+                    purchase_date=data.purchase_date,
+                    credit_card_id=credit_card.id,
+                )
+
+                # Vincular série ao payment
+                payment.installment_series_id = series.id
+
+                # Calcular o período da fatura para a primeira parcela
+                period = invoice_service.calculate_invoice_period(credit_card, data.purchase_date)
+
+                # Obter/criar a fatura para a primeira parcela
+                first_invoice = await invoice_service.get_or_create_invoice(
+                    user=user,
+                    credit_card=credit_card,
+                    reference_month=period['reference_month'],
+                    reference_year=period['reference_year'],
+                    closing_date=period['closing_date'],
+                    due_date=period['due_date'],
+                )
+
+                # Criar transação da primeira parcela
+                first_installment_tx = await installment_service.create_installment_transaction(
+                    user=user,
+                    series=series,
+                    installment_number=1,
+                    transaction_date=data.purchase_date,
+                    is_paid=False,  # Parcela futura (vai para fatura)
+                    document_id=data.document_id,
+                    credit_card_id=credit_card.id,
+                    invoice_id=first_invoice.id,
+                )
+
+                # Vincular transação à série como first_transaction
+                series.first_transaction_id = first_installment_tx.id
+
+                # Criar parcelas futuras
+                await installment_service.create_future_installments(
+                    user=user,
+                    series=series,
+                    from_installment=1,
+                    current_invoice_month=period['reference_month'],
+                    current_invoice_year=period['reference_year'],
+                )
+
+                # Atualizar total da fatura da primeira parcela
+                await invoice_service.update_invoice_total(first_invoice)
+
+                # NÃO deduzir saldo da conta - parcelas vão para as faturas
+            else:
+                # Atualizar saldo da conta (deduzir o valor do pagamento)
+                account = valid_accounts[payment_data.account_id]
+                account.balance = float(account.balance) - float(payment_data.amount)
 
         # 7. Criar as Transactions vinculadas ao receipt
         # Transações de receipt NÃO têm account_id - o saldo vem dos ReceiptPayments
@@ -268,6 +361,10 @@ class ReceiptService:
                     benefit_card_name=benefit_card_name,
                     sequence=payment.sequence,
                     original_label=payment.original_label,
+                    is_installment=payment.is_installment,
+                    installment_count=payment.installment_count,
+                    credit_card_id=payment.credit_card_id,
+                    installment_series_id=payment.installment_series_id,
                 )
             )
 
