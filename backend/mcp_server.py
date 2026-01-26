@@ -886,9 +886,16 @@ async def _criar_transacao_parcelada(session: AsyncSession, user: User, args: di
         first_transaction_id=transaction.id,  # VINCULA À TRANSAÇÃO
     )
 
-    # PASSO 3: Vincular transação à série e incrementar paid_count
+    # PASSO 3: Vincular transação à série e definir paid_count
     transaction.installment_series_id = series.id
-    series.paid_count += 1
+    if marcar_anteriores:
+        # Parcelas anteriores serão criadas explicitamente
+        # mark_previous_installments_as_paid incrementará paid_count para cada uma
+        series.paid_count = 1
+    else:
+        # Parcelas anteriores são implícitas (pagas antes do sistema)
+        # Ex: importou 6/12, então 1-5 já foram pagas
+        series.paid_count = parcela_atual
 
     transactions_created.append(transaction)
 
