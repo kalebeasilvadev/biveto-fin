@@ -76,7 +76,7 @@ export function StreakWidget() {
       {next_milestone && days_until_next_milestone && (
         <div className="mt-4">
           <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400 mb-1">
-            <span>Próximo badge: {next_milestone} dias</span>
+            <span>Próxima conquista: {next_milestone} dias</span>
             <span>{current_streak}/{next_milestone}</span>
           </div>
           <div className="h-2 bg-gray-200 dark:bg-slate-700 rounded-full overflow-hidden">
@@ -87,8 +87,8 @@ export function StreakWidget() {
           </div>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">
             {days_until_next_milestone === 1
-              ? 'Falta 1 dia para o próximo badge!'
-              : `Faltam ${days_until_next_milestone} dias para o próximo badge`
+              ? 'Falta 1 dia para a próxima conquista!'
+              : `Faltam ${days_until_next_milestone} dias para a próxima conquista`
             }
           </p>
         </div>

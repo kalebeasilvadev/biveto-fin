@@ -193,8 +193,11 @@ export default function Challenges() {
           ) : activeTab === 'available' ? (
             <>
               <Sparkles className="mx-auto text-gray-300 dark:text-slate-600 mb-4" size={48} />
-              <p className="text-gray-500 dark:text-gray-400">
-                Todos os desafios deste mês já foram iniciados!
+              <p className="text-gray-500 dark:text-gray-400 mb-2">
+                Parabéns! Você já iniciou todos os desafios disponíveis.
+              </p>
+              <p className="text-sm text-gray-400 dark:text-gray-500">
+                Novos desafios ficam disponíveis todo mês.
               </p>
             </>
           ) : activeTab === 'completed' ? (
