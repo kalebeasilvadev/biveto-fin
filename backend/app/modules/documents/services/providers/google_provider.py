@@ -38,8 +38,23 @@ class GoogleProvider(BaseProvider):
                 raise ImportError("google-genai nao instalado. Execute: pip install google-genai")
         return self._client
 
+    def _generate_content_sync(self, client, model: str, contents, config):
+        """Chamada sincrona ao Gemini (executada em thread separada)"""
+        return client.models.generate_content(
+            model=model,
+            contents=contents,
+            config=config,
+        )
+
+    def _upload_file_sync(self, client, file_path: str, mime_type: str):
+        """Upload sincrono de arquivo (executado em thread separada)"""
+        return client.files.upload(
+            file=file_path,
+            config={"mime_type": mime_type},
+        )
+
     async def extract_from_image(self, image_content: bytes, mime_type: str) -> dict:
-        """Extrai dados de uma imagem usando Google Gemini"""
+        """Extrai dados de uma imagem usando Google Gemini (non-blocking)"""
         try:
             from google.genai import types
         except ImportError:
@@ -47,19 +62,21 @@ class GoogleProvider(BaseProvider):
 
         client = self._get_client()
 
+        contents = [
+            types.Part.from_bytes(data=image_content, mime_type=mime_type),
+            self.prompt,
+        ]
+        config = types.GenerateContentConfig(
+            temperature=0.1,
+            max_output_tokens=16000,
+        )
+
         last_error = None
         for attempt in range(self.max_retries):
             try:
-                response = client.models.generate_content(
-                    model=self.model,
-                    contents=[
-                        types.Part.from_bytes(data=image_content, mime_type=mime_type),
-                        self.prompt,
-                    ],
-                    config=types.GenerateContentConfig(
-                        temperature=0.1,
-                        max_output_tokens=16000,
-                    ),
+                # Executa em thread separada para nao bloquear o event loop
+                response = await asyncio.to_thread(
+                    self._generate_content_sync, client, self.model, contents, config
                 )
                 return self._parse_response(response.text)
 
@@ -75,7 +92,7 @@ class GoogleProvider(BaseProvider):
         return {'items': [], 'error': f'Falha apos {self.max_retries} tentativas: {last_error}'}
 
     async def extract_from_pdf(self, pdf_content: bytes, filename: str = "document.pdf") -> dict:
-        """Extrai dados de um PDF via upload para o Gemini"""
+        """Extrai dados de um PDF via upload para o Gemini (non-blocking)"""
         try:
             from google.genai import types
         except ImportError:
@@ -95,32 +112,34 @@ class GoogleProvider(BaseProvider):
 
             temp_file = await asyncio.to_thread(_write_temp)
 
-            # Upload do PDF para o Gemini
+            # Upload do PDF para o Gemini (em thread separada)
             print(f"[GoogleProvider] Uploading PDF to Gemini...")
-            uploaded_file = client.files.upload(
-                file=temp_file,
-                config={"mime_type": "application/pdf"},
+            uploaded_file = await asyncio.to_thread(
+                self._upload_file_sync, client, temp_file, "application/pdf"
             )
             print(f"[GoogleProvider] PDF uploaded: uri={uploaded_file.uri}")
+
+            # Preparar conteudo e config
+            contents = [
+                types.Part.from_uri(
+                    file_uri=uploaded_file.uri,
+                    mime_type=uploaded_file.mime_type,
+                ),
+                self.prompt,
+            ]
+            config = types.GenerateContentConfig(
+                temperature=0.1,
+                response_mime_type="application/json",
+                response_schema=self.response_schema,
+            )
 
             last_error = None
             for attempt in range(self.max_retries):
                 try:
                     print(f"[GoogleProvider] Calling Gemini API (attempt {attempt + 1}/{self.max_retries})...")
-                    response = client.models.generate_content(
-                        model=self.model,
-                        contents=[
-                            types.Part.from_uri(
-                                file_uri=uploaded_file.uri,
-                                mime_type=uploaded_file.mime_type,
-                            ),
-                            self.prompt,
-                        ],
-                        config=types.GenerateContentConfig(
-                            temperature=0.1,
-                            response_mime_type="application/json",
-                            response_schema=self.response_schema,
-                        ),
+                    # Executa em thread separada para nao bloquear o event loop
+                    response = await asyncio.to_thread(
+                        self._generate_content_sync, client, self.model, contents, config
                     )
 
                     response_text = response.text if response else ""
@@ -145,7 +164,7 @@ class GoogleProvider(BaseProvider):
                 await asyncio.to_thread(os.unlink, temp_file)
 
     async def extract_multi_page(self, images: list[tuple[bytes, str]]) -> dict:
-        """Extrai dados de multiplas paginas usando SDK oficial"""
+        """Extrai dados de multiplas paginas usando SDK oficial (non-blocking)"""
         try:
             from google.genai import types
         except ImportError:
@@ -161,19 +180,20 @@ class GoogleProvider(BaseProvider):
             parts.append(types.Part.from_bytes(data=img_content, mime_type=img_mime))
             parts.append(f'[Pagina {i+1} de {len(images)}]')
 
+        config = types.GenerateContentConfig(
+            temperature=0.1,
+            max_output_tokens=32000,  # Increased for large receipts with many items
+            response_mime_type="application/json",
+            response_schema=self.response_schema,
+        )
+
         last_error = None
         for attempt in range(self.max_retries):
             try:
                 print(f"[GoogleProvider] Calling Gemini API (attempt {attempt + 1}/{self.max_retries})...")
-                response = client.models.generate_content(
-                    model=self.model,
-                    contents=parts,
-                    config=types.GenerateContentConfig(
-                        temperature=0.1,
-                        max_output_tokens=32000,  # Increased for large receipts with many items
-                        response_mime_type="application/json",
-                        response_schema=self.response_schema,
-                    ),
+                # Executa em thread separada para nao bloquear o event loop
+                response = await asyncio.to_thread(
+                    self._generate_content_sync, client, self.model, parts, config
                 )
 
                 response_text = response.text if response else ""

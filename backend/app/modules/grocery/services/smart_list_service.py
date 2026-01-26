@@ -220,8 +220,18 @@ class SmartListService:
         print(f"[SmartListService] Todos os providers falharam!")
         return self._fallback_response()
 
+    def _mistral_chat_sync(self, client, model: str, prompt: str):
+        """Chamada sincrona ao Mistral (executada em thread separada)"""
+        return client.chat.complete(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            response_format={"type": "json_object"},
+            temperature=0.2,
+            max_tokens=16000,
+        )
+
     async def _call_mistral(self, prompt: str) -> dict | None:
-        """Call Mistral API to generate shopping list"""
+        """Call Mistral API to generate shopping list (non-blocking)"""
         import asyncio
 
         try:
@@ -237,12 +247,9 @@ class SmartListService:
             try:
                 print(f"[SmartListService] Tentativa {attempt + 1}/3 com Mistral ({model})")
 
-                response = client.chat.complete(
-                    model=model,
-                    messages=[{"role": "user", "content": prompt}],
-                    response_format={"type": "json_object"},
-                    temperature=0.2,
-                    max_tokens=16000,
+                # Executa em thread separada para nao bloquear o event loop
+                response = await asyncio.to_thread(
+                    self._mistral_chat_sync, client, model, prompt
                 )
 
                 response_text = response.choices[0].message.content if response.choices else ""
@@ -272,8 +279,16 @@ class SmartListService:
             print(f"[SmartListService] Mistral falhou apos 3 tentativas: {last_error}")
         return None
 
+    def _gemini_generate_sync(self, client, model: str, prompt: str, config):
+        """Chamada sincrona ao Gemini (executada em thread separada)"""
+        return client.models.generate_content(
+            model=model,
+            contents=[prompt],
+            config=config,
+        )
+
     async def _call_gemini(self, prompt: str) -> dict | None:
-        """Call Google Gemini API as fallback"""
+        """Call Google Gemini API as fallback (non-blocking)"""
         import asyncio
 
         try:
@@ -292,20 +307,21 @@ class SmartListService:
         models_to_try = ["gemini-2.5-flash-preview-05-20", "gemini-2.0-flash"]
         last_error = None
 
+        config = types.GenerateContentConfig(
+            temperature=0.2,
+            max_output_tokens=16000,
+            response_mime_type="application/json",
+            response_schema=SMART_LIST_RESPONSE_SCHEMA,
+        )
+
         for model in models_to_try:
             for attempt in range(3):
                 try:
                     print(f"[SmartListService] Tentativa {attempt + 1}/3 com Gemini ({model})")
 
-                    response = client.models.generate_content(
-                        model=model,
-                        contents=[prompt],
-                        config=types.GenerateContentConfig(
-                            temperature=0.2,
-                            max_output_tokens=16000,
-                            response_mime_type="application/json",
-                            response_schema=SMART_LIST_RESPONSE_SCHEMA,
-                        ),
+                    # Executa em thread separada para nao bloquear o event loop
+                    response = await asyncio.to_thread(
+                        self._gemini_generate_sync, client, model, prompt, config
                     )
 
                     response_text = response.text if response else ""
