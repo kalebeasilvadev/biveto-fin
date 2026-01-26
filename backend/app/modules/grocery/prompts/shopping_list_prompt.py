@@ -93,7 +93,44 @@ TIPOS DE NECESSIDADE:
 HISTORICO DE COMPRAS (JSON):
 {purchases_json}
 
-RESPONDA APENAS COM JSON VALIDO no formato especificado. Nao inclua texto antes ou depois do JSON.
+FORMATO DE RESPOSTA (JSON):
+Retorne EXATAMENTE neste formato, preenchendo os valores:
+```json
+{{
+  "shopping_list": [
+    {{
+      "product_type": "Nome do tipo de produto (ex: Leite Integral)",
+      "display_name": "Nome curto (ex: Leite)",
+      "category": "uma das categorias validas listadas acima",
+      "necessity_type": "essential ou non_essential",
+      "suggested_quantity": 3,
+      "unit": "L ou kg ou un",
+      "estimated_price": 5.99,
+      "urgency": "high ou medium ou low",
+      "reasoning": "Explicacao da urgencia",
+      "original_product_names": ["Nome original 1", "Nome original 2"],
+      "purchase_count": 5,
+      "days_since_last_purchase": 15,
+      "avg_cycle_days": 20
+    }}
+  ],
+  "excluded": [
+    {{"name": "Nome do item", "reason": "Motivo da exclusao"}}
+  ],
+  "insights": [
+    "Insight 1 sobre padroes de compra",
+    "Insight 2 sobre economia"
+  ]
+}}
+```
+
+IMPORTANTE:
+- product_type deve ser o nome REAL do produto agrupado (ex: "Arroz Branco", "Leite Integral", "Detergente")
+- NAO use "Produto" como nome generico
+- Preencha TODOS os campos obrigatorios
+- suggested_quantity deve ser calculada com base no historico real, NAO use 1 para tudo
+
+RESPONDA APENAS COM O JSON, sem texto antes ou depois.
 """
 
 # Schema for structured JSON response from Gemini
