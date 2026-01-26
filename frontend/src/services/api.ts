@@ -910,3 +910,30 @@ export const receiptsApi = {
   // Cancel receipt
   cancel: (id: number) => api.delete(`/receipts/${id}`),
 }
+
+// Gamification API
+export const gamificationApi = {
+  // Summary for dashboard
+  getSummary: () => api.get('/gamification/summary'),
+
+  // Streak week view for widget
+  getStreakWeek: () => api.get('/gamification/streak/week'),
+
+  // List all badges with user status
+  getBadges: (category?: string) =>
+    api.get('/gamification/badges', { params: category ? { category } : {} }),
+
+  // Mark badges as seen
+  markBadgesSeen: () => api.post('/gamification/badges/mark-seen'),
+
+  // List challenges by status
+  getChallenges: () => api.get('/gamification/challenges'),
+
+  // Start a challenge
+  startChallenge: (challengeId: number) =>
+    api.post(`/gamification/challenges/${challengeId}/start`),
+
+  // Get points history
+  getPointsHistory: (limit = 20, offset = 0) =>
+    api.get('/gamification/points/history', { params: { limit, offset } }),
+}

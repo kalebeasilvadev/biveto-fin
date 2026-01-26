@@ -35,6 +35,8 @@ import {
   Ticket,
   Store,
   Percent,
+  Trophy,
+  Flame,
 } from 'lucide-react'
 import { useState, useEffect, useCallback } from 'react'
 import { clsx } from 'clsx'
@@ -52,6 +54,8 @@ import { useBottomSheet } from '../hooks/useBottomSheet'
 import { NotificationBell } from './notifications'
 import { PullToRefreshIndicator, UpdateBanner } from './pwa'
 import { BottomSheet, UserCard } from './mobile'
+import { AchievementToast } from './gamification'
+import { useGamificationStore } from '../stores/gamificationStore'
 
 // Types for menu structure
 interface NavItem {
@@ -123,6 +127,15 @@ const menuGroups: NavGroup[] = [
       { to: '/simulators', icon: Calculator, label: 'Simuladores' },
       { to: '/automations', icon: Zap, label: 'Automações' },
       { to: '/weekly-review', icon: ClipboardCheck, label: 'Revisão' },
+    ],
+  },
+  {
+    id: 'gamification',
+    label: 'Gamificação',
+    icon: Trophy,
+    items: [
+      { to: '/achievements', icon: Trophy, label: 'Conquistas' },
+      { to: '/challenges', icon: Flame, label: 'Desafios' },
     ],
   },
 ]
@@ -281,6 +294,8 @@ export default function Layout() {
   const user = useAuthStore((state) => state.user)
   const setUser = useAuthStore((state) => state.setUser)
   const { theme, toggleTheme } = useThemeStore()
+  const pendingBadge = useGamificationStore((state) => state.pendingBadge)
+  const hideBadgeToast = useGamificationStore((state) => state.hideBadgeToast)
   // PWA install prompt is handled by InstallPromptBanner - install option available in Settings
   usePWAInstall()
   const { hasUpdate, isUpdating, updateApp, dismissUpdate } = useServiceWorker()
@@ -653,6 +668,14 @@ export default function Layout() {
 
       {/* Toast Notifications */}
       <ToastContainer />
+
+      {/* Achievement Toast */}
+      {pendingBadge && (
+        <AchievementToast
+          badge={pendingBadge}
+          onClose={hideBadgeToast}
+        />
+      )}
 
       {/* PWA Update Banner */}
       <UpdateBanner

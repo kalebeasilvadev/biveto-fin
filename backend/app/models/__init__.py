@@ -72,6 +72,21 @@ from .chat import (
     MessageRole,
 )
 from app.modules.known_services.models.known_service import KnownRecurringService
+from .gamification import (
+    BadgeDefinition,
+    UserBadge,
+    BadgeRarity,
+    BadgeCategory,
+    UserStreak,
+    StreakHistory,
+    StreakType,
+    ChallengeDefinition,
+    UserChallenge,
+    ChallengeDifficulty,
+    ChallengeStatus,
+    UserPoints,
+    PointsTransaction,
+)
 
 __all__ = [
     "License",
@@ -163,4 +178,18 @@ __all__ = [
     "ChatConversation",
     "ChatMessage",
     "MessageRole",
+    # Gamification
+    "BadgeDefinition",
+    "UserBadge",
+    "BadgeRarity",
+    "BadgeCategory",
+    "UserStreak",
+    "StreakHistory",
+    "StreakType",
+    "ChallengeDefinition",
+    "UserChallenge",
+    "ChallengeDifficulty",
+    "ChallengeStatus",
+    "UserPoints",
+    "PointsTransaction",
 ]

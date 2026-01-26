@@ -22,6 +22,7 @@ import {
 } from 'recharts'
 import { Link } from 'react-router-dom'
 import { clsx } from 'clsx'
+import { StreakWidget } from '../components/gamification'
 
 const COLORS = [
   '#22c55e',
@@ -188,6 +189,9 @@ export default function Dashboard() {
           </p>
         </div>
       </div>
+
+      {/* Streak Widget */}
+      <StreakWidget />
 
       {/* Card de Orçamento */}
       {budgetSummary?.items && budgetSummary.items.length > 0 && (

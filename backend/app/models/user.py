@@ -109,6 +109,20 @@ class User(Base):
         back_populates="user", lazy="noload", cascade="all, delete-orphan"
     )
 
+    # Gamification relationships
+    badges: Mapped[list["UserBadge"]] = relationship(
+        back_populates="user", lazy="noload", cascade="all, delete-orphan"
+    )
+    streaks: Mapped[list["UserStreak"]] = relationship(
+        back_populates="user", lazy="noload", cascade="all, delete-orphan"
+    )
+    challenges: Mapped[list["UserChallenge"]] = relationship(
+        back_populates="user", lazy="noload", cascade="all, delete-orphan"
+    )
+    points: Mapped["UserPoints | None"] = relationship(
+        back_populates="user", lazy="noload", uselist=False, cascade="all, delete-orphan"
+    )
+
     @property
     def household_role(self) -> str | None:
         """Retorna o role do usuario na familia"""
@@ -151,3 +165,4 @@ from .notification import Notification, NotificationPreference, NotificationSett
 from .envelope import SpendingEnvelope
 from .automation_rule import AutomationRule
 from .receipt import Receipt
+from .gamification import UserBadge, UserStreak, UserChallenge, UserPoints

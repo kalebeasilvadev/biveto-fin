@@ -36,6 +36,8 @@ import WeeklyReview from './pages/WeeklyReview'
 import Onboarding from './pages/Onboarding'
 import Market from './pages/Market'
 import Receipts from './pages/Receipts'
+import Achievements from './pages/Achievements'
+import Challenges from './pages/Challenges'
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
@@ -103,6 +105,8 @@ function App() {
         <Route path="weekly-review" element={<WeeklyReview />} />
         <Route path="market" element={<Market />} />
         <Route path="receipts" element={<Receipts />} />
+        <Route path="achievements" element={<Achievements />} />
+        <Route path="challenges" element={<Challenges />} />
         <Route path="upload" element={<Upload />} />
         <Route path="insights" element={<Insights />} />
         <Route path="chat" element={<Chat />} />

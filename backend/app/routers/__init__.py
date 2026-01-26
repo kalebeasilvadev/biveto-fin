@@ -37,6 +37,7 @@ from app.modules.automations.routers.automations import router as automations_ro
 from app.modules.review.routers.review import router as review_router
 from app.modules.grocery.routers.grocery import router as grocery_router
 from app.modules.receipts.routers.receipts import router as receipts_router
+from app.modules.gamification.routers.gamification import router as gamification_router
 
 api_router = APIRouter()
 
@@ -120,3 +121,6 @@ api_router.include_router(grocery_router, prefix="/grocery", tags=["Mercado"])
 
 # Receipts module
 api_router.include_router(receipts_router, prefix="/receipts", tags=["Compras"])
+
+# Gamification module
+api_router.include_router(gamification_router, prefix="/gamification", tags=["Gamificação"])
