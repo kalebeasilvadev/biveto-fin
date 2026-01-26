@@ -474,6 +474,45 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
             total_parcelas_mensais += parcelas_mes_valor
             total_parcelas_restantes += parcelas_total_valor
 
+            # NOVO: Agrupar parcelas por estabelecimento para facilitar consultas
+            # Ex: "quanto tenho de parcelas da Inside Games?"
+            parcelas_por_estabelecimento: dict[str, dict] = {}
+            for p in parcelas_do_cartao:
+                # Extrair nome base do estabelecimento (remover número de parcela)
+                # Ex: "INSIDE GAMES 01/06" -> "INSIDE GAMES"
+                desc = p["descricao"] or "Outros"
+                # Remover padrões comuns de parcela no final
+                nome_base = re.sub(r'\s*\d+/\d+\s*$', '', desc).strip()
+                nome_base = nome_base.upper()
+
+                if nome_base not in parcelas_por_estabelecimento:
+                    parcelas_por_estabelecimento[nome_base] = {
+                        "estabelecimento": nome_base,
+                        "quantidade_compras": 0,
+                        "impacto_mensal_total": 0,
+                        "valor_total_restante": 0,
+                        "compras": []
+                    }
+
+                parcelas_por_estabelecimento[nome_base]["quantidade_compras"] += 1
+                parcelas_por_estabelecimento[nome_base]["impacto_mensal_total"] += p["valor_parcela"]
+                parcelas_por_estabelecimento[nome_base]["valor_total_restante"] += p["valor_total_restante"]
+                parcelas_por_estabelecimento[nome_base]["compras"].append({
+                    "descricao": p["descricao"],
+                    "valor_parcela": p["valor_parcela"],
+                    "parcelas_pagas": p["parcelas_pagas"],
+                    "parcelas_total": p["parcelas_total"],
+                    "parcelas_restantes": p["parcelas_restantes"],
+                    "valor_restante": p["valor_total_restante"]
+                })
+
+            # Converter para lista ordenada por impacto
+            resumo_por_estabelecimento = sorted(
+                parcelas_por_estabelecimento.values(),
+                key=lambda x: x["valor_total_restante"],
+                reverse=True
+            )
+
             # Ordenar projeção por data (mais próximo primeiro)
             projecao_faturas_futuras = []
             for chave in sorted(projecao_por_mes.keys(), key=lambda x: (int(x.split("/")[1]), int(x.split("/")[0]))):
@@ -520,6 +559,9 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
                 "parcelas_por_mes": parcelas_mes_valor,
                 "total_parcelas_restantes": parcelas_total_valor,
                 "quantidade_parcelas_ativas": len(parcelas_do_cartao),
+                # NOVO: Resumo de parcelas agrupado por estabelecimento
+                # Facilita responder "quanto tenho de parcelas da X?"
+                "parcelas_por_estabelecimento": resumo_por_estabelecimento,
                 # PROJEÇÃO DE FATURAS FUTURAS - mês a mês com itens detalhados
                 "projecao_faturas_futuras": projecao_faturas_futuras,
                 # Impacto e estratégia
@@ -2326,7 +2368,13 @@ DOMÍNIOS IDENTIFICADOS PARA ESTA PERGUNTA: {", ".join(domains)}
 
 {expert_instructions}
 
-REGRAS DE RESPOSTA (CRÍTICAS!):
+⚠️ REGRA CRÍTICA - NUNCA INVENTAR NÚMEROS:
+- Use EXCLUSIVAMENTE os valores que estão nos dados fornecidos
+- Se não encontrar um dado específico, diga "não encontrei essa informação nos dados"
+- NUNCA faça estimativas, aproximações ou cálculos "por cima"
+- Quando mostrar valores, copie EXATAMENTE do contexto JSON
+
+REGRAS DE RESPOSTA:
 1. Seja DIRETO e CONVERSACIONAL - como um amigo que entende de finanças
 2. Respostas CURTAS: 2-4 frases para perguntas simples
 3. Use números reais dos dados, mas NÃO liste tudo - destaque os principais
@@ -2334,23 +2382,36 @@ REGRAS DE RESPOSTA (CRÍTICAS!):
 5. Só expanda se o usuário pedir explicitamente detalhes
 6. Use os dados do contexto correto para cada domínio (context["cartoes"], context["mercado"], etc.)
 
+📊 COMO USAR OS DADOS DE PARCELAS:
+- Para perguntas sobre parcelas de um estabelecimento específico (ex: "Inside Games"),
+  use o campo "parcelas_por_estabelecimento" que agrupa as parcelas por loja
+- Cada estabelecimento tem:
+  * "quantidade_compras": número de compras parceladas
+  * "impacto_mensal_total": soma das parcelas mensais (R$/mês)
+  * "valor_total_restante": soma total a pagar de todas as parcelas
+  * "compras": lista detalhada de cada compra com parcelas_pagas/parcelas_total
+- Para saber o impacto no limite: use "valor_total_restante" do estabelecimento
+
 DADOS DO USUÁRIO (APENAS DOS DOMÍNIOS RELEVANTES):
 {context_json}
 
 EXEMPLOS DE RESPOSTAS BOAS:
 
 Para "qual cartão tem maior impacto mensal":
-✅ "O {{nome_cartao}} tem o maior impacto com R$ {{impacto_mensal}}/mês (fatura R$ X + parcelas R$ Y). Ele está com {{utilizacao}}% do limite usado. Quer ver estratégia de pagamento?"
+✅ "O {{nome_cartao}} tem o maior impacto com R$ {{impacto_mensal}}/mês. Ele está com {{utilizacao}}% do limite usado. Quer ver estratégia de pagamento?"
 
-Para "quanto gastei no mercado":
-✅ "Você gastou R$ {{total}} no mercado este mês, em {{quantidade}} compras (média de R$ {{media}}/compra). O maior gasto foi em {{categoria}}. Quer ver os produtos mais comprados?"
+Para "quanto tenho de parcelas da Inside Games":
+✅ "Você tem {{quantidade_compras}} compras parceladas da Inside Games:
+- Impacto mensal: R$ {{impacto_mensal_total}}/mês
+- Total ainda a pagar: R$ {{valor_total_restante}}
+Quer ver o detalhe de cada compra?"
 
 Para "como estão minhas finanças":
-✅ "Seu saldo é R$ {{saldo}}. Este mês: receitas R$ {{receitas}}, despesas R$ {{despesas}} ({{variacao}}% vs mês passado). Score de saúde: {{score}}/100. Quer ver alguma área específica?"
+✅ "Seu saldo é R$ {{saldo}}. Este mês: receitas R$ {{receitas}}, despesas R$ {{despesas}}. Quer ver alguma área específica?"
 
 PONTOS IMPORTANTES:
 - Use APENAS os dados disponíveis no contexto fornecido
-- Se um dado não estiver disponível, diga que precisa de mais informações
+- Se um dado não estiver disponível, diga claramente que não encontrou
 - Sempre ofereça uma próxima ação ou pergunta de follow-up
 - Use emojis com moderação (máximo 1-2 por resposta)"""
 
