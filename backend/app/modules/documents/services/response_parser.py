@@ -37,13 +37,10 @@ class ResponseParser:
         items = data.get('items', [])
         for item in items:
             desc = item.get('description', '')
-            date = item.get('date', '')
             if any(ph in str(desc) for ph in self.PLACEHOLDER_VALUES):
                 print(f"[Parser] AVISO: Detectado placeholder em item.description: {desc}")
                 return True
-            if date and 'YYYY' in str(date):
-                print(f"[Parser] AVISO: Detectado placeholder em item.date: {date}")
-                return True
+            # Data placeholder é aceita - será tratada como None no _normalize_item
 
         return False
 
@@ -166,10 +163,16 @@ class ResponseParser:
         if transaction_type not in valid_types:
             transaction_type = 'compra'
 
+        # Limpa data se for placeholder (YYYY-MM-DD ou similar)
+        item_date = item.get('date')
+        if item_date and 'YYYY' in str(item_date):
+            print(f"[Parser] Data placeholder detectada '{item_date}', usando None")
+            item_date = None
+
         normalized = {
             'description': description,
             'amount': float(amount) if amount else 0,
-            'date': item.get('date'),
+            'date': item_date,
             'category': category,
             'transaction_type': transaction_type,
             'confidence': 0.9,
