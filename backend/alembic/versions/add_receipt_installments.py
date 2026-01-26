@@ -1,6 +1,6 @@
 """Add installment fields to receipt_payments
 
-Revision ID: add_installment_to_receipt_payments
+Revision ID: add_receipt_installments
 Revises: add_more_challenges
 Create Date: 2026-01-26
 
@@ -17,7 +17,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = 'add_installment_to_receipt_payments'
+revision: str = 'add_receipt_installments'
 down_revision: Union[str, None] = 'add_more_challenges'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
