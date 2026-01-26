@@ -194,7 +194,7 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
             "cartoes": ["cartao", "cartão", "fatura", "limite", "credito", "crédito", "bandeira", "visa", "master", "elo"],
             "mercado": ["mercado", "supermercado", "compras", "produto", "lista de compras", "groceries", "feira", "hortifruti"],
             "dividas": ["divida", "dívida", "emprestimo", "empréstimo", "financiamento", "juros", "quitacao", "quitação", "snowball", "avalanche"],
-            "orcamento": ["orcamento", "orçamento", "planejado", "categoria", "estourei", "estourou", "limite de gasto"],
+            "orcamento": ["orcamento", "orçamento", "planejado", "estourei", "estourou", "limite de gasto", "budget"],
             "metas": ["meta", "objetivo", "pnif", "fundo de emergencia", "emergência", "guardar", "economizar", "poupar"],
             "recorrentes": ["assinatura", "netflix", "spotify", "recorrente", "mensal fixo", "streaming", "amazon prime", "icloud"],
             "fluxo": ["fluxo", "quando recebo", "salario", "salário", "receita", "projecao", "projeção"],
@@ -203,7 +203,7 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
             "calendario": ["calendario", "calendário", "agenda", "vencimento", "proximo pagamento", "próximo pagamento", "quando vence"],
             "revisao": ["review", "revisao", "revisão", "semana passada", "essa semana", "sem categoria", "categorizar", "o que mudou"],
             "automacoes": ["automacao", "automação", "automatico", "automático", "regra", "robo", "robô", "transferencia programada", "transferência programada"],
-            "geral": ["resumo", "geral", "financas", "finanças", "como estou", "situacao", "situação", "saude financeira", "saúde financeira"],
+            "geral": ["resumo", "geral", "financas", "finanças", "como estou", "situacao", "situação", "saude financeira", "saúde financeira", "quanto gastei", "gastos do mes", "gastos do mês", "esse mes", "esse mês", "este mes", "este mês", "por categoria", "categoria"],
         }
 
         for domain, keywords in keyword_map.items():
@@ -920,9 +920,43 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
         budget = budget_result.scalar_one_or_none()
 
         if not budget:
+            # Mesmo sem orçamento, buscar gastos reais do mês
+            start_date = date(today.year, today.month, 1)
+            result = await self.db.execute(
+                select(
+                    Transaction.category_id,
+                    func.sum(Transaction.amount).label('total')
+                ).where(
+                    Transaction.user_id == user.id,
+                    Transaction.type == TransactionType.EXPENSE.value,
+                    Transaction.date >= start_date,
+                    Transaction.date <= today,
+                    Transaction.linked_transaction_id.is_(None),
+                    Transaction.receipt_id.is_(None)
+                ).group_by(Transaction.category_id)
+            )
+            gastos_raw = {row.category_id: float(row.total) for row in result.all()}
+
+            # Buscar nomes das categorias
+            category_ids = list(gastos_raw.keys())
+            categories: dict[int | None, str] = {}
+            if category_ids:
+                cat_result = await self.db.execute(
+                    select(Category).where(Category.id.in_([c for c in category_ids if c is not None]))
+                )
+                categories = {c.id: c.name for c in cat_result.scalars().all()}
+
+            # Formatar gastos por categoria
+            gastos_por_categoria = {}
+            for cat_id, total in gastos_raw.items():
+                cat_name = categories.get(cat_id, "Sem categoria")
+                gastos_por_categoria[cat_name] = {"total": total, "count": 1}
+
             return {
                 "tem_orcamento": False,
-                "mensagem": "Sem orçamento definido para este mês"
+                "gastos_por_categoria": gastos_por_categoria,
+                "total_gasto": sum(gastos_raw.values()),
+                "mensagem": "Sem orçamento definido, mas aqui estão seus gastos do mês"
             }
 
         # Buscar itens do orçamento
@@ -940,7 +974,7 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
             )
             categories = {c.id: c.name for c in cat_result.scalars().all()}
 
-        # Buscar gastos reais do mês
+        # Buscar gastos reais do mês - excluindo transferências e receipts
         start_date = date(today.year, today.month, 1)
         result = await self.db.execute(
             select(
@@ -950,7 +984,9 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
                 Transaction.user_id == user.id,
                 Transaction.type == TransactionType.EXPENSE.value,
                 Transaction.date >= start_date,
-                Transaction.date <= today
+                Transaction.date <= today,
+                Transaction.linked_transaction_id.is_(None),
+                Transaction.receipt_id.is_(None)
             ).group_by(Transaction.category_id)
         )
         gastos_por_categoria = {row.category_id: float(row.total) for row in result.all()}
@@ -1218,8 +1254,19 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
         tx_result = await self.db.execute(tx_query)
         transactions = tx_result.scalars().all()
 
-        receitas_periodo = sum(float(t.amount) for t in transactions if t.type == TransactionType.INCOME.value)
-        despesas_periodo = sum(float(t.amount) for t in transactions if t.type == TransactionType.EXPENSE.value)
+        # Excluir transferências e receipts do cálculo
+        receitas_periodo = sum(
+            float(t.amount) for t in transactions
+            if t.type == TransactionType.INCOME.value
+            and not t.linked_transaction_id
+            and not t.receipt_id
+        )
+        despesas_periodo = sum(
+            float(t.amount) for t in transactions
+            if t.type == TransactionType.EXPENSE.value
+            and not t.linked_transaction_id
+            and not t.receipt_id
+        )
 
         # Calcular próximas receitas esperadas
         proximas_receitas = []
@@ -1348,10 +1395,13 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
         query_context = {"period": {"start": period_start, "end": period_end}}
         full_context = await self._get_comprehensive_context(user, query_context)
 
-        # Extrair resumo
+        # Extrair resumo com gastos detalhados
         return {
             "saldo_total": full_context.get("saldo_total", 0),
             "resumo_periodo": full_context.get("resumo_periodo", {}),
+            "gastos_por_categoria": full_context.get("gastos_por_categoria", {}),
+            "gastos_por_estabelecimento": full_context.get("gastos_por_estabelecimento", {}),
+            "maiores_gastos": full_context.get("maiores_gastos", []),
             "comparacao_mes_anterior": full_context.get("comparacao_mes_anterior", {}),
             "saude_financeira": full_context.get("saude_financeira", {}),
             "total_dividas": full_context.get("total_dividas", 0),
@@ -1612,9 +1662,19 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
         )
         week_transactions = result.scalars().all()
 
-        # Calcular totais da semana
-        receitas_semana = sum(float(t.amount) for t in week_transactions if t.type == TransactionType.INCOME.value)
-        despesas_semana = sum(float(t.amount) for t in week_transactions if t.type == TransactionType.EXPENSE.value)
+        # Calcular totais da semana - excluindo transferências e receipts
+        receitas_semana = sum(
+            float(t.amount) for t in week_transactions
+            if t.type == TransactionType.INCOME.value
+            and not t.linked_transaction_id
+            and not t.receipt_id
+        )
+        despesas_semana = sum(
+            float(t.amount) for t in week_transactions
+            if t.type == TransactionType.EXPENSE.value
+            and not t.linked_transaction_id
+            and not t.receipt_id
+        )
 
         # Buscar transações sem categoria
         uncategorized_result = await self.db.execute(
@@ -1650,7 +1710,12 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
         )
         prev_transactions = prev_result.scalars().all()
 
-        despesas_semana_anterior = sum(float(t.amount) for t in prev_transactions if t.type == TransactionType.EXPENSE.value)
+        despesas_semana_anterior = sum(
+            float(t.amount) for t in prev_transactions
+            if t.type == TransactionType.EXPENSE.value
+            and not t.linked_transaction_id
+            and not t.receipt_id
+        )
 
         # Calcular variação
         variacao_despesas = None
@@ -1668,7 +1733,7 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
 
         gastos_por_categoria: dict[str, float] = defaultdict(float)
         for t in week_transactions:
-            if t.type == TransactionType.EXPENSE.value:
+            if t.type == TransactionType.EXPENSE.value and not t.linked_transaction_id and not t.receipt_id:
                 cat_name = categories.get(t.category_id, "Sem categoria")
                 gastos_por_categoria[cat_name] += float(t.amount)
 
@@ -2594,9 +2659,21 @@ PONTOS IMPORTANTES:
             )
             merchants = {m.id: m.name for m in merchants_result.scalars().all()}
 
-        # Calcular totais
-        receitas = sum(float(t.amount) for t in txs if t.type == TransactionType.INCOME.value)
-        despesas = sum(float(t.amount) for t in txs if t.type == TransactionType.EXPENSE.value)
+        # Calcular totais (excluindo transferências e transações de receipts)
+        # Transferências são identificadas pelo linked_transaction_id
+        # Transações de receipts já estão contabilizadas no receipt e devem ser excluídas
+        receitas = sum(
+            float(t.amount) for t in txs
+            if t.type == TransactionType.INCOME.value
+            and not t.linked_transaction_id
+            and not t.receipt_id
+        )
+        despesas = sum(
+            float(t.amount) for t in txs
+            if t.type == TransactionType.EXPENSE.value
+            and not t.linked_transaction_id
+            and not t.receipt_id
+        )
 
         context["periodo_analise"] = {
             "label": period_label,
@@ -2612,10 +2689,10 @@ PONTOS IMPORTANTES:
             "media_diaria_gastos": round(despesas / max(1, (period_end - period_start).days + 1), 2)
         }
 
-        # 4. Gastos por categoria (DETALHADO)
+        # 4. Gastos por categoria (DETALHADO) - excluindo transferências e receipts
         gastos_por_categoria: dict[str, Any] = defaultdict(lambda: {"total": 0, "count": 0, "transacoes": []})
         for t in txs:
-            if t.type == TransactionType.EXPENSE.value:
+            if t.type == TransactionType.EXPENSE.value and not t.linked_transaction_id and not t.receipt_id:
                 cat_name = categories.get(t.category_id, "Sem categoria")
                 merchant_name = merchants.get(t.merchant_id, t.description or "Nao identificado")
                 gastos_por_categoria[cat_name]["total"] += float(t.amount)
@@ -2632,10 +2709,10 @@ PONTOS IMPORTANTES:
             sorted(gastos_por_categoria.items(), key=lambda x: x[1]["total"], reverse=True)
         )
 
-        # 5. Gastos por estabelecimento
+        # 5. Gastos por estabelecimento - excluindo transferências e receipts
         gastos_por_estabelecimento: dict[str, Any] = defaultdict(lambda: {"total": 0, "count": 0, "categoria": None})
         for t in txs:
-            if t.type == TransactionType.EXPENSE.value:
+            if t.type == TransactionType.EXPENSE.value and not t.linked_transaction_id and not t.receipt_id:
                 merchant_name = merchants.get(t.merchant_id, t.description or "Outros")
                 cat_name = categories.get(t.category_id, "Sem categoria")
                 gastos_por_estabelecimento[merchant_name]["total"] += float(t.amount)
@@ -2646,18 +2723,23 @@ PONTOS IMPORTANTES:
             sorted(gastos_por_estabelecimento.items(), key=lambda x: x[1]["total"], reverse=True)[:15]
         )
 
-        # 6. Receitas por categoria
+        # 6. Receitas por categoria - excluindo transferências e receipts
         receitas_por_categoria: dict[str, Any] = defaultdict(lambda: {"total": 0, "count": 0})
         for t in txs:
-            if t.type == TransactionType.INCOME.value:
+            if t.type == TransactionType.INCOME.value and not t.linked_transaction_id and not t.receipt_id:
                 cat_name = categories.get(t.category_id, "Sem categoria")
                 receitas_por_categoria[cat_name]["total"] += float(t.amount)
                 receitas_por_categoria[cat_name]["count"] += 1
 
         context["receitas_por_categoria"] = dict(receitas_por_categoria)
 
-        # 7. Top 10 maiores gastos do periodo
-        despesas_list = [t for t in txs if t.type == TransactionType.EXPENSE.value]
+        # 7. Top 10 maiores gastos do periodo - excluindo transferências e receipts
+        despesas_list = [
+            t for t in txs
+            if t.type == TransactionType.EXPENSE.value
+            and not t.linked_transaction_id
+            and not t.receipt_id
+        ]
         despesas_list.sort(key=lambda x: float(x.amount), reverse=True)
         context["maiores_gastos"] = [
             {
