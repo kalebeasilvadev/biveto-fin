@@ -37,7 +37,7 @@ from app.models.grocery import (
     GroceryPurchase, GroceryProduct, ShoppingList, ShoppingListItem,
     GroceryPriceHistory, ShoppingListStatus, GROCERY_CATEGORY_DISPLAY
 )
-from app.models.envelope import SpendingEnvelope, EnvelopeHistory, EnvelopeStatus
+# Envelope module removed - functionality merged into Budgets module
 from app.models.automation_rule import AutomationRule, AutomationExecution
 from app.modules.chat.schemas.chat import ChatResponse
 
@@ -76,7 +76,6 @@ class FinancialAgentService:
         "recorrentes",  # Assinaturas, Netflix, Spotify, contas fixas mensais
         "fluxo",        # Fluxo de caixa, quando recebo, saldo futuro, projeções
         "beneficios",   # VA, VR, VT, vale alimentação, vale refeição
-        "envelopes",    # Envelope budgeting, limites diários, gastos por envelope
         "calendario",   # Calendário financeiro, projeções, vencimentos futuros
         "revisao",      # Weekly review, análise semanal, transações sem categoria
         "automacoes",   # Automações, regras automáticas, transferências programadas
@@ -119,7 +118,6 @@ DOMÍNIOS DISPONÍVEIS:
 - recorrentes: assinaturas, Netflix, Spotify, contas fixas mensais, recorrentes
 - fluxo: fluxo de caixa, quando recebo, saldo futuro, projeções de receita, saldo disponível
 - beneficios: VA, VR, VT, vale alimentação, vale refeição, benefício
-- envelopes: envelope budgeting, limite diário, quanto posso gastar hoje, envelopes
 - calendario: calendário financeiro, vencimentos futuros, próximos pagamentos, agenda
 - revisao: review semanal, análise da semana, transações sem categoria, o que mudou
 - automacoes: automações, regras automáticas, transferências programadas, robôs
@@ -199,7 +197,6 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
             "recorrentes": ["assinatura", "netflix", "spotify", "recorrente", "mensal fixo", "streaming", "amazon prime", "icloud"],
             "fluxo": ["fluxo", "quando recebo", "salario", "salário", "receita", "projecao", "projeção"],
             "beneficios": ["va", "vr", "vt", "vale alimentacao", "vale alimentação", "vale refeicao", "vale refeição", "beneficio", "benefício", "alelo", "sodexo"],
-            "envelopes": ["envelope", "limite diario", "limite diário", "quanto posso gastar", "diaria", "diária", "ynab"],
             "calendario": ["calendario", "calendário", "agenda", "vencimento", "proximo pagamento", "próximo pagamento", "quando vence"],
             "revisao": ["review", "revisao", "revisão", "semana passada", "essa semana", "sem categoria", "categorizar", "o que mudou"],
             "automacoes": ["automacao", "automação", "automatico", "automático", "regra", "robo", "robô", "transferencia programada", "transferência programada"],
@@ -257,9 +254,6 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
 
         if "beneficios" in domains:
             context["beneficios"] = await self._get_benefits_expert_context(user)
-
-        if "envelopes" in domains:
-            context["envelopes"] = await self._get_envelopes_expert_context(user)
 
         if "calendario" in domains:
             context["calendario"] = await self._get_calendar_expert_context(user, household_user_ids)
@@ -1410,84 +1404,6 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
             "contas": full_context.get("contas", [])
         }
 
-    async def _get_envelopes_expert_context(self, user: User) -> dict[str, Any]:
-        """Contexto detalhado para o especialista de envelopes (envelope budgeting)"""
-        result = await self.db.execute(
-            select(SpendingEnvelope).where(
-                SpendingEnvelope.user_id == user.id,
-                SpendingEnvelope.is_active == True
-            ).order_by(SpendingEnvelope.priority.desc())
-        )
-        envelopes = result.scalars().all()
-
-        # Buscar categorias para mapeamento
-        category_ids = [e.category_id for e in envelopes if e.category_id]
-        categories: dict[int | None, str] = {}
-        if category_ids:
-            cat_result = await self.db.execute(
-                select(Category).where(Category.id.in_(category_ids))
-            )
-            categories = {c.id: c.name for c in cat_result.scalars().all()}
-
-        envelopes_info = []
-        total_disponivel = 0
-        total_limite = 0
-        envelopes_estourados = []
-        envelopes_alerta = []
-        today = date.today()
-
-        for e in envelopes:
-            saldo = float(e.current_balance)
-            limite = float(e.limit_amount)
-            total_disponivel += saldo
-            total_limite += limite
-
-            # Calcular percentual usado
-            percentual_usado = round(((limite - saldo) / limite) * 100, 1) if limite > 0 else 0
-
-            # Calcular dias restantes no período
-            dias_restantes = max(0, (e.period_end_date - today).days)
-
-            # Calcular valor diário disponível
-            valor_diario = round(saldo / max(1, dias_restantes), 2) if dias_restantes > 0 else 0
-
-            envelope_info = {
-                "nome": e.name,
-                "categoria": categories.get(e.category_id, "Geral"),
-                "periodo": e.period_type,
-                "limite": limite,
-                "saldo_disponivel": saldo,
-                "percentual_usado": percentual_usado,
-                "valor_diario_disponivel": valor_diario,
-                "dias_restantes_periodo": dias_restantes,
-                "periodo_inicio": e.period_start_date.strftime("%d/%m/%Y"),
-                "periodo_fim": e.period_end_date.strftime("%d/%m/%Y"),
-                "permite_rollover": e.allow_rollover,
-                "rollover_acumulado": float(e.rollover_balance),
-                "status": e.status
-            }
-            envelopes_info.append(envelope_info)
-
-            if e.status == EnvelopeStatus.OVERSPENT.value:
-                envelopes_estourados.append(envelope_info)
-            elif percentual_usado >= 80:
-                envelopes_alerta.append(envelope_info)
-
-        # Calcular valor diário total disponível
-        dias_ate_fim_mes = max(1, (date(today.year, today.month + 1 if today.month < 12 else 1, 1) - timedelta(days=1) - today).days)
-        valor_diario_total = round(total_disponivel / dias_ate_fim_mes, 2)
-
-        return {
-            "envelopes": envelopes_info,
-            "quantidade": len(envelopes_info),
-            "total_disponivel": total_disponivel,
-            "total_limite": total_limite,
-            "valor_diario_total_disponivel": valor_diario_total,
-            "envelopes_estourados": envelopes_estourados,
-            "envelopes_em_alerta": envelopes_alerta,
-            "tem_envelopes": len(envelopes_info) > 0
-        }
-
     async def _get_calendar_expert_context(self, user: User, household_user_ids: list[int]) -> dict[str, Any]:
         """Contexto detalhado para o especialista de calendário financeiro"""
         today = date.today()
@@ -2130,23 +2046,6 @@ COMO RESPONDER:
 2. "quando recarrega?" → Use proxima_recarga e dias_para_recarga
 3. "está durando?" → Compare uso_diario_estimado com dias restantes
 4. Alerte se saldo estiver acabando antes da recarga""",
-
-            "envelopes": """## ESPECIALISTA EM ENVELOPES (Envelope Budgeting) 📦
-
-DADOS DISPONÍVEIS EM context["envelopes"]:
-- envelopes: lista com nome, limite, saldo_disponivel, percentual_usado
-- valor_diario_disponivel: quanto pode gastar por dia em cada envelope
-- valor_diario_total_disponivel: soma de todos os envelopes / dias restantes
-- envelopes_estourados: envelopes que ultrapassaram o limite
-- envelopes_em_alerta: envelopes com >80% usado
-- total_disponivel: soma de todos os saldos disponíveis
-
-COMO RESPONDER:
-1. "quanto posso gastar hoje?" → Use valor_diario_total_disponivel
-2. "como estão meus envelopes?" → Liste status de cada envelope
-3. "estourei algum envelope?" → Use envelopes_estourados
-4. Alerte sobre envelopes em alerta proativamente
-5. Mostre valor diário disponível para ajudar no controle diário""",
 
             "calendario": """## ESPECIALISTA EM CALENDÁRIO FINANCEIRO 📆
 

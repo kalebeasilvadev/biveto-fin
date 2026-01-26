@@ -99,9 +99,6 @@ class User(Base):
     push_subscriptions: Mapped[list["PushSubscription"]] = relationship(
         back_populates="user", lazy="noload", cascade="all, delete-orphan"
     )
-    spending_envelopes: Mapped[list["SpendingEnvelope"]] = relationship(
-        back_populates="user", lazy="noload", cascade="all, delete-orphan"
-    )
     automation_rules: Mapped[list["AutomationRule"]] = relationship(
         back_populates="user", lazy="noload", cascade="all, delete-orphan"
     )
@@ -162,7 +159,6 @@ from .income_split_rule import IncomeSplitRule
 from .credit_card_invoice import CreditCardInvoice
 from .api_key import APIKey
 from .notification import Notification, NotificationPreference, NotificationSettings, PushSubscription
-from .envelope import SpendingEnvelope
 from .automation_rule import AutomationRule
 from .receipt import Receipt
 from .gamification import UserBadge, UserStreak, UserChallenge, UserPoints
