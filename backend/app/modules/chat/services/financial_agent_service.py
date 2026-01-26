@@ -376,24 +376,33 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
 
             # Separar faturas por status e período
             faturas_abertas = []
+            faturas_do_periodo = []  # NOVO: todas as faturas do período filtrado (incluindo pagas)
             fatura_mes_atual = None
             fatura_proximo_mes = None
 
             for inv in all_invoices:
                 remaining = float(inv.total_amount) - float(inv.paid_amount or 0)
 
+                # Criar info da fatura para qualquer invoice
+                fatura_info = {
+                    "periodo": f"{inv.reference_month:02d}/{inv.reference_year}",
+                    "mes": inv.reference_month,
+                    "ano": inv.reference_year,
+                    "status": inv.status,
+                    "valor_total": float(inv.total_amount),
+                    "valor_pago": float(inv.paid_amount or 0),
+                    "valor_restante": remaining,
+                    "vencimento": inv.due_date.strftime("%d/%m/%Y") if inv.due_date else None,
+                    "vencida": inv.due_date < today if inv.due_date else False
+                }
+
+                # Se um período específico foi solicitado, adicionar TODAS as faturas
+                # (incluindo pagas) para responder perguntas históricas
+                if target_month:
+                    faturas_do_periodo.append(fatura_info)
+
+                # Adicionar a faturas_abertas apenas se não estiver paga
                 if inv.status not in (InvoiceStatus.PAID.value,) and remaining > 0:
-                    fatura_info = {
-                        "periodo": f"{inv.reference_month:02d}/{inv.reference_year}",
-                        "mes": inv.reference_month,
-                        "ano": inv.reference_year,
-                        "status": inv.status,
-                        "valor_total": float(inv.total_amount),
-                        "valor_pago": float(inv.paid_amount or 0),
-                        "valor_restante": remaining,
-                        "vencimento": inv.due_date.strftime("%d/%m/%Y") if inv.due_date else None,
-                        "vencida": inv.due_date < today if inv.due_date else False
-                    }
                     faturas_abertas.append(fatura_info)
 
                     # Identificar fatura do mês atual e próximo
@@ -504,6 +513,8 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
                 "total_faturas_abertas": saldo_faturas,
                 "fatura_mes_atual": fatura_mes_atual,
                 "fatura_proximo_mes": fatura_proximo_mes,
+                # Faturas do período solicitado (inclui pagas) - para consultas históricas
+                "faturas_do_periodo": faturas_do_periodo if target_month else [],
                 # Parcelas ativas
                 "parcelas": parcelas_do_cartao,
                 "parcelas_por_mes": parcelas_mes_valor,
@@ -1305,18 +1316,16 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
         tx_result = await self.db.execute(tx_query)
         transactions = tx_result.scalars().all()
 
-        # Excluir transferências e receipts do cálculo
+        # Excluir apenas transferências do cálculo
         receitas_periodo = sum(
             float(t.amount) for t in transactions
             if t.type == TransactionType.INCOME.value
             and not t.linked_transaction_id
-            and not t.receipt_id
         )
         despesas_periodo = sum(
             float(t.amount) for t in transactions
             if t.type == TransactionType.EXPENSE.value
             and not t.linked_transaction_id
-            and not t.receipt_id
         )
 
         # Calcular próximas receitas esperadas
@@ -1635,18 +1644,16 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
         )
         week_transactions = result.scalars().all()
 
-        # Calcular totais da semana - excluindo transferências e receipts
+        # Calcular totais da semana - excluindo apenas transferências
         receitas_semana = sum(
             float(t.amount) for t in week_transactions
             if t.type == TransactionType.INCOME.value
             and not t.linked_transaction_id
-            and not t.receipt_id
         )
         despesas_semana = sum(
             float(t.amount) for t in week_transactions
             if t.type == TransactionType.EXPENSE.value
             and not t.linked_transaction_id
-            and not t.receipt_id
         )
 
         # Buscar transações sem categoria
@@ -1687,7 +1694,6 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
             float(t.amount) for t in prev_transactions
             if t.type == TransactionType.EXPENSE.value
             and not t.linked_transaction_id
-            and not t.receipt_id
         )
 
         # Calcular variação
@@ -1706,7 +1712,7 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
 
         gastos_por_categoria: dict[str, float] = defaultdict(float)
         for t in week_transactions:
-            if t.type == TransactionType.EXPENSE.value and not t.linked_transaction_id and not t.receipt_id:
+            if t.type == TransactionType.EXPENSE.value and not t.linked_transaction_id:
                 cat_name = categories.get(t.category_id, "Sem categoria")
                 gastos_por_categoria[cat_name] += float(t.amount)
 
@@ -2615,20 +2621,19 @@ PONTOS IMPORTANTES:
             )
             merchants = {m.id: m.name for m in merchants_result.scalars().all()}
 
-        # Calcular totais (excluindo transferências e transações de receipts)
+        # Calcular totais (excluindo apenas transferências)
         # Transferências são identificadas pelo linked_transaction_id
-        # Transações de receipts já estão contabilizadas no receipt e devem ser excluídas
+        # Nota: transações com receipt_id SÃO despesas legítimas (itens de cupom fiscal)
+        # e NÃO devem ser excluídas - o Receipt é apenas um agrupador, não uma transação
         receitas = sum(
             float(t.amount) for t in txs
             if t.type == TransactionType.INCOME.value
             and not t.linked_transaction_id
-            and not t.receipt_id
         )
         despesas = sum(
             float(t.amount) for t in txs
             if t.type == TransactionType.EXPENSE.value
             and not t.linked_transaction_id
-            and not t.receipt_id
         )
 
         context["periodo_analise"] = {
@@ -2645,10 +2650,10 @@ PONTOS IMPORTANTES:
             "media_diaria_gastos": round(despesas / max(1, (period_end - period_start).days + 1), 2)
         }
 
-        # 4. Gastos por categoria (DETALHADO) - excluindo transferências e receipts
+        # 4. Gastos por categoria (DETALHADO) - excluindo apenas transferências
         gastos_por_categoria: dict[str, Any] = defaultdict(lambda: {"total": 0, "count": 0, "transacoes": []})
         for t in txs:
-            if t.type == TransactionType.EXPENSE.value and not t.linked_transaction_id and not t.receipt_id:
+            if t.type == TransactionType.EXPENSE.value and not t.linked_transaction_id:
                 cat_name = categories.get(t.category_id, "Sem categoria")
                 merchant_name = merchants.get(t.merchant_id, t.description or "Nao identificado")
                 gastos_por_categoria[cat_name]["total"] += float(t.amount)
@@ -2665,10 +2670,10 @@ PONTOS IMPORTANTES:
             sorted(gastos_por_categoria.items(), key=lambda x: x[1]["total"], reverse=True)
         )
 
-        # 5. Gastos por estabelecimento - excluindo transferências e receipts
+        # 5. Gastos por estabelecimento - excluindo apenas transferências
         gastos_por_estabelecimento: dict[str, Any] = defaultdict(lambda: {"total": 0, "count": 0, "categoria": None})
         for t in txs:
-            if t.type == TransactionType.EXPENSE.value and not t.linked_transaction_id and not t.receipt_id:
+            if t.type == TransactionType.EXPENSE.value and not t.linked_transaction_id:
                 merchant_name = merchants.get(t.merchant_id, t.description or "Outros")
                 cat_name = categories.get(t.category_id, "Sem categoria")
                 gastos_por_estabelecimento[merchant_name]["total"] += float(t.amount)
@@ -2679,22 +2684,21 @@ PONTOS IMPORTANTES:
             sorted(gastos_por_estabelecimento.items(), key=lambda x: x[1]["total"], reverse=True)[:15]
         )
 
-        # 6. Receitas por categoria - excluindo transferências e receipts
+        # 6. Receitas por categoria - excluindo apenas transferências
         receitas_por_categoria: dict[str, Any] = defaultdict(lambda: {"total": 0, "count": 0})
         for t in txs:
-            if t.type == TransactionType.INCOME.value and not t.linked_transaction_id and not t.receipt_id:
+            if t.type == TransactionType.INCOME.value and not t.linked_transaction_id:
                 cat_name = categories.get(t.category_id, "Sem categoria")
                 receitas_por_categoria[cat_name]["total"] += float(t.amount)
                 receitas_por_categoria[cat_name]["count"] += 1
 
         context["receitas_por_categoria"] = dict(receitas_por_categoria)
 
-        # 7. Top 10 maiores gastos do periodo - excluindo transferências e receipts
+        # 7. Top 10 maiores gastos do periodo - excluindo apenas transferências
         despesas_list = [
             t for t in txs
             if t.type == TransactionType.EXPENSE.value
             and not t.linked_transaction_id
-            and not t.receipt_id
         ]
         despesas_list.sort(key=lambda x: float(x.amount), reverse=True)
         context["maiores_gastos"] = [
