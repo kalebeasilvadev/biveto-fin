@@ -12,6 +12,63 @@ class ResponseParser:
     def __init__(self):
         self.validator = ExtractionValidator()
 
+    # Mapeamento de palavras-chave para categorias automaticas
+    CATEGORY_KEYWORDS = {
+        'alimentacao': [
+            'restaurante', 'lanchonete', 'padaria', 'pizzaria', 'burger',
+            'mcdonald', 'subway', 'habib', 'giraffas', 'outback', 'madero',
+            'ifood', 'rappi', 'uber eats', 'delivery', 'sushi', 'churrascaria',
+            'cafe', 'cafeteria', 'doceria', 'sorvete', 'acai',
+        ],
+        'mercado': [
+            'supermercado', 'atacadao', 'atacado', 'assai',
+            'carrefour', 'extra', 'pao de acucar', 'dia', 'big', 'walmart',
+            'supermarket', 'hortifruti', 'sacolao', 'feira',
+        ],
+        'transporte': [
+            'uber', '99', 'cabify', 'lyft', 'taxi', 'posto', 'combustivel',
+            'gasolina', 'etanol', 'shell', 'ipiranga', 'br distribuidora', 'petrobras',
+            'estacionamento', 'parking', 'pedagio', 'sem parar', 'conectcar',
+            'auto posto', 'abastecimento',
+        ],
+        'saude': [
+            'farmacia', 'drogasil', 'drogaria', 'pacheco', 'raia', 'droga',
+            'hospital', 'clinica', 'laboratorio', 'medico', 'dentista',
+            'otica', 'oculos', 'unimed', 'amil', 'sulamerica', 'bradesco saude',
+        ],
+        'lazer': [
+            'cinema', 'cinemark', 'cinepolis', 'uci', 'kinoplex',
+            'teatro', 'show', 'ingresso', 'evento', 'parque', 'zoo',
+            'museu', 'netflix', 'spotify', 'amazon prime', 'disney',
+            'hbo', 'youtube', 'twitch', 'steam', 'playstation', 'xbox',
+            'jogos', 'games', 'nintendo',
+        ],
+        'compras': [
+            'shopee', 'mercadolivre', 'mercado livre', 'amazon', 'aliexpress',
+            'magalu', 'magazine luiza', 'americanas', 'submarino', 'casas bahia',
+            'renner', 'riachuelo', 'c&a', 'zara', 'hm', 'forever',
+            'adidas', 'nike', 'fila', 'puma', 'centauro', 'netshoes',
+            'shein', 'wish', 'ebay',
+        ],
+        'servicos': [
+            'internet', 'starlink', 'vivo', 'claro', 'tim', 'oi',
+            'telefone', 'celular', 'telecom', 'net', 'sky',
+            'luz', 'energia', 'enel', 'cpfl', 'cemig',
+            'agua', 'saneamento', 'sabesp', 'caesb',
+            'gas', 'comgas', 'naturgy',
+        ],
+        'educacao': [
+            'escola', 'faculdade', 'universidade', 'curso', 'aula',
+            'udemy', 'coursera', 'alura', 'duolingo', 'livro', 'livraria',
+            'saraiva', 'cultura', 'amazon kindle',
+        ],
+        'financeiro': [
+            'pagseguro', 'mercadopago', 'picpay', 'ame', 'paypal',
+            'stone', 'cielo', 'rede', 'getnet', 'pag seguro',
+            'emprestimo', 'financiamento', 'seguro', 'investimento',
+        ],
+    }
+
     # Valores placeholder que indicam que o LLM não conseguiu extrair dados reais
     PLACEHOLDER_VALUES = [
         'NOME DO ESTABELECIMENTO',
@@ -147,6 +204,12 @@ class ResponseParser:
         transaction_type = item.get('transaction_type', 'compra')
         category = item.get('category', 'outros')
 
+        # Auto-categorizar se a categoria for generica
+        if category in ['outros', 'other', None, '']:
+            auto_category = self._auto_categorize(description)
+            if auto_category:
+                category = auto_category
+
         if transaction_type == 'compra':
             if category in ['pagamento']:
                 transaction_type = 'pagamento'
@@ -211,6 +274,32 @@ class ResponseParser:
 
         return normalized
 
+    def _auto_categorize(self, description: str) -> str | None:
+        """
+        Categoriza automaticamente uma transacao baseado em palavras-chave na descricao.
+        Retorna a categoria ou None se nao encontrar match.
+        """
+        if not description:
+            return None
+
+        desc_lower = description.lower()
+
+        # Remove acentos para facilitar match
+        import unicodedata
+        desc_normalized = unicodedata.normalize('NFD', desc_lower)
+        desc_normalized = desc_normalized.encode('ascii', 'ignore').decode('utf-8')
+
+        for category, keywords in self.CATEGORY_KEYWORDS.items():
+            for keyword in keywords:
+                # Normalizar keyword tambem
+                kw_normalized = unicodedata.normalize('NFD', keyword.lower())
+                kw_normalized = kw_normalized.encode('ascii', 'ignore').decode('utf-8')
+
+                if kw_normalized in desc_normalized:
+                    return category
+
+        return None
+
     def _normalize_card_info(self, card_info: dict) -> dict:
         """Normaliza informacoes do cartao"""
         # Valida card_name para evitar nomes de pessoas
@@ -260,12 +349,25 @@ class ResponseParser:
     def _validate_card_name(self, card_name: str, card_info: dict) -> str | None:
         """
         Valida se o card_name e realmente um nome de cartao e nao o nome do titular.
-        Retorna None se parecer ser nome de pessoa, ou gera um nome correto.
+        Retorna None se parecer ser nome de pessoa/empresa, ou gera um nome correto.
         """
         if not card_name:
             return None
 
         card_name_upper = card_name.upper().strip()
+
+        # Sufixos que indicam que e nome de EMPRESA (titular), NAO cartao
+        company_suffixes = [
+            'LTDA', 'S.A.', 'S/A', ' SA', 'EIRELI', ' MEI', ' ME',
+            'CONSULTORIA', 'SERVICOS', 'COMERCIO', 'INFORMATICA',
+            'TECNOLOGIA', 'SISTEMAS', 'SOLUCOES'
+        ]
+
+        # Se contem sufixo de empresa, e nome do titular, nao do cartao
+        has_company_suffix = any(suffix in card_name_upper for suffix in company_suffixes)
+        if has_company_suffix:
+            print(f"[Parser] card_name '{card_name}' parece ser nome de empresa/titular, gerando nome do cartao...")
+            return self._generate_card_name(card_info)
 
         # Palavras que indicam que e um nome de cartao valido
         valid_card_keywords = [

@@ -5,9 +5,10 @@ Prompt for LLM-powered smart shopping list generation
 SMART_LIST_PROMPT = """Voce e um assistente de lista de compras de supermercado brasileiro.
 
 DATA ATUAL: {current_date}
+PERIODO DE ANALISE: {period_days} dias
 
 TAREFA:
-Analise o historico de compras e gere uma lista de compras inteligente.
+Analise o historico de compras dos ultimos {period_days} dias e gere uma lista de compras inteligente.
 
 INSTRUCOES:
 
@@ -43,7 +44,21 @@ INSTRUCOES:
      * MEDIUM: Proximo do fim do ciclo (ratio 0.8-1.2) - "Proximo de acabar"
      * LOW: Comprado recentemente (ratio < 0.8) - "Ainda tem em casa"
 
-5. SUGERIR QUANTIDADES baseadas no padrao de compra medio
+5. CALCULAR QUANTIDADES com base no historico real:
+   - O campo "qty" no JSON representa a quantidade comprada de cada item
+   - Para cada tipo de produto agrupado, SOME os valores "qty" de todos os itens
+   - Calcule a media mensal: (soma total) / ({period_days} / 30)
+   - A quantidade sugerida deve ser essa MEDIA MENSAL arredondada para cima
+
+   EXEMPLOS DE CALCULO (para periodo de 90 dias = 3 meses):
+   - Leite: 4 compras de 2L cada = 8L total / 3 meses = 2.67L/mes = sugerir 3 L
+   - Arroz: 2 compras de 5kg cada = 10kg total / 3 meses = 3.33kg/mes = sugerir 4 kg
+   - Ovos: 6 compras de 12 un cada = 72 un total / 3 meses = 24/mes = sugerir 24 un
+
+   IMPORTANTE:
+   - NAO sugerir quantidade 1 para todos os itens! Use os dados reais
+   - Some as quantidades de produtos do mesmo tipo antes de calcular
+   - Arredonde para cima para evitar falta de produtos
 
 6. GERAR INSIGHTS uteis (max 5):
    - Padroes de consumo identificados

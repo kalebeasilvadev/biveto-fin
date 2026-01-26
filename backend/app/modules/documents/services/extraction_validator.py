@@ -40,6 +40,19 @@ PAYMENT_PATTERNS = [
     'credito pagamento',
 ]
 
+# Padroes que indicam subtotais/headers de secao (NAO sao transacoes reais)
+SECTION_HEADER_PATTERNS = [
+    # Nomes de empresas/titulares que aparecem como headers de secao
+    r'^[A-Z\s]+LTDA$',
+    r'^[A-Z\s]+S\.?A\.?$',
+    r'^[A-Z\s]+EIRELI$',
+    r'^[A-Z\s]+MEI$',
+    r'^[A-Z\s]+ME$',
+    # Headers comuns de secoes Nubank
+    r'pagamentos e financiamentos',
+    r'transacoes de \d+ [a-z]+ a \d+ [a-z]+',
+]
+
 
 class ExtractionValidator:
     """Valida e corrige dados extraidos de faturas"""
@@ -58,8 +71,13 @@ class ExtractionValidator:
 
         is_cupom_fiscal = document_type == 'cupom_fiscal'
 
-        # Pipeline de validacao
+        # Pipeline de validacao - primeiro remove itens invalidos
+        items = self.remove_section_headers(items, card_info)
         items = self.fix_payment_amounts(items)
+
+        if not is_cupom_fiscal:
+            # Filtrar pagamentos de fatura anterior (apenas para faturas de cartao)
+            items = self.filter_previous_invoice_payments(items, card_info)
 
         if is_cupom_fiscal:
             # Remover duplicatas de overlap usando total como validação
@@ -243,6 +261,125 @@ class ExtractionValidator:
             return True
 
         return False
+
+    def remove_section_headers(self, items: list, card_info: dict | None) -> list:
+        """Remove itens que sao headers de secao ou subtotais (nao transacoes reais).
+
+        Exemplos de headers que devem ser removidos:
+        - "KAS S C T LTDA" R$ 679,49 (subtotal de secao no Nubank)
+        - Nomes de empresas/titulares que aparecem como headers
+        """
+        if not items:
+            return items
+
+        result = []
+        total_amount = card_info.get('total_amount') if card_info else None
+
+        for item in items:
+            desc = item.get('description', '').strip()
+            desc_upper = desc.upper()
+            amount = item.get('amount', 0)
+
+            is_section_header = False
+
+            # Verificar padroes de headers de secao
+            for pattern in SECTION_HEADER_PATTERNS:
+                if re.match(pattern, desc_upper) or re.match(pattern, desc.lower()):
+                    is_section_header = True
+                    break
+
+            # Detectar nomes de empresa com sufixos que TERMINAM com esses sufixos
+            # (nao apenas contem, para evitar falsos positivos como "Mercadolivre")
+            # Regex para verificar se termina com sufixo de empresa
+            company_suffix_pattern = r'\s+(LTDA|S\.?A\.?|EIRELI|MEI|ME)$'
+            has_company_suffix = bool(re.search(company_suffix_pattern, desc_upper))
+
+            if has_company_suffix and amount > 0:
+                # Se o valor e diferente do total_amount, provavelmente e um subtotal de secao
+                if total_amount and abs(amount - total_amount) > 1.0:
+                    is_section_header = True
+                # Se nao tem parcela (headers geralmente nao tem), e mais provavel ser header
+                if not item.get('is_installment'):
+                    is_section_header = True
+
+            if is_section_header:
+                print(f"[Validator] Removendo header de secao: '{desc}' R${amount:.2f}")
+            else:
+                result.append(item)
+
+        if len(result) < len(items):
+            print(f"[Validator] Removidos {len(items) - len(result)} headers de secao")
+
+        return result
+
+    def filter_previous_invoice_payments(self, items: list, card_info: dict | None) -> list:
+        """Remove pagamentos que sao da fatura anterior (nao da atual).
+
+        Na fatura Nubank, o "Pagamento em XX DEZ" que aparece no resumo
+        e o pagamento da fatura ANTERIOR, nao deve ser contabilizado
+        como transacao da fatura atual.
+
+        Logica: Se remover um pagamento de fatura e a soma das compras
+        restantes ficar proxima do total_amount, esse pagamento e da fatura anterior.
+        """
+        if not items or not card_info:
+            return items
+
+        total_amount = card_info.get('total_amount')
+        if not total_amount:
+            return items
+
+        # Identificar pagamentos de fatura (com descricoes tipicas)
+        pagamentos_fatura = []
+        outros_items = []
+
+        for item in items:
+            desc_lower = item.get('description', '').lower()
+            is_invoice_payment = (
+                item.get('transaction_type') == 'pagamento' and
+                any(p in desc_lower for p in [
+                    'pagamento em', 'pagamento recebido', 'pgto fatura',
+                    'pagamento de fatura', 'credito pagamento', 'pag fatura'
+                ])
+            )
+
+            if is_invoice_payment:
+                pagamentos_fatura.append(item)
+            else:
+                outros_items.append(item)
+
+        if not pagamentos_fatura:
+            return items
+
+        # Calcular soma das compras (tudo exceto pagamentos de fatura)
+        soma_compras = sum(i.get('amount', 0) for i in outros_items)
+
+        # Se a soma das compras ja esta proxima do total, remover pagamentos de fatura anterior
+        if abs(soma_compras - total_amount) < 50:
+            # Os pagamentos de fatura sao da fatura anterior - remover
+            for pag in pagamentos_fatura:
+                print(f"[Validator] Removendo pagamento de fatura anterior: '{pag['description']}' R${pag['amount']:.2f}")
+            print(f"[Validator] Soma das compras: R${soma_compras:.2f} ≈ total fatura: R${total_amount:.2f}")
+            return outros_items
+
+        # Se nao, verificar se algum pagamento especifico pode ser da fatura anterior
+        items_to_keep = []
+        removed_any = False
+
+        for pag in pagamentos_fatura:
+            payment_amount = abs(pag.get('amount', 0))
+            # Se remover este pagamento, a soma fica proxima do total?
+            soma_sem_este = soma_compras
+            if abs(soma_sem_este - total_amount) < 50:
+                print(f"[Validator] Removendo pagamento de fatura anterior: '{pag['description']}' R${pag['amount']:.2f}")
+                removed_any = True
+            else:
+                items_to_keep.append(pag)
+
+        if removed_any:
+            return outros_items + items_to_keep
+
+        return items
 
     def fix_payment_amounts(self, items: list) -> list:
         """Corrige pagamentos que vieram com valor positivo."""

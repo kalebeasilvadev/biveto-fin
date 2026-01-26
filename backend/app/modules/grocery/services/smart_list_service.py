@@ -35,20 +35,34 @@ class SmartListService:
 
     def __init__(self, db: AsyncSession):
         self.db = db
-        self._llm_client = None
+        self._gemini_client = None
+        self._mistral_client = None
 
-    def _get_llm_client(self):
+    def _get_gemini_client(self):
         """Get Google Genai client (lazy initialization)"""
-        if self._llm_client is None:
+        if self._gemini_client is None:
             try:
                 from google import genai
                 api_key = settings.google_api_key
                 if not api_key:
                     raise ValueError("GOOGLE_API_KEY nao configurada")
-                self._llm_client = genai.Client(api_key=api_key)
+                self._gemini_client = genai.Client(api_key=api_key)
             except ImportError:
                 raise ImportError("google-genai nao instalado. Execute: pip install google-genai")
-        return self._llm_client
+        return self._gemini_client
+
+    def _get_mistral_client(self):
+        """Get Mistral client (lazy initialization)"""
+        if self._mistral_client is None:
+            try:
+                from mistralai import Mistral
+                api_key = settings.mistral_api_key
+                if not api_key:
+                    raise ValueError("MISTRAL_API_KEY nao configurada")
+                self._mistral_client = Mistral(api_key=api_key)
+            except ImportError:
+                raise ImportError("mistralai nao instalado. Execute: pip install mistralai")
+        return self._mistral_client
 
     async def generate_smart_list(
         self, user: User, request: SmartListGenerateRequest
@@ -176,60 +190,155 @@ class SmartListService:
     async def _call_llm(
         self, purchases_json: str, request: SmartListGenerateRequest
     ) -> dict:
-        """Call Google Gemini to analyze purchases and generate list"""
-        try:
-            from google.genai import types
-        except ImportError:
-            print("[SmartListService] ERRO: google.genai not available - biblioteca nao instalada")
-            return self._fallback_response()
-
-        try:
-            client = self._get_llm_client()
-        except Exception as e:
-            print(f"[SmartListService] ERRO ao criar cliente LLM: {type(e).__name__}: {e}")
-            return self._fallback_response()
-
-        model = settings.vision_model or "gemini-2.0-flash"
-        print(f"[SmartListService] Usando modelo: {model}")
-
+        """
+        Call LLM to analyze purchases and generate list.
+        Strategy: Mistral (primary) -> Gemini (fallback)
+        """
         prompt = SMART_LIST_PROMPT.format(
             current_date=date.today().isoformat(),
+            period_days=request.period_days,
             purchases_json=purchases_json
         )
 
+        print(f"[SmartListService] Chamando LLM com {len(purchases_json)} chars de dados...")
+        print(f"[SmartListService] Prompt total: {len(prompt)} chars")
+
+        # 1. Tentar Mistral primeiro (mais barato e confiavel)
+        if settings.mistral_api_key:
+            result = await self._call_mistral(prompt)
+            if result and result.get("shopping_list"):
+                return result
+            print(f"[SmartListService] Mistral falhou ou retornou lista vazia, tentando Gemini...")
+
+        # 2. Fallback para Gemini
+        if settings.google_api_key:
+            result = await self._call_gemini(prompt)
+            if result and result.get("shopping_list"):
+                return result
+
+        # 3. Todos os providers falharam
+        print(f"[SmartListService] Todos os providers falharam!")
+        return self._fallback_response()
+
+    async def _call_mistral(self, prompt: str) -> dict | None:
+        """Call Mistral API to generate shopping list"""
+        import asyncio
+
         try:
-            print(f"[SmartListService] Chamando Gemini API com {len(purchases_json)} chars de dados...")
-            print(f"[SmartListService] Prompt total: {len(prompt)} chars")
-            response = client.models.generate_content(
-                model=model,
-                contents=[prompt],
-                config=types.GenerateContentConfig(
-                    temperature=0.2,
-                    max_output_tokens=8000,
-                    response_mime_type="application/json",
-                    response_schema=SMART_LIST_RESPONSE_SCHEMA,
-                ),
-            )
-
-            response_text = response.text if response else ""
-            print(f"[SmartListService] Resposta recebida: {len(response_text)} chars")
-
-            if not response_text:
-                print(f"[SmartListService] ERRO: Resposta vazia do LLM!")
-                if response:
-                    print(f"[SmartListService] Response object: {response}")
-                    if hasattr(response, 'candidates') and response.candidates:
-                        print(f"[SmartListService] Candidates: {response.candidates}")
-                        if response.candidates[0].finish_reason:
-                            print(f"[SmartListService] Finish reason: {response.candidates[0].finish_reason}")
-
-            return self._parse_llm_response(response_text)
-
+            client = self._get_mistral_client()
         except Exception as e:
+            print(f"[SmartListService] ERRO ao criar cliente Mistral: {type(e).__name__}: {e}")
+            return None
+
+        model = settings.mistral_llm_model or "mistral-small-latest"
+        last_error = None
+
+        for attempt in range(3):
+            try:
+                print(f"[SmartListService] Tentativa {attempt + 1}/3 com Mistral ({model})")
+
+                response = client.chat.complete(
+                    model=model,
+                    messages=[{"role": "user", "content": prompt}],
+                    response_format={"type": "json_object"},
+                    temperature=0.2,
+                    max_tokens=16000,
+                )
+
+                response_text = response.choices[0].message.content if response.choices else ""
+                print(f"[SmartListService] Mistral respondeu: {len(response_text)} chars")
+
+                if not response_text:
+                    print(f"[SmartListService] ERRO: Resposta vazia do Mistral!")
+                    continue
+
+                return self._parse_llm_response(response_text)
+
+            except Exception as e:
+                last_error = e
+                error_str = str(e).lower()
+                print(f"[SmartListService] ERRO Mistral tentativa {attempt + 1}: {type(e).__name__}: {e}")
+
+                # Se for erro de rate limit ou overloaded, esperar e tentar novamente
+                if "429" in str(e) or "rate" in error_str or "overload" in error_str:
+                    wait_time = (attempt + 1) * 2  # 2s, 4s, 6s
+                    print(f"[SmartListService] Mistral rate limited, aguardando {wait_time}s...")
+                    await asyncio.sleep(wait_time)
+                else:
+                    # Erro diferente, parar tentativas
+                    break
+
+        if last_error:
+            print(f"[SmartListService] Mistral falhou apos 3 tentativas: {last_error}")
+        return None
+
+    async def _call_gemini(self, prompt: str) -> dict | None:
+        """Call Google Gemini API as fallback"""
+        import asyncio
+
+        try:
+            from google.genai import types
+        except ImportError:
+            print("[SmartListService] ERRO: google.genai not available")
+            return None
+
+        try:
+            client = self._get_gemini_client()
+        except Exception as e:
+            print(f"[SmartListService] ERRO ao criar cliente Gemini: {type(e).__name__}: {e}")
+            return None
+
+        # Modelos Gemini atualizados (removendo modelos obsoletos)
+        models_to_try = ["gemini-2.5-flash-preview-05-20", "gemini-2.0-flash"]
+        last_error = None
+
+        for model in models_to_try:
+            for attempt in range(3):
+                try:
+                    print(f"[SmartListService] Tentativa {attempt + 1}/3 com Gemini ({model})")
+
+                    response = client.models.generate_content(
+                        model=model,
+                        contents=[prompt],
+                        config=types.GenerateContentConfig(
+                            temperature=0.2,
+                            max_output_tokens=16000,
+                            response_mime_type="application/json",
+                            response_schema=SMART_LIST_RESPONSE_SCHEMA,
+                        ),
+                    )
+
+                    response_text = response.text if response else ""
+                    print(f"[SmartListService] Gemini respondeu: {len(response_text)} chars")
+
+                    if not response_text:
+                        print(f"[SmartListService] ERRO: Resposta vazia do Gemini!")
+                        if response and hasattr(response, 'candidates') and response.candidates:
+                            if response.candidates[0].finish_reason:
+                                print(f"[SmartListService] Finish reason: {response.candidates[0].finish_reason}")
+                        continue
+
+                    return self._parse_llm_response(response_text)
+
+                except Exception as e:
+                    last_error = e
+                    error_str = str(e).lower()
+                    print(f"[SmartListService] ERRO Gemini tentativa {attempt + 1}: {type(e).__name__}: {e}")
+
+                    if "503" in str(e) or "overloaded" in error_str or "429" in str(e) or "rate" in error_str:
+                        wait_time = (attempt + 1) * 2
+                        print(f"[SmartListService] Gemini sobrecarregado, aguardando {wait_time}s...")
+                        await asyncio.sleep(wait_time)
+                    else:
+                        break
+
+            print(f"[SmartListService] Modelo {model} falhou, tentando proximo...")
+
+        if last_error:
             import traceback
-            print(f"[SmartListService] ERRO na chamada LLM: {type(e).__name__}: {e}")
+            print(f"[SmartListService] Gemini falhou: {type(last_error).__name__}: {last_error}")
             print(f"[SmartListService] Traceback: {traceback.format_exc()}")
-            return self._fallback_response()
+        return None
 
     def _parse_llm_response(self, response_text: str) -> dict:
         """Parse and validate LLM JSON response"""
@@ -264,8 +373,66 @@ class SmartListService:
 
         except json.JSONDecodeError as e:
             print(f"[SmartListService] _parse_llm_response: ERRO de parse JSON: {e}")
-            print(f"[SmartListService] _parse_llm_response: Texto recebido (primeiros 500 chars): {response_text[:500]}")
+            print(f"[SmartListService] _parse_llm_response: Tentando reparar JSON truncado...")
+
+            # Tentar reparar JSON truncado - extrair itens válidos da shopping_list
+            repaired_data = self._try_repair_truncated_json(response_text)
+            if repaired_data and repaired_data.get("shopping_list"):
+                print(f"[SmartListService] _parse_llm_response: JSON reparado com {len(repaired_data['shopping_list'])} itens")
+                return repaired_data
+
+            print(f"[SmartListService] _parse_llm_response: Nao foi possivel reparar o JSON")
             return self._fallback_response()
+
+    def _try_repair_truncated_json(self, response_text: str) -> dict | None:
+        """Tenta reparar JSON truncado extraindo itens válidos"""
+        try:
+            # Encontrar o array shopping_list
+            start_marker = '"shopping_list": ['
+            start_idx = response_text.find(start_marker)
+            if start_idx == -1:
+                return None
+
+            array_start = start_idx + len(start_marker)
+
+            # Extrair itens válidos um por um
+            valid_items = []
+            depth = 0
+            item_start = None
+
+            for i, char in enumerate(response_text[array_start:], start=array_start):
+                if char == '{':
+                    if depth == 0:
+                        item_start = i
+                    depth += 1
+                elif char == '}':
+                    depth -= 1
+                    if depth == 0 and item_start is not None:
+                        # Tentar parsear este item
+                        item_str = response_text[item_start:i+1]
+                        try:
+                            item = json.loads(item_str)
+                            # Validar campos obrigatórios
+                            if all(k in item for k in ['product_type', 'display_name', 'category']):
+                                valid_items.append(item)
+                        except json.JSONDecodeError:
+                            pass
+                        item_start = None
+                elif char == ']' and depth == 0:
+                    break
+
+            if valid_items:
+                return {
+                    "shopping_list": valid_items,
+                    "excluded": [],
+                    "insights": ["Lista parcialmente recuperada de resposta truncada."]
+                }
+
+            return None
+
+        except Exception as e:
+            print(f"[SmartListService] _try_repair_truncated_json: Erro: {e}")
+            return None
 
     def _fallback_response(self) -> dict:
         """Return empty response when LLM fails"""
