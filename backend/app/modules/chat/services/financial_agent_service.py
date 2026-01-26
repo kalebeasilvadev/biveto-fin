@@ -232,7 +232,9 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
 
         # Buscar contexto específico para cada domínio
         if "cartoes" in domains:
-            context["cartoes"] = await self._get_credit_card_expert_context(user, query_context)
+            context["cartoes"] = await self._get_credit_card_expert_context(
+                user, query_context, period_start, period_end
+            )
 
         if "mercado" in domains:
             context["mercado"] = await self._get_grocery_expert_context(user, period_start, period_end, household_user_ids)
@@ -271,16 +273,41 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
 
     # ========== CONTEXTOS ESPECIALIZADOS POR DOMÍNIO ==========
 
-    async def _get_credit_card_expert_context(self, user: User, query_context: dict[str, Any] | None = None) -> dict[str, Any]:
+    async def _get_credit_card_expert_context(
+        self,
+        user: User,
+        query_context: dict[str, Any] | None = None,
+        period_start: date | None = None,
+        period_end: date | None = None
+    ) -> dict[str, Any]:
         """Contexto detalhado para o especialista de cartões com análise completa de faturas e parcelas
 
         Args:
             user: Usuário autenticado
             query_context: Contexto da query, pode conter 'valor_disponivel' para estratégia dinâmica
+            period_start: Data início do período para filtrar faturas
+            period_end: Data fim do período para filtrar faturas
         """
         today = date.today()
         mes_atual = today.month
         ano_atual = today.year
+
+        # Mapeamento de meses em português
+        MESES_PT = {
+            1: "janeiro", 2: "fevereiro", 3: "março", 4: "abril",
+            5: "maio", 6: "junho", 7: "julho", 8: "agosto",
+            9: "setembro", 10: "outubro", 11: "novembro", 12: "dezembro"
+        }
+
+        # Variáveis para controle de filtro por período
+        target_month: int | None = None
+        target_year: int | None = None
+        spans_multiple_years = False
+
+        if period_start and period_end:
+            target_month = period_start.month
+            target_year = period_start.year
+            spans_multiple_years = period_start.year != period_end.year
 
         # Buscar cartões ativos
         credit_cards_result = await self.db.execute(
@@ -327,6 +354,25 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
                 )
             )
             all_invoices = invoices_result.scalars().all()
+
+            # Filtrar faturas pelo período solicitado (se especificado)
+            if target_month:
+                if spans_multiple_years:
+                    # Filtrar apenas por mês (ex: "todas as faturas de janeiro")
+                    filtered_invoices = [
+                        inv for inv in all_invoices
+                        if inv.reference_month == target_month
+                    ]
+                else:
+                    # Filtrar por mês E ano específico (ex: "fatura de janeiro de 2026")
+                    filtered_invoices = [
+                        inv for inv in all_invoices
+                        if inv.reference_month == target_month and inv.reference_year == target_year
+                    ]
+
+                # Se encontrou faturas do período específico, usar apenas elas
+                if filtered_invoices:
+                    all_invoices = filtered_invoices
 
             # Separar faturas por status e período
             faturas_abertas = []
@@ -505,6 +551,17 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
                 "impacto_mensal_total": total_parcelas_mensais,
                 "valor_para_zerar_todos": total_parcelas_restantes,
                 "faturas_em_aberto": total_faturas_abertas
+            },
+            # Informação sobre filtro de período aplicado
+            "periodo_filtrado": {
+                "mes": target_month,
+                "ano": target_year if not spans_multiple_years else None,
+                "todos_os_anos": spans_multiple_years,
+                "label": (
+                    f"Faturas de {MESES_PT[target_month]} (todos os anos)" if spans_multiple_years and target_month
+                    else f"Fatura de {MESES_PT[target_month]}/{target_year}" if target_month
+                    else "Todas as faturas"
+                )
             }
         }
 
