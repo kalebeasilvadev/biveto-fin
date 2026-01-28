@@ -25,7 +25,7 @@ const options: FABOption[] = [
     icon: Camera,
     label: 'Foto',
     angle: 0,
-    distance: 85,
+    distance: 135,
     color: 'text-amber-600',
     bgColor: 'bg-amber-100 dark:bg-amber-900/50'
   },
@@ -33,8 +33,8 @@ const options: FABOption[] = [
     id: 'gallery',
     icon: Image,
     label: 'Galeria',
-    angle: -50,
-    distance: 95,
+    angle: -55,
+    distance: 150,
     color: 'text-blue-600',
     bgColor: 'bg-blue-100 dark:bg-blue-900/50'
   },
@@ -42,8 +42,8 @@ const options: FABOption[] = [
     id: 'manual',
     icon: PenLine,
     label: 'Manual',
-    angle: 50,
-    distance: 95,
+    angle: 55,
+    distance: 150,
     color: 'text-green-600',
     bgColor: 'bg-green-100 dark:bg-green-900/50'
   },
@@ -52,7 +52,7 @@ const options: FABOption[] = [
     icon: FileSpreadsheet,
     label: 'Extrato',
     angle: 0,
-    distance: 155,
+    distance: 240,
     color: 'text-emerald-600',
     bgColor: 'bg-emerald-100 dark:bg-emerald-900/50'
   },
@@ -130,7 +130,7 @@ export default function SemicircleFAB({ onFileSelect, isOpen, onToggle }: Semici
       <div className="relative -mt-5 flex-1 flex justify-center">
         {/* Semicircle Options */}
         {mounted && (
-          <div className="absolute bottom-full mb-3 z-50">
+          <div className="absolute bottom-full mb-5 z-50">
             {options.map((option, index) => {
               const pos = getPosition(option.angle, option.distance)
               const delay = index * 40 // staggered animation
@@ -154,15 +154,15 @@ export default function SemicircleFAB({ onFileSelect, isOpen, onToggle }: Semici
                   aria-label={option.label}
                 >
                   <div className={clsx(
-                    'w-12 h-12 rounded-full flex items-center justify-center shadow-lg',
+                    'w-[72px] h-[72px] rounded-full flex items-center justify-center shadow-lg',
                     'bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700',
                     'active:scale-95 transition-transform'
                   )}>
-                    <div className={clsx('p-2 rounded-full', option.bgColor)}>
-                      <option.icon size={20} className={option.color} />
+                    <div className={clsx('p-3 rounded-full', option.bgColor)}>
+                      <option.icon size={30} className={option.color} />
                     </div>
                   </div>
-                  <span className="text-[10px] font-medium text-white drop-shadow-md bg-black/40 px-2 py-0.5 rounded-full">
+                  <span className="text-xs font-medium text-white drop-shadow-md bg-black/40 px-3 py-1 rounded-full mt-1">
                     {option.label}
                   </span>
                 </button>
@@ -179,10 +179,10 @@ export default function SemicircleFAB({ onFileSelect, isOpen, onToggle }: Semici
           className="relative z-50"
         >
           <div className={clsx(
-            'w-14 h-14 rounded-2xl gradient-biveto shadow-lg shadow-biveto/30 flex items-center justify-center text-white transition-all duration-200',
+            'w-[68px] h-[68px] rounded-2xl gradient-biveto shadow-lg shadow-biveto/30 flex items-center justify-center text-white transition-all duration-200',
             isOpen ? 'rotate-45 scale-95' : 'active:scale-95'
           )}>
-            <Plus size={26} strokeWidth={2.5} aria-hidden="true" />
+            <Plus size={32} strokeWidth={2.5} aria-hidden="true" />
           </div>
         </button>
 
