@@ -267,6 +267,11 @@ if STATIC_DIR.exists():
         app.mount("/screenshots", StaticFiles(directory=STATIC_DIR / "screenshots"), name="screenshots")
         print("Mounted /screenshots")
 
+    # Servir .well-known (para Digital Asset Links - Android TWA)
+    if (STATIC_DIR / ".well-known").exists():
+        app.mount("/.well-known", StaticFiles(directory=STATIC_DIR / ".well-known"), name="well-known")
+        print("Mounted /.well-known")
+
     # Rotas específicas para arquivos PWA
     @app.get("/manifest.json")
     async def serve_manifest():

@@ -147,8 +147,8 @@ class SmartListService:
         else:
             print(f"[SmartListService] _fetch_purchases: Incluindo todos os tipos de necessidade")
 
-        # Limit to avoid token overflow (max 300 items)
-        query = query.order_by(GroceryPurchase.purchase_date.desc()).limit(300)
+        # Limit to avoid token overflow (max 100 items - reduced for faster response)
+        query = query.order_by(GroceryPurchase.purchase_date.desc()).limit(100)
 
         result = await self.db.execute(query)
         purchases = list(result.scalars().all())
@@ -226,8 +226,8 @@ class SmartListService:
             model=model,
             messages=[{"role": "user", "content": prompt}],
             response_format={"type": "json_object"},
-            temperature=0.2,
-            max_tokens=16000,
+            temperature=0.1,
+            max_tokens=32000,  # Aumentado para listas grandes
         )
 
     async def _call_mistral(self, prompt: str) -> dict | None:
@@ -472,38 +472,33 @@ class SmartListService:
             purchases_by_name[name_lower].append(p)
 
         enriched_items = []
+        seen_product_types = set()  # Avoid duplicates
+
         for item in llm_items:
-            original_names = item.get("original_product_names", [])
+            product_type = item.get("product_type", "Produto")
+
+            # Skip duplicates
+            if product_type.lower() in seen_product_types:
+                continue
+            seen_product_types.add(product_type.lower())
+
+            # Try to match by product_type name
             original_products = []
+            product_type_parts = product_type.lower().split()
 
-            # Find matching purchases for each original name
-            for orig_name in original_names:
-                name_lower = orig_name.lower().strip()
-                for p in purchases_by_name.get(name_lower, []):
-                    original_products.append(OriginalProductDetail(
-                        product_name=p.product_name,
-                        purchase_date=p.purchase_date,
-                        unit_price=float(p.unit_price),
-                        quantity=float(p.quantity),
-                        merchant_name=p.merchant.name if p.merchant else None
-                    ))
-
-            # Also try partial matching if exact match not found
-            if not original_products:
-                for orig_name in original_names:
-                    name_parts = orig_name.lower().split()
-                    for name_key, p_list in purchases_by_name.items():
-                        if any(part in name_key for part in name_parts if len(part) > 3):
-                            for p in p_list:
-                                if not any(op.product_name == p.product_name and op.purchase_date == p.purchase_date
-                                          for op in original_products):
-                                    original_products.append(OriginalProductDetail(
-                                        product_name=p.product_name,
-                                        purchase_date=p.purchase_date,
-                                        unit_price=float(p.unit_price),
-                                        quantity=float(p.quantity),
-                                        merchant_name=p.merchant.name if p.merchant else None
-                                    ))
+            for name_key, p_list in purchases_by_name.items():
+                # Match if any significant word from product_type is in the purchase name
+                if any(part in name_key for part in product_type_parts if len(part) > 3):
+                    for p in p_list:
+                        if not any(op.product_name == p.product_name and op.purchase_date == p.purchase_date
+                                  for op in original_products):
+                            original_products.append(OriginalProductDetail(
+                                product_name=p.product_name,
+                                purchase_date=p.purchase_date,
+                                unit_price=float(p.unit_price),
+                                quantity=float(p.quantity),
+                                merchant_name=p.merchant.name if p.merchant else None
+                            ))
 
             # Validate and normalize category
             try:
@@ -518,19 +513,19 @@ class SmartListService:
                 necessity_type = NecessityType.ESSENTIAL
 
             enriched_items.append(SmartListItemResponse(
-                product_type=item.get("product_type", "Produto"),
-                display_name=item.get("display_name", item.get("product_type", "Produto")),
+                product_type=product_type,
+                display_name=item.get("display_name", product_type),
                 category=category,
                 necessity_type=necessity_type,
                 suggested_quantity=item.get("suggested_quantity", 1),
                 unit=item.get("unit", "un"),
                 estimated_price=item.get("estimated_price"),
                 urgency=item.get("urgency", "medium"),
-                reasoning=item.get("reasoning", ""),
+                reasoning="",  # Not in simplified response
                 original_products=original_products,
                 purchase_count=item.get("purchase_count", len(original_products)),
                 days_since_last_purchase=item.get("days_since_last_purchase", 0),
-                avg_cycle_days=item.get("avg_cycle_days")
+                avg_cycle_days=None  # Not in simplified response
             ))
 
         return enriched_items
