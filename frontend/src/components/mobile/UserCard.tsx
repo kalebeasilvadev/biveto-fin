@@ -1,5 +1,6 @@
-import { Settings, LogOut } from 'lucide-react'
+import { Settings, LogOut, Moon, Sun } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { useThemeStore } from '../../stores/themeStore'
 
 interface User {
   name?: string
@@ -14,6 +15,8 @@ interface UserCardProps {
 
 export default function UserCard({ user, onLogout, onClose }: UserCardProps) {
   const navigate = useNavigate()
+  const { theme, toggleTheme } = useThemeStore()
+  const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
 
   const handleSettingsClick = () => {
     onClose?.()
@@ -61,6 +64,14 @@ export default function UserCard({ user, onLogout, onClose }: UserCardProps) {
 
       {/* Action buttons */}
       <div className="flex items-center gap-1">
+        <button
+          onClick={toggleTheme}
+          className="p-2.5 text-gray-500 hover:text-biveto hover:bg-gray-100 dark:hover:bg-slate-600 rounded-xl transition-all"
+          title={isDark ? 'Modo claro' : 'Modo escuro'}
+          aria-label={isDark ? 'Ativar modo claro' : 'Ativar modo escuro'}
+        >
+          {isDark ? <Sun size={20} /> : <Moon size={20} />}
+        </button>
         <button
           onClick={handleSettingsClick}
           className="p-2.5 text-gray-500 hover:text-biveto hover:bg-gray-100 dark:hover:bg-slate-600 rounded-xl transition-all"
