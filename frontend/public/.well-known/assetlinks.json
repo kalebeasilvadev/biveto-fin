@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.biveto.app",
+      "sha256_cert_fingerprints": [
+        "AA:4E:F4:01:E8:6A:D5:7D:34:6C:BB:82:09:45:EB:DA:AC:A0:8A:E5:6C:F6:C7:FA:03:7A:96:32:B1:C9:81:F7"
+      ]
+    }
+  }
+]
