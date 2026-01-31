@@ -20,7 +20,7 @@ export default function DuplicateAlert({ invoiceId }: DuplicateAlertProps) {
     return null
   }
 
-  const { estimated_excess, duplicate_count, affected_series_pairs } = duplicateWarnings.data
+  const { estimated_excess, duplicate_count } = duplicateWarnings.data
 
   const handleResolve = () => {
     // Navegar para /installments
