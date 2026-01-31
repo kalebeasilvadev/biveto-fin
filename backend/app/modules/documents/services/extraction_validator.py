@@ -279,27 +279,39 @@ class ExtractionValidator:
             desc = item.get('description', '').strip()
             desc_upper = desc.upper()
             amount = item.get('amount', 0)
+            has_date = item.get('date') is not None
 
             is_section_header = False
 
-            # Verificar padroes de headers de secao
+            # Detectar nomes de empresa com sufixos (LTDA, S.A., EIRELI, MEI, ME)
+            company_suffix_pattern = r'\s+(LTDA|S\.?A\.?|EIRELI|MEI|ME)$'
+            has_company_suffix = bool(re.search(company_suffix_pattern, desc_upper))
+
+            # REGRA PRINCIPAL: Se tem sufixo de empresa E tem data, e uma compra legitima
+            # NAO deve ser removido como header, independente de outros padroes
+            if has_company_suffix and has_date:
+                # Transacao legitima com data - manter
+                result.append(item)
+                continue
+
+            # Verificar padroes de headers de secao (apenas para itens SEM data)
             for pattern in SECTION_HEADER_PATTERNS:
                 if re.match(pattern, desc_upper) or re.match(pattern, desc.lower()):
                     is_section_header = True
                     break
 
-            # Detectar nomes de empresa com sufixos que TERMINAM com esses sufixos
-            # (nao apenas contem, para evitar falsos positivos como "Mercadolivre")
-            # Regex para verificar se termina com sufixo de empresa
-            company_suffix_pattern = r'\s+(LTDA|S\.?A\.?|EIRELI|MEI|ME)$'
-            has_company_suffix = bool(re.search(company_suffix_pattern, desc_upper))
+            # Para itens com sufixo de empresa SEM data, aplicar regras adicionais
+            if has_company_suffix and amount > 0 and not has_date:
+                has_merchant_chars = bool(re.search(r'[\d\*\-]', desc))  # Merchants tem numeros, *, -
+                is_all_caps_simple = desc == desc.upper() and not has_merchant_chars
+                is_total_value = total_amount and abs(amount - total_amount) < 1.0
 
-            if has_company_suffix and amount > 0:
-                # Se o valor e diferente do total_amount, provavelmente e um subtotal de secao
-                if total_amount and abs(amount - total_amount) > 1.0:
+                # Marcar como header se:
+                # - Valor igual ao total (e um subtotal de secao)
+                # - OU e all caps simples sem caracteres de merchant
+                if is_total_value:
                     is_section_header = True
-                # Se nao tem parcela (headers geralmente nao tem), e mais provavel ser header
-                if not item.get('is_installment'):
+                elif is_all_caps_simple:
                     is_section_header = True
 
             if is_section_header:
@@ -853,3 +865,70 @@ class ExtractionValidator:
             "soma_debitos": soma_final,
             "num_items": len(items)
         }
+
+    def validate_extraction_completeness(
+        self,
+        items: list,
+        card_info: dict | None,
+        ocr_text: str | None = None
+    ) -> dict:
+        """
+        Valida se a extracao esta completa comparando quantidade de itens
+        com padroes detectados no texto OCR.
+
+        Args:
+            items: Lista de itens extraidos
+            card_info: Informacoes do cartao
+            ocr_text: Texto bruto do OCR (se disponivel)
+
+        Returns:
+            dict com is_complete, warnings e estimated_count
+        """
+        result = {
+            "is_complete": True,
+            "warnings": [],
+            "estimated_transaction_count": None,
+            "extracted_count": len(items) if items else 0
+        }
+
+        if not ocr_text:
+            return result
+
+        # Contar padroes de data no texto OCR
+        # Formatos: DD/MM, DD/MM/AAAA, DD MMM, DD de MMM
+        date_patterns = [
+            r'\b\d{1,2}/\d{1,2}(?:/\d{2,4})?\b',  # DD/MM ou DD/MM/AAAA
+            r'\b\d{1,2}\s+(?:jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)\b',  # DD MMM
+            r'\b\d{1,2}\s+de\s+(?:jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)\b',  # DD de MMM
+        ]
+
+        all_dates = []
+        for pattern in date_patterns:
+            matches = re.findall(pattern, ocr_text.lower())
+            all_dates.extend(matches)
+
+        # Remover duplicatas (mesma data pode aparecer mais de uma vez)
+        unique_dates = len(set(all_dates))
+
+        # Estimar quantidade de transacoes (cada data unica pode ser uma transacao)
+        # Reduzir por ~20% para compensar datas de headers, resumos, etc.
+        estimated_count = max(1, int(unique_dates * 0.8))
+        result["estimated_transaction_count"] = estimated_count
+
+        extracted_count = len(items) if items else 0
+
+        # Se extraimos menos de 70% do estimado, pode haver problema
+        if extracted_count > 0 and estimated_count > 0:
+            ratio = extracted_count / estimated_count
+
+            if ratio < 0.7:
+                result["is_complete"] = False
+                result["warnings"].append(
+                    f"Possivel extracao incompleta: {extracted_count} itens extraidos, "
+                    f"mas ~{estimated_count} transacoes detectadas no texto OCR. "
+                    f"Verifique se todos os itens foram capturados."
+                )
+                print(f"[Validator] WARNING: Extracao possivelmente incompleta "
+                      f"({extracted_count}/{estimated_count} = {ratio:.0%})")
+
+        return result

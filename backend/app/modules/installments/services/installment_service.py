@@ -111,6 +111,194 @@ class InstallmentService:
         # Sem data para validar, retorna a primeira (comportamento antigo)
         return candidates[0] if candidates else None
 
+    async def find_matching_series_fuzzy(
+        self,
+        user: User,
+        merchant_name: str,
+        installment_amount: float,
+        installment_total: int,
+        credit_card_id: int | None = None,
+        invoice_month: int | None = None,
+        invoice_year: int | None = None,
+    ) -> InstallmentSeries | None:
+        """
+        Busca serie de parcelas usando fuzzy matching no nome do merchant.
+
+        Criterios de match (todos devem bater):
+        1. Mesmo credit_card_id (se fornecido)
+        2. Mesmo installment_total
+        3. Valor similar (+/- 5% tolerancia)
+        4. Nome do merchant similar (>=50% word overlap apos normalizacao)
+        5. Serie ainda ativa com parcelas pendentes
+
+        Args:
+            user: Usuario atual
+            merchant_name: Nome do estabelecimento da fatura
+            installment_amount: Valor da parcela
+            installment_total: Total de parcelas
+            credit_card_id: ID do cartao de credito (opcional)
+            invoice_month: Mes da fatura (para contexto)
+            invoice_year: Ano da fatura (para contexto)
+
+        Returns:
+            InstallmentSeries se encontrar match, None caso contrario
+        """
+        # DEBUG: Log dos parâmetros recebidos
+        print(f"[FUZZY DEBUG] find_matching_series_fuzzy chamada: "
+              f"merchant='{merchant_name}', amount={installment_amount}, "
+              f"total={installment_total}, card_id={credit_card_id}")
+
+        if not merchant_name or not installment_amount or not installment_total:
+            print(f"[FUZZY DEBUG] Retornando None - parametros invalidos: "
+                  f"merchant={bool(merchant_name)}, amount={bool(installment_amount)}, total={bool(installment_total)}")
+            return None
+
+        # Normalizar merchant name da fatura
+        normalized_merchant = self._normalize_merchant_name(merchant_name)
+        merchant_words = set(normalized_merchant.split())
+
+        if not merchant_words:
+            return None
+
+        # Calcular range de valor (tolerancia de 5%)
+        min_amount = installment_amount * (1 - self.AMOUNT_TOLERANCE)
+        max_amount = installment_amount * (1 + self.AMOUNT_TOLERANCE)
+
+        # Query base: series ativas com mesmo total de parcelas e valor similar
+        query = select(InstallmentSeries).where(
+            and_(
+                InstallmentSeries.user_id == user.id,
+                InstallmentSeries.status == InstallmentSeriesStatus.ACTIVE,
+                InstallmentSeries.installment_count == installment_total,
+                InstallmentSeries.installment_amount >= min_amount,
+                InstallmentSeries.installment_amount <= max_amount,
+                InstallmentSeries.paid_count < InstallmentSeries.installment_count,
+            )
+        )
+
+        # Filtrar por credit_card_id se fornecido
+        if credit_card_id:
+            query = query.where(InstallmentSeries.credit_card_id == credit_card_id)
+
+        result = await self.db.execute(query)
+        candidates = list(result.scalars().all())
+
+        # DEBUG: Log dos candidatos encontrados
+        print(f"[FUZZY DEBUG] Candidatos encontrados: {len(candidates)}")
+        for c in candidates[:5]:  # Mostrar max 5
+            print(f"  - id={c.id}, merchant='{c.merchant_name}', amount={c.installment_amount}, "
+                  f"count={c.installment_count}, paid={c.paid_count}")
+
+        if not candidates:
+            print(f"[FUZZY DEBUG] Nenhum candidato encontrado para: "
+                  f"amount_range=[{min_amount:.2f}, {max_amount:.2f}], total={installment_total}")
+            return None
+
+        # Score candidates por similaridade do nome do merchant
+        best_match = None
+        best_score = 0.0
+
+        for series in candidates:
+            if not series.merchant_name:
+                continue
+
+            series_normalized = self._normalize_merchant_name(series.merchant_name)
+            series_words = set(series_normalized.split())
+
+            if not series_words:
+                continue
+
+            # Calcular word overlap similarity
+            common_words = merchant_words & series_words
+            total_words = max(len(merchant_words), len(series_words))
+
+            if total_words == 0:
+                continue
+
+            similarity = len(common_words) / total_words
+
+            # Bonus para match de palavras significativas (>=4 caracteres)
+            significant_words = {w for w in merchant_words if len(w) >= 4}
+            significant_match = significant_words & series_words
+            if significant_match:
+                similarity += 0.2 * len(significant_match)
+
+            # Bonus para match exato de primeira palavra significativa
+            if significant_words and series_words:
+                first_significant = sorted(significant_words, key=len, reverse=True)
+                if first_significant and first_significant[0] in series_words:
+                    similarity += 0.3
+
+            if similarity > best_score and similarity >= 0.5:  # Minimo 50% match
+                best_score = similarity
+                best_match = series
+
+                print(f"[InstallmentService] Fuzzy match candidato: "
+                      f"'{merchant_name}' ~= '{series.merchant_name}' "
+                      f"(score: {similarity:.2f})")
+
+                # Se match quase perfeito, usar imediatamente
+                if similarity >= 0.9:
+                    break
+
+        if best_match:
+            print(f"[InstallmentService] Fuzzy match encontrado: series_id={best_match.id}, "
+                  f"merchant='{best_match.merchant_name}', score={best_score:.2f}")
+
+        return best_match
+
+    def _normalize_merchant_name(self, name: str) -> str:
+        """
+        Normaliza nome do merchant para comparacao fuzzy.
+
+        Remove:
+        - Acentos
+        - Sufixos de empresa (LTDA, S.A., etc.)
+        - Padroes de parcela (3/12, PARC.3/12)
+        - Caracteres especiais (*, -, _)
+        """
+        import unicodedata
+
+        if not name:
+            return ""
+
+        # Remove acentos
+        name = unicodedata.normalize('NFD', name)
+        name = ''.join(c for c in name if unicodedata.category(c) != 'Mn')
+
+        # Lowercase
+        name = name.lower()
+
+        # Remove padroes de parcela: "3/12", "PARC.3/12", "PARC 3/12", "(Parcela 3 de 12)"
+        # IMPORTANTE: Padroes mais especificos devem vir ANTES dos genericos
+        import re
+        parcela_patterns = [
+            r'\s*\(parcela\s*\d+\s*de\s*\d+\)',  # "(Parcela 3 de 12)"
+            r'\s*parc\.?\s*\d+/\d+',  # "PARC.3/12" ou "PARC 3/12"
+            r'\s*\d+/\d+\s*$',  # "3/12" no final (mais generico)
+        ]
+        for pattern in parcela_patterns:
+            name = re.sub(pattern, '', name, flags=re.IGNORECASE)
+
+        # Remove sufixos de empresa
+        company_suffixes = [
+            r'\s+ltda\.?$',
+            r'\s+s\.?a\.?$',
+            r'\s+eireli$',
+            r'\s+mei$',
+            r'\s+me$',
+        ]
+        for pattern in company_suffixes:
+            name = re.sub(pattern, '', name, flags=re.IGNORECASE)
+
+        # Remove caracteres especiais
+        name = re.sub(r'[\*\-_\.]', ' ', name)
+
+        # Remove espacos extras
+        name = ' '.join(name.split())
+
+        return name.strip()
+
     async def find_existing_installment(
         self,
         series: InstallmentSeries,
