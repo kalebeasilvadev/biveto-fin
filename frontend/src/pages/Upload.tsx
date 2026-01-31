@@ -81,6 +81,12 @@ export default function Upload() {
   const [showCreateCardPrompt, setShowCreateCardPrompt] = useState(false)
   const [isCreatingCard, setIsCreatingCard] = useState(false)
 
+  // Invoice reference state (editable month/year)
+  const [invoiceReference, setInvoiceReference] = useState<{ month: number | null; year: number | null }>({
+    month: null,
+    year: null
+  })
+
   // Payment mapping state for receipts with split payments
   // Maps payment index to { account_id, benefit_card_id, installment data }
   const [paymentMappings, setPaymentMappings] = useState<Record<number, {
@@ -236,8 +242,8 @@ export default function Upload() {
             installment_total: item.installment_total || undefined,
           })),
           credit_card_id: selectedCreditCardId ? parseInt(selectedCreditCardId) : undefined,
-          invoice_month: document.card_info?.invoice_month,
-          invoice_year: document.card_info?.invoice_year,
+          invoice_month: invoiceReference.month || undefined,
+          invoice_year: invoiceReference.year || undefined,
         })
 
         const results = response.data.results as Array<{
@@ -263,7 +269,7 @@ export default function Upload() {
     }
 
     checkProjected()
-  }, [document, selectedCreditCardId, isCreditCardInvoice])
+  }, [document, selectedCreditCardId, isCreditCardInvoice, invoiceReference])
 
   // Helper: find category by suggested name
   const findCategoryId = (suggestedCategory: string | null): string => {
@@ -290,6 +296,14 @@ export default function Upload() {
       const doc = response.data as Document
       setDocument(doc)
       setMode('confirm')
+
+      // Initialize invoice reference from OCR extraction
+      if (doc.card_info) {
+        setInvoiceReference({
+          month: doc.card_info.invoice_month || null,
+          year: doc.card_info.invoice_year || null
+        })
+      }
 
       if (doc.extracted_items && doc.extracted_items.length > 0) {
         const firstItem = doc.extracted_items[0]
@@ -800,8 +814,9 @@ export default function Upload() {
 
   const handleBatchAdd = () => {
     if (!document?.extracted_items) return
-    // For credit card invoices, require credit card selection
+    // For credit card invoices, require credit card selection and invoice reference
     if (isCreditCardInvoice && !selectedCreditCardId) return
+    if (isCreditCardInvoice && (!invoiceReference.month || !invoiceReference.year)) return
     // For cupom fiscal with split payment, require all payments mapped
     if (isCupomFiscalWithSplitPayment && !allPaymentsMapped) return
     // For other documents, require account selection
@@ -887,9 +902,9 @@ export default function Upload() {
           installment_current: item.is_installment && item.installment_current ? item.installment_current : null,
           installment_total: item.is_installment && item.installment_total ? item.installment_total : null,
           credit_card_id: selectedCreditCardId ? parseInt(selectedCreditCardId) : null,
-          // Invoice period from PDF (so all items go to the same invoice)
-          invoice_month: document.card_info?.invoice_month || null,
-          invoice_year: document.card_info?.invoice_year || null,
+          // Invoice period (from OCR or user-edited)
+          invoice_month: invoiceReference.month || null,
+          invoice_year: invoiceReference.year || null,
           // Criar parcelas futuras automaticamente para itens parcelados
           create_future_installments: item.is_installment &&
             item.installment_current &&
@@ -912,8 +927,9 @@ export default function Upload() {
 
   const handleAddAll = () => {
     if (!document?.extracted_items) return
-    // For credit card invoices, require credit card selection
+    // For credit card invoices, require credit card selection and invoice reference
     if (isCreditCardInvoice && !selectedCreditCardId) return
+    if (isCreditCardInvoice && (!invoiceReference.month || !invoiceReference.year)) return
     // For cupom fiscal with split payment, require all payments mapped
     if (isCupomFiscalWithSplitPayment && !allPaymentsMapped) return
     // For other documents, require account selection
@@ -996,9 +1012,9 @@ export default function Upload() {
         installment_current: item.is_installment && item.installment_current ? item.installment_current : null,
         installment_total: item.is_installment && item.installment_total ? item.installment_total : null,
         credit_card_id: selectedCreditCardId ? parseInt(selectedCreditCardId) : null,
-        // Invoice period from PDF (so all items go to the same invoice)
-        invoice_month: document.card_info?.invoice_month || null,
-        invoice_year: document.card_info?.invoice_year || null,
+        // Invoice period (from OCR or user-edited)
+        invoice_month: invoiceReference.month || null,
+        invoice_year: invoiceReference.year || null,
         // Criar parcelas futuras automaticamente para itens parcelados
         create_future_installments: item.is_installment &&
           item.installment_current &&
@@ -1235,6 +1251,7 @@ export default function Upload() {
     setPendingDuplicates([])
     setFormData(initialFormData)
     setSelectedCreditCardId('')
+    setInvoiceReference({ month: null, year: null })
     setShowCreateCardPrompt(false)
     setIsCreatingCard(false)
     setCreatingRecurringIndex(null)
@@ -1367,22 +1384,50 @@ export default function Upload() {
 
               {/* Card info for credit card invoices */}
               {isCreditCardInvoice && document.card_info && (
-                <div className="flex items-center gap-2 pt-2 border-t border-primary-100 dark:border-primary-800">
-                  <CreditCard size={14} className="text-primary-600" />
-                  <span className="text-sm text-gray-700 dark:text-gray-300">
-                    {document.card_info.card_issuer?.toUpperCase() || 'Cartão'}
-                    {document.card_info.card_last_digits && ` ****${document.card_info.card_last_digits}`}
-                    {document.card_info.invoice_month && document.card_info.invoice_year && (
-                      <span className="ml-1 text-gray-500 dark:text-gray-400">
-                        • Ref: {document.card_info.invoice_month.toString().padStart(2, '0')}/{document.card_info.invoice_year}
+                <div className="flex flex-col gap-2 pt-2 border-t border-primary-100 dark:border-primary-800">
+                  <div className="flex items-center gap-2">
+                    <CreditCard size={14} className="text-primary-600" />
+                    <span className="text-sm text-gray-700 dark:text-gray-300">
+                      {document.card_info.card_issuer?.toUpperCase() || 'Cartão'}
+                      {document.card_info.card_last_digits && ` ****${document.card_info.card_last_digits}`}
+                      {document.card_info.due_date && (
+                        <span className="ml-1 text-gray-500 dark:text-gray-400">
+                          • Venc: {new Date(document.card_info.due_date + 'T12:00:00').toLocaleDateString('pt-BR')}
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                  {/* Editable Invoice Reference Month/Year */}
+                  <div className="flex items-center gap-2 bg-primary-50 dark:bg-primary-900/30 rounded-lg p-2">
+                    <span className="text-xs font-medium text-primary-700 dark:text-primary-300">Referência:</span>
+                    <select
+                      value={invoiceReference.month || ''}
+                      onChange={(e) => setInvoiceReference(prev => ({ ...prev, month: e.target.value ? parseInt(e.target.value) : null }))}
+                      className="text-xs px-2 py-1 rounded border border-primary-200 dark:border-primary-700 bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-300 focus:ring-1 focus:ring-primary-500"
+                    >
+                      <option value="">Mês</option>
+                      {[1,2,3,4,5,6,7,8,9,10,11,12].map(m => (
+                        <option key={m} value={m}>{m.toString().padStart(2, '0')}</option>
+                      ))}
+                    </select>
+                    <span className="text-gray-500">/</span>
+                    <select
+                      value={invoiceReference.year || ''}
+                      onChange={(e) => setInvoiceReference(prev => ({ ...prev, year: e.target.value ? parseInt(e.target.value) : null }))}
+                      className="text-xs px-2 py-1 rounded border border-primary-200 dark:border-primary-700 bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-300 focus:ring-1 focus:ring-primary-500"
+                    >
+                      <option value="">Ano</option>
+                      {[2023, 2024, 2025, 2026].map(y => (
+                        <option key={y} value={y}>{y}</option>
+                      ))}
+                    </select>
+                    {!invoiceReference.month || !invoiceReference.year ? (
+                      <span className="text-xs text-amber-600 dark:text-amber-400 ml-1">
+                        <AlertCircle size={12} className="inline mr-1" />
+                        Informe o período
                       </span>
-                    )}
-                    {document.card_info.due_date && (
-                      <span className="ml-1 text-gray-500 dark:text-gray-400">
-                        • Venc: {new Date(document.card_info.due_date + 'T12:00:00').toLocaleDateString('pt-BR')}
-                      </span>
-                    )}
-                  </span>
+                    ) : null}
+                  </div>
                 </div>
               )}
 
@@ -1656,6 +1701,7 @@ export default function Upload() {
               setSelectedItems([])
               setEditingItemIndex(null)
               setSelectedCreditCardId('')
+              setInvoiceReference({ month: null, year: null })
               setProjectedInfo({})
               setCreatingRecurringIndex(null)
               setBatchOwnershipType('household')

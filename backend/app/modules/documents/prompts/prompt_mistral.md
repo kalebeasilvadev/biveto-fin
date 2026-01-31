@@ -60,7 +60,25 @@ Se o PDF mostra "R$ 500,00" para um pagamento, extraia como **-500.00** (negativ
 - **total_amount**: valor TOTAL A PAGAR desta fatura
 - **due_date**: data de vencimento no formato YYYY-MM-DD
 - **closing_date**: data de fechamento no formato YYYY-MM-DD
-- **invoice_month/invoice_year**: MÊS e ANO do VENCIMENTO (não do fechamento!) - Ex: vence em 10/01/2026 → invoice_month=1, invoice_year=2026
+- **invoice_month/invoice_year**: MÊS e ANO de REFERÊNCIA/COMPETÊNCIA da fatura (período de consumo)
+
+### COMO IDENTIFICAR O MÊS/ANO DE REFERÊNCIA (MUITO IMPORTANTE!)
+
+A referência da fatura é o período de CONSUMO, não o vencimento. Priorize nesta ordem:
+
+1. **Procure por "Referência", "Competência", "Período", "Mês Ref"** no cabeçalho
+   - Ex: "Competência: Janeiro/2026" → invoice_month=1, invoice_year=2026
+   - Ex: "Referência: 01/2026" → invoice_month=1, invoice_year=2026
+   - Ex: "Período: DEZ/2025" → invoice_month=12, invoice_year=2025
+
+2. **Se não encontrar explícito, calcule pelo fechamento/vencimento:**
+   - Fatura com fechamento em 15/01/2026 e vencimento em 10/02/2026 → referência é JANEIRO/2026 (mês do fechamento)
+   - Fatura com fechamento em 28/12/2025 e vencimento em 15/01/2026 → referência é DEZEMBRO/2025
+
+3. **Analise as datas das transações:**
+   - Se a maioria das transações é de Janeiro/2026, a referência provavelmente é Janeiro/2026
+
+**IMPORTANTE**: A referência geralmente é o mês ANTERIOR ao vencimento. Se vence em 10/02/2026, a referência é provavelmente Janeiro/2026.
 
 ## CAMPOS items
 
@@ -159,15 +177,37 @@ NÃO inclua como items:
 - "CAMPEAO DA CONS BRASILIA 076" ✓
 - "ANUIDADE DIFERENCIADA - PARCELA 06/12" ✓
 
+## REGRAS CRÍTICAS - EXTRAIR TODAS AS TRANSAÇÕES (OBRIGATÓRIO!)
+
+### NUNCA omita transações!
+Cada linha com DATA e VALOR deve ser extraída. Nenhuma transação pode ser ignorada.
+
+### Estabelecimentos com sufixos de empresa são COMPRAS VÁLIDAS:
+- "BARBER PRIME LTDA R$ 198,70" → DEVE ser extraído como compra!
+- "COMERCIAL XYZ S.A. R$ 500,00" → DEVE ser extraído como compra!
+- "RESTAURANTE EIRELI R$ 80,00" → DEVE ser extraído como compra!
+- "LOJA ABC MEI R$ 45,00" → DEVE ser extraído como compra!
+
+### ATENÇÃO: LTDA, S.A., EIRELI, MEI, ME são sufixos comuns de empresas brasileiras!
+Esses sufixos indicam estabelecimentos comerciais legítimos, NÃO são headers de seção.
+
+### Contagem obrigatória:
+Antes de retornar o JSON, conte:
+- Quantas linhas de transação existem no texto do OCR (linhas com data + valor)
+- Quantos items você está retornando
+
+Os números devem ser iguais (exceto totais, resumos e pagamentos de fatura anterior).
+
 ## VALIDAÇÃO FINAL
 
 Antes de retornar, verifique:
 1. [ ] Compras têm valores POSITIVOS
 2. [ ] Pagamentos têm valores NEGATIVOS
 3. [ ] Soma das compras ≈ total_amount
-4. [ ] Todas as linhas de transação foram extraídas
+4. [ ] **TODAS as linhas de transação foram extraídas** (incluindo estabelecimentos com LTDA, S.A., etc.)
 5. [ ] Nenhum item tem amount: null
 6. [ ] Descrições estão COMPLETAS (não truncadas)
 7. [ ] "Total da Fatura Anterior" NÃO está nos items
+8. [ ] Estabelecimentos com LTDA/S.A./EIRELI/MEI/ME foram incluídos como compras
 
 ## EXTRAIA OS DADOS:

@@ -209,6 +209,10 @@ if settings.debug:
         "http://127.0.0.1:3001",
         "http://127.0.0.1:5173",
         "http://127.0.0.1:5174",
+        "https://localhost:3000",
+        "https://localhost:3001",
+        "https://127.0.0.1:3000",
+        "https://127.0.0.1:3001",
     ]
     # Regex para permitir IPs de rede local, localtunnel e cloudflare tunnel (para teste no celular)
     # Aceita HTTP e HTTPS em 192.168.x.x, 10.x.x.x, 172.16-31.x.x nas portas 3000 e 5173
