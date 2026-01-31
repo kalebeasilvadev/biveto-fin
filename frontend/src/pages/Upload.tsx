@@ -18,6 +18,7 @@ import {
   ExtractedItemsList,
   TransactionForm,
 } from '../components/upload'
+import DuplicateResolutionModal from '../components/upload/DuplicateResolutionModal'
 import OwnershipSelector from '../components/shared/OwnershipSelector'
 import { HelpButton } from '../components/help'
 
@@ -108,6 +109,19 @@ export default function Upload() {
     message?: string
   }>>({})
   const [isCheckingProjected, setIsCheckingProjected] = useState(false)
+
+  // Duplicatas potenciais state
+  const [potentialDuplicates, setPotentialDuplicates] = useState<Record<number, {
+    series_id: number
+    description: string
+    merchant_name: string
+    installment_count: number
+    installment_amount: number
+    paid_count: number
+    similarity_score: number
+    first_installment_date: string
+  }>>({})
+  const [duplicateModalIndex, setDuplicateModalIndex] = useState<number | null>(null)
 
   // Recurring creation state
   const [creatingRecurringIndex, setCreatingRecurringIndex] = useState<number | null>(null)
@@ -254,13 +268,32 @@ export default function Upload() {
           series_id?: number
           series_description?: string
           message?: string
+          potential_duplicate_series?: {
+            series_id: number
+            description: string
+            merchant_name: string
+            installment_count: number
+            installment_amount: number
+            paid_count: number
+            similarity_score: number
+            first_installment_date: string
+          }
         }>
 
         const projectedMap: Record<number, typeof results[0]> = {}
+        const duplicatesMap: Record<number, NonNullable<typeof results[0]['potential_duplicate_series']>> = {}
+
         results.forEach(result => {
           projectedMap[result.index] = result
+
+          // Extrair duplicatas potenciais
+          if (result.potential_duplicate_series) {
+            duplicatesMap[result.index] = result.potential_duplicate_series
+          }
         })
+
         setProjectedInfo(projectedMap)
+        setPotentialDuplicates(duplicatesMap)
       } catch (error) {
         console.error('Erro ao verificar parcelas projetadas:', error)
       } finally {
@@ -1233,6 +1266,73 @@ export default function Upload() {
     }
   }
 
+  // Vincular parcela à série existente (resolver duplicata)
+  const handleLinkToSeries = async (itemIndex: number, seriesId: number) => {
+    if (!document?.extracted_items) return
+    const item = document.extracted_items[itemIndex]
+
+    try {
+      // Obter account_id da conta ou do cartão
+      let accountId: number
+      if (isCreditCardInvoice) {
+        if (!selectedCreditCardId) {
+          setBatchAddError('Selecione um cartão de crédito')
+          return
+        }
+        const selectedCard = creditCards.find((c: { id: number; account_id?: number }) => c.id === parseInt(selectedCreditCardId))
+        accountId = selectedCard?.account_id || 0
+        if (!accountId) {
+          setBatchAddError('O cartão selecionado não possui uma conta vinculada')
+          return
+        }
+      } else {
+        accountId = formData.account_id ? parseInt(formData.account_id) : 0
+        if (!accountId) {
+          setBatchAddError('Selecione uma conta')
+          return
+        }
+      }
+
+      // Confirmar transação vinculada à série existente
+      await transactionsApi.confirm({
+        document_id: document.id,
+        amount: Math.abs(item.amount),
+        date: item.date || formData.date,
+        account_id: accountId,
+        category_id: findCategoryId(item.category) ? parseInt(findCategoryId(item.category)) : undefined,
+        merchant_name: item.description || '',
+        ownership_type: batchOwnershipType,
+        is_installment: true,
+        installment_current: item.installment_current,
+        installment_total: item.installment_total,
+        installment_series_id: seriesId, // Vincular à série existente
+        credit_card_id: selectedCreditCardId ? parseInt(selectedCreditCardId) : undefined,
+        invoice_month: invoiceReference.month || undefined,
+        invoice_year: invoiceReference.year || undefined,
+      })
+
+      // Fechar modal
+      setDuplicateModalIndex(null)
+
+      // Remover item da lista de duplicatas potenciais
+      setPotentialDuplicates(prev => {
+        const updated = { ...prev }
+        delete updated[itemIndex]
+        return updated
+      })
+
+      // Desmarcar item
+      setSelectedItems(prev => prev.filter(i => i !== itemIndex))
+
+      // Incrementar contador de sucesso
+      setBatchAddSuccess(prev => prev + 1)
+    } catch (error: any) {
+      console.error('Erro ao vincular parcela à série:', error)
+      setBatchAddError(error.response?.data?.detail || 'Erro ao vincular parcela à série')
+      setDuplicateModalIndex(null)
+    }
+  }
+
   const resetForm = () => {
     // If came directly from URL (e.g., from Transactions page), go back
     if (cameFromUrl && mode === 'manual') {
@@ -1709,6 +1809,8 @@ export default function Upload() {
             }}
             projectedInfo={projectedInfo}
             isCheckingProjected={isCheckingProjected}
+            potentialDuplicates={potentialDuplicates}
+            onShowDuplicateModal={setDuplicateModalIndex}
             onCreateRecurring={handleCreateRecurring}
             creatingRecurringIndex={creatingRecurringIndex}
             onCreateAllRecurrences={handleCreateAllRecurrences}
@@ -1873,6 +1975,21 @@ export default function Upload() {
           />
         )}
       </div>
+
+      {/* Modal de resolução de duplicata */}
+      {duplicateModalIndex !== null && potentialDuplicates[duplicateModalIndex] && document?.extracted_items && (
+        <DuplicateResolutionModal
+          item={document.extracted_items[duplicateModalIndex]}
+          itemIndex={duplicateModalIndex}
+          duplicate={potentialDuplicates[duplicateModalIndex]}
+          onLink={(seriesId) => handleLinkToSeries(duplicateModalIndex, seriesId)}
+          onCreateNew={() => {
+            // Criar nova série normalmente (fechar modal e permitir o fluxo normal)
+            setDuplicateModalIndex(null)
+          }}
+          onClose={() => setDuplicateModalIndex(null)}
+        />
+      )}
     </div>
   )
 }

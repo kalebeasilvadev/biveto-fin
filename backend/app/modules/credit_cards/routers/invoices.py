@@ -1033,3 +1033,125 @@ async def reprocess_orphan_transactions(
         invoices_updated=result["invoices_updated"],
         transactions=result["transactions"],
     )
+
+
+class DuplicateSeriesPair(BaseModel):
+    """Par de séries potencialmente duplicadas"""
+    series_a_id: int
+    series_b_id: int
+    series_a_name: str
+    series_b_name: str
+    similarity_score: float
+
+
+class InvoiceDuplicateWarning(BaseModel):
+    """Alerta de duplicatas em uma fatura"""
+    has_duplicates: bool
+    estimated_excess: float = 0.0
+    affected_series_pairs: list[DuplicateSeriesPair] = []
+    duplicate_count: int = 0
+
+
+@router.get("/{invoice_id}/duplicate-warnings", response_model=InvoiceDuplicateWarning)
+async def get_invoice_duplicate_warnings(
+    invoice_id: int,
+    current_user: CurrentUser,
+    db: DbSession,
+):
+    """
+    Verifica se a fatura tem parcelas de séries duplicadas.
+
+    Retorna:
+    - has_duplicates: bool
+    - estimated_excess: float (valor a mais devido a duplicatas)
+    - affected_series_pairs: list de pares de séries duplicadas
+    - duplicate_count: número de parcelas duplicadas
+    """
+    from app.modules.installments.services.duplicate_detection_service import DuplicateDetectionService
+    from app.models.installment import InstallmentSeries
+
+    # Verificar se fatura existe e pertence ao usuário
+    invoice_result = await db.execute(
+        select(CreditCardInvoice).where(
+            and_(
+                CreditCardInvoice.id == invoice_id,
+                CreditCardInvoice.user_id == current_user.id,
+            )
+        )
+    )
+    invoice = invoice_result.scalar_one_or_none()
+
+    if not invoice:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Fatura não encontrada"
+        )
+
+    # Buscar todas as transações parceladas desta fatura
+    transactions_result = await db.execute(
+        select(Transaction).where(
+            and_(
+                Transaction.invoice_id == invoice_id,
+                Transaction.installment_series_id.is_not(None),
+            )
+        )
+    )
+    transactions = list(transactions_result.scalars().all())
+
+    if not transactions:
+        return InvoiceDuplicateWarning(has_duplicates=False)
+
+    # Obter IDs únicos das séries nesta fatura
+    series_ids = list(set(t.installment_series_id for t in transactions if t.installment_series_id))
+
+    if len(series_ids) < 2:
+        return InvoiceDuplicateWarning(has_duplicates=False)
+
+    # Detectar duplicatas entre essas séries
+    detection_service = DuplicateDetectionService(db)
+    all_duplicates = await detection_service.find_duplicate_groups(
+        user=current_user,
+        min_similarity=0.7
+    )
+
+    # Filtrar apenas duplicatas que afetam esta fatura
+    affected_pairs = []
+    total_excess = 0.0
+    duplicate_count = 0
+
+    for group in all_duplicates:
+        series_in_group = [s.id for s in group.series]
+
+        # Verificar se alguma série do grupo está nesta fatura
+        intersection = set(series_in_group) & set(series_ids)
+
+        if len(intersection) >= 2:  # Ambas séries do grupo estão na fatura
+            # Calcular excesso apenas para esta fatura
+            for conflict in group.conflicts:
+                # Verificar se as transações do conflito estão nesta fatura
+                conflict_tx_ids = [
+                    conflict.series_a_transaction_id,
+                    conflict.series_b_transaction_id
+                ]
+
+                for tx in transactions:
+                    if tx.id in conflict_tx_ids:
+                        total_excess += float(tx.amount)
+                        duplicate_count += 1
+                        break  # Contar apenas uma vez por conflito
+
+            # Adicionar par afetado
+            affected_pairs.append(DuplicateSeriesPair(
+                series_a_id=group.series[0].id,
+                series_b_id=group.series[1].id,
+                series_a_name=group.series[0].merchant_name,
+                series_b_name=group.series[1].merchant_name,
+                similarity_score=group.similarity_score,
+            ))
+
+    return InvoiceDuplicateWarning(
+        has_duplicates=len(affected_pairs) > 0,
+        estimated_excess=total_excess,
+        affected_series_pairs=affected_pairs,
+        duplicate_count=duplicate_count,
+    )
