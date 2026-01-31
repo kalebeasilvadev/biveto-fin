@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { AlertTriangle, X, ArrowRight } from 'lucide-react'
+import { AlertTriangle, X, ArrowRight, RefreshCw } from 'lucide-react'
 
 interface InstallmentSeries {
   id: number
@@ -43,14 +43,26 @@ interface MergeModalProps {
 export default function MergeModal({ group, onMerge, onSkip, isPending }: MergeModalProps) {
   const [conflictResolution, setConflictResolution] = useState<string>('keep_oldest')
 
+  // Determinar qual é a original (primeira criada) e qual é a duplicada
   const [seriesA, seriesB] = group.series
-  const suggestedTarget = group.series.find(s => s.id === group.suggested_primary_id)
-  const suggestedSource = group.series.find(s => s.id !== group.suggested_primary_id)
+  const seriesADate = new Date(seriesA.created_at)
+  const seriesBDate = new Date(seriesB.created_at)
+  const isAOlder = seriesADate < seriesBDate
+
+  // Estado para controlar qual série o usuário escolheu como principal
+  const [selectedTargetId, setSelectedTargetId] = useState<number>(
+    group.suggested_primary_id
+  )
+
+  const targetSeries = group.series.find(s => s.id === selectedTargetId)!
+  const sourceSeries = group.series.find(s => s.id !== selectedTargetId)!
 
   const handleMerge = () => {
-    if (suggestedSource && suggestedTarget) {
-      onMerge(suggestedSource.id, suggestedTarget.id, conflictResolution)
-    }
+    onMerge(sourceSeries.id, targetSeries.id, conflictResolution)
+  }
+
+  const handleSwap = () => {
+    setSelectedTargetId(sourceSeries.id)
   }
 
   return (
@@ -77,18 +89,57 @@ export default function MergeModal({ group, onMerge, onSkip, isPending }: MergeM
           </button>
         </div>
 
+        {/* Escolha de série principal */}
+        <div className="mb-4">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="text-sm font-medium text-white">
+              Escolha qual série manter como principal:
+            </h4>
+            <button
+              onClick={handleSwap}
+              disabled={isPending}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors disabled:opacity-50"
+            >
+              <RefreshCw size={12} />
+              Inverter
+            </button>
+          </div>
+        </div>
+
         {/* Séries */}
         <div className="mb-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Série A */}
-            <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
+            <div
+              onClick={() => setSelectedTargetId(seriesA.id)}
+              className={`rounded-lg p-4 border-2 cursor-pointer transition-all ${
+                seriesA.id === selectedTargetId
+                  ? 'bg-primary-500/10 border-primary-500'
+                  : 'bg-slate-800 border-slate-700 hover:border-slate-600'
+              }`}
+            >
               <div className="flex items-start justify-between mb-2">
-                <h4 className="font-medium text-white text-sm">Série 1</h4>
-                {seriesA.id === group.suggested_primary_id && (
-                  <span className="px-2 py-0.5 text-xs bg-primary-500/20 text-primary-300 rounded">
-                    Sugerida
-                  </span>
-                )}
+                <div className="flex items-center gap-2">
+                  <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                    seriesA.id === selectedTargetId
+                      ? 'border-primary-500 bg-primary-500'
+                      : 'border-slate-600'
+                  }`}>
+                    {seriesA.id === selectedTargetId && (
+                      <div className="w-2 h-2 bg-white rounded-full" />
+                    )}
+                  </div>
+                  <h4 className="font-medium text-white text-sm">
+                    {seriesA.id === selectedTargetId ? 'Principal (Manter)' : 'Remover'}
+                  </h4>
+                </div>
+                <span className={`px-2 py-0.5 text-xs rounded ${
+                  isAOlder
+                    ? 'bg-blue-500/20 text-blue-300'
+                    : 'bg-amber-500/20 text-amber-300'
+                }`}>
+                  {isAOlder ? 'ORIGINAL' : 'DUPLICADA'}
+                </span>
               </div>
               <p className="text-sm text-gray-300 mb-1">{seriesA.merchant_name}</p>
               <div className="space-y-1 text-xs text-gray-400">
@@ -99,14 +150,36 @@ export default function MergeModal({ group, onMerge, onSkip, isPending }: MergeM
             </div>
 
             {/* Série B */}
-            <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
+            <div
+              onClick={() => setSelectedTargetId(seriesB.id)}
+              className={`rounded-lg p-4 border-2 cursor-pointer transition-all ${
+                seriesB.id === selectedTargetId
+                  ? 'bg-primary-500/10 border-primary-500'
+                  : 'bg-slate-800 border-slate-700 hover:border-slate-600'
+              }`}
+            >
               <div className="flex items-start justify-between mb-2">
-                <h4 className="font-medium text-white text-sm">Série 2</h4>
-                {seriesB.id === group.suggested_primary_id && (
-                  <span className="px-2 py-0.5 text-xs bg-primary-500/20 text-primary-300 rounded">
-                    Sugerida
-                  </span>
-                )}
+                <div className="flex items-center gap-2">
+                  <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                    seriesB.id === selectedTargetId
+                      ? 'border-primary-500 bg-primary-500'
+                      : 'border-slate-600'
+                  }`}>
+                    {seriesB.id === selectedTargetId && (
+                      <div className="w-2 h-2 bg-white rounded-full" />
+                    )}
+                  </div>
+                  <h4 className="font-medium text-white text-sm">
+                    {seriesB.id === selectedTargetId ? 'Principal (Manter)' : 'Remover'}
+                  </h4>
+                </div>
+                <span className={`px-2 py-0.5 text-xs rounded ${
+                  !isAOlder
+                    ? 'bg-blue-500/20 text-blue-300'
+                    : 'bg-amber-500/20 text-amber-300'
+                }`}>
+                  {!isAOlder ? 'ORIGINAL' : 'DUPLICADA'}
+                </span>
               </div>
               <p className="text-sm text-gray-300 mb-1">{seriesB.merchant_name}</p>
               <div className="space-y-1 text-xs text-gray-400">
@@ -115,6 +188,14 @@ export default function MergeModal({ group, onMerge, onSkip, isPending }: MergeM
                 <p>Criada em {new Date(seriesB.created_at).toLocaleDateString('pt-BR')}</p>
               </div>
             </div>
+          </div>
+
+          {/* Explicação */}
+          <div className="mt-3 p-3 bg-slate-800/50 rounded-lg">
+            <p className="text-xs text-gray-400 leading-relaxed">
+              <strong className="text-white">O que acontecerá:</strong> A série "{sourceSeries.merchant_name}" será removida
+              e suas {sourceSeries.paid_count} transação(ões) serão movidas para "{targetSeries.merchant_name}".
+            </p>
           </div>
         </div>
 
@@ -208,7 +289,7 @@ export default function MergeModal({ group, onMerge, onSkip, isPending }: MergeM
           <button
             onClick={handleMerge}
             disabled={isPending}
-            className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
+            className="flex-1 flex items-center justify-center gap-2 py-3 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
           >
             {isPending ? (
               <>
@@ -218,18 +299,23 @@ export default function MergeModal({ group, onMerge, onSkip, isPending }: MergeM
             ) : (
               <>
                 <ArrowRight size={16} />
-                Mesclar Séries
+                Mesclar e Remover Duplicada
               </>
             )}
           </button>
           <button
             onClick={onSkip}
             disabled={isPending}
-            className="px-6 py-2.5 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-white rounded-lg font-medium transition-colors"
+            className="px-6 py-3 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-white rounded-lg font-medium transition-colors"
           >
             Pular
           </button>
         </div>
+
+        {/* Resumo da ação */}
+        <p className="text-xs text-center text-gray-500 mt-3">
+          Ao mesclar, você manterá <strong className="text-white">{targetSeries.merchant_name}</strong> e removerá a duplicata
+        </p>
       </div>
     </div>
   )
