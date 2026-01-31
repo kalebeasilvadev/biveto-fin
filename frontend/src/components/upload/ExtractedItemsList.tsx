@@ -58,6 +58,17 @@ interface ExtractedItemsListProps {
   onSkipDuplicates?: () => void
   projectedInfo?: Record<number, ProjectedInfo>
   isCheckingProjected?: boolean
+  potentialDuplicates?: Record<number, {
+    series_id: number
+    description: string
+    merchant_name: string
+    installment_count: number
+    installment_amount: number
+    paid_count: number
+    similarity_score: number
+    first_installment_date: string
+  }>
+  onShowDuplicateModal?: (index: number) => void
   onCreateRecurring?: (index: number) => void
   creatingRecurringIndex?: number | null
   onCreateAllRecurrences?: () => void
@@ -88,6 +99,8 @@ export default function ExtractedItemsList({
   onSkipDuplicates,
   projectedInfo = {},
   isCheckingProjected = false,
+  potentialDuplicates = {},
+  onShowDuplicateModal,
   onCreateRecurring,
   creatingRecurringIndex,
   onCreateAllRecurrences,
@@ -343,7 +356,19 @@ export default function ExtractedItemsList({
                         Projetado
                       </span>
                     )}
-                    {item.is_duplicate && !hasProjected && (
+                    {potentialDuplicates[index] && !hasProjected && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onShowDuplicateModal?.(index)
+                        }}
+                        className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium bg-amber-500/20 text-amber-300 rounded hover:bg-amber-500/30 transition-colors"
+                      >
+                        <AlertTriangle size={10} />
+                        Parcela similar
+                      </button>
+                    )}
+                    {item.is_duplicate && !hasProjected && !potentialDuplicates[index] && (
                       <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium bg-amber-500/20 text-amber-300 rounded">
                         <AlertTriangle size={10} />
                         Duplicado

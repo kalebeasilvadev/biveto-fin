@@ -25,6 +25,7 @@ import {
 import { clsx } from 'clsx'
 import EmptyState from '../components/EmptyState'
 import { HelpButton } from '../components/help'
+import DuplicateAlert from '../components/invoices/DuplicateAlert'
 
 interface Invoice {
   id: number
@@ -841,6 +842,11 @@ export default function Invoices() {
                       {formatCurrency(invoiceDetail.remaining_amount)}
                     </p>
                   </div>
+                </div>
+
+                {/* Duplicate Alert */}
+                <div className="px-4 pt-4">
+                  <DuplicateAlert invoiceId={invoiceDetail.id} />
                 </div>
 
                 {/* Info Row */}

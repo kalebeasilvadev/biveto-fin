@@ -299,6 +299,111 @@ class InstallmentService:
 
         return name.strip()
 
+    async def find_potential_duplicate(
+        self,
+        user: User,
+        merchant_name: str,
+        installment_amount: float,
+        installment_total: int,
+        credit_card_id: int | None = None,
+        min_similarity: float = 0.75,
+    ) -> tuple[InstallmentSeries, float] | None:
+        """
+        Busca série similar para detectar duplicatas durante upload.
+
+        Similar a find_matching_series_fuzzy, mas retorna também o score
+        de similaridade para exibir ao usuário.
+
+        Critérios:
+        - Fuzzy match no merchant_name (>= min_similarity)
+        - Valor da parcela com tolerância de 5%
+        - Mesmo total de parcelas
+        - Mesmo cartão de crédito (se fornecido)
+        - Série ativa com parcelas pendentes
+
+        Returns:
+            Tupla (série, similarity_score) ou None se não encontrar match
+        """
+        if not merchant_name or not installment_amount or not installment_total:
+            return None
+
+        # Normalizar merchant name
+        normalized_merchant = self._normalize_merchant_name(merchant_name)
+        merchant_words = set(normalized_merchant.split())
+
+        if not merchant_words:
+            return None
+
+        # Calcular range de valor (tolerância de 5%)
+        min_amount = installment_amount * (1 - self.AMOUNT_TOLERANCE)
+        max_amount = installment_amount * (1 + self.AMOUNT_TOLERANCE)
+
+        # Query base: séries ativas com mesmo total de parcelas e valor similar
+        query = select(InstallmentSeries).where(
+            and_(
+                InstallmentSeries.user_id == user.id,
+                InstallmentSeries.status == InstallmentSeriesStatus.ACTIVE,
+                InstallmentSeries.installment_count == installment_total,
+                InstallmentSeries.installment_amount >= min_amount,
+                InstallmentSeries.installment_amount <= max_amount,
+                InstallmentSeries.paid_count < InstallmentSeries.installment_count,
+            )
+        )
+
+        # Filtrar por credit_card_id se fornecido
+        if credit_card_id:
+            query = query.where(InstallmentSeries.credit_card_id == credit_card_id)
+
+        result = await self.db.execute(query)
+        candidates = list(result.scalars().all())
+
+        if not candidates:
+            return None
+
+        # Score candidates por similaridade do nome do merchant
+        best_match = None
+        best_score = 0.0
+
+        for series in candidates:
+            if not series.merchant_name:
+                continue
+
+            series_normalized = self._normalize_merchant_name(series.merchant_name)
+            series_words = set(series_normalized.split())
+
+            if not series_words:
+                continue
+
+            # Calcular word overlap similarity
+            common_words = merchant_words & series_words
+            total_words = max(len(merchant_words), len(series_words))
+
+            if total_words == 0:
+                continue
+
+            similarity = len(common_words) / total_words
+
+            # Bonus para match de palavras significativas (>=4 caracteres)
+            significant_words = {w for w in merchant_words if len(w) >= 4}
+            significant_match = significant_words & series_words
+            if significant_match:
+                similarity += 0.2 * len(significant_match)
+
+            # Bonus para match exato de primeira palavra significativa
+            if significant_words and series_words:
+                first_significant = sorted(significant_words, key=len, reverse=True)
+                if first_significant and first_significant[0] in series_words:
+                    similarity += 0.3
+
+            if similarity > best_score and similarity >= min_similarity:
+                best_score = similarity
+                best_match = series
+
+        if best_match:
+            return (best_match, best_score)
+
+        return None
+
     async def find_existing_installment(
         self,
         series: InstallmentSeries,

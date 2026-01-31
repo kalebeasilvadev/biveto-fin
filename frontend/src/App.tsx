@@ -38,6 +38,7 @@ import Market from './pages/Market'
 import Receipts from './pages/Receipts'
 import Achievements from './pages/Achievements'
 import Challenges from './pages/Challenges'
+import Installments from './pages/Installments'
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
@@ -93,6 +94,7 @@ function App() {
       >
         <Route index element={<Dashboard />} />
         <Route path="transactions" element={<Transactions />} />
+        <Route path="installments" element={<Installments />} />
         <Route path="budget" element={<Budget />} />
         <Route path="goals" element={<Goals />} />
         <Route path="debts" element={<Debts />} />

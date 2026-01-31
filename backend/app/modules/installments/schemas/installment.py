@@ -103,3 +103,15 @@ class CreateFutureInstallmentsRequest(BaseModel):
     """Criar transações para parcelas futuras"""
     series_id: int
     from_installment: int = Field(ge=1)
+
+
+class PotentialDuplicateSeriesResponse(BaseModel):
+    """Informações sobre uma série potencialmente duplicada"""
+    series_id: int
+    description: str
+    merchant_name: str
+    installment_count: int
+    installment_amount: float
+    paid_count: int
+    similarity_score: float
+    first_installment_date: date_type

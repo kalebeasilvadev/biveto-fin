@@ -337,6 +337,27 @@ export const transactionsApi = {
   },
 }
 
+export const installmentsApi = {
+  list: (params?: { status_filter?: string; limit?: number }) =>
+    api.get('/installments', { params }),
+  getById: (id: number) => api.get(`/installments/${id}`),
+  detectDuplicates: (minSimilarity = 0.7) =>
+    api.post('/installments/detect-duplicates', { min_similarity: minSimilarity }),
+  merge: (data: {
+    source_series_id: number
+    target_series_id: number
+    conflict_resolution?: string
+    new_merchant_name?: string
+  }) => api.post('/installments/merge', data),
+  update: (id: number, data: {
+    description?: string
+    merchant_name?: string
+    not_duplicate_with?: number[]
+  }) => api.patch(`/installments/${id}`, data),
+  getDuplicateWarnings: (invoiceId: number) =>
+    api.get(`/invoices/${invoiceId}/duplicate-warnings`),
+}
+
 export const documentsApi = {
   upload: (file: File) => {
     const formData = new FormData()

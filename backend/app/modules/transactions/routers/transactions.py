@@ -463,6 +463,18 @@ class ExtractedItemCheck(BaseModel):
     installment_total: int | None = None
 
 
+class PotentialDuplicateSeries(BaseModel):
+    """Informações sobre uma série potencialmente duplicada"""
+    series_id: int
+    description: str
+    merchant_name: str
+    installment_count: int
+    installment_amount: float
+    paid_count: int
+    similarity_score: float
+    first_installment_date: date
+
+
 class ProjectedMatchResult(BaseModel):
     """Resultado da verificacao de match com projecao"""
     index: int
@@ -472,6 +484,7 @@ class ProjectedMatchResult(BaseModel):
     series_id: Optional[int] = None
     series_description: Optional[str] = None
     message: Optional[str] = None
+    potential_duplicate_series: Optional[PotentialDuplicateSeries] = None
 
 
 class CheckProjectedRequest(BaseModel):
@@ -549,6 +562,29 @@ async def check_projected_transactions(
                     total_projected += 1
                 elif existing and existing.is_paid:
                     result.message = f"Parcela {item.installment_current}/{item.installment_total} ja confirmada em {existing.date.strftime('%d/%m/%Y')}"
+
+            # Se não tem projeção, verificar se há duplicata potencial
+            if not result.has_projected:
+                potential_dup = await installment_service.find_potential_duplicate(
+                    user=current_user,
+                    merchant_name=item.description,
+                    installment_amount=item.amount,
+                    installment_total=item.installment_total,
+                    credit_card_id=data.credit_card_id,
+                )
+
+                if potential_dup:
+                    series, similarity_score = potential_dup
+                    result.potential_duplicate_series = PotentialDuplicateSeries(
+                        series_id=series.id,
+                        description=series.description,
+                        merchant_name=series.merchant_name,
+                        installment_count=series.installment_count,
+                        installment_amount=float(series.installment_amount),
+                        paid_count=series.paid_count,
+                        similarity_score=similarity_score,
+                        first_installment_date=series.first_installment_date,
+                    )
 
         results.append(result)
 
