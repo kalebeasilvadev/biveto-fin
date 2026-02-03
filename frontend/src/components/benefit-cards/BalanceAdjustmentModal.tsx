@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { benefitCardsApi } from '@/services/api'
-import { toast } from 'react-hot-toast'
+import { useToastStore } from '@/stores/toastStore'
 import CurrencyInput from '@/components/shared/CurrencyInput'
 
 const balanceAdjustmentSchema = z.object({
@@ -34,6 +34,7 @@ export default function BalanceAdjustmentModal({ isOpen, onClose, card }: Balanc
   const [desiredBalance, setDesiredBalance] = useState<number>(0)
   const [adjustment, setAdjustment] = useState<number>(0)
   const queryClient = useQueryClient()
+  const toast = useToastStore()
 
   const {
     register,
@@ -90,7 +91,6 @@ export default function BalanceAdjustmentModal({ isOpen, onClose, card }: Balanc
 
   const isNegativeBalance = card.current_balance < 0
   const isIncreasing = adjustment > 0
-  const isDecreasing = adjustment < 0
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
