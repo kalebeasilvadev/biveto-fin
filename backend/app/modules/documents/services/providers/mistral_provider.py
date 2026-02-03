@@ -6,6 +6,7 @@ from pathlib import Path
 
 from app.core.config import settings
 from .base import BaseProvider
+from ..document_classifier import DocumentClassifier, DocumentType
 
 
 DEFAULT_MAX_RETRIES = 3
@@ -122,12 +123,14 @@ def compress_image_sync(image_bytes: bytes, max_size_mb: float = MAX_IMAGE_SIZE_
 class MistralProvider(BaseProvider):
     """Provider Mistral para extracao via OCR especializado + LLM"""
 
-    def __init__(self, model: str | None = None, prompt: str = "", parse_response_fn=None):
+    def __init__(self, model: str | None = None, prompt: str = "", parse_response_fn=None, use_classifier: bool = True):
         super().__init__(model or settings.mistral_llm_model)
         self.max_retries = DEFAULT_MAX_RETRIES
         self.retry_delay = DEFAULT_RETRY_DELAY
         self.prompt = prompt
         self._parse_response = parse_response_fn or (lambda x: {'items': [], 'error': 'No parser'})
+        self.classifier = DocumentClassifier() if use_classifier else None
+        print(f"[MistralProvider] Initialized with classifier={use_classifier}")
 
     def _upload_sync(self, client, pdf_content: bytes, filename: str):
         """Upload sincrono do PDF para Mistral"""
@@ -165,22 +168,54 @@ class MistralProvider(BaseProvider):
             max_tokens=32000  # Aumentado para cupons grandes com muitos itens
         )
 
-    def _get_prompt(self, ocr_text: str = "") -> str:
-        """Carrega o prompt apropriado baseado no tipo de documento detectado."""
+    async def _get_prompt(self, ocr_text: str = "") -> tuple[str, str]:
+        """Carrega o prompt apropriado baseado no tipo de documento detectado.
+
+        Returns:
+            tuple[str, str]: (prompt_text, document_type)
+        """
         prompts_dir = Path(__file__).parent.parent.parent / "prompts"
 
-        # Detectar tipo de documento pelo texto OCR
-        doc_type = self._detect_document_type(ocr_text)
-        print(f"[MistralProvider] Tipo de documento detectado: {doc_type}")
+        # Usar novo classificador se disponivel
+        if self.classifier:
+            print(f"[MistralProvider] Usando DocumentClassifier...")
+            doc_type_enum = await self.classifier.classify(ocr_text, max_chars=3000)
 
-        if doc_type == "cupom_fiscal":
-            prompt_path = prompts_dir / "prompt_cupom_fiscal.md"
+            if doc_type_enum == DocumentType.CUPOM_FISCAL:
+                doc_type = "cupom_fiscal"
+                prompt_path = prompts_dir / "cupom_fiscal_focused.md"
+                print(f"[MistralProvider] Tipo detectado: CUPOM_FISCAL -> usando prompt focado")
+            elif doc_type_enum == DocumentType.FATURA_CARTAO:
+                doc_type = "fatura_cartao"
+                prompt_path = prompts_dir / "fatura_cartao_focused.md"
+                print(f"[MistralProvider] Tipo detectado: FATURA_CARTAO -> usando prompt focado")
+            else:
+                # Fallback: usar metodo antigo
+                print(f"[MistralProvider] Tipo UNKNOWN, usando deteccao antiga...")
+                doc_type = self._detect_document_type(ocr_text)
+                if doc_type == "cupom_fiscal":
+                    prompt_path = prompts_dir / "cupom_fiscal_focused.md"
+                else:
+                    prompt_path = prompts_dir / "fatura_cartao_focused.md"
         else:
-            prompt_path = prompts_dir / "prompt_mistral.md"
+            # Fallback: usar metodo antigo
+            doc_type = self._detect_document_type(ocr_text)
+            print(f"[MistralProvider] Tipo detectado (metodo antigo): {doc_type}")
 
+            if doc_type == "cupom_fiscal":
+                prompt_path = prompts_dir / "cupom_fiscal_focused.md"
+            else:
+                prompt_path = prompts_dir / "fatura_cartao_focused.md"
+
+        # Carregar prompt
         if prompt_path.exists():
-            return prompt_path.read_text(encoding="utf-8")
-        return self.prompt
+            prompt_text = prompt_path.read_text(encoding="utf-8")
+            print(f"[MistralProvider] Prompt carregado: {prompt_path.name}")
+            return prompt_text, doc_type
+
+        # Fallback final: prompt generico
+        print(f"[MistralProvider] AVISO: Prompt {prompt_path} nao encontrado, usando self.prompt")
+        return self.prompt, doc_type
 
     def _detect_document_type(self, ocr_text: str) -> str:
         """Detecta se é cupom fiscal ou fatura de cartão."""
@@ -507,8 +542,10 @@ class MistralProvider(BaseProvider):
             # Passo 3: Estruturar com LLM (em thread separada com retry)
             print(f"[MistralProvider] Passo 3: Estruturando com LLM {settings.mistral_llm_model}...")
 
-            prompt = self._get_prompt(ocr_text)
+            prompt, detected_doc_type = await self._get_prompt(ocr_text)
             full_prompt = f"{prompt}\n\n## Texto extraido do PDF pelo OCR:\n\n{ocr_text}"
+
+            print(f"[MistralProvider] Tipo final detectado: {detected_doc_type}")
 
             last_error = None
             for attempt in range(self.max_retries):

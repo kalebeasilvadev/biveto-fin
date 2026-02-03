@@ -5,7 +5,9 @@ Este modulo foi refatorado para seguir Clean Code:
 - Validacao em extraction_validator.py
 - Parser em response_parser.py
 - Conversao PDF em pdf_converter.py
+- Classificador de documentos em document_classifier.py
 """
+from pathlib import Path
 from app.core.config import settings
 
 from .schemas import FaturaExtracao
@@ -13,48 +15,75 @@ from .prompts import EXTRACTION_PROMPT
 from .pdf_converter import convert_pdf_to_images
 from .response_parser import ResponseParser
 from .extraction_validator import ExtractionValidator
+from .document_classifier import DocumentClassifier, DocumentType
 from .providers import GoogleProvider, MistralProvider, OpenAIProvider, AnthropicProvider
 
 
 class LLMOCRService:
     """Extrai dados de imagens usando LLM com visao (suporta multiplos providers)"""
 
-    def __init__(self, provider: str | None = None, model: str | None = None):
+    def __init__(self, provider: str | None = None, model: str | None = None, use_classifier: bool = True):
         self.provider_name = provider or settings.vision_provider
         self.model = model or settings.vision_model or 'gemini-2.0-flash'
         self.parser = ResponseParser()
         self.validator = ExtractionValidator()
+        self.classifier = DocumentClassifier() if use_classifier else None
         self._provider = None
-        print(f"[LLM_OCR] Initialized: provider={self.provider_name}, model={self.model}")
+        self._prompts_cache = {}  # Cache de prompts carregados
+        print(f"[LLM_OCR] Initialized: provider={self.provider_name}, model={self.model}, classifier={use_classifier}")
 
-    def _get_provider(self):
-        """Retorna o provider configurado (lazy initialization)"""
+    def _load_prompt(self, filename: str) -> str:
+        """Carrega prompt de arquivo (com cache)"""
+        if filename in self._prompts_cache:
+            return self._prompts_cache[filename]
+
+        prompts_dir = Path(__file__).parent.parent / "prompts"
+        prompt_path = prompts_dir / filename
+
+        if prompt_path.exists():
+            prompt = prompt_path.read_text(encoding="utf-8")
+            self._prompts_cache[filename] = prompt
+            return prompt
+
+        # Fallback para prompt generico
+        print(f"[LLM_OCR] AVISO: Prompt {filename} nao encontrado, usando EXTRACTION_PROMPT")
+        return EXTRACTION_PROMPT
+
+    def _get_provider(self, prompt: str | None = None):
+        """Retorna o provider configurado (lazy initialization)
+
+        Args:
+            prompt: Prompt customizado (se None, usa EXTRACTION_PROMPT)
+        """
+        # Nota: Para simplificar, estamos criando provider com prompt padrao
+        # O prompt especifico sera passado diretamente nas chamadas quando necessario
         if self._provider is None:
             parse_fn = self.parser.parse
+            default_prompt = prompt or EXTRACTION_PROMPT
 
             if self.provider_name == 'google':
                 self._provider = GoogleProvider(
                     model=self.model,
-                    prompt=EXTRACTION_PROMPT,
+                    prompt=default_prompt,
                     response_schema=FaturaExtracao,
                     parse_response_fn=parse_fn
                 )
             elif self.provider_name == 'mistral':
                 self._provider = MistralProvider(
                     model=self.model,
-                    prompt=EXTRACTION_PROMPT,
+                    prompt=default_prompt,
                     parse_response_fn=parse_fn
                 )
             elif self.provider_name == 'openai':
                 self._provider = OpenAIProvider(
                     model=self.model,
-                    prompt=EXTRACTION_PROMPT,
+                    prompt=default_prompt,
                     parse_response_fn=parse_fn
                 )
             elif self.provider_name == 'anthropic':
                 self._provider = AnthropicProvider(
                     model=self.model,
-                    prompt=EXTRACTION_PROMPT,
+                    prompt=default_prompt,
                     parse_response_fn=parse_fn
                 )
             else:
