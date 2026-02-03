@@ -558,6 +558,8 @@ export const benefitCardsApi = {
   create: (data: unknown) => api.post('/benefit-cards', data),
   update: (id: number, data: unknown) => api.patch(`/benefit-cards/${id}`, data),
   delete: (id: number) => api.delete(`/benefit-cards/${id}`),
+  adjustBalance: (id: number, data: { adjustment_amount: number; reason: string }) =>
+    api.post(`/benefit-cards/${id}/adjust-balance`, data),
 }
 
 export const incomeSourcesApi = {

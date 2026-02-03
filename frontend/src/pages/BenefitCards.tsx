@@ -13,11 +13,14 @@ import {
   Ticket,
   Fuel,
   CircleDollarSign,
+  AlertTriangle,
+  DollarSign,
 } from 'lucide-react'
 import { HelpButton } from '../components/help'
 import { clsx } from 'clsx'
 import EmptyState from '../components/EmptyState'
 import BenefitCardModal from '../components/benefit-cards/BenefitCardModal'
+import BalanceAdjustmentModal from '../components/benefit-cards/BalanceAdjustmentModal'
 import ConfirmDialog from '../components/shared/ConfirmDialog'
 import { useToastStore } from '../stores/toastStore'
 import {
@@ -71,6 +74,7 @@ export default function BenefitCards() {
   const [showModal, setShowModal] = useState(false)
   const [editingCard, setEditingCard] = useState<BenefitCard | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<BenefitCard | null>(null)
+  const [adjustingCard, setAdjustingCard] = useState<BenefitCard | null>(null)
   const [apiError, setApiError] = useState<string | null>(null)
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -303,7 +307,7 @@ export default function BenefitCards() {
                       <MoreVertical size={18} />
                     </button>
                     {openMenuId === card.id && (
-                      <div className="absolute right-0 top-full mt-1 w-40 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-gray-200 dark:border-slate-700 py-1 z-50">
+                      <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-gray-200 dark:border-slate-700 py-1 z-50">
                         <button
                           onClick={() => {
                             openEditModal(card)
@@ -313,6 +317,21 @@ export default function BenefitCards() {
                         >
                           <Pencil size={16} />
                           Editar
+                        </button>
+                        <button
+                          onClick={() => {
+                            setAdjustingCard(card)
+                            setOpenMenuId(null)
+                          }}
+                          className={clsx(
+                            "w-full px-4 py-2.5 text-left text-sm flex items-center gap-3 transition-colors",
+                            card.current_balance < 0
+                              ? "text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/30"
+                              : "text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30"
+                          )}
+                        >
+                          <DollarSign size={16} />
+                          Ajustar Saldo
                         </button>
                         <button
                           onClick={() => {
@@ -329,12 +348,31 @@ export default function BenefitCards() {
                   </div>
                 </div>
 
+                {/* Alerta de Saldo Negativo */}
+                {card.current_balance < 0 && (
+                  <div className="mb-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 flex items-start gap-2">
+                    <AlertTriangle className="text-red-500 flex-shrink-0 mt-0.5" size={16} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-red-800 dark:text-red-300">
+                        Saldo Negativo
+                      </p>
+                      <p className="text-xs text-red-600 dark:text-red-400 mt-0.5">
+                        Verifique o saldo real no app da operadora e ajuste
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 {/* Balance */}
                 <div className="mb-3">
                   <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Saldo disponivel</p>
                   <p className={clsx(
                     'text-xl font-bold',
-                    card.current_balance > 0 ? 'text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-gray-400'
+                    card.current_balance > 0
+                      ? 'text-green-600 dark:text-green-400'
+                      : card.current_balance < 0
+                        ? 'text-red-600 dark:text-red-400'
+                        : 'text-gray-600 dark:text-gray-400'
                   )}>
                     {card.current_balance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                   </p>
@@ -377,6 +415,15 @@ export default function BenefitCards() {
         error={apiError}
         showOwnershipSelector={showOwnershipSelector || false}
       />
+
+      {/* Modal de Ajuste de Saldo */}
+      {adjustingCard && (
+        <BalanceAdjustmentModal
+          isOpen={!!adjustingCard}
+          onClose={() => setAdjustingCard(null)}
+          card={adjustingCard}
+        />
+      )}
 
       {/* Modal de Confirmacao de Exclusao */}
       <ConfirmDialog
