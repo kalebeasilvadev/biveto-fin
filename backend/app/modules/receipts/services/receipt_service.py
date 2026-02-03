@@ -22,6 +22,7 @@ from app.modules.receipts.schemas.receipt import (
 )
 from app.modules.installments.services.installment_service import InstallmentService
 from app.modules.credit_cards.services.invoice_service import InvoiceService
+from app.core.balance_monitor import BalanceMonitor
 
 
 class ReceiptService:
@@ -214,6 +215,25 @@ class ReceiptService:
             else:
                 # Atualizar saldo da conta (deduzir o valor do pagamento)
                 account = valid_accounts[payment_data.account_id]
+
+                # MONITOR: Verificar se resultará em saldo negativo (ALERTA, não bloqueia)
+                check_result = BalanceMonitor.check_negative_balance(
+                    account,
+                    payment_data.amount,
+                    f"pagamento de recibo #{receipt.id}"
+                )
+
+                if check_result["will_be_negative"]:
+                    # LOG: Registrar evento para auditoria
+                    BalanceMonitor.log_negative_balance_event(
+                        account,
+                        payment_data.amount,
+                        f"receipt_payment #{payment.id}",
+                        user.id
+                    )
+                    print(check_result["alert_message"])
+
+                # Realizar débito (PERMITE saldo negativo - cartão físico tem saldo real)
                 account.balance = float(account.balance) - float(payment_data.amount)
 
         # 7. Criar as Transactions vinculadas ao receipt

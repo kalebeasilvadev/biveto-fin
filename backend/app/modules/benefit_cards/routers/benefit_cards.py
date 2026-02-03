@@ -14,6 +14,8 @@ from app.modules.benefit_cards.schemas.benefit_card import (
     BenefitCardUpdate,
     BenefitCardResponse,
     BenefitCardListResponse,
+    BalanceAdjustmentRequest,
+    BalanceAdjustmentResponse,
 )
 from app.modules.household.utils.household_helpers import validate_create_permission
 
@@ -444,3 +446,72 @@ async def delete_benefit_card(
         await db.delete(card)
 
     await db.commit()
+
+
+@router.post("/{card_id}/adjust-balance", response_model=BalanceAdjustmentResponse)
+async def adjust_balance(
+    card_id: int,
+    data: BalanceAdjustmentRequest,
+    db: DbSession,
+    current_user: CurrentUser
+):
+    """Ajusta manualmente o saldo de um cartão de benefício
+
+    Use este endpoint quando o saldo no sistema divergir do saldo real no cartão físico.
+
+    Exemplo:
+    - Saldo no sistema: R$ -50 (negativo por erro de lançamento)
+    - Saldo real no cartão Alelo: R$ 400
+    - Ajuste necessário: +450 (para corrigir para R$ 400)
+
+    O ajuste cria uma transação de auditoria e atualiza o saldo base da conta.
+    """
+    from app.core.balance_monitor import create_balance_adjustment
+
+    # Buscar cartão
+    household_user_ids = await get_household_user_ids(db, current_user)
+
+    result = await db.execute(
+        select(BenefitCard)
+        .join(Account, BenefitCard.account_id == Account.id)
+        .where(
+            BenefitCard.id == card_id,
+            or_(
+                and_(BenefitCard.user_id == current_user.id, Account.ownership_type == "personal"),
+                and_(BenefitCard.user_id.in_(household_user_ids), Account.ownership_type == "household")
+            )
+        )
+    )
+    card = result.scalar_one_or_none()
+
+    if not card:
+        raise HTTPException(status_code=404, detail="Cartao de beneficio nao encontrado")
+
+    # Buscar conta vinculada
+    account_result = await db.execute(
+        select(Account).where(Account.id == card.account_id)
+    )
+    account = account_result.scalar_one_or_none()
+
+    if not account:
+        raise HTTPException(status_code=404, detail="Conta vinculada nao encontrada")
+
+    # Realizar ajuste
+    adjustment_result = await create_balance_adjustment(
+        db=db,
+        account=account,
+        adjustment_amount=data.adjustment_amount,
+        reason=data.reason,
+        user_id=current_user.id
+    )
+
+    await db.commit()
+
+    return BalanceAdjustmentResponse(
+        old_balance=adjustment_result["old_balance"],
+        adjustment=adjustment_result["adjustment"],
+        new_balance=adjustment_result["new_balance"],
+        transaction_id=adjustment_result["transaction_id"],
+        reason=adjustment_result["reason"],
+        timestamp=datetime.utcnow()
+    )

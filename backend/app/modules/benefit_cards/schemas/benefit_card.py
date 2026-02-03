@@ -78,3 +78,19 @@ class BenefitCardListResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class BalanceAdjustmentRequest(BaseModel):
+    """Request para ajuste manual de saldo"""
+    adjustment_amount: float = Field(description="Valor do ajuste (positivo para adicionar, negativo para subtrair)")
+    reason: str = Field(min_length=3, max_length=500, description="Motivo do ajuste")
+
+
+class BalanceAdjustmentResponse(BaseModel):
+    """Response de ajuste de saldo"""
+    old_balance: float
+    adjustment: float
+    new_balance: float
+    transaction_id: int
+    reason: str
+    timestamp: datetime
