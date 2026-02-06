@@ -7,7 +7,7 @@ from app.models.household import OwnershipType
 class TransactionBase(BaseModel):
     type: TransactionType
     payment_method: PaymentMethod | None = None
-    amount: float = Field(gt=0)
+    amount: float = Field(ge=0)  # ge=0 permite valores >= 0 (incluindo zero)
     currency: str = "BRL"
     date: date_type
     description: str | None = None
@@ -53,7 +53,7 @@ class TransactionConfirm(BaseModel):
     """Confirmacao de transacao a partir de documento processado"""
     document_id: int | None = None  # Opcional para transacoes sem documento
     account_id: int
-    amount: float = Field(gt=0)
+    amount: float = Field(ge=0)
     date: date_type
     category_id: int | None = None
     merchant_name: str | None = None
@@ -97,7 +97,7 @@ class TransactionConfirm(BaseModel):
 
 
 class TransactionUpdate(BaseModel):
-    amount: float | None = Field(None, gt=0)
+    amount: float | None = Field(None, ge=0)  # ge=0 permite valores >= 0
     date: date_type | None = None
     type: TransactionType | None = None
     payment_method: PaymentMethod | None = None
@@ -168,7 +168,7 @@ class BatchConfirmItem(BaseModel):
     """Item individual do batch confirm - mesmo schema do TransactionConfirm"""
     document_id: int | None = None
     account_id: int
-    amount: float = Field(gt=0)
+    amount: float = Field(ge=0)
     date: date_type
     category_id: int | None = None
     merchant_name: str | None = None
@@ -233,7 +233,7 @@ class BatchConfirmResponse(BaseModel):
 class SplitPaymentItem(BaseModel):
     """Item de pagamento em uma transacao com pagamento dividido"""
     payment_method: PaymentMethod
-    amount: float = Field(gt=0)
+    amount: float = Field(ge=0)
     account_id: int
     benefit_card_id: int | None = None  # Se for pagamento com VA/VR
     credit_card_id: int | None = None   # Se for pagamento com cartao de credito
@@ -243,7 +243,7 @@ class SplitPaymentRequest(BaseModel):
     """Request para criar transacao com pagamento dividido"""
     document_id: int | None = None
     date: date_type
-    total_amount: float = Field(gt=0)
+    total_amount: float = Field(ge=0)
     description: str | None = None
     merchant_name: str | None = None
     category_id: int | None = None

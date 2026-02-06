@@ -1107,6 +1107,9 @@ async def get_invoice_duplicate_warnings(
     if len(series_ids) < 2:
         return InvoiceDuplicateWarning(has_duplicates=False)
 
+    # Criar mapa de transações por ID para lookup rápido
+    transactions_by_id = {tx.id: tx for tx in transactions}
+
     # Detectar duplicatas entre essas séries
     detection_service = DuplicateDetectionService(db)
     all_duplicates = await detection_service.find_duplicate_groups(
@@ -1122,32 +1125,35 @@ async def get_invoice_duplicate_warnings(
     for group in all_duplicates:
         series_in_group = [s.id for s in group.series]
 
-        # Verificar se alguma série do grupo está nesta fatura
+        # Verificar se AMBAS as séries do grupo estão nesta fatura
         intersection = set(series_in_group) & set(series_ids)
 
         if len(intersection) >= 2:  # Ambas séries do grupo estão na fatura
-            # Calcular excesso apenas para esta fatura
+            # Calcular excesso APENAS para conflitos nesta fatura
+            conflicts_in_invoice = []
+
             for conflict in group.conflicts:
-                # Verificar se as transações do conflito estão nesta fatura
-                conflict_tx_ids = [
-                    conflict.series_a_transaction_id,
-                    conflict.series_b_transaction_id
-                ]
+                # Verificar se AMBAS as transações do conflito estão nesta fatura
+                tx_a_in_invoice = conflict.series_a_transaction_id in transactions_by_id
+                tx_b_in_invoice = conflict.series_b_transaction_id in transactions_by_id
 
-                for tx in transactions:
-                    if tx.id in conflict_tx_ids:
-                        total_excess += float(tx.amount)
-                        duplicate_count += 1
-                        break  # Contar apenas uma vez por conflito
+                # Só é um conflito nesta fatura se AMBAS as transações estão aqui
+                if tx_a_in_invoice and tx_b_in_invoice:
+                    conflicts_in_invoice.append(conflict)
+                    # Contar o valor de UMA das transações duplicadas como excess
+                    tx = transactions_by_id[conflict.series_a_transaction_id]
+                    total_excess += float(tx.amount)
+                    duplicate_count += 1
 
-            # Adicionar par afetado
-            affected_pairs.append(DuplicateSeriesPair(
-                series_a_id=group.series[0].id,
-                series_b_id=group.series[1].id,
-                series_a_name=group.series[0].merchant_name,
-                series_b_name=group.series[1].merchant_name,
-                similarity_score=group.similarity_score,
-            ))
+            # Só adicionar o par se realmente houver conflitos nesta fatura
+            if conflicts_in_invoice:
+                affected_pairs.append(DuplicateSeriesPair(
+                    series_a_id=group.series[0].id,
+                    series_b_id=group.series[1].id,
+                    series_a_name=group.series[0].merchant_name,
+                    series_b_name=group.series[1].merchant_name,
+                    similarity_score=group.similarity_score,
+                ))
 
     return InvoiceDuplicateWarning(
         has_duplicates=len(affected_pairs) > 0,

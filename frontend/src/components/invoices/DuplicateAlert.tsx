@@ -23,8 +23,14 @@ export default function DuplicateAlert({ invoiceId }: DuplicateAlertProps) {
   const { estimated_excess, duplicate_count } = duplicateWarnings.data
 
   const handleResolve = () => {
-    // Navegar para /installments
-    navigate('/installments')
+    // Navegar para /installments com contexto da fatura
+    // Para que a página possa filtrar/destacar apenas as duplicatas relevantes
+    navigate('/installments', {
+      state: {
+        fromInvoice: invoiceId,
+        highlightDuplicates: duplicateWarnings.data.affected_series_pairs.map(pair => [pair.series_a_id, pair.series_b_id])
+      }
+    })
   }
 
   return (

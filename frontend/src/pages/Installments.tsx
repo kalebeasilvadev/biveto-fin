@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { AlertTriangle, RefreshCw } from 'lucide-react'
+import { useQuery, useMutation, useQueryClient } from '@tantml:react-query'
+import { useLocation } from 'react-router-dom'
+import { AlertTriangle, RefreshCw, ArrowLeft } from 'lucide-react'
 import { installmentsApi } from '../services/api'
 import SeriesCard from '../components/installments/SeriesCard'
 import MergeModal from '../components/installments/MergeModal'
@@ -41,6 +42,13 @@ interface DuplicateGroup {
 export default function Installments() {
   const [showMergeModal, setShowMergeModal] = useState<DuplicateGroup | null>(null)
   const queryClient = useQueryClient()
+  const location = useLocation()
+
+  // Capturar contexto de navegação (se veio de uma fatura)
+  const navigationState = location.state as {
+    fromInvoice?: number
+    highlightDuplicates?: number[][]
+  } | null
 
   // Buscar séries
   const { data: seriesData, isLoading: isLoadingSeries } = useQuery<{ data: InstallmentSeries[] }>({
@@ -66,12 +74,23 @@ export default function Installments() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['installments'] })
       queryClient.invalidateQueries({ queryKey: ['installments-duplicates'] })
+      queryClient.invalidateQueries({ queryKey: ['invoice-duplicates'] })
       setShowMergeModal(null)
     },
   })
 
   const series = seriesData?.data || []
-  const duplicateGroups = duplicatesData?.data?.duplicate_groups || []
+  const allDuplicateGroups = duplicatesData?.data?.duplicate_groups || []
+
+  // Filtrar duplicatas se vier de uma fatura específica
+  const duplicateGroups = navigationState?.highlightDuplicates
+    ? allDuplicateGroups.filter(group => {
+        const seriesIds = group.series.map(s => s.id)
+        return navigationState.highlightDuplicates!.some(pair =>
+          pair.every(id => seriesIds.includes(id))
+        )
+      })
+    : allDuplicateGroups
 
   const handleMerge = (sourceId: number, targetId: number, conflictResolution: string) => {
     mergeMutation.mutate({
@@ -96,7 +115,25 @@ export default function Installments() {
     <div className="max-w-4xl mx-auto p-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-white">Compras Parceladas</h1>
+        <div className="flex items-center gap-3">
+          {navigationState?.fromInvoice && (
+            <button
+              onClick={() => window.history.back()}
+              className="p-2 text-gray-400 hover:text-white transition-colors"
+              title="Voltar para a fatura"
+            >
+              <ArrowLeft size={20} />
+            </button>
+          )}
+          <div>
+            <h1 className="text-2xl font-bold text-white">Compras Parceladas</h1>
+            {navigationState?.fromInvoice && (
+              <p className="text-sm text-amber-400 mt-1">
+                Mostrando apenas duplicatas da fatura selecionada
+              </p>
+            )}
+          </div>
+        </div>
 
         <div className="flex items-center gap-3">
           {duplicateGroups.length > 0 && (
