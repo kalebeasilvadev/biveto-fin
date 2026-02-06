@@ -201,6 +201,7 @@ export default function IncomeSources() {
       year: number
       month: number
       overwrite?: boolean
+      source_ids?: number[]
       amount_overrides?: Array<{ source_id: number; amount: number }>
     }) => incomeSourcesApi.generateTransactions(data),
     onSuccess: (response) => {
