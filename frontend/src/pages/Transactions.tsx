@@ -182,6 +182,7 @@ const formatDateBR = (dateStr: string): string => {
 
 export default function Transactions() {
   const [categoryFilter, setCategoryFilter] = useState<string>('')
+  const [typeFilter, setTypeFilter] = useState<'all' | 'expense' | 'income' | 'transfer'>('all')
   const [showFilters, setShowFilters] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
   const [page, setPage] = useState(0)
@@ -216,10 +217,11 @@ export default function Transactions() {
   }, [searchInput])
 
   const { data: transactionsData, isLoading } = useQuery({
-    queryKey: ['transactions', categoryFilter, searchQuery, selectedYear, selectedMonth],
+    queryKey: ['transactions', categoryFilter, typeFilter, searchQuery, selectedYear, selectedMonth],
     queryFn: () => {
       const params: Record<string, unknown> = {
         category_id: categoryFilter || undefined,
+        type: typeFilter !== 'all' ? typeFilter : undefined,
         search: searchQuery || undefined,
         limit: 100, // Backend limit
         offset: 0,
@@ -534,6 +536,57 @@ export default function Transactions() {
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Transações</h1>
             <HelpButton pageId="transactions" />
           </div>
+
+          {/* Quick Type Filters */}
+          <div className="flex items-center gap-2 mt-2">
+            <button
+              onClick={() => setTypeFilter('all')}
+              className={clsx(
+                'px-3 py-1.5 text-xs font-medium rounded-full transition-all',
+                typeFilter === 'all'
+                  ? 'bg-primary-600 text-white shadow-sm'
+                  : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-600'
+              )}
+            >
+              Todas
+            </button>
+            <button
+              onClick={() => setTypeFilter('expense')}
+              className={clsx(
+                'px-3 py-1.5 text-xs font-medium rounded-full transition-all flex items-center gap-1.5',
+                typeFilter === 'expense'
+                  ? 'bg-red-600 text-white shadow-sm'
+                  : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-600'
+              )}
+            >
+              <ArrowDownRight size={14} />
+              Despesas
+            </button>
+            <button
+              onClick={() => setTypeFilter('income')}
+              className={clsx(
+                'px-3 py-1.5 text-xs font-medium rounded-full transition-all flex items-center gap-1.5',
+                typeFilter === 'income'
+                  ? 'bg-green-600 text-white shadow-sm'
+                  : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-600'
+              )}
+            >
+              <ArrowUpRight size={14} />
+              Receitas
+            </button>
+            <button
+              onClick={() => setTypeFilter('transfer')}
+              className={clsx(
+                'px-3 py-1.5 text-xs font-medium rounded-full transition-all flex items-center gap-1.5',
+                typeFilter === 'transfer'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-600'
+              )}
+            >
+              <ArrowRightLeft size={14} />
+              Transferências
+            </button>
+          </div>
           {!isLoading && filteredTransactions.length > 0 && selectedMonth && (
             <div className="flex flex-wrap items-center gap-3 mt-1 text-sm">
               <span className="text-gray-500 dark:text-gray-400">
@@ -597,11 +650,11 @@ export default function Transactions() {
               onClick={() => setShowFilters(!showFilters)}
               className={clsx(
                 'btn-secondary flex items-center gap-2',
-                categoryFilter && 'ring-2 ring-primary-500 ring-offset-1'
+                (categoryFilter || typeFilter !== 'all') && 'ring-2 ring-primary-500 ring-offset-1'
               )}
             >
               <Filter size={18} />
-              {categoryFilter && (
+              {(categoryFilter || typeFilter !== 'all') && (
                 <span className="w-2 h-2 bg-primary-500 rounded-full" />
               )}
             </button>
@@ -614,15 +667,16 @@ export default function Transactions() {
                 <div className="absolute right-0 top-full mt-2 z-50 w-72 bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-gray-200 dark:border-slate-700 p-4">
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="font-medium dark:text-white">Filtros</h3>
-                    {categoryFilter && (
+                    {(categoryFilter || typeFilter !== 'all') && (
                       <button
                         onClick={() => {
                           setCategoryFilter('')
+                          setTypeFilter('all')
                           setShowFilters(false)
                         }}
                         className="text-xs text-primary-600 hover:underline"
                       >
-                        Limpar
+                        Limpar Tudo
                       </button>
                     )}
                   </div>
