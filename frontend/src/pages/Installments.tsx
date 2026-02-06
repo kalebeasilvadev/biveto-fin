@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tantml:react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useLocation } from 'react-router-dom'
 import { AlertTriangle, RefreshCw, ArrowLeft } from 'lucide-react'
 import { installmentsApi } from '../services/api'
@@ -84,10 +84,10 @@ export default function Installments() {
 
   // Filtrar duplicatas se vier de uma fatura específica
   const duplicateGroups = navigationState?.highlightDuplicates
-    ? allDuplicateGroups.filter(group => {
-        const seriesIds = group.series.map(s => s.id)
-        return navigationState.highlightDuplicates!.some(pair =>
-          pair.every(id => seriesIds.includes(id))
+    ? allDuplicateGroups.filter((group: any) => {
+        const seriesIds = group.series.map((s: any) => s.id)
+        return navigationState.highlightDuplicates!.some((pair: number[]) =>
+          pair.every((id: number) => seriesIds.includes(id))
         )
       })
     : allDuplicateGroups
@@ -175,10 +175,10 @@ export default function Installments() {
       {/* Series list */}
       {!isLoadingSeries && series.length > 0 && (
         <div className="space-y-4">
-          {series.map((s) => {
+          {series.map((s: any) => {
             // Verificar se esta série faz parte de um grupo duplicado
-            const isDuplicate = duplicateGroups.some(g =>
-              g.series.some(series => series.id === s.id)
+            const isDuplicate = duplicateGroups.some((g: any) =>
+              g.series.some((series: any) => series.id === s.id)
             )
 
             return (
@@ -187,8 +187,8 @@ export default function Installments() {
                 series={s}
                 isDuplicate={isDuplicate}
                 onResolve={() => {
-                  const group = duplicateGroups.find(g =>
-                    g.series.some(series => series.id === s.id)
+                  const group = duplicateGroups.find((g: any) =>
+                    g.series.some((series: any) => series.id === s.id)
                   )
                   if (group) setShowMergeModal(group)
                 }}

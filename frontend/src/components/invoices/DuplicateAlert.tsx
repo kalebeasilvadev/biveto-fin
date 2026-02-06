@@ -28,7 +28,7 @@ export default function DuplicateAlert({ invoiceId }: DuplicateAlertProps) {
     navigate('/installments', {
       state: {
         fromInvoice: invoiceId,
-        highlightDuplicates: duplicateWarnings.data.affected_series_pairs.map(pair => [pair.series_a_id, pair.series_b_id])
+        highlightDuplicates: duplicateWarnings.data.affected_series_pairs.map((pair: any) => [pair.series_a_id, pair.series_b_id])
       }
     })
   }
