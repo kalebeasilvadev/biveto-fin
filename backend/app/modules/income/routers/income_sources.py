@@ -28,6 +28,7 @@ class GenerateTransactionsRequest(BaseModel):
     year: int
     month: int
     overwrite: bool = False
+    source_ids: list[int] | None = None  # IDs específicos para gerar (None = todas)
     amount_overrides: list[SourceAmountOverride] | None = None
 
 
@@ -133,6 +134,7 @@ async def generate_income_transactions(
         year=data.year,
         month=data.month,
         overwrite=data.overwrite,
+        source_ids=data.source_ids,  # Filtrar por IDs específicos
         amount_overrides=amount_overrides_dict
     )
 

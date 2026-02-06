@@ -22,10 +22,11 @@ class IncomeTransactionService:
         year: int,
         month: int,
         overwrite: bool = False,
+        source_ids: Optional[List[int]] = None,
         amount_overrides: Optional[dict[int, float]] = None
     ) -> List[Transaction]:
         """
-        Gera transações para todas as fontes de receita ativas de um usuário
+        Gera transações para as fontes de receita ativas de um usuário
         para um determinado mês.
 
         Args:
@@ -33,25 +34,30 @@ class IncomeTransactionService:
             year: Ano
             month: Mês (1-12)
             overwrite: Se True, recria transações mesmo se já existirem
+            source_ids: Lista de IDs específicos para gerar (None = todas)
             amount_overrides: Dict mapeando source_id para valor customizado
 
         Returns:
             Lista de transações criadas
         """
-        # Buscar fontes de receita ativas do usuário
-        result = await self.db.execute(
-            select(IncomeSource).where(
-                and_(
-                    IncomeSource.user_id == user_id,
-                    IncomeSource.is_active == True,
-                    IncomeSource.frequency.in_([
-                        IncomeFrequency.MONTHLY.value,
-                        IncomeFrequency.BIWEEKLY.value,
-                        IncomeFrequency.WEEKLY.value,
-                    ])
-                )
+        # Construir query base
+        query = select(IncomeSource).where(
+            and_(
+                IncomeSource.user_id == user_id,
+                IncomeSource.is_active == True,
+                IncomeSource.frequency.in_([
+                    IncomeFrequency.MONTHLY.value,
+                    IncomeFrequency.BIWEEKLY.value,
+                    IncomeFrequency.WEEKLY.value,
+                ])
             )
         )
+
+        # Filtrar por IDs específicos se fornecidos
+        if source_ids:
+            query = query.where(IncomeSource.id.in_(source_ids))
+
+        result = await self.db.execute(query)
         sources = result.scalars().all()
 
         created_transactions = []

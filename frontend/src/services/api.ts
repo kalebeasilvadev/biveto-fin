@@ -570,8 +570,13 @@ export const incomeSourcesApi = {
   delete: (id: number) => api.delete(`/income-sources/${id}`),
   previewTransactions: (year: number, month: number) =>
     api.get(`/income-sources/preview-transactions?year=${year}&month=${month}`),
-  generateTransactions: (data: { year: number; month: number; overwrite?: boolean }) =>
-    api.post('/income-sources/generate-transactions', data),
+  generateTransactions: (data: {
+    year: number
+    month: number
+    overwrite?: boolean
+    source_ids?: number[]
+    amount_overrides?: Array<{ source_id: number; amount: number }>
+  }) => api.post('/income-sources/generate-transactions', data),
   generateSingleTransaction: (sourceId: number, data: { year: number; month: number; overwrite?: boolean }) =>
     api.post(`/income-sources/${sourceId}/generate-transaction`, data),
 }

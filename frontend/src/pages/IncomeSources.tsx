@@ -112,6 +112,7 @@ export default function IncomeSources() {
   const [generateMonth, setGenerateMonth] = useState(new Date().getMonth() + 1)
   const [previewData, setPreviewData] = useState<TransactionPreview[]>([])
   const [editedAmounts, setEditedAmounts] = useState<Record<number, number>>({})
+  const [selectedSources, setSelectedSources] = useState<Set<number>>(new Set())
   const [generateResult, setGenerateResult] = useState<{ count: number; message: string } | null>(null)
   const [editingSource, setEditingSource] = useState<IncomeSource | null>(null)
   const [formData, setFormData] = useState({
@@ -184,10 +185,13 @@ export default function IncomeSources() {
       setPreviewData(data)
       // Initialize edited amounts with original values
       const initialAmounts: Record<number, number> = {}
+      const initialSelected = new Set<number>()
       data.forEach((item: TransactionPreview) => {
         initialAmounts[item.source_id] = item.amount
+        initialSelected.add(item.source_id) // Selecionar todas por padrão
       })
       setEditedAmounts(initialAmounts)
+      setSelectedSources(initialSelected)
       setGenerateResult(null)
     },
   })
@@ -295,6 +299,7 @@ export default function IncomeSources() {
     setShowGenerateModal(false)
     setPreviewData([])
     setEditedAmounts({})
+    setSelectedSources(new Set())
     setGenerateResult(null)
   }
 
@@ -303,11 +308,17 @@ export default function IncomeSources() {
   }
 
   const handleGenerate = () => {
-    // Build amount overrides for any values that were changed
+    // Filtrar apenas as fontes selecionadas
     const amount_overrides: Array<{ source_id: number; amount: number }> = []
+    const source_ids_to_generate: number[] = []
+
     previewData.forEach((item) => {
+      // Só processar se a fonte estiver selecionada
+      if (!selectedSources.has(item.source_id)) return
+
+      source_ids_to_generate.push(item.source_id)
       const editedAmount = editedAmounts[item.source_id]
-      // Only include if the amount was edited (different from original)
+      // Include amount override if edited
       if (editedAmount !== undefined && editedAmount !== item.amount) {
         amount_overrides.push({
           source_id: item.source_id,
@@ -316,11 +327,37 @@ export default function IncomeSources() {
       }
     })
 
+    if (source_ids_to_generate.length === 0) {
+      alert('Selecione pelo menos uma fonte de renda para gerar')
+      return
+    }
+
     generateMutation.mutate({
       year: generateYear,
       month: generateMonth,
+      source_ids: source_ids_to_generate,
       amount_overrides: amount_overrides.length > 0 ? amount_overrides : undefined,
     })
+  }
+
+  const toggleSourceSelection = (sourceId: number) => {
+    setSelectedSources((prev) => {
+      const newSet = new Set(prev)
+      if (newSet.has(sourceId)) {
+        newSet.delete(sourceId)
+      } else {
+        newSet.add(sourceId)
+      }
+      return newSet
+    })
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedSources.size === previewData.length) {
+      setSelectedSources(new Set())
+    } else {
+      setSelectedSources(new Set(previewData.map(item => item.source_id)))
+    }
   }
 
   const handleAmountChange = (sourceId: number, value: string) => {
@@ -809,29 +846,45 @@ export default function IncomeSources() {
               {/* Preview List */}
               {previewData.length > 0 && !generateResult && (
                 <div className="space-y-2">
-                  <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Transações a serem criadas:
-                  </h3>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Transações a serem criadas:
+                    </h3>
+                    <button
+                      onClick={toggleSelectAll}
+                      className="text-xs text-biveto hover:text-biveto-dark dark:hover:text-biveto-light font-medium"
+                    >
+                      {selectedSources.size === previewData.length ? 'Desmarcar Todas' : 'Selecionar Todas'}
+                    </button>
+                  </div>
                   <div className="max-h-60 overflow-y-auto space-y-2">
                     {previewData.map((item, index) => {
                       const typeInfo = getIncomeTypeInfo(item.type)
                       const currentAmount = editedAmounts[item.source_id] ?? item.amount
                       const isEdited = editedAmounts[item.source_id] !== undefined && editedAmounts[item.source_id] !== item.amount
+                      const isSelected = selectedSources.has(item.source_id)
                       return (
                         <div
                           key={index}
                           className={clsx(
-                            'flex items-center justify-between p-3 rounded-lg',
-                            isEdited
+                            'flex items-center gap-3 p-3 rounded-lg transition-all',
+                            !isSelected && 'opacity-50',
+                            isEdited && isSelected
                               ? 'bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700'
                               : 'bg-gray-50 dark:bg-gray-700'
                           )}
                         >
-                          <div className="flex items-center gap-3">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleSourceSelection(item.source_id)}
+                            className="w-5 h-5 rounded border-gray-300 text-biveto focus:ring-biveto"
+                          />
+                          <div className="flex items-center gap-3 flex-1">
                             <div className={clsx('p-2 rounded-full bg-white dark:bg-gray-600', typeInfo.color)}>
                               <DollarSign size={16} />
                             </div>
-                            <div>
+                            <div className="flex-1">
                               <p className="font-medium text-gray-900 dark:text-white text-sm">
                                 {item.source_name}
                               </p>
@@ -850,14 +903,16 @@ export default function IncomeSources() {
                               step="0.01"
                               value={currentAmount}
                               onChange={(e) => handleAmountChange(item.source_id, e.target.value)}
+                              disabled={!isSelected}
                               className={clsx(
                                 'w-28 text-right font-bold px-2 py-1 rounded border text-sm',
-                                isEdited
+                                !isSelected && 'opacity-50 cursor-not-allowed',
+                                isEdited && isSelected
                                   ? 'border-amber-400 bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400'
                                   : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-600 text-green-600 dark:text-green-400'
                               )}
                             />
-                            {isEdited && (
+                            {isEdited && isSelected && (
                               <button
                                 onClick={() => handleAmountChange(item.source_id, String(item.amount))}
                                 className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
@@ -872,9 +927,14 @@ export default function IncomeSources() {
                     })}
                   </div>
                   <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/30 rounded-lg">
-                    <span className="font-medium text-green-700 dark:text-green-400">Total</span>
+                    <span className="font-medium text-green-700 dark:text-green-400">
+                      Total ({selectedSources.size} de {previewData.length})
+                    </span>
                     <span className="font-bold text-green-700 dark:text-green-400">
-                      {previewData.reduce((sum, item) => sum + (editedAmounts[item.source_id] ?? item.amount), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                      {previewData
+                        .filter(item => selectedSources.has(item.source_id))
+                        .reduce((sum, item) => sum + (editedAmounts[item.source_id] ?? item.amount), 0)
+                        .toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                     </span>
                   </div>
                   {previewData.some((item) => editedAmounts[item.source_id] !== undefined && editedAmounts[item.source_id] !== item.amount) && (
