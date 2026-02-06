@@ -388,13 +388,17 @@ export default function FloatingAssistant() {
           </button>
         </div>
       ) : (
-        /* Mini restore button when hidden */
+        /* Mini restore button when hidden - uses saved position */
         <button
           onClick={handleShow}
-          className="fixed z-40 bottom-4 right-4 w-10 h-10 bg-gray-700 hover:bg-gray-600 dark:bg-gray-600 dark:hover:bg-gray-500 rounded-full shadow-lg flex items-center justify-center text-white transition-all duration-200 hover:scale-105 hidden lg:flex"
-          title="Mostrar assistente"
+          className="fixed z-40 w-10 h-10 bg-gray-700 hover:bg-gray-600 dark:bg-gray-600 dark:hover:bg-gray-500 rounded-full shadow-lg flex items-center justify-center text-white transition-all duration-200 hover:scale-105 hidden lg:flex opacity-60 hover:opacity-100"
+          style={{
+            left: `${position.x + 16}px`,
+            top: `${position.y + 16}px`,
+          }}
+          title="Mostrar assistente novamente"
         >
-          <Bot size={20} />
+          <Bot size={18} />
         </button>
       )}
 
