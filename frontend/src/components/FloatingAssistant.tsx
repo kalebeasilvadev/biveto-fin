@@ -78,6 +78,47 @@ function saveConversations(conversations: Conversation[]) {
   }
 }
 
+const POSITION_KEY = 'biveto_assistant_position'
+const HIDDEN_KEY = 'biveto_assistant_hidden'
+
+function loadPosition(): { x: number; y: number } {
+  try {
+    const stored = localStorage.getItem(POSITION_KEY)
+    if (stored) {
+      return JSON.parse(stored)
+    }
+  } catch {
+    // Ignore errors
+  }
+  // Default position: bottom-right
+  return { x: window.innerWidth - 80, y: window.innerHeight - 80 }
+}
+
+function savePosition(x: number, y: number) {
+  try {
+    localStorage.setItem(POSITION_KEY, JSON.stringify({ x, y }))
+  } catch {
+    // Ignore errors
+  }
+}
+
+function loadHiddenState(): boolean {
+  try {
+    const stored = localStorage.getItem(HIDDEN_KEY)
+    return stored === 'true'
+  } catch {
+    return false
+  }
+}
+
+function saveHiddenState(hidden: boolean) {
+  try {
+    localStorage.setItem(HIDDEN_KEY, String(hidden))
+  } catch {
+    // Ignore errors
+  }
+}
+
 export default function FloatingAssistant() {
   const [isOpen, setIsOpen] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
@@ -88,7 +129,12 @@ export default function FloatingAssistant() {
   const [input, setInput] = useState('')
   const [conversationId, setConversationId] = useState<string | null>(null)
   const [isAnyModalOpen, setIsAnyModalOpen] = useState(false)
+  const [isHidden, setIsHidden] = useState(loadHiddenState)
+  const [position, setPosition] = useState(loadPosition)
+  const [isDragging, setIsDragging] = useState(false)
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const buttonRef = useRef<HTMLDivElement>(null)
   const location = useLocation()
 
   // Check if we're on chat page (for conditional rendering later)
@@ -102,6 +148,66 @@ export default function FloatingAssistant() {
     window.addEventListener('modalStateChange', handleModalChange as EventListener)
     return () => window.removeEventListener('modalStateChange', handleModalChange as EventListener)
   }, [])
+
+  // Drag handlers
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (isOpen) return // Don't drag when chat is open
+    setIsDragging(true)
+    const rect = buttonRef.current?.getBoundingClientRect()
+    if (rect) {
+      setDragOffset({
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top,
+      })
+    }
+    e.preventDefault()
+  }
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDragging) return
+
+      const newX = e.clientX - dragOffset.x
+      const newY = e.clientY - dragOffset.y
+
+      // Keep button within viewport bounds (with margins)
+      const maxX = window.innerWidth - 70  // 56px button + 14px margin
+      const maxY = window.innerHeight - 70
+      const minX = 10
+      const minY = 10
+
+      const boundedX = Math.max(minX, Math.min(newX, maxX))
+      const boundedY = Math.max(minY, Math.min(newY, maxY))
+
+      setPosition({ x: boundedX, y: boundedY })
+    }
+
+    const handleMouseUp = () => {
+      if (isDragging) {
+        setIsDragging(false)
+        savePosition(position.x, position.y)
+      }
+    }
+
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove)
+      document.addEventListener('mouseup', handleMouseUp)
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove)
+        document.removeEventListener('mouseup', handleMouseUp)
+      }
+    }
+  }, [isDragging, dragOffset, position])
+
+  const handleHide = () => {
+    setIsHidden(true)
+    saveHiddenState(true)
+  }
+
+  const handleShow = () => {
+    setIsHidden(false)
+    saveHiddenState(false)
+  }
 
   const { data: suggestionsData } = useQuery({
     queryKey: ['chat-suggestions'],
@@ -226,18 +332,55 @@ export default function FloatingAssistant() {
 
   return (
     <>
-      {/* Floating Button - Hidden on mobile (already in bottom nav) */}
-      <button
-        onClick={() => setIsOpen(true)}
-        className={clsx(
-          'fixed z-50 w-14 h-14 rounded-full gradient-biveto shadow-lg shadow-primary-500/30 hidden lg:flex items-center justify-center text-white transition-all duration-300 hover:scale-105 active:scale-95',
-          'lg:bottom-6 lg:right-6',
-          isOpen && 'scale-0 opacity-0'
-        )}
-        aria-label="Abrir assistente"
-      >
-        <Bot size={26} />
-      </button>
+      {/* Floating Button - Draggable and hideable */}
+      {!isHidden ? (
+        <div
+          ref={buttonRef}
+          className={clsx(
+            'fixed z-40 hidden lg:block transition-opacity duration-300 group',
+            isOpen && 'opacity-0 pointer-events-none',
+            isDragging && 'cursor-grabbing'
+          )}
+          style={{
+            left: `${position.x}px`,
+            top: `${position.y}px`,
+          }}
+        >
+          <button
+            onMouseDown={handleMouseDown}
+            onClick={() => !isDragging && setIsOpen(true)}
+            className={clsx(
+              'w-14 h-14 rounded-full gradient-biveto shadow-lg shadow-primary-500/30 flex items-center justify-center text-white transition-all duration-200',
+              isDragging ? 'cursor-grabbing scale-110' : 'cursor-grab hover:scale-105 active:scale-95'
+            )}
+            aria-label="Abrir assistente"
+            title="Arraste para reposicionar • Clique para abrir"
+          >
+            <Bot size={26} />
+          </button>
+
+          {/* Hide button - appears on hover */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              handleHide()
+            }}
+            className="absolute -top-1 -right-1 w-6 h-6 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity shadow-md text-sm font-bold"
+            title="Esconder assistente"
+          >
+            ×
+          </button>
+        </div>
+      ) : (
+        /* Mini restore button when hidden */
+        <button
+          onClick={handleShow}
+          className="fixed z-40 bottom-4 right-4 w-10 h-10 bg-gray-700 hover:bg-gray-600 dark:bg-gray-600 dark:hover:bg-gray-500 rounded-full shadow-lg flex items-center justify-center text-white transition-all duration-200 hover:scale-105 hidden lg:flex"
+          title="Mostrar assistente"
+        >
+          <Bot size={20} />
+        </button>
+      )}
 
       {/* Chat Panel */}
       <div
