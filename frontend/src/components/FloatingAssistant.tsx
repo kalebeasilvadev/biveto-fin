@@ -132,6 +132,7 @@ export default function FloatingAssistant() {
   const [isHidden, setIsHidden] = useState(loadHiddenState)
   const [position, setPosition] = useState(loadPosition)
   const [isDragging, setIsDragging] = useState(false)
+  const [hasMoved, setHasMoved] = useState(false)
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const buttonRef = useRef<HTMLDivElement>(null)
@@ -153,6 +154,7 @@ export default function FloatingAssistant() {
   const handleMouseDown = (e: React.MouseEvent) => {
     if (isOpen) return // Don't drag when chat is open
     setIsDragging(true)
+    setHasMoved(false) // Reset moved flag
     const rect = buttonRef.current?.getBoundingClientRect()
     if (rect) {
       setDragOffset({
@@ -170,6 +172,13 @@ export default function FloatingAssistant() {
       const newX = e.clientX - dragOffset.x
       const newY = e.clientY - dragOffset.y
 
+      // Mark as moved if position changed significantly (more than 5px)
+      const dx = Math.abs(newX - position.x)
+      const dy = Math.abs(newY - position.y)
+      if (dx > 5 || dy > 5) {
+        setHasMoved(true)
+      }
+
       // Keep button within viewport bounds (with margins)
       const maxX = window.innerWidth - 70  // 56px button + 14px margin
       const maxY = window.innerHeight - 70
@@ -185,7 +194,9 @@ export default function FloatingAssistant() {
     const handleMouseUp = () => {
       if (isDragging) {
         setIsDragging(false)
-        savePosition(position.x, position.y)
+        if (hasMoved) {
+          savePosition(position.x, position.y)
+        }
       }
     }
 
@@ -197,7 +208,7 @@ export default function FloatingAssistant() {
         document.removeEventListener('mouseup', handleMouseUp)
       }
     }
-  }, [isDragging, dragOffset, position])
+  }, [isDragging, dragOffset, position, hasMoved])
 
   const handleHide = () => {
     setIsHidden(true)
@@ -348,7 +359,12 @@ export default function FloatingAssistant() {
         >
           <button
             onMouseDown={handleMouseDown}
-            onClick={() => !isDragging && setIsOpen(true)}
+            onClick={() => {
+              // Only open chat if button wasn't dragged
+              if (!hasMoved) {
+                setIsOpen(true)
+              }
+            }}
             className={clsx(
               'w-14 h-14 rounded-full gradient-biveto shadow-lg shadow-primary-500/30 flex items-center justify-center text-white transition-all duration-200',
               isDragging ? 'cursor-grabbing scale-110' : 'cursor-grab hover:scale-105 active:scale-95'
