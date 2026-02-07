@@ -441,14 +441,12 @@ class MistralProvider(BaseProvider):
                 return pdf_content
 
             if not needs_split and pdf_was_encrypted:
-                # No split needed but PDF was encrypted - save decrypted version
-                print("[MistralProvider] PDF was encrypted, saving decrypted version...")
-                output = io.BytesIO()
-                doc.save(output)
-                result = output.getvalue()
+                # PDF was password-protected
+                # Mistral OCR has issues with decrypted PDFs (corrupts content)
+                # Return None to force fallback to image-based processing
+                print("[MistralProvider] PDF was encrypted - forcing image-based processing...")
                 doc.close()
-                print(f"[MistralProvider] Decrypted PDF: {len(result)} bytes")
-                return result
+                return None  # Force fallback to convert_pdf_to_images
 
             print(f"[MistralProvider] PDF com página longa detectado, processando {len(doc)} página(s)...")
 
@@ -536,6 +534,11 @@ class MistralProvider(BaseProvider):
         """
         # Pré-processar PDF para dividir páginas muito longas
         pdf_content = await self._split_long_pdf(pdf_content, password=password)
+
+        # If password-protected PDF, fallback to image processing
+        if pdf_content is None:
+            print("[MistralProvider] Returning None to force image-based processing")
+            return None
 
         try:
             # Usar cliente singleton com connection pooling
