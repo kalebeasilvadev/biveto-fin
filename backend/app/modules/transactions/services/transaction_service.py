@@ -1287,9 +1287,11 @@ class TransactionService:
         if transaction.credit_card_id and not transaction.invoice_id and "invoice_id" not in update_data:
             needs_invoice_link = True
 
-        # Guardar invoice_id para atualizar total depois se amount mudar
+        # Guardar invoice_id para atualizar total depois se amount, type ou category mudar
         amount_changed = "amount" in update_data and update_data["amount"] != transaction.amount
+        type_changed = "type" in update_data and update_data["type"] != transaction.type
         date_changed = "date" in update_data and update_data["date"] != transaction.date
+        category_changed = "category_id" in update_data and update_data["category_id"] != transaction.category_id
 
         # Registrar alteracoes para auditoria
         for field, value in update_data.items():
@@ -1411,12 +1413,12 @@ class TransactionService:
                         await invoice_service.update_invoice_total(old_invoice)
                     await invoice_service.update_invoice_total(correct_invoice)
                 elif current_invoice:
-                    # Mesma fatura, apenas atualizar total se valor mudou
-                    if amount_changed:
+                    # Mesma fatura, atualizar total se valor ou tipo mudou
+                    if amount_changed or type_changed or category_changed:
                         await invoice_service.update_invoice_total(current_invoice)
 
-        elif amount_changed:
-            # Apenas valor mudou, atualizar a fatura atual
+        elif amount_changed or type_changed or category_changed:
+            # Valor, tipo ou categoria mudou, atualizar a fatura atual
             if transaction.invoice_id:
                 result = await self.db.execute(
                     select(CreditCardInvoice).where(CreditCardInvoice.id == transaction.invoice_id)
