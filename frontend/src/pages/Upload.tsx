@@ -355,11 +355,16 @@ export default function Upload() {
         // Check if detail is an object with error property
         if (detail && typeof detail === 'object' && 'error' in detail && detail.error === 'password_required') {
           console.log('✅ PASSWORD REQUIRED - SHOWING MODAL')
-          alert('SENHA NECESSÁRIA - Modal deveria aparecer agora!')
-          // setPasswordError(null) // Temporarily disabled
-          // setPasswordAttemptCount(0) // Temporarily disabled
-          setShowPasswordModal(true)
-          console.log('Modal should be visible now')
+
+          // CRITICAL FIX: Use setTimeout to escape React Query's error handling cycle
+          // React Query may be batching state updates or preventing re-renders in onError
+          setTimeout(() => {
+            console.log('Opening modal via setTimeout')
+            setShowPasswordModal(true)
+            alert('Modal setado! Verifique se apareceu.')
+          }, 10)
+
+          console.log('Scheduled modal to open')
           return
         } else {
           console.log('❌ Detail does not match password_required format')
