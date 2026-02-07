@@ -1,8 +1,8 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, Query, BackgroundTasks
+from fastapi import APIRouter, UploadFile, File, HTTPException, Query, BackgroundTasks, Form
 
 from app.core.deps import CurrentUser, DbSession
 from app.modules.documents.schemas.document import DocumentResponse, DocumentAsyncUploadResponse
-from app.modules.documents.services.document_service import DocumentService
+from app.modules.documents.services.document_service import DocumentService, PasswordRequiredError
 
 router = APIRouter()
 
@@ -12,6 +12,8 @@ async def upload_document(
     current_user: CurrentUser,
     db: DbSession,
     file: UploadFile = File(...),
+    password: str | None = Form(None),
+    credit_card_id: int | None = Form(None),
 ):
     """
     Upload de documento (foto/PDF) para processamento SINCRONO.
@@ -19,10 +21,24 @@ async def upload_document(
     Inclui alerta is_duplicate se documento ja foi enviado antes.
 
     NOTA: Para melhor UX, use POST /documents/async que retorna imediatamente.
+
+    Args:
+        file: PDF or image file
+        password: Optional password for protected PDFs
+        credit_card_id: Optional credit card ID to use saved password automatically
     """
     service = DocumentService(db)
-    # Service agora retorna DocumentResponse diretamente
-    return await service.upload(current_user, file)
+    try:
+        # Service agora retorna DocumentResponse diretamente
+        return await service.upload(current_user, file, password, credit_card_id)
+    except PasswordRequiredError:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error": "password_required",
+                "message": "PDF protegido por senha"
+            }
+        )
 
 
 @router.post("/async", response_model=DocumentAsyncUploadResponse, status_code=202)
@@ -31,14 +47,30 @@ async def upload_document_async(
     db: DbSession,
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
+    password: str | None = Form(None),
+    credit_card_id: int | None = Form(None),
 ):
     """
     Upload de documento (foto/PDF) para processamento ASSINCRONO.
     Retorna imediatamente com status "processing".
     Use GET /documents/{id} para verificar status e obter dados extraidos.
+
+    Args:
+        file: PDF or image file
+        password: Optional password for protected PDFs
+        credit_card_id: Optional credit card ID to use saved password automatically
     """
     service = DocumentService(db)
-    return await service.upload_async(current_user, file, background_tasks)
+    try:
+        return await service.upload_async(current_user, file, background_tasks, password, credit_card_id)
+    except PasswordRequiredError:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error": "password_required",
+                "message": "PDF protegido por senha"
+            }
+        )
 
 
 @router.post("/batch", response_model=DocumentResponse, status_code=201)

@@ -21,6 +21,7 @@ import {
 import DuplicateResolutionModal from '../components/upload/DuplicateResolutionModal'
 import OwnershipSelector from '../components/shared/OwnershipSelector'
 import { HelpButton } from '../components/help'
+import PasswordInputModal from '../components/PasswordInputModal'
 
 const accountTypeLabels: Record<string, string> = {
   wallet: 'Carteira',
@@ -128,6 +129,13 @@ export default function Upload() {
 
   // State for async upload polling
   const [processingDocumentId, setProcessingDocumentId] = useState<number | null>(null)
+
+  // Password modal state
+  const [showPasswordModal, setShowPasswordModal] = useState(false)
+  const [pendingPasswordFile, setPendingPasswordFile] = useState<File | null>(null)
+  const [passwordError, setPasswordError] = useState<string | null>(null)
+  const [passwordAttemptCount, setPasswordAttemptCount] = useState(0)
+  const [passwordCreditCardId, setPasswordCreditCardId] = useState<number | undefined>(undefined)
 
   // Poll for document status when processing
   const { data: polledDocument } = useQuery({
@@ -317,9 +325,27 @@ export default function Upload() {
 
   // Mutations
   const uploadMutation = useMutation({
-    mutationFn: (file: File) => documentsApi.upload(file),
+    mutationFn: ({ file, password, creditCardId }: { file: File; password?: string; creditCardId?: number }) =>
+      documentsApi.upload(file, password, creditCardId),
     onSuccess: handleUploadSuccess,
     onError: (error: unknown) => {
+      // Check for password required error
+      const axiosErr = error as { response?: { status?: number; data?: { detail?: { error?: string; message?: string } } } }
+      if (axiosErr.response?.status === 422 && axiosErr.response?.data?.detail?.error === 'password_required') {
+        // Show password modal
+        setPasswordError(null)
+        setPasswordAttemptCount(0)
+        setShowPasswordModal(true)
+        return
+      }
+
+      // Check for incorrect password
+      if (axiosErr.response?.status === 422 && axiosErr.response?.data?.detail?.message?.includes('Senha incorreta')) {
+        setPasswordError('Senha incorreta. Verifique e tente novamente.')
+        setPasswordAttemptCount(prev => prev + 1)
+        return
+      }
+
       setUploadError(getApiErrorMessage(error, 'Erro ao processar documento'))
     },
   })
@@ -774,7 +800,55 @@ export default function Upload() {
 
   // Handlers
   const handleFileUpload = (file: File) => {
-    uploadMutation.mutate(file)
+    // Store file for potential password retry
+    setPendingPasswordFile(file)
+
+    // Try to get credit card ID from selected credit card (if invoice mode)
+    const creditCardId = selectedCreditCardId ? parseInt(selectedCreditCardId) : undefined
+    setPasswordCreditCardId(creditCardId)
+
+    // Upload with optional credit card ID for automatic password
+    uploadMutation.mutate({ file, creditCardId })
+  }
+
+  // Handle password modal submit
+  const handlePasswordSubmit = async (password: string, saveToCard: boolean) => {
+    if (!pendingPasswordFile) return
+
+    try {
+      // Try upload with password
+      const response = await documentsApi.upload(pendingPasswordFile, password, passwordCreditCardId)
+
+      // Success - save password if requested
+      if (saveToCard && passwordCreditCardId) {
+        try {
+          await creditCardsApi.saveInvoicePassword(passwordCreditCardId, password)
+        } catch (err) {
+          console.error('Failed to save password:', err)
+          // Don't fail the whole flow if password save fails
+        }
+      }
+
+      // Close modal and process document
+      setShowPasswordModal(false)
+      setPendingPasswordFile(null)
+      setPasswordError(null)
+      setPasswordAttemptCount(0)
+      handleUploadSuccess(response)
+    } catch (error) {
+      // Handle password error
+      const axiosErr = error as { response?: { status?: number; data?: { detail?: { message?: string } } } }
+      if (axiosErr.response?.status === 422) {
+        setPasswordError('Senha incorreta. Verifique e tente novamente.')
+        setPasswordAttemptCount(prev => prev + 1)
+        throw error // Re-throw to keep modal open
+      } else {
+        // Other error - close modal and show general error
+        setShowPasswordModal(false)
+        setUploadError(getApiErrorMessage(error, 'Erro ao processar documento'))
+        throw error
+      }
+    }
   }
 
   const handleManualSubmit = () => {
@@ -1975,6 +2049,27 @@ export default function Upload() {
           />
         )}
       </div>
+
+      {/* Password Input Modal */}
+      <PasswordInputModal
+        isOpen={showPasswordModal}
+        onClose={() => {
+          setShowPasswordModal(false)
+          setPendingPasswordFile(null)
+          setPasswordError(null)
+          setPasswordAttemptCount(0)
+        }}
+        onSubmit={handlePasswordSubmit}
+        creditCardId={passwordCreditCardId}
+        creditCardName={
+          passwordCreditCardId
+            ? creditCards.find((c: { id: number; name: string }) => c.id === passwordCreditCardId)?.name
+            : undefined
+        }
+        error={passwordError}
+        attemptCount={passwordAttemptCount}
+        maxAttempts={5}
+      />
 
       {/* Modal de resolução de duplicata */}
       {duplicateModalIndex !== null && potentialDuplicates[duplicateModalIndex] && document?.extracted_items && (

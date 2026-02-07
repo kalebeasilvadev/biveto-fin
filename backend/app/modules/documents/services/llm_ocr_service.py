@@ -95,7 +95,8 @@ class LLMOCRService:
         self,
         image_content: bytes,
         mime_type: str = 'image/png',
-        filename: str = "document"
+        filename: str = "document",
+        password: str | None = None
     ) -> dict:
         """Extrai dados do documento usando o provider configurado
 
@@ -103,6 +104,7 @@ class LLMOCRService:
             image_content: Conteudo binario do arquivo
             mime_type: Tipo MIME (image/png, application/pdf, etc.)
             filename: Nome do arquivo original
+            password: Optional password for protected PDFs
 
         Returns:
             Dict com items, card_info, document_type ou error
@@ -116,12 +118,12 @@ class LLMOCRService:
             # 1. Tentar processar diretamente (PDF ou imagem)
             if is_pdf:
                 print(f"[LLM_OCR] Processing PDF via {self.provider_name}")
-                result = await provider.extract_from_pdf(image_content, filename)
+                result = await provider.extract_from_pdf(image_content, filename, password)
 
                 # Se provider retornou None, precisa converter para imagens
                 if result is None:
                     print(f"[LLM_OCR] Provider nao suporta PDF direto, convertendo para imagens...")
-                    result = await self._process_pdf_as_images(image_content)
+                    result = await self._process_pdf_as_images(image_content, password)
             else:
                 result = await provider.extract_from_image(image_content, mime_type)
 
@@ -159,9 +161,17 @@ class LLMOCRService:
             traceback.print_exc()
             return {'items': [], 'error': str(e)}
 
-    async def _process_pdf_as_images(self, pdf_content: bytes) -> dict:
-        """Fallback: converte PDF para imagens e processa"""
-        images, pdf_error = await convert_pdf_to_images(pdf_content)
+    async def _process_pdf_as_images(self, pdf_content: bytes, password: str | None = None) -> dict:
+        """Fallback: converte PDF para imagens e processa
+
+        Args:
+            pdf_content: PDF file content as bytes
+            password: Optional password for protected PDFs
+
+        Raises:
+            PasswordRequiredException: If PDF requires password
+        """
+        images, pdf_error = await convert_pdf_to_images(pdf_content, password)
 
         if pdf_error:
             return {'items': [], 'error': pdf_error}

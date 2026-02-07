@@ -15,6 +15,7 @@ from app.modules.credit_cards.schemas.credit_card import (
     CreditCardUpdate,
     CreditCardResponse,
     CreditCardListResponse,
+    InvoicePasswordRequest,
 )
 from app.modules.household.utils.household_helpers import validate_create_permission
 
@@ -244,6 +245,7 @@ async def get_credit_card(
         is_active=card.is_active,
         created_at=card.created_at,
         updated_at=card.updated_at,
+        has_invoice_password=bool(card.invoice_password_encrypted),
         account_name=account.name,
         account_balance=float(account.balance),
         account_color=account.color,
@@ -323,6 +325,7 @@ async def update_credit_card(
         is_active=card.is_active,
         created_at=card.created_at,
         updated_at=card.updated_at,
+        has_invoice_password=bool(card.invoice_password_encrypted),
         account_name=account.name,
         account_balance=float(account.balance),
         account_color=account.color,
@@ -575,3 +578,78 @@ async def recalculate_card_invoices(
         invoices_created=invoices_created,
         invoices_updated=len(affected_invoices),
     )
+
+
+@router.post("/{card_id}/invoice-password", status_code=200)
+async def save_invoice_password(
+    card_id: int,
+    request: InvoicePasswordRequest,
+    current_user: CurrentUser,
+    db: DbSession,
+):
+    """
+    Save encrypted invoice PDF password for automatic unlock.
+
+    IMPORTANT: This password is ONLY for unlocking password-protected invoice PDF files.
+    It has no relation to the credit card security or bank account password.
+
+    Args:
+        card_id: Credit card ID
+        request: Request with password field
+    """
+    from app.core.crypto import encrypt_password
+
+    # Fetch card and verify ownership
+    result = await db.execute(
+        select(CreditCard).where(
+            CreditCard.id == card_id,
+            CreditCard.user_id == current_user.id
+        )
+    )
+    card = result.scalar_one_or_none()
+
+    if not card:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Cartão não encontrado"
+        )
+
+    # Encrypt and save password
+    card.invoice_password_encrypted = encrypt_password(request.password)
+    await db.commit()
+
+    return {"message": "Senha salva com sucesso"}
+
+
+@router.delete("/{card_id}/invoice-password", status_code=204)
+async def delete_invoice_password(
+    card_id: int,
+    current_user: CurrentUser,
+    db: DbSession,
+):
+    """
+    Remove saved invoice PDF password from credit card.
+
+    Args:
+        card_id: Credit card ID
+    """
+    # Fetch card and verify ownership
+    result = await db.execute(
+        select(CreditCard).where(
+            CreditCard.id == card_id,
+            CreditCard.user_id == current_user.id
+        )
+    )
+    card = result.scalar_one_or_none()
+
+    if not card:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Cartão não encontrado"
+        )
+
+    # Remove password
+    card.invoice_password_encrypted = None
+    await db.commit()
+
+    return None

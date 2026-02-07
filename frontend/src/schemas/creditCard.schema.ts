@@ -102,6 +102,7 @@ export interface CreditCard {
   annual_fee: number | null
   annual_fee_frequency: 'monthly' | 'yearly'
   annual_fee_waived: boolean
+  has_invoice_password?: boolean // Indicates if invoice PDF password is saved
 }
 
 export interface CreditCardPayload {

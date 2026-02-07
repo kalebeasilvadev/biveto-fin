@@ -65,6 +65,7 @@ class CreditCardResponse(CreditCardBase):
     is_active: bool
     created_at: datetime
     updated_at: datetime
+    has_invoice_password: bool = False  # Indicates if invoice password is saved (does not return the password)
 
     # Account info
     account_name: str | None = None
@@ -103,3 +104,11 @@ class CreditCardListResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class InvoicePasswordRequest(BaseModel):
+    """Request to save invoice password"""
+    password: str
+
+    class Config:
+        json_schema_extra = {"example": {"password": "mypassword123"}}

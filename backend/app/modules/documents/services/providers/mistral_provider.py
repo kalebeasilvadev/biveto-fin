@@ -264,11 +264,17 @@ class MistralProvider(BaseProvider):
 
         return "cupom_fiscal" if cupom_score > fatura_score else "fatura_cartao"
 
-    async def extract_from_image(self, image_content: bytes, mime_type: str) -> dict:
-        """Converte imagem para PDF e processa via OCR"""
+    async def extract_from_image(self, image_content: bytes, mime_type: str, password: str | None = None) -> dict:
+        """Converte imagem para PDF e processa via OCR
+
+        Args:
+            image_content: Image file content as bytes
+            mime_type: MIME type of the image
+            password: Optional password (not used for images, only for consistency)
+        """
         # Converter imagem para PDF
         pdf_content = await self._image_to_pdf(image_content, mime_type)
-        return await self.extract_from_pdf(pdf_content, "image.pdf")
+        return await self.extract_from_pdf(pdf_content, "image.pdf", password)
 
     async def extract_multi_page(self, images: list[tuple[bytes, str]]) -> dict:
         """Converte multiplas imagens para PDF e processa via OCR"""
@@ -372,10 +378,18 @@ class MistralProvider(BaseProvider):
 
         return await asyncio.to_thread(_convert)
 
-    async def _split_long_pdf(self, pdf_content: bytes, max_ratio: float = 3.0) -> bytes:
+    async def _split_long_pdf(self, pdf_content: bytes, max_ratio: float = 3.0, password: str | None = None) -> bytes:
         """
         Detecta e divide PDFs com páginas muito longas.
         Otimizado para memoria: processa pagina por pagina e libera recursos imediatamente.
+
+        Args:
+            pdf_content: PDF file content as bytes
+            max_ratio: Maximum height/width ratio before splitting
+            password: Optional password for protected PDFs
+
+        Raises:
+            PasswordRequiredException: If PDF requires password and none provided
         """
         import gc
         import io
@@ -387,8 +401,25 @@ class MistralProvider(BaseProvider):
             print("[MistralProvider] PyMuPDF não instalado, não é possível dividir PDF longo")
             return pdf_content
 
+        # Import PasswordRequiredException
+        from ..pdf_converter import PasswordRequiredException
+
         def _process():
             doc = fitz.open(stream=pdf_content, filetype="pdf")
+
+            # Check if password is required
+            if doc.needs_pass:
+                if password is None:
+                    doc.close()
+                    raise PasswordRequiredException("PDF protegido por senha")
+
+                # Try to authenticate with provided password
+                auth_result = doc.authenticate(password)
+                if auth_result == 0:
+                    doc.close()
+                    raise ValueError("Senha incorreta")
+
+            # Continue with normal processing after successful authentication
 
             # Primeira passagem: apenas verificar se precisa dividir (sem armazenar imagens)
             needs_split = False
@@ -471,7 +502,7 @@ class MistralProvider(BaseProvider):
 
         return await asyncio.to_thread(_process)
 
-    async def extract_from_pdf(self, pdf_content: bytes, filename: str = "document.pdf") -> dict:
+    async def extract_from_pdf(self, pdf_content: bytes, filename: str = "document.pdf", password: str | None = None) -> dict:
         """
         Extrai dados de um PDF usando Mistral OCR + LLM (processo em 2 etapas).
 
@@ -479,9 +510,17 @@ class MistralProvider(BaseProvider):
         1. Upload do PDF para Mistral (via thread)
         2. Mistral OCR extrai texto/tabelas em markdown (via thread)
         3. Mistral LLM estrutura os dados em JSON (via thread)
+
+        Args:
+            pdf_content: PDF file content as bytes
+            filename: Original filename
+            password: Optional password for protected PDFs
+
+        Raises:
+            PasswordRequiredException: If PDF requires password and none provided
         """
         # Pré-processar PDF para dividir páginas muito longas
-        pdf_content = await self._split_long_pdf(pdf_content)
+        pdf_content = await self._split_long_pdf(pdf_content, password=password)
 
         try:
             # Usar cliente singleton com connection pooling

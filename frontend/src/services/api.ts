@@ -359,17 +359,21 @@ export const installmentsApi = {
 }
 
 export const documentsApi = {
-  upload: (file: File) => {
+  upload: (file: File, password?: string, creditCardId?: number) => {
     const formData = new FormData()
     formData.append('file', file)
+    if (password) formData.append('password', password)
+    if (creditCardId) formData.append('credit_card_id', creditCardId.toString())
     return api.post('/documents', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
   },
   // Upload async: retorna imediatamente com status "processing"
-  uploadAsync: (file: File) => {
+  uploadAsync: (file: File, password?: string, creditCardId?: number) => {
     const formData = new FormData()
     formData.append('file', file)
+    if (password) formData.append('password', password)
+    if (creditCardId) formData.append('credit_card_id', creditCardId.toString())
     return api.post('/documents/async', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
@@ -550,6 +554,11 @@ export const creditCardsApi = {
     api.post(`/credit-cards/${id}/project-recurring`, null, {
       params: monthsAhead ? { months_ahead: monthsAhead } : {}
     }),
+  // Invoice PDF password management
+  saveInvoicePassword: (id: number, password: string) =>
+    api.post(`/credit-cards/${id}/invoice-password`, { password }),
+  deleteInvoicePassword: (id: number) =>
+    api.delete(`/credit-cards/${id}/invoice-password`),
 }
 
 export const benefitCardsApi = {

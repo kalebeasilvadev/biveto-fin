@@ -62,6 +62,11 @@ class CreditCard(Base):
     # Additional benefits
     benefits_notes: Mapped[str | None] = mapped_column(Text)  # Free text for benefits like lounge access, insurance, etc.
 
+    # Invoice PDF password (encrypted for automatic PDF unlock)
+    # IMPORTANT: This password is ONLY for unlocking password-protected invoice PDF files
+    # It has no relation to the credit card security or bank account password
+    invoice_password_encrypted: Mapped[str | None] = mapped_column(Text)  # Encrypted with Fernet
+
     # Status
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 

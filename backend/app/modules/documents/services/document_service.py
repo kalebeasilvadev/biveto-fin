@@ -13,9 +13,15 @@ from fastapi import HTTPException, status, UploadFile, BackgroundTasks
 from app.models.document import Document, DocumentExtraction, DocumentStatus
 from app.models.transaction import Transaction
 from app.models.user import User
+from app.models.credit_card import CreditCard
 from app.core.config import settings
 from app.core.utils import utc_now
 from app.core.database import async_session_maker
+
+
+class PasswordRequiredError(Exception):
+    """Special error for inline password request - not a failure"""
+    pass
 
 
 def _write_file_sync(file_path: Path, content: bytes) -> None:
@@ -30,11 +36,19 @@ def _read_file_sync(file_path: str) -> bytes:
         return f.read()
 
 
-async def process_document_background(document_id: int, user_id: int, file_path: str, mime_type: str, filename: str):
+async def process_document_background(document_id: int, user_id: int, file_path: str, mime_type: str, filename: str, password: str | None = None):
     """
     Processa documento em background (fora do request context).
     Cria sua propria sessao do banco.
     Recebe file_path ao inves de bytes para economizar memoria.
+
+    Args:
+        document_id: Document ID
+        user_id: User ID
+        file_path: Path to file on disk
+        mime_type: MIME type
+        filename: Original filename
+        password: Optional password for protected PDFs
     """
     import gc
 
@@ -97,7 +111,7 @@ async def process_document_background(document_id: int, user_id: int, file_path:
             else:
                 llm_service = LLMOCRService(provider='google', model=settings.vision_model or 'gemini-2.0-flash')
 
-            extraction_data = await llm_service.extract_from_image(file_bytes, mime_type, filename=filename)
+            extraction_data = await llm_service.extract_from_image(file_bytes, mime_type, filename=filename, password=password)
 
             # Verificar se houve erro
             if extraction_data is None or extraction_data.get('error'):
@@ -146,10 +160,19 @@ class DocumentService:
         user: User,
         file: UploadFile,
         background_tasks: BackgroundTasks,
+        password: str | None = None,
+        credit_card_id: int | None = None,
     ) -> dict:
         """
         Upload async: retorna imediatamente e processa em background.
         Retorna dict com id, status e message.
+
+        Args:
+            user: Current user
+            file: Uploaded file
+            background_tasks: FastAPI background tasks
+            password: Optional password for protected PDFs
+            credit_card_id: Optional credit card ID to fetch saved password
         """
         from app.modules.documents.schemas.document import DocumentAsyncUploadResponse
 
@@ -175,6 +198,35 @@ class DocumentService:
 
         # Ler conteudo (tamanho já validado)
         content = await file.read()
+
+        # Check if PDF requires password
+        is_pdf = file.filename and file.filename.lower().endswith('.pdf')
+        if is_pdf:
+            from app.modules.documents.services.pdf_converter import check_pdf_needs_password
+            needs_password = check_pdf_needs_password(content)
+
+            if needs_password and password is None:
+                # Try to get password from credit card if provided
+                if credit_card_id:
+                    result = await self.db.execute(
+                        select(CreditCard).where(
+                            CreditCard.id == credit_card_id,
+                            CreditCard.user_id == user.id
+                        )
+                    )
+                    card = result.scalar_one_or_none()
+
+                    if card and card.invoice_password_encrypted:
+                        from app.core.crypto import decrypt_password
+                        try:
+                            password = decrypt_password(card.invoice_password_encrypted)
+                            print(f"[DOC_SVC_ASYNC] Using saved password from credit card {credit_card_id}")
+                        except Exception as e:
+                            print(f"[DOC_SVC_ASYNC] Failed to decrypt password: {e}")
+
+                # If still no password, raise special error
+                if password is None:
+                    raise PasswordRequiredError("PDF protegido por senha")
 
         # Calcular hash para dedupe
         file_hash = hashlib.sha256(content).hexdigest()
@@ -214,6 +266,7 @@ class DocumentService:
             str(file_path),  # Passa path ao inves de bytes para economizar memoria
             file.content_type or f"application/{ext}",
             file.filename or "unknown",
+            password,  # Pass password to background task
         )
 
         print(f"[DOC_SVC] Upload async agendado: document_id={document.id}")
@@ -224,7 +277,7 @@ class DocumentService:
             message="Documento enviado. Processamento em andamento.",
         )
 
-    async def upload(self, user: User, file: UploadFile) -> Document:
+    async def upload(self, user: User, file: UploadFile, password: str | None = None, credit_card_id: int | None = None) -> Document:
         # Validar extensao
         ext = file.filename.split(".")[-1].lower() if file.filename else ""
         if ext not in settings.allowed_extensions:
@@ -247,6 +300,36 @@ class DocumentService:
 
         # Ler conteudo (tamanho já validado)
         content = await file.read()
+
+        # Check if PDF requires password
+        is_pdf = file.filename and file.filename.lower().endswith('.pdf')
+        if is_pdf:
+            from app.modules.documents.services.pdf_converter import check_pdf_needs_password
+            needs_password = check_pdf_needs_password(content)
+
+            if needs_password and password is None:
+                # Try to get password from credit card if provided
+                if credit_card_id:
+                    result = await self.db.execute(
+                        select(CreditCard).where(
+                            CreditCard.id == credit_card_id,
+                            CreditCard.user_id == user.id
+                        )
+                    )
+                    card = result.scalar_one_or_none()
+
+                    if card and card.invoice_password_encrypted:
+                        from app.core.crypto import decrypt_password
+                        try:
+                            password = decrypt_password(card.invoice_password_encrypted)
+                            print(f"[DOC_SVC] Using saved password from credit card {credit_card_id}")
+                        except Exception as e:
+                            print(f"[DOC_SVC] Failed to decrypt password: {e}")
+                            # Password might be invalid, will raise PasswordRequiredError below
+
+                # If still no password, raise special error
+                if password is None:
+                    raise PasswordRequiredError("PDF protegido por senha")
 
         # Calcular hash para dedupe
         file_hash = hashlib.sha256(content).hexdigest()
@@ -287,7 +370,7 @@ class DocumentService:
         await self.db.refresh(document)
 
         # Processar documento e extrair dados (sem salvar extracao)
-        extraction_data = await self._process_document(document, content)
+        extraction_data = await self._process_document(document, content, password)
 
         # Retornar resposta com flag de duplicata e itens extraidos (nao salvos)
         from app.modules.documents.schemas.document import DocumentResponse, ExtractedItemResponse, CardInfoResponse
@@ -775,8 +858,14 @@ class DocumentService:
 
         await self.db.delete(document)
 
-    async def _process_document(self, document: Document, content: bytes) -> dict | None:
-        """Processa documento e extrai dados (NAO salva - retorna para confirmacao)"""
+    async def _process_document(self, document: Document, content: bytes, password: str | None = None) -> dict | None:
+        """Processa documento e extrai dados (NAO salva - retorna para confirmacao)
+
+        Args:
+            document: Document model instance
+            content: File content as bytes
+            password: Optional password for protected PDFs
+        """
         try:
             print(f"[DOC_SVC] _process_document: id={document.id}, mime_type={document.mime_type}, content_size={len(content)}")
             document.status = DocumentStatus.PROCESSING
@@ -784,7 +873,7 @@ class DocumentService:
 
             # Extrair dados com LLM
             print(f"[DOC_SVC] Calling _extract_data...")
-            extraction_data = await self._extract_data(document, content)
+            extraction_data = await self._extract_data(document, content, password)
             items_count = len(extraction_data.get('items', [])) if extraction_data else 0
             print(f"[DOC_SVC] _extract_data returned: items={items_count}, error={document.error_message}")
 
@@ -813,9 +902,15 @@ class DocumentService:
             return None
 
     async def _extract_data(
-        self, document: Document, content: bytes
+        self, document: Document, content: bytes, password: str | None = None
     ) -> dict | None:
-        """Extrai dados do documento usando LLM com visao ou parser de planilha"""
+        """Extrai dados do documento usando LLM com visao ou parser de planilha
+
+        Args:
+            document: Document model instance
+            content: File content as bytes
+            password: Optional password for protected PDFs
+        """
         print(f"[DOC_SVC] _extract_data: content_size={len(content)}")
 
         # Verificar se e CSV ou Excel
@@ -850,7 +945,7 @@ class DocumentService:
 
             from app.modules.documents.services.llm_ocr_service import LLMOCRService
             llm_service = LLMOCRService(provider=selected_provider, model=selected_model)
-            result = await llm_service.extract_from_image(content, mime_type, filename=filename)
+            result = await llm_service.extract_from_image(content, mime_type, filename=filename, password=password)
             print(f"[DOC_SVC] LLM OCR result: items={len(result.get('items', []))}, error={result.get('error')}")
 
         # Se houve erro na extracao
@@ -1020,3 +1115,34 @@ class DocumentService:
             print(f"[DOC_SVC] Error in batch duplicate check: {e}")
             # Em caso de erro, retornar todos como nao duplicados
             return [{'is_duplicate': False, 'transaction_id': None} for _ in items]
+
+    async def save_card_password(self, user: User, card_id: int, password: str):
+        """Encrypt and save invoice password to credit card
+
+        Args:
+            user: Current user
+            card_id: Credit card ID
+            password: Plain text password to encrypt and save
+
+        Raises:
+            HTTPException: If card not found or doesn't belong to user
+        """
+        from app.core.crypto import encrypt_password
+
+        result = await self.db.execute(
+            select(CreditCard).where(
+                CreditCard.id == card_id,
+                CreditCard.user_id == user.id
+            )
+        )
+        card = result.scalar_one_or_none()
+
+        if not card:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Cartão não encontrado"
+            )
+
+        card.invoice_password_encrypted = encrypt_password(password)
+        await self.db.commit()
+        print(f"[DOC_SVC] Saved encrypted password for credit card {card_id}")
