@@ -54,7 +54,13 @@ export default function PasswordInputModal({
     }
   }, [isOpen])
 
-  if (!isOpen) return null
+  console.log('[PasswordInputModal] Before return check - isOpen:', isOpen)
+  if (!isOpen) {
+    console.log('[PasswordInputModal] Returning null (not rendering)')
+    return null
+  }
+
+  console.log('[PasswordInputModal] Rendering modal content')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
