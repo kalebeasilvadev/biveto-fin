@@ -166,6 +166,7 @@ class InvoiceService:
     PAYMENT_DESCRIPTION_PATTERNS = [
         'pagamento em ',      # Nubank: "Pagamento em 08 DEZ"
         'pagamento de fatura',
+        'pagamento banco',    # "Pagamento Banco CSP", "Pagamento Banco do Brasil"
         'pag fatura',
         'pgto fatura',
         'pgto cobranca',
