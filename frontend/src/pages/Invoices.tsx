@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
-import { invoicesApi, creditCardsApi, accountsApi, transactionsApi } from '../services/api'
+import { invoicesApi, creditCardsApi, accountsApi, transactionsApi, categoriesApi } from '../services/api'
 import {
   CreditCard,
   Calendar,
@@ -21,6 +21,7 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
+  Pencil,
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import EmptyState from '../components/EmptyState'
@@ -109,6 +110,8 @@ export default function Invoices() {
   const [deleteTransactions, setDeleteTransactions] = useState(true)
   const [showMoveModal, setShowMoveModal] = useState(false)
   const [transactionToMove, setTransactionToMove] = useState<{ id: number; description: string } | null>(null)
+  const [showEditTransactionModal, setShowEditTransactionModal] = useState(false)
+  const [transactionToEdit, setTransactionToEdit] = useState<any | null>(null)
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null)
   const [sortField, setSortField] = useState<SortField>('total_amount')
@@ -122,6 +125,11 @@ export default function Invoices() {
   const { data: accountsData } = useQuery({
     queryKey: ['accounts'],
     queryFn: accountsApi.list,
+  })
+
+  const { data: categoriesData } = useQuery({
+    queryKey: ['categories'],
+    queryFn: categoriesApi.list,
   })
 
   const { data: invoicesData, isLoading } = useQuery({
@@ -181,6 +189,19 @@ export default function Invoices() {
     },
   })
 
+  const editTransactionMutation = useMutation({
+    mutationFn: ({ transactionId, data }: { transactionId: number; data: any }) =>
+      transactionsApi.update(transactionId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invoices'] })
+      queryClient.invalidateQueries({ queryKey: ['invoice'] })
+      queryClient.invalidateQueries({ queryKey: ['transactions'] })
+      queryClient.invalidateQueries({ queryKey: ['credit-cards'] })
+      setShowEditTransactionModal(false)
+      setTransactionToEdit(null)
+    },
+  })
+
   const reprocessMutation = useMutation({
     mutationFn: (creditCardId?: number) => invoicesApi.reprocessOrphanTransactions(creditCardId),
     onSuccess: (response) => {
@@ -204,6 +225,7 @@ export default function Invoices() {
   const accounts: Account[] = (accountsData?.data || []).filter(
     (a: Account) => a.type !== 'credit_card'
   )
+  const categories: any[] = categoriesData?.data || []
   const invoices: Invoice[] = invoicesData?.data || []
   const invoiceDetail: InvoiceDetail | null = invoiceDetailData?.data || null
 
@@ -911,26 +933,38 @@ export default function Invoices() {
                               )}
                             </div>
                           </div>
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-2">
                             <span className={clsx(
                               'font-semibold',
                               t.is_paid ? 'text-gray-900 dark:text-white' : 'text-purple-700 dark:text-purple-300'
                             )}>
                               {formatCurrency(t.amount)}
                             </span>
-                            <button
-                              onClick={() => {
-                                setTransactionToMove({
-                                  id: t.id,
-                                  description: t.description || t.merchant_name || 'Transação',
-                                })
-                                setShowMoveModal(true)
-                              }}
-                              className="p-1.5 opacity-0 group-hover:opacity-100 hover:bg-gray-200 dark:hover:bg-slate-600 rounded transition-opacity"
-                              title="Mover para outra fatura"
-                            >
-                              <ArrowRightLeft size={14} className="text-gray-500" />
-                            </button>
+                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button
+                                onClick={() => {
+                                  setTransactionToEdit(t)
+                                  setShowEditTransactionModal(true)
+                                }}
+                                className="p-1.5 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded transition-colors"
+                                title="Editar transação"
+                              >
+                                <Pencil size={14} className="text-blue-600 dark:text-blue-400" />
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setTransactionToMove({
+                                    id: t.id,
+                                    description: t.description || t.merchant_name || 'Transação',
+                                  })
+                                  setShowMoveModal(true)
+                                }}
+                                className="p-1.5 hover:bg-gray-200 dark:hover:bg-slate-600 rounded transition-colors"
+                                title="Mover para outra fatura"
+                              >
+                                <ArrowRightLeft size={14} className="text-gray-500" />
+                              </button>
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -1182,6 +1216,120 @@ export default function Invoices() {
                   disabled={moveTransactionMutation.isPending}
                 >
                   {moveTransactionMutation.isPending ? 'Movendo...' : 'Mover'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Transaction Modal */}
+      {showEditTransactionModal && transactionToEdit && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
+              Editar Transação
+            </h3>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault()
+                const formData = new FormData(e.currentTarget)
+                const updateData: any = {}
+
+                const amount = formData.get('amount')
+                const description = formData.get('description')
+                const date = formData.get('date')
+                const categoryId = formData.get('category_id')
+
+                if (amount) updateData.amount = Number(amount)
+                if (description !== transactionToEdit.description) updateData.description = String(description)
+                if (date) updateData.date = String(date)
+                if (categoryId) updateData.category_id = Number(categoryId)
+
+                editTransactionMutation.mutate({
+                  transactionId: transactionToEdit.id,
+                  data: updateData,
+                })
+              }}
+            >
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Descrição
+                  </label>
+                  <input
+                    type="text"
+                    name="description"
+                    defaultValue={transactionToEdit.description || transactionToEdit.merchant_name || ''}
+                    className="input"
+                    placeholder="Ex: Compra no supermercado"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Valor
+                  </label>
+                  <input
+                    type="number"
+                    name="amount"
+                    step="0.01"
+                    min="0"
+                    defaultValue={transactionToEdit.amount}
+                    className="input"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Data
+                  </label>
+                  <input
+                    type="date"
+                    name="date"
+                    defaultValue={transactionToEdit.date}
+                    className="input"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Categoria
+                  </label>
+                  <select
+                    name="category_id"
+                    defaultValue={transactionToEdit.category_id || ''}
+                    className="input"
+                  >
+                    <option value="">Sem categoria</option>
+                    {categories.map((cat: any) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex gap-2 mt-6">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowEditTransactionModal(false)
+                    setTransactionToEdit(null)
+                  }}
+                  className="btn-secondary flex-1"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="btn-primary flex-1"
+                  disabled={editTransactionMutation.isPending}
+                >
+                  {editTransactionMutation.isPending ? 'Salvando...' : 'Salvar'}
                 </button>
               </div>
             </form>
