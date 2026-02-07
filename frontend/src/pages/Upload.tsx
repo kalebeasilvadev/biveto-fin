@@ -132,10 +132,8 @@ export default function Upload() {
 
   // Password modal state
   const [showPasswordModal, setShowPasswordModal] = useState(false)
-  // const [pendingPasswordFile, setPendingPasswordFile] = useState<File | null>(null) // Temporarily disabled
-  // const [passwordError, setPasswordError] = useState<string | null>(null) // Temporarily disabled
-  // const [passwordAttemptCount, setPasswordAttemptCount] = useState(0) // Temporarily disabled
-  // const [passwordCreditCardId, setPasswordCreditCardId] = useState<number | undefined>(undefined) // Temporarily disabled
+  const [pendingPasswordFile, setPendingPasswordFile] = useState<File | null>(null)
+  const [passwordCreditCardId, setPasswordCreditCardId] = useState<number | undefined>(undefined)
 
   // Debug: Monitor showPasswordModal changes
   useEffect(() => {
@@ -359,13 +357,14 @@ export default function Upload() {
           // TEMPORARY: Use prompt for immediate feedback while fixing modal
           const password = window.prompt('Este PDF está protegido por senha.\n\nDigite a senha do PDF:')
 
-          if (password) {
+          if (password && pendingPasswordFile) {
+            console.log('Retrying upload with password...')
             // Retry upload with password
-            const file = (uploadMutation.variables as { file: File })?.file
-            if (file) {
-              const creditCardId = selectedCreditCardId ? parseInt(selectedCreditCardId) : undefined
-              uploadMutation.mutate({ file, password, creditCardId })
-            }
+            uploadMutation.mutate({
+              file: pendingPasswordFile,
+              password,
+              creditCardId: passwordCreditCardId
+            })
           }
 
           return
@@ -841,11 +840,11 @@ export default function Upload() {
   // Handlers
   const handleFileUpload = (file: File) => {
     // Store file for potential password retry
-    // setPendingPasswordFile(file) // Temporarily disabled
+    setPendingPasswordFile(file)
 
     // Try to get credit card ID from selected credit card (if invoice mode)
     const creditCardId = selectedCreditCardId ? parseInt(selectedCreditCardId) : undefined
-    // setPasswordCreditCardId(creditCardId) // Temporarily disabled
+    setPasswordCreditCardId(creditCardId)
 
     // Upload with optional credit card ID for automatic password
     uploadMutation.mutate({ file, creditCardId })
