@@ -68,6 +68,7 @@ async def list_transactions(
     end_date: date | None = Query(None),
     category_id: int | None = Query(None),
     account_id: int | None = Query(None),
+    type: str | None = Query(None),
     search: str | None = Query(None, min_length=2, max_length=100),
     limit: int = Query(20, le=100),
     offset: int = Query(0, ge=0),
@@ -81,6 +82,7 @@ async def list_transactions(
         end_date=end_date,
         category_id=category_id,
         account_id=account_id,
+        transaction_type=type,
         search=search,
         limit=limit,
         offset=offset,
@@ -95,6 +97,7 @@ async def list_transactions(
         end_date=end_date,
         category_id=category_id,
         account_id=account_id,
+        transaction_type=type,
         search=search,
     )
 

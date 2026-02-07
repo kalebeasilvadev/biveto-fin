@@ -1081,6 +1081,7 @@ class TransactionService:
         end_date: date | None = None,
         category_id: int | None = None,
         account_id: int | None = None,
+        transaction_type: str | None = None,
         search: str | None = None,
         limit: int = 50,
         offset: int = 0,
@@ -1117,6 +1118,8 @@ class TransactionService:
             query = query.where(Transaction.category_id == category_id)
         if account_id:
             query = query.where(Transaction.account_id == account_id)
+        if transaction_type:
+            query = query.where(Transaction.type == transaction_type)
 
         # Search across description, merchant name, and category name
         if search:
@@ -1152,6 +1155,7 @@ class TransactionService:
         end_date: date | None = None,
         category_id: int | None = None,
         account_id: int | None = None,
+        transaction_type: str | None = None,
         search: str | None = None,
     ) -> int:
         """Returns the total count of transactions matching the filters"""
@@ -1183,6 +1187,8 @@ class TransactionService:
             query = query.where(Transaction.category_id == category_id)
         if account_id:
             query = query.where(Transaction.account_id == account_id)
+        if transaction_type:
+            query = query.where(Transaction.type == transaction_type)
 
         # Search across description, merchant name, and category name
         if search:
