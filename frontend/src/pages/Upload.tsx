@@ -359,12 +359,16 @@ export default function Upload() {
 
           if (password && pendingPasswordFile) {
             console.log('Retrying upload with password...')
-            // Retry upload with password
-            uploadMutation.mutate({
-              file: pendingPasswordFile,
-              password,
-              creditCardId: passwordCreditCardId
-            })
+            // Retry upload with password - use direct API call instead of mutation
+            documentsApi.upload(pendingPasswordFile, password, passwordCreditCardId)
+              .then(response => {
+                console.log('Upload with password succeeded!', response)
+                handleUploadSuccess(response)
+              })
+              .catch(retryError => {
+                console.error('Upload with password failed:', retryError)
+                setUploadError(getApiErrorMessage(retryError, 'Senha incorreta ou erro no processamento'))
+              })
           }
 
           return
