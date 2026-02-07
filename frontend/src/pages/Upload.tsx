@@ -1498,18 +1498,19 @@ export default function Upload() {
   const isPending = isManual ? createMutation.isPending : confirmMutation.isPending
 
   return (
-    <div className="max-w-lg mx-auto space-y-6 pb-20">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            {isManual ? 'Nova Transação' : 'Confirmar Transação'}
-          </h1>
-          <HelpButton pageId="upload" />
+    <>
+      <div className="max-w-lg mx-auto space-y-6 pb-20">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+              {isManual ? 'Nova Transação' : 'Confirmar Transação'}
+            </h1>
+            <HelpButton pageId="upload" />
+          </div>
+          <button onClick={resetForm} className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+            <X size={24} />
+          </button>
         </div>
-        <button onClick={resetForm} className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
-          <X size={24} />
-        </button>
-      </div>
 
       <div className="card space-y-4">
         {/* Duplicate alert - informational only */}
@@ -2082,29 +2083,6 @@ export default function Upload() {
         )}
       </div>
 
-      {/* Password Input Modal */}
-      {showPasswordModal && (
-        <PasswordInputModal
-          isOpen={showPasswordModal}
-          onClose={() => {
-            setShowPasswordModal(false)
-            setPendingPasswordFile(null)
-            setPasswordError(null)
-            setPasswordAttemptCount(0)
-          }}
-          onSubmit={handlePasswordSubmit}
-          creditCardId={passwordCreditCardId}
-          creditCardName={
-            passwordCreditCardId
-              ? creditCards.find((c: { id: number; name: string }) => c.id === passwordCreditCardId)?.name
-              : undefined
-          }
-          error={passwordError}
-          attemptCount={passwordAttemptCount}
-          maxAttempts={5}
-        />
-      )}
-
       {/* Modal de resolução de duplicata */}
       {duplicateModalIndex !== null && potentialDuplicates[duplicateModalIndex] && document?.extracted_items && (
         <DuplicateResolutionModal
@@ -2120,5 +2098,29 @@ export default function Upload() {
         />
       )}
     </div>
+
+    {/* Password Input Modal - Outside main container for proper z-index */}
+    {showPasswordModal && (
+      <PasswordInputModal
+        isOpen={showPasswordModal}
+        onClose={() => {
+          setShowPasswordModal(false)
+          setPendingPasswordFile(null)
+          setPasswordError(null)
+          setPasswordAttemptCount(0)
+        }}
+        onSubmit={handlePasswordSubmit}
+        creditCardId={passwordCreditCardId}
+        creditCardName={
+          passwordCreditCardId
+            ? creditCards.find((c: { id: number; name: string }) => c.id === passwordCreditCardId)?.name
+            : undefined
+        }
+        error={passwordError}
+        attemptCount={passwordAttemptCount}
+        maxAttempts={5}
+      />
+    )}
+    </>
   )
 }
