@@ -1275,7 +1275,7 @@ export default function Invoices() {
                     name="amount"
                     step="0.01"
                     min="0"
-                    defaultValue={transactionToEdit.amount}
+                    defaultValue={Math.abs(transactionToEdit.amount)}
                     className="input"
                     required
                   />
