@@ -369,7 +369,13 @@ export default function Upload() {
                 console.log('=== UPLOAD WITH PASSWORD SUCCEEDED ===')
                 console.log('Response status:', response.status)
                 console.log('Response data:', response.data)
-                handleUploadSuccess(response)
+                try {
+                  handleUploadSuccess(response)
+                  console.log('handleUploadSuccess completed')
+                } catch (e) {
+                  console.error('Error in handleUploadSuccess:', e)
+                  throw e
+                }
               })
               .catch(retryError => {
                 console.log('=== UPLOAD WITH PASSWORD FAILED ===')
@@ -377,6 +383,9 @@ export default function Upload() {
                 const errorMessage = getApiErrorMessage(retryError, 'Senha incorreta ou erro no processamento')
                 console.log('Error message:', errorMessage)
                 setUploadError(errorMessage)
+              })
+              .finally(() => {
+                console.log('=== UPLOAD WITH PASSWORD PROMISE COMPLETED ===')
               })
           } else {
             console.log('No password entered or no pending file')
