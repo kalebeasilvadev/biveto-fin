@@ -2100,6 +2100,11 @@ export default function Upload() {
       )}
     </div>
 
+    {/* DEBUG: Indicator always visible */}
+    <div className="fixed top-4 right-4 z-[999] bg-red-500 text-white px-4 py-2 rounded font-mono text-xs">
+      Modal State: {showPasswordModal ? 'TRUE ✓' : 'FALSE ✗'}
+    </div>
+
     {/* Password Input Modal - Outside main container for proper z-index */}
     {showPasswordModal && (
       <div
