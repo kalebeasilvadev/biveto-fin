@@ -2108,7 +2108,7 @@ export default function Upload() {
     {/* Password Input Modal - Outside main container for proper z-index */}
     {showPasswordModal && (
       <div
-        className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center"
+        style={{ position: 'fixed', inset: 0, zIndex: 99999, backgroundColor: 'rgba(255,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
         onClick={() => {
           setShowPasswordModal(false)
           // setPendingPasswordFile(null)
@@ -2116,9 +2116,9 @@ export default function Upload() {
           // setPasswordAttemptCount(0)
         }}
       >
-        <div className="bg-white dark:bg-slate-800 p-6 rounded-xl max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
-          <h2 className="text-xl font-bold mb-4">PDF Protegido por Senha</h2>
-          <p className="text-sm mb-4">Digite a senha do PDF para continuar</p>
+        <div style={{ backgroundColor: 'yellow', padding: '2rem', borderRadius: '1rem', maxWidth: '400px', width: '100%', margin: '1rem', border: '5px solid red' }} onClick={(e) => e.stopPropagation()}>
+          <h2 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '1rem', color: 'red' }}>MODAL DE TESTE - PDF COM SENHA</h2>
+          <p style={{ marginBottom: '1rem', fontSize: '1.2rem' }}>Se você está vendo isso, o modal ESTÁ funcionando!</p>
           <input
             type="password"
             className="w-full px-4 py-2 border rounded mb-4"
