@@ -2083,25 +2083,27 @@ export default function Upload() {
       </div>
 
       {/* Password Input Modal */}
-      <PasswordInputModal
-        isOpen={showPasswordModal}
-        onClose={() => {
-          setShowPasswordModal(false)
-          setPendingPasswordFile(null)
-          setPasswordError(null)
-          setPasswordAttemptCount(0)
-        }}
-        onSubmit={handlePasswordSubmit}
-        creditCardId={passwordCreditCardId}
-        creditCardName={
-          passwordCreditCardId
-            ? creditCards.find((c: { id: number; name: string }) => c.id === passwordCreditCardId)?.name
-            : undefined
-        }
-        error={passwordError}
-        attemptCount={passwordAttemptCount}
-        maxAttempts={5}
-      />
+      {showPasswordModal && (
+        <PasswordInputModal
+          isOpen={showPasswordModal}
+          onClose={() => {
+            setShowPasswordModal(false)
+            setPendingPasswordFile(null)
+            setPasswordError(null)
+            setPasswordAttemptCount(0)
+          }}
+          onSubmit={handlePasswordSubmit}
+          creditCardId={passwordCreditCardId}
+          creditCardName={
+            passwordCreditCardId
+              ? creditCards.find((c: { id: number; name: string }) => c.id === passwordCreditCardId)?.name
+              : undefined
+          }
+          error={passwordError}
+          attemptCount={passwordAttemptCount}
+          maxAttempts={5}
+        />
+      )}
 
       {/* Modal de resolução de duplicata */}
       {duplicateModalIndex !== null && potentialDuplicates[duplicateModalIndex] && document?.extracted_items && (
