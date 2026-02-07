@@ -421,6 +421,10 @@ class MistralProvider(BaseProvider):
 
             # Continue with normal processing after successful authentication
 
+            # If PDF was password-protected, we need to return the decrypted version
+            # even if it doesn't need splitting
+            pdf_was_encrypted = doc.needs_pass or password is not None
+
             # Primeira passagem: apenas verificar se precisa dividir (sem armazenar imagens)
             needs_split = False
             for page_num in range(len(doc)):
@@ -431,9 +435,20 @@ class MistralProvider(BaseProvider):
                     needs_split = True
                     break
 
-            if not needs_split:
+            if not needs_split and not pdf_was_encrypted:
+                # No split needed and no decryption - return original
                 doc.close()
                 return pdf_content
+
+            if not needs_split and pdf_was_encrypted:
+                # No split needed but PDF was encrypted - save decrypted version
+                print("[MistralProvider] PDF was encrypted, saving decrypted version...")
+                output = io.BytesIO()
+                doc.save(output)
+                result = output.getvalue()
+                doc.close()
+                print(f"[MistralProvider] Decrypted PDF: {len(result)} bytes")
+                return result
 
             print(f"[MistralProvider] PDF com página longa detectado, processando {len(doc)} página(s)...")
 
