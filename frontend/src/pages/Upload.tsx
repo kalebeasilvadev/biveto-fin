@@ -358,17 +358,30 @@ export default function Upload() {
           const password = window.prompt('Este PDF está protegido por senha.\n\nDigite a senha do PDF:')
 
           if (password && pendingPasswordFile) {
-            console.log('Retrying upload with password...')
+            console.log('=== RETRYING UPLOAD WITH PASSWORD ===')
+            console.log('File:', pendingPasswordFile.name, pendingPasswordFile.size, 'bytes')
+            console.log('Password length:', password.length)
+            console.log('Credit card ID:', passwordCreditCardId)
+
             // Retry upload with password - use direct API call instead of mutation
             documentsApi.upload(pendingPasswordFile, password, passwordCreditCardId)
               .then(response => {
-                console.log('Upload with password succeeded!', response)
+                console.log('=== UPLOAD WITH PASSWORD SUCCEEDED ===')
+                console.log('Response status:', response.status)
+                console.log('Response data:', response.data)
                 handleUploadSuccess(response)
               })
               .catch(retryError => {
-                console.error('Upload with password failed:', retryError)
-                setUploadError(getApiErrorMessage(retryError, 'Senha incorreta ou erro no processamento'))
+                console.log('=== UPLOAD WITH PASSWORD FAILED ===')
+                console.error('Error:', retryError)
+                const errorMessage = getApiErrorMessage(retryError, 'Senha incorreta ou erro no processamento')
+                console.log('Error message:', errorMessage)
+                setUploadError(errorMessage)
               })
+          } else {
+            console.log('No password entered or no pending file')
+            console.log('Password:', password ? `${password.length} chars` : 'null')
+            console.log('Pending file:', pendingPasswordFile ? pendingPasswordFile.name : 'null')
           }
 
           return
