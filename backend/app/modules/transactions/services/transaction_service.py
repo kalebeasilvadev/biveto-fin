@@ -235,7 +235,7 @@ class TransactionService:
 
                 # Atualizar total da fatura se houver
                 if invoice and invoice_service:
-                    await invoice_service.update_invoice_total(invoice)
+                    await invoice_service.update_invoice_total(invoice, force_recalculate=True)
 
                 return transaction
 
@@ -255,7 +255,7 @@ class TransactionService:
 
                 # Atualizar total da fatura se houver
                 if invoice and invoice_service:
-                    await invoice_service.update_invoice_total(invoice)
+                    await invoice_service.update_invoice_total(invoice, force_recalculate=True)
 
                 return transaction
 
@@ -284,7 +284,7 @@ class TransactionService:
 
                 # Atualizar total da fatura se houver
                 if invoice and invoice_service:
-                    await invoice_service.update_invoice_total(invoice)
+                    await invoice_service.update_invoice_total(invoice, force_recalculate=True)
 
                 return transaction
 
@@ -1343,7 +1343,7 @@ class TransactionService:
                 await self.db.flush()
 
                 # Atualizar total da fatura
-                await invoice_service.update_invoice_total(invoice)
+                await invoice_service.update_invoice_total(invoice, force_recalculate=True)
 
         # Se mudou de fatura, atualizar ambas
         elif invoice_changed:
@@ -1354,7 +1354,7 @@ class TransactionService:
                 )
                 old_invoice = result.scalar_one_or_none()
                 if old_invoice:
-                    await invoice_service.update_invoice_total(old_invoice)
+                    await invoice_service.update_invoice_total(old_invoice, force_recalculate=True)
 
             # Atualizar fatura nova (se existe)
             if new_invoice_id:
@@ -1410,12 +1410,12 @@ class TransactionService:
 
                     # Atualizar totais de ambas as faturas
                     if old_invoice:
-                        await invoice_service.update_invoice_total(old_invoice)
-                    await invoice_service.update_invoice_total(correct_invoice)
+                        await invoice_service.update_invoice_total(old_invoice, force_recalculate=True)
+                    await invoice_service.update_invoice_total(correct_invoice, force_recalculate=True)
                 elif current_invoice:
                     # Mesma fatura, atualizar total se valor ou tipo mudou
                     if amount_changed or type_changed or category_changed:
-                        await invoice_service.update_invoice_total(current_invoice)
+                        await invoice_service.update_invoice_total(current_invoice, force_recalculate=True)
 
         elif amount_changed or type_changed or category_changed:
             # Valor, tipo ou categoria mudou, atualizar a fatura atual
@@ -1425,7 +1425,7 @@ class TransactionService:
                 )
                 invoice = result.scalar_one_or_none()
                 if invoice:
-                    await invoice_service.update_invoice_total(invoice)
+                    await invoice_service.update_invoice_total(invoice, force_recalculate=True)
 
         # Se é uma transferência, sincronizar a transação linkada
         if transaction.type == TransactionType.TRANSFER.value and transaction.linked_transaction_id:
@@ -1583,7 +1583,7 @@ class TransactionService:
                         result["invoices_deleted"] += 1
                     else:
                         # Atualizar total da fatura
-                        await invoice_service.update_invoice_total(invoice)
+                        await invoice_service.update_invoice_total(invoice, force_recalculate=True)
 
         else:
             # Deletar apenas a transacao especifica
@@ -1601,7 +1601,7 @@ class TransactionService:
                 invoice = inv_result.scalar_one_or_none()
                 if invoice:
                     invoice_service = InvoiceService(self.db)
-                    await invoice_service.update_invoice_total(invoice)
+                    await invoice_service.update_invoice_total(invoice, force_recalculate=True)
 
         return result
 

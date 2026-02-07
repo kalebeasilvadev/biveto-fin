@@ -177,7 +177,11 @@ class InvoiceService:
         'pagamento boleto',
     ]
 
-    async def update_invoice_total(self, invoice: CreditCardInvoice) -> None:
+    async def update_invoice_total(
+        self,
+        invoice: CreditCardInvoice,
+        force_recalculate: bool = False
+    ) -> None:
         """
         Recalcula o total da fatura baseado nas transacoes vinculadas.
 
@@ -192,18 +196,21 @@ class InvoiceService:
         - Reembolsos
         - Creditos promocionais
 
+        Args:
+            invoice: Fatura a ser recalculada
+            force_recalculate: Se True, recalcula mesmo faturas de PDF
+
         NOTA: Nao recalcula faturas:
         - Já pagas (status='paid') - valor histórico preservado
-        - Criadas a partir de documento PDF (document_id) - valor do PDF é mais confiável
+        - Criadas de PDF (document_id) - a menos que force_recalculate=True
         """
         # Se a fatura ja foi paga, nao recalcular o total
         # O valor historico deve ser preservado
         if invoice.status == InvoiceStatus.PAID.value:
             return
 
-        # Se a fatura veio de um documento PDF, nao recalcular o total
-        # O valor extraido do PDF e mais confiavel
-        if invoice.document_id and invoice.total_amount > 0:
+        # Se a fatura veio de PDF e nao esta forcando recalculo, preservar total do PDF
+        if invoice.document_id and invoice.total_amount > 0 and not force_recalculate:
             return
 
         # Buscar todas as transacoes da fatura
