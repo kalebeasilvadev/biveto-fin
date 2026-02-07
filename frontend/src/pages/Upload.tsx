@@ -355,12 +355,14 @@ export default function Upload() {
           console.log('✅ PASSWORD REQUIRED - Requesting password')
 
           // TEMPORARY: Use prompt for immediate feedback while fixing modal
-          const password = window.prompt('Este PDF está protegido por senha.\n\nDigite a senha do PDF:')
+          const rawPassword = window.prompt('Este PDF está protegido por senha.\n\nDigite a senha do PDF:')
+          const password = rawPassword?.trim() // Remove espaços extras
 
           if (password && pendingPasswordFile) {
             console.log('=== RETRYING UPLOAD WITH PASSWORD ===')
             console.log('File:', pendingPasswordFile.name, pendingPasswordFile.size, 'bytes')
-            console.log('Password length:', password.length)
+            console.log('Password (raw):', rawPassword ? `"${rawPassword}" (${rawPassword.length} chars)` : 'null')
+            console.log('Password (trimmed):', password ? `"${password}" (${password.length} chars)` : 'null')
             console.log('Credit card ID:', passwordCreditCardId)
 
             // Retry upload with password - use direct API call instead of mutation
