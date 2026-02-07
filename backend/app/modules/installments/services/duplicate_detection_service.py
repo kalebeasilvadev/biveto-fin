@@ -16,7 +16,19 @@ from app.modules.installments.schemas.installment import InstallmentSeriesRespon
 
 
 class DuplicateDetectionService:
-    """Detecta e resolve duplicatas em séries de parcelas"""
+    """
+    Detecta e resolve duplicatas em séries de parcelas.
+
+    IMPORTANTE: Este serviço detecta duplicatas apenas em SÉRIES de parcelas.
+    Transações avulsas (installment_series_id=null) não são comparadas.
+
+    Para detectar duplicatas em transações individuais, será necessário
+    implementar lógica adicional no futuro.
+    """
+
+    # Constantes para hard rules de detecção de duplicatas
+    MAX_AMOUNT_DIFFERENCE_BRL = 0.05  # R$ 0,05 (5 centavos) - diferença absoluta máxima
+    MIN_NAME_OVERLAP = 0.80           # 80% mínimo de palavras em comum
 
     def __init__(self, db: AsyncSession):
         self.db = db
@@ -112,12 +124,60 @@ class DuplicateDetectionService:
         """
         Calcula score de similaridade entre duas séries (0.0 a 1.0).
 
-        Critérios:
+        HARD RULES (bloqueiam comparação):
+        1. Valores devem diferir em no máximo R$ 0,05 (diferença absoluta)
+        2. Nome deve ter pelo menos 80% de palavras em comum
+        3. Total de parcelas deve ser igual
+
+        SOFT SCORING (se passar hard rules):
         - Merchant name (fuzzy) - peso 40%
-        - Valor parcela (tolerância 5%) - peso 30%
+        - Valor parcela - peso 30%
         - Total parcelas - peso 15%
         - Cartão crédito - peso 15%
         """
+
+        # ============================================
+        # HARD RULE 1: Amount Difference Check (ABSOLUTA)
+        # ============================================
+        if series_a.installment_amount and series_b.installment_amount:
+            amount_a = float(series_a.installment_amount)
+            amount_b = float(series_b.installment_amount)
+
+            # Diferença absoluta em reais (não percentual)
+            diff_absolute = abs(amount_a - amount_b)
+
+            # Bloqueia se diferença > R$ 0,05 (5 centavos)
+            if diff_absolute > self.MAX_AMOUNT_DIFFERENCE_BRL:
+                return 0.0  # CRÍTICO: Retorna 0 imediatamente
+
+        # ============================================
+        # HARD RULE 2: Merchant Name Minimum Overlap
+        # ============================================
+        if series_a.merchant_name and series_b.merchant_name:
+            norm_a = self.installment_service._normalize_merchant_name(series_a.merchant_name)
+            norm_b = self.installment_service._normalize_merchant_name(series_b.merchant_name)
+
+            words_a = set(norm_a.split())
+            words_b = set(norm_b.split())
+
+            if words_a and words_b:
+                common = words_a & words_b
+                total = max(len(words_a), len(words_b))
+                name_overlap = len(common) / total if total > 0 else 0
+
+                # Bloqueia se < 80% de sobreposição no nome
+                if name_overlap < self.MIN_NAME_OVERLAP:
+                    return 0.0  # Bloqueia matches ruins de nome
+
+        # ============================================
+        # HARD RULE 3: Installment Count Must Match
+        # ============================================
+        if series_a.installment_count != series_b.installment_count:
+            return 0.0  # Número de parcelas deve ser idêntico
+
+        # ============================================
+        # SOFT SCORING (lógica existente)
+        # ============================================
         score = 0.0
 
         # 1. Similaridade do nome (40%)
@@ -139,13 +199,15 @@ class DuplicateDetectionService:
         if series_a.installment_amount and series_b.installment_amount:
             amount_a = float(series_a.installment_amount)
             amount_b = float(series_b.installment_amount)
-            tolerance = 0.05  # 5%
 
-            if amount_a > 0:
-                diff = abs(amount_a - amount_b) / amount_a
-                if diff <= tolerance:
-                    amount_score = 1.0 - (diff / tolerance)
-                    score += amount_score * 0.3
+            # Diferença absoluta (já sabemos que é <= R$ 0,05 pelas hard rules)
+            diff_absolute = abs(amount_a - amount_b)
+
+            # Score baseado na diferença absoluta
+            # R$ 0,00 = 100%, R$ 0,05 = 0%
+            if diff_absolute <= self.MAX_AMOUNT_DIFFERENCE_BRL:
+                amount_score = 1.0 - (diff_absolute / self.MAX_AMOUNT_DIFFERENCE_BRL)
+                score += amount_score * 0.3
 
         # 3. Mesmo total de parcelas (15%)
         if series_a.installment_count == series_b.installment_count:

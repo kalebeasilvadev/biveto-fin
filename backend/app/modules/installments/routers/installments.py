@@ -54,13 +54,16 @@ async def get_series(
 async def detect_duplicates(
     current_user: CurrentUser,
     db: DbSession,
-    min_similarity: float = Query(0.7, ge=0.0, le=1.0),
+    min_similarity: float = Query(0.80, ge=0.5, le=1.0),
 ):
     """
     Detecta séries potencialmente duplicadas.
 
     Retorna grupos de séries similares com score de similaridade,
     conflitos identificados e sugestão de série primária.
+
+    O threshold padrão de 0.80 (80%) foi escolhido para minimizar falsos positivos,
+    garantindo que apenas duplicatas com alta confiança sejam detectadas.
     """
     service = DuplicateDetectionService(db)
     duplicate_groups = await service.find_duplicate_groups(
