@@ -355,7 +355,7 @@ export default function Upload() {
         // Check if detail is an object with error property
         if (detail && typeof detail === 'object' && 'error' in detail && detail.error === 'password_required') {
           console.log('✅ PASSWORD REQUIRED - SHOWING MODAL')
-          console.log('Setting showPasswordModal to true')
+          alert('SENHA NECESSÁRIA - Modal deveria aparecer agora!')
           setPasswordError(null)
           setPasswordAttemptCount(0)
           setShowPasswordModal(true)
