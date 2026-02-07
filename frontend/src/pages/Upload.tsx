@@ -354,17 +354,20 @@ export default function Upload() {
 
         // Check if detail is an object with error property
         if (detail && typeof detail === 'object' && 'error' in detail && detail.error === 'password_required') {
-          console.log('✅ PASSWORD REQUIRED - SHOWING MODAL')
+          console.log('✅ PASSWORD REQUIRED - Requesting password')
 
-          // CRITICAL FIX: Use setTimeout to escape React Query's error handling cycle
-          // React Query may be batching state updates or preventing re-renders in onError
-          setTimeout(() => {
-            console.log('Opening modal via setTimeout')
-            setShowPasswordModal(true)
-            alert('Modal setado! Verifique se apareceu.')
-          }, 10)
+          // TEMPORARY: Use prompt for immediate feedback while fixing modal
+          const password = window.prompt('Este PDF está protegido por senha.\n\nDigite a senha do PDF:')
 
-          console.log('Scheduled modal to open')
+          if (password) {
+            // Retry upload with password
+            const file = (uploadMutation.variables as { file: File })?.file
+            if (file) {
+              const creditCardId = selectedCreditCardId ? parseInt(selectedCreditCardId) : undefined
+              uploadMutation.mutate({ file, password, creditCardId })
+            }
+          }
+
           return
         } else {
           console.log('❌ Detail does not match password_required format')
