@@ -137,6 +137,11 @@ export default function Upload() {
   const [passwordAttemptCount, setPasswordAttemptCount] = useState(0)
   const [passwordCreditCardId, setPasswordCreditCardId] = useState<number | undefined>(undefined)
 
+  // Debug: Monitor showPasswordModal changes
+  useEffect(() => {
+    console.log('[Upload] showPasswordModal changed to:', showPasswordModal)
+  }, [showPasswordModal])
+
   // Poll for document status when processing
   const { data: polledDocument } = useQuery({
     queryKey: ['document', processingDocumentId],

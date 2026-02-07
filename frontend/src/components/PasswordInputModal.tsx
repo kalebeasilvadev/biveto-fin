@@ -22,6 +22,8 @@ export default function PasswordInputModal({
   attemptCount = 0,
   maxAttempts = 5,
 }: PasswordInputModalProps) {
+  console.log('[PasswordInputModal] Component render - isOpen:', isOpen)
+
   const [password, setPassword] = useState('')
   const [saveToCard, setSaveToCard] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
