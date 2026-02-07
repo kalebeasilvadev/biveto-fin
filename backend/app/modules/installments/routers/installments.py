@@ -8,6 +8,7 @@ from app.modules.installments.services.duplicate_detection_service import Duplic
 from app.modules.installments.schemas.installment import InstallmentSeriesResponse
 from app.modules.installments.schemas.duplicate import (
     DuplicateGroupsResponse,
+    TransactionDuplicatesResponse,
     MergeSeriesRequest,
     UpdateSeriesRequest,
 )
@@ -75,6 +76,40 @@ async def detect_duplicates(
         duplicate_groups=duplicate_groups,
         total_groups=len(duplicate_groups),
     )
+
+
+@router.post("/detect-transaction-duplicates", response_model=TransactionDuplicatesResponse)
+async def detect_transaction_duplicates(
+    current_user: CurrentUser,
+    db: DbSession,
+    min_similarity: float = Query(0.80, ge=0.5, le=1.0),
+    credit_card_id: int | None = Query(None, description="Filtrar por cartão específico"),
+    reference_month: int | None = Query(None, ge=1, le=12, description="Mês de referência"),
+    reference_year: int | None = Query(None, ge=2020, le=2100, description="Ano de referência"),
+):
+    """
+    Detecta duplicatas entre transações individuais.
+
+    Compara transações avulsas vs transações de séries, detectando duplicatas como:
+    - "cartao protegido" vs "Seg. Cartão Protegido com Piv. jan/26"
+
+    Critérios de detecção:
+    - Valores iguais ou muito próximos (±R$ 0,05)
+    - Descrições similares (fuzzy matching >= 80%)
+    - Datas próximas (±3 dias)
+
+    O threshold padrão de 0.80 (80%) foi escolhido para minimizar falsos positivos.
+    """
+    service = DuplicateDetectionService(db)
+    result = await service.find_transaction_duplicates(
+        user=current_user,
+        min_similarity=min_similarity,
+        credit_card_id=credit_card_id,
+        reference_month=reference_month,
+        reference_year=reference_year,
+    )
+
+    return result
 
 
 @router.post("/merge", response_model=InstallmentSeriesResponse)

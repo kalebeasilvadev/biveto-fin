@@ -1,7 +1,9 @@
-"""Serviço para detecção e resolução de duplicatas em séries de parcelas"""
+"""Serviço para detecção e resolução de duplicatas em séries de parcelas e transações"""
 
+from datetime import timedelta
+from rapidfuzz import fuzz
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, or_
 from fastapi import HTTPException, status
 
 from app.models.installment import InstallmentSeries, InstallmentSeriesStatus
@@ -11,24 +13,30 @@ from app.modules.installments.services.installment_service import InstallmentSer
 from app.modules.installments.schemas.duplicate import (
     DuplicateGroup,
     ConflictDetail,
+    TransactionDuplicatePair,
+    TransactionDuplicatesResponse,
 )
 from app.modules.installments.schemas.installment import InstallmentSeriesResponse
 
 
 class DuplicateDetectionService:
     """
-    Detecta e resolve duplicatas em séries de parcelas.
+    Detecta e resolve duplicatas em séries de parcelas e transações individuais.
 
-    IMPORTANTE: Este serviço detecta duplicatas apenas em SÉRIES de parcelas.
-    Transações avulsas (installment_series_id=null) não são comparadas.
-
-    Para detectar duplicatas em transações individuais, será necessário
-    implementar lógica adicional no futuro.
+    Funcionalidades:
+    1. Detecção de séries duplicadas (find_duplicate_groups)
+    2. Detecção de transações duplicadas (find_transaction_duplicates)
+    3. Mesclagem de séries (merge_series)
     """
 
-    # Constantes para hard rules de detecção de duplicatas
+    # Constantes para hard rules de detecção de duplicatas em SÉRIES
     MAX_AMOUNT_DIFFERENCE_BRL = 0.05  # R$ 0,05 (5 centavos) - diferença absoluta máxima
     MIN_NAME_OVERLAP = 0.80           # 80% mínimo de palavras em comum
+
+    # Constantes para detecção de duplicatas em TRANSAÇÕES INDIVIDUAIS
+    MAX_TRANSACTION_AMOUNT_DIFF = 0.05  # R$ 0,05 diferença máxima entre valores
+    MIN_DESCRIPTION_SIMILARITY = 80.0    # 80% similaridade mínima na descrição (fuzzy)
+    MAX_DATE_DIFFERENCE_DAYS = 3         # 3 dias de diferença máxima entre datas
 
     def __init__(self, db: AsyncSession):
         self.db = db
@@ -115,6 +123,224 @@ class DuplicateDetectionService:
         duplicate_groups.sort(key=lambda g: g.similarity_score, reverse=True)
 
         return duplicate_groups
+
+    async def find_transaction_duplicates(
+        self,
+        user: User,
+        min_similarity: float = 0.80,
+        credit_card_id: int | None = None,
+        reference_month: int | None = None,
+        reference_year: int | None = None,
+    ) -> TransactionDuplicatesResponse:
+        """
+        Detecta duplicatas entre transações individuais.
+
+        Compara:
+        - Transações avulsas vs transações de séries
+        - Transações avulsas vs transações avulsas
+
+        Critérios:
+        - Mesmo valor (±R$ 0,05)
+        - Descrição similar (fuzzy matching >= 80%)
+        - Mesma data aproximada (±3 dias)
+
+        Args:
+            user: Usuário dono das transações
+            min_similarity: Similaridade mínima (0.0 a 1.0)
+            credit_card_id: Filtrar por cartão específico
+            reference_month: Filtrar por mês de referência
+            reference_year: Filtrar por ano de referência
+        """
+        # Buscar transações do usuário
+        query = select(Transaction).where(Transaction.user_id == user.id)
+
+        # Filtros opcionais
+        if credit_card_id:
+            query = query.where(Transaction.credit_card_id == credit_card_id)
+
+        if reference_month and reference_year:
+            # Buscar por fatura (transactions que cairiam nessa fatura)
+            from datetime import date
+            # Aproximação: transações do mês anterior ao fechamento
+            start_date = date(reference_year, reference_month - 1 if reference_month > 1 else 12, 1)
+            end_date = date(reference_year, reference_month, 28)  # Aproximado
+            query = query.where(
+                and_(
+                    Transaction.date >= start_date,
+                    Transaction.date <= end_date,
+                )
+            )
+
+        result = await self.db.execute(query.order_by(Transaction.date.desc()))
+        transactions = list(result.scalars().all())
+
+        if len(transactions) < 2:
+            return TransactionDuplicatesResponse(
+                duplicate_pairs=[],
+                total_pairs=0,
+                estimated_excess=0.0,
+            )
+
+        # Encontrar pares duplicados
+        duplicate_pairs = []
+        processed_ids = set()
+
+        for i, tx_a in enumerate(transactions):
+            if tx_a.id in processed_ids:
+                continue
+
+            for tx_b in transactions[i + 1:]:
+                if tx_b.id in processed_ids:
+                    continue
+
+                # Verificar se são duplicatas
+                is_duplicate, score = self._check_transaction_duplicate(tx_a, tx_b)
+
+                if is_duplicate and score >= min_similarity:
+                    # Calcular diferença de valores
+                    amount_diff = abs(float(tx_a.amount) - float(tx_b.amount))
+
+                    # Calcular diferença de dias
+                    days_apart = abs((tx_a.date - tx_b.date).days)
+
+                    # Sugerir ação
+                    suggested_action = self._suggest_duplicate_action(tx_a, tx_b)
+
+                    duplicate_pairs.append(TransactionDuplicatePair(
+                        transaction_a_id=tx_a.id,
+                        transaction_a_description=tx_a.description,
+                        transaction_a_date=tx_a.date,
+                        transaction_a_amount=float(tx_a.amount),
+                        transaction_a_is_installment=tx_a.installment_series_id is not None,
+
+                        transaction_b_id=tx_b.id,
+                        transaction_b_description=tx_b.description,
+                        transaction_b_date=tx_b.date,
+                        transaction_b_amount=float(tx_b.amount),
+                        transaction_b_is_installment=tx_b.installment_series_id is not None,
+
+                        similarity_score=score,
+                        amount_difference=amount_diff,
+                        days_apart=days_apart,
+                        suggested_action=suggested_action,
+                    ))
+
+                    # Marcar como processadas
+                    processed_ids.add(tx_a.id)
+                    processed_ids.add(tx_b.id)
+                    break
+
+        # Ordenar por score (maior primeiro)
+        duplicate_pairs.sort(key=lambda p: p.similarity_score, reverse=True)
+
+        # Calcular excesso estimado
+        estimated_excess = sum(
+            min(pair.transaction_a_amount, pair.transaction_b_amount)
+            for pair in duplicate_pairs
+        )
+
+        return TransactionDuplicatesResponse(
+            duplicate_pairs=duplicate_pairs,
+            total_pairs=len(duplicate_pairs),
+            estimated_excess=estimated_excess,
+        )
+
+    def _check_transaction_duplicate(
+        self,
+        tx_a: Transaction,
+        tx_b: Transaction,
+    ) -> tuple[bool, float]:
+        """
+        Verifica se duas transações são duplicatas.
+
+        Retorna: (is_duplicate, similarity_score)
+        """
+        # Hard Rule 1: Valores devem ser muito próximos
+        if not tx_a.amount or not tx_b.amount:
+            return False, 0.0
+
+        amount_a = float(tx_a.amount)
+        amount_b = float(tx_b.amount)
+        amount_diff = abs(amount_a - amount_b)
+
+        if amount_diff > self.MAX_TRANSACTION_AMOUNT_DIFF:
+            return False, 0.0
+
+        # Hard Rule 2: Datas devem ser próximas
+        if not tx_a.date or not tx_b.date:
+            return False, 0.0
+
+        days_apart = abs((tx_a.date - tx_b.date).days)
+
+        if days_apart > self.MAX_DATE_DIFFERENCE_DAYS:
+            return False, 0.0
+
+        # Soft Scoring: Similaridade de descrição
+        if not tx_a.description or not tx_b.description:
+            return False, 0.0
+
+        # Usar fuzzy matching para comparar descrições
+        description_similarity = fuzz.partial_ratio(
+            tx_a.description.lower(),
+            tx_b.description.lower()
+        )
+
+        if description_similarity < self.MIN_DESCRIPTION_SIMILARITY:
+            return False, 0.0
+
+        # Calcular score final (0.0 a 1.0)
+        # - Descrição: 70%
+        # - Valor: 20%
+        # - Data: 10%
+        score = 0.0
+
+        # Componente de descrição (70%)
+        score += (description_similarity / 100.0) * 0.7
+
+        # Componente de valor (20%)
+        if amount_diff == 0:
+            score += 0.2
+        else:
+            # Quanto menor a diferença, maior o score
+            value_score = 1.0 - (amount_diff / self.MAX_TRANSACTION_AMOUNT_DIFF)
+            score += value_score * 0.2
+
+        # Componente de data (10%)
+        if days_apart == 0:
+            score += 0.1
+        else:
+            # Quanto menor a diferença, maior o score
+            date_score = 1.0 - (days_apart / self.MAX_DATE_DIFFERENCE_DAYS)
+            score += date_score * 0.1
+
+        return True, score
+
+    def _suggest_duplicate_action(
+        self,
+        tx_a: Transaction,
+        tx_b: Transaction,
+    ) -> str:
+        """
+        Sugere ação para resolver duplicata.
+
+        Retorna: "delete_a", "delete_b", ou "review"
+        """
+        # Se uma é de série e outra é avulsa, sugerir deletar a avulsa
+        if tx_a.installment_series_id and not tx_b.installment_series_id:
+            return "delete_b"  # Deletar a avulsa (tx_b)
+
+        if tx_b.installment_series_id and not tx_a.installment_series_id:
+            return "delete_a"  # Deletar a avulsa (tx_a)
+
+        # Se ambas são de séries ou ambas avulsas, deletar a mais recente
+        if tx_a.created_at and tx_b.created_at:
+            if tx_a.created_at < tx_b.created_at:
+                return "delete_b"  # Deletar a mais recente
+            else:
+                return "delete_a"
+
+        # Se não conseguir decidir, pedir revisão manual
+        return "review"
 
     def _calculate_similarity_score(
         self,

@@ -52,3 +52,34 @@ class UpdateSeriesRequest(BaseModel):
         default=None,
         description="IDs de séries para não sugerir como duplicata"
     )
+
+
+class TransactionDuplicatePair(BaseModel):
+    """Par de transações potencialmente duplicadas"""
+    transaction_a_id: int
+    transaction_a_description: str
+    transaction_a_date: date
+    transaction_a_amount: float
+    transaction_a_is_installment: bool
+
+    transaction_b_id: int
+    transaction_b_description: str
+    transaction_b_date: date
+    transaction_b_amount: float
+    transaction_b_is_installment: bool
+
+    similarity_score: float
+    amount_difference: float
+    days_apart: int
+    suggested_action: str = Field(
+        description="Ação sugerida: delete_a, delete_b, review"
+    )
+
+
+class TransactionDuplicatesResponse(BaseModel):
+    """Response com pares de transações duplicadas"""
+    duplicate_pairs: list[TransactionDuplicatePair]
+    total_pairs: int
+    estimated_excess: float = Field(
+        description="Valor estimado em excesso devido a duplicatas"
+    )
