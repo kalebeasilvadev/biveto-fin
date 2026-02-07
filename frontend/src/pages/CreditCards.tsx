@@ -195,7 +195,7 @@ export default function CreditCards() {
     setApiError(null)
   }
 
-  const handleSubmit = (formData: CreditCardFormData) => {
+  const handleSubmit = (formData: CreditCardFormData, invoicePassword?: string) => {
     const payload: CreditCardPayload = {
       name: formData.name,
       nickname: formData.nickname || null,
@@ -219,9 +219,35 @@ export default function CreditCards() {
     }
 
     if (editingCard) {
-      updateMutation.mutate({ id: editingCard.id, data: payload })
+      updateMutation.mutate(
+        { id: editingCard.id, data: payload },
+        {
+          onSuccess: () => {
+            // Save invoice password if provided
+            if (invoicePassword) {
+              creditCardsApi
+                .saveInvoicePassword(editingCard.id, invoicePassword)
+                .catch((err) => console.error('Failed to save invoice password:', err))
+            }
+            queryClient.invalidateQueries({ queryKey: ['credit-cards'] })
+            closeModal()
+          },
+        }
+      )
     } else {
-      createMutation.mutate(payload)
+      createMutation.mutate(payload, {
+        onSuccess: (response: { data?: { id?: number } }) => {
+          // Save invoice password if provided and we got the card ID back
+          const cardId = response?.data?.id
+          if (invoicePassword && cardId) {
+            creditCardsApi
+              .saveInvoicePassword(cardId, invoicePassword)
+              .catch((err) => console.error('Failed to save invoice password:', err))
+          }
+          queryClient.invalidateQueries({ queryKey: ['credit-cards'] })
+          closeModal()
+        },
+      })
     }
   }
 

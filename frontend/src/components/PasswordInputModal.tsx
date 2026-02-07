@@ -29,9 +29,12 @@ export default function PasswordInputModal({
 
   // Prevent body scroll when modal is open
   useEffect(() => {
+    console.log('[PasswordInputModal] isOpen changed to:', isOpen)
     if (isOpen) {
+      console.log('[PasswordInputModal] Opening modal - preventing body scroll')
       document.body.style.overflow = 'hidden'
     } else {
+      console.log('[PasswordInputModal] Closing modal - restoring body scroll')
       document.body.style.overflow = ''
     }
     return () => {

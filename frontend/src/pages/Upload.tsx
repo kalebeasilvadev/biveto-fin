@@ -329,21 +329,48 @@ export default function Upload() {
       documentsApi.upload(file, password, creditCardId),
     onSuccess: handleUploadSuccess,
     onError: (error: unknown) => {
+      // Debug: log error structure
+      console.log('=== UPLOAD ERROR DEBUG ===')
+      console.log('Full error:', error)
+
       // Check for password required error
-      const axiosErr = error as { response?: { status?: number; data?: { detail?: { error?: string; message?: string } } } }
-      if (axiosErr.response?.status === 422 && axiosErr.response?.data?.detail?.error === 'password_required') {
-        // Show password modal
-        setPasswordError(null)
-        setPasswordAttemptCount(0)
-        setShowPasswordModal(true)
-        return
+      const axiosErr = error as { response?: { status?: number; data?: { detail?: { error?: string; message?: string } | string } } }
+
+      console.log('Status code:', axiosErr.response?.status)
+      console.log('Response data:', axiosErr.response?.data)
+      console.log('Detail:', axiosErr.response?.data?.detail)
+      console.log('Detail type:', typeof axiosErr.response?.data?.detail)
+
+      // Handle object detail format
+      if (axiosErr.response?.status === 422) {
+        const detail = axiosErr.response?.data?.detail
+
+        console.log('Processing 422 error, detail:', detail)
+
+        // Check if detail is an object with error property
+        if (detail && typeof detail === 'object' && 'error' in detail && detail.error === 'password_required') {
+          console.log('✅ PASSWORD REQUIRED - SHOWING MODAL')
+          console.log('Setting showPasswordModal to true')
+          setPasswordError(null)
+          setPasswordAttemptCount(0)
+          setShowPasswordModal(true)
+          console.log('Modal should be visible now')
+          return
+        } else {
+          console.log('❌ Detail does not match password_required format')
+          console.log('Detail structure:', JSON.stringify(detail, null, 2))
+        }
       }
 
       // Check for incorrect password
-      if (axiosErr.response?.status === 422 && axiosErr.response?.data?.detail?.message?.includes('Senha incorreta')) {
-        setPasswordError('Senha incorreta. Verifique e tente novamente.')
-        setPasswordAttemptCount(prev => prev + 1)
-        return
+      if (axiosErr.response?.status === 422) {
+        const detail = axiosErr.response?.data?.detail
+        const message = detail && typeof detail === 'object' && 'message' in detail ? detail.message : ''
+        if (message && typeof message === 'string' && message.includes('Senha incorreta')) {
+          setPasswordError('Senha incorreta. Verifique e tente novamente.')
+          setPasswordAttemptCount(prev => prev + 1)
+          return
+        }
       }
 
       setUploadError(getApiErrorMessage(error, 'Erro ao processar documento'))

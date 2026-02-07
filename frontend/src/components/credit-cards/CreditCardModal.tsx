@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { X, ChevronLeft } from 'lucide-react'
+import { X, ChevronLeft, Eye, EyeOff, Lock } from 'lucide-react'
 import { clsx } from 'clsx'
 import {
   creditCardSchema,
@@ -22,7 +22,7 @@ import CardTemplateSelector from './CardTemplateSelector'
 interface CreditCardModalProps {
   isOpen: boolean
   onClose: () => void
-  onSubmit: (data: CreditCardFormData) => void
+  onSubmit: (data: CreditCardFormData, invoicePassword?: string) => void
   editingCard?: CreditCard | null
   isLoading?: boolean
   error?: string | null
@@ -41,6 +41,8 @@ export default function CreditCardModal({
   showOwnershipSelector = false,
 }: CreditCardModalProps) {
   const [step, setStep] = useState<ModalStep>('template')
+  const [showPassword, setShowPassword] = useState(false)
+  const [invoicePassword, setInvoicePassword] = useState('')
 
   const {
     register,
@@ -78,6 +80,11 @@ export default function CreditCardModal({
   const hasPoints = watch('has_points')
   const annualFeeWaived = watch('annual_fee_waived')
   const selectedColor = watch('color')
+
+  // Wrapper to include invoice password in submit
+  const handleFormSubmit = (data: CreditCardFormData) => {
+    onSubmit(data, invoicePassword || undefined)
+  }
 
   // Reset form when modal opens/closes or editingCard changes
   useEffect(() => {
@@ -222,7 +229,7 @@ export default function CreditCardModal({
             <CardTemplateSelector onSelect={handleTemplateSelect} onSkip={handleSkipTemplate} />
           </div>
         ) : (
-          <form onSubmit={handleSubmit(onSubmit)} className="p-4 space-y-4 max-h-[70vh] overflow-y-auto">
+          <form onSubmit={handleSubmit(handleFormSubmit)} className="p-4 space-y-4 max-h-[70vh] overflow-y-auto">
             {/* Banco */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -517,6 +524,48 @@ export default function CreditCardModal({
               {errors.benefits_notes && (
                 <p className="text-red-500 text-sm mt-1">{errors.benefits_notes.message}</p>
               )}
+            </div>
+
+            {/* Senha do PDF da Fatura */}
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 space-y-3">
+              <div className="flex items-start gap-2">
+                <Lock size={18} className="text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                <div className="flex-1">
+                  <label className="block text-sm font-semibold text-gray-900 dark:text-white mb-1">
+                    Senha do PDF da Fatura (opcional)
+                  </label>
+                  <p className="text-xs text-blue-900 dark:text-blue-200 mb-2">
+                    Alguns bancos protegem PDFs de fatura com senha (CPF, data de nascimento, etc.).
+                    Salve aqui para facilitar uploads futuros.
+                  </p>
+                  {editingCard?.has_invoice_password && !invoicePassword && (
+                    <p className="text-xs text-green-700 dark:text-green-300 mb-2 flex items-center gap-1">
+                      <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                      Senha já configurada. Deixe em branco para manter ou digite uma nova para alterar.
+                    </p>
+                  )}
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={invoicePassword}
+                      onChange={(e) => setInvoicePassword(e.target.value)}
+                      className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-biveto focus:border-transparent text-sm"
+                      placeholder="Digite a senha do PDF"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors"
+                      aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                    >
+                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">
+                    <strong>Esta senha é apenas para desbloquear o PDF.</strong> Não tem relação com a senha do cartão ou conta bancária.
+                  </p>
+                </div>
+              </div>
             </div>
 
             {/* Ownership Selector */}
