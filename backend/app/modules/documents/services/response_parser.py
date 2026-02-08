@@ -231,6 +231,11 @@ class ResponseParser:
         if item_date and 'YYYY' in str(item_date):
             print(f"[Parser] Data placeholder detectada '{item_date}', usando None")
             item_date = None
+        elif item_date:
+            # Normalizar data para formato ISO (YYYY-MM-DD)
+            item_date = self._parse_date(item_date)
+            if not item_date:
+                print(f"[Parser] AVISO: Data inválida '{item.get('date')}', usando None")
 
         normalized = {
             'description': description,
@@ -274,6 +279,61 @@ class ResponseParser:
 
         return normalized
 
+    def _parse_date(self, value) -> str | None:
+        """Converte data para formato YYYY-MM-DD (ISO 8601)"""
+        if value is None:
+            return None
+
+        # Se já é datetime, converte
+        if isinstance(value, datetime):
+            return value.strftime('%Y-%m-%d')
+
+        if hasattr(value, 'strftime'):
+            return value.strftime('%Y-%m-%d')
+
+        if isinstance(value, str):
+            value = value.strip()
+
+            # Tenta vários formatos comuns
+            formats = [
+                '%Y-%m-%d',        # ISO 8601 (já correto)
+                '%d/%m/%Y',        # Brasileiro: 03/01/2026
+                '%d-%m-%Y',        # Brasileiro com traço
+                '%Y/%m/%d',        # Ano primeiro com barra
+                '%d/%m/%y',        # Ano curto: 03/01/26
+                '%d-%m-%y',        # Ano curto com traço
+                '%m/%d/%Y',        # Americano
+                '%d %b %Y',        # 15 Jan 2026
+                '%d %B %Y',        # 15 Janeiro 2026
+                '%Y-%m-%dT%H:%M:%S',    # ISO com hora
+                '%Y-%m-%dT%H:%M:%SZ',   # ISO com hora e Z
+            ]
+
+            for fmt in formats:
+                try:
+                    dt = datetime.strptime(value[:len(fmt)+5], fmt)
+                    return dt.strftime('%Y-%m-%d')
+                except ValueError:
+                    continue
+
+            # Regex fallback para DD/MM/YYYY ou DD-MM-YYYY
+            import re
+            match = re.search(r'(\d{1,2})[/\-\.](\d{1,2})[/\-\.](\d{2,4})', value)
+            if match:
+                d, m, y = match.groups()
+                # Se ano tem 2 dígitos, assumir 20xx se < 50, senão 19xx
+                if len(y) == 2:
+                    y = '20' + y if int(y) < 50 else '19' + y
+                try:
+                    # Assumir formato brasileiro DD/MM/YYYY
+                    dt = datetime(int(y), int(m), int(d))
+                    return dt.strftime('%Y-%m-%d')
+                except ValueError:
+                    pass
+
+        print(f"[Parser] AVISO: Não foi possível parsear data '{value}'")
+        return None
+
     def _auto_categorize(self, description: str) -> str | None:
         """
         Categoriza automaticamente uma transacao baseado em palavras-chave na descricao.
@@ -307,6 +367,19 @@ class ResponseParser:
         if card_name:
             card_name = self._validate_card_name(card_name, card_info)
 
+        # Normalizar datas de fechamento e vencimento
+        closing_date = card_info.get('closing_date')
+        if closing_date and not ('YYYY' in str(closing_date)):
+            closing_date = self._parse_date(closing_date)
+        elif closing_date and 'YYYY' in str(closing_date):
+            closing_date = None
+
+        due_date = card_info.get('due_date')
+        if due_date and not ('YYYY' in str(due_date)):
+            due_date = self._parse_date(due_date)
+        elif due_date and 'YYYY' in str(due_date):
+            due_date = None
+
         result = {
             'card_issuer': card_info.get('card_issuer'),
             'card_last_digits': str(card_info.get('card_last_digits', ''))[-4:] if card_info.get('card_last_digits') else None,
@@ -316,8 +389,8 @@ class ResponseParser:
             'card_partner': card_info.get('card_partner'),
             'invoice_month': card_info.get('invoice_month'),
             'invoice_year': card_info.get('invoice_year'),
-            'closing_date': card_info.get('closing_date'),
-            'due_date': card_info.get('due_date'),
+            'closing_date': closing_date,
+            'due_date': due_date,
             'total_amount': float(card_info.get('total_amount', 0)) if card_info.get('total_amount') else None,
             'credit_limit': card_info.get('credit_limit'),
             'credit_used': card_info.get('credit_used'),

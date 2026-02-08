@@ -8,6 +8,47 @@ Este documento é **GARANTIDAMENTE uma fatura de cartão**. NÃO é cupom fiscal
 ## SUA TAREFA
 Extrair **TODAS as transações da fatura ATUAL** e informações do cartão.
 
+## ⚠️ ATENÇÃO: VOCÊ ESTÁ VENDO O DOCUMENTO COMPLETO (TODAS AS PÁGINAS)
+
+O documento pode conter:
+- Página 1: Resumo com dados de EXEMPLO (NÃO extrair!)
+- Páginas 2-3: Transações REAIS da fatura atual ✅
+- Páginas 4-5: Transações de OUTROS cartões ou OUTRAS faturas (NÃO extrair!)
+- Páginas 6-7: Boleto, instruções, encargos (NÃO extrair!)
+
+**VOCÊ PRECISA IDENTIFICAR quais páginas contêm as transações REAIS da fatura ATUAL.**
+
+## REGRA #0 - CRÍTICO: IDENTIFICAR A SEÇÃO CORRETA DO DOCUMENTO
+
+**COMO IDENTIFICAR A SEÇÃO DE TRANSAÇÕES REAIS:**
+
+✅ **EXTRAIA de páginas que têm:**
+- Título "Despesas da fatura" ou "Transações" ou "Lançamentos"
+- Tabela com colunas: Data | Descrição/Movimentação | Valor
+- Número do cartão ESPECÍFICO (ex: "CARTÃO 5364****7931")
+- **IMPORTANTE**: Uma mesma página pode ter MÚLTIPLAS seções de transações:
+  - Seção 1: Lançamentos do mês atual (janeiro/fevereiro 2026)
+  - Seção 2: Parcelas recorrentes de compras anteriores
+  - **EXTRAIA TODAS AS SEÇÕES** da mesma página!
+
+❌ **NÃO EXTRAIA de páginas que têm:**
+- Título "Resumo da fatura" (apenas valores totais)
+- Texto "Olá, [Nome]! A sua fatura chegou!" (página de introdução)
+- Exemplos com valores redondos (R$ 100,00, R$ 200,00, R$ 300,00)
+- Empresas genéricas: "BARBER PRIME LTDA", "COMERCIAL XYZ S.A.", "RESTAURANTE EIRELI", "LOJA ABC MEI"
+- Seção de "Opções de parcelamento" (tabela de simulação)
+- Seção de "Encargos financeiros" (apenas taxas)
+- Boleto bancário (código de barras, endereços, NOSSO NÚMERO)
+
+**⚠️ DADOS DE EXEMPLO COMUNS NA PÁGINA 1 (NÃO EXTRAIR!):**
+- BARBER PRIME LTDA - R$ 100,00
+- COMERCIAL XYZ S.A. - R$ 200,00
+- RESTAURANTE EIRELI - R$ 150,00
+- LOJA ABC MEI - R$ 300,00
+- PAGAMENTO EFETUADO - R$ -500,00
+
+**Esses são EXEMPLOS ilustrativos, não transações reais!**
+
 ## REGRA #1 - CRÍTICO: EXTRAIR APENAS FATURA ATUAL
 
 🛑 **PARE IMEDIATAMENTE de extrair quando encontrar:**
@@ -231,9 +272,12 @@ Diferença: R$ 763,47 ← ERRO! Remova itens!
   - **PAGAMENTOS** = valores **NEGATIVOS** (ex: -500.00)
   - **CRÉDITOS/ESTORNOS** = valores **NEGATIVOS**
 
-- **date**: data da transação (YYYY-MM-DD)
+- **date**: data da transação no formato ISO 8601: **YYYY-MM-DD**
+  - ⚠️ **CRÍTICO**: Use SEMPRE o formato YYYY-MM-DD (ex: 2026-01-03, NÃO 03/01/2026)
   - Se não tem ano, use invoice_year
   - Se mês da transação > mês da fatura, use invoice_year - 1
+  - **EXEMPLO CORRETO**: "2026-01-15", "2025-12-20"
+  - **EXEMPLO ERRADO**: "15/01/2026", "20-12-2025", "Jan 15 2026"
 
 - **transaction_type**: tipo do lançamento
   - **compra**: compras normais (valor POSITIVO)
