@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { documentsApi, transactionsApi, accountsApi, categoriesApi, familyApi, creditCardsApi, invoicesApi, recurringApi, benefitCardsApi, receiptsApi, getApiErrorMessage } from '../services/api'
@@ -21,7 +22,7 @@ import {
 import DuplicateResolutionModal from '../components/upload/DuplicateResolutionModal'
 import OwnershipSelector from '../components/shared/OwnershipSelector'
 import { HelpButton } from '../components/help'
-// import PasswordInputModal from '../components/PasswordInputModal' // Temporarily disabled for testing
+import PasswordInputModal from '../components/PasswordInputModal'
 
 const accountTypeLabels: Record<string, string> = {
   wallet: 'Carteira',
@@ -352,49 +353,9 @@ export default function Upload() {
 
         // Check if detail is an object with error property
         if (detail && typeof detail === 'object' && 'error' in detail && detail.error === 'password_required') {
-          console.log('✅ PASSWORD REQUIRED - Requesting password')
-
-          // TEMPORARY: Use prompt for immediate feedback while fixing modal
-          const rawPassword = window.prompt('Este PDF está protegido por senha.\n\nDigite a senha do PDF:')
-          const password = rawPassword?.trim() // Remove espaços extras
-
-          if (password && pendingPasswordFile) {
-            console.log('=== RETRYING UPLOAD WITH PASSWORD ===')
-            console.log('File:', pendingPasswordFile.name, pendingPasswordFile.size, 'bytes')
-            console.log('Password (raw):', rawPassword ? `"${rawPassword}" (${rawPassword.length} chars)` : 'null')
-            console.log('Password (trimmed):', password ? `"${password}" (${password.length} chars)` : 'null')
-            console.log('Credit card ID:', passwordCreditCardId)
-
-            // Retry upload with password - use direct API call instead of mutation
-            documentsApi.upload(pendingPasswordFile, password, passwordCreditCardId)
-              .then(response => {
-                console.log('=== UPLOAD WITH PASSWORD SUCCEEDED ===')
-                console.log('Response status:', response.status)
-                console.log('Response data:', response.data)
-                try {
-                  handleUploadSuccess(response)
-                  console.log('handleUploadSuccess completed')
-                } catch (e) {
-                  console.error('Error in handleUploadSuccess:', e)
-                  throw e
-                }
-              })
-              .catch(retryError => {
-                console.log('=== UPLOAD WITH PASSWORD FAILED ===')
-                console.error('Error:', retryError)
-                const errorMessage = getApiErrorMessage(retryError, 'Senha incorreta ou erro no processamento')
-                console.log('Error message:', errorMessage)
-                setUploadError(errorMessage)
-              })
-              .finally(() => {
-                console.log('=== UPLOAD WITH PASSWORD PROMISE COMPLETED ===')
-              })
-          } else {
-            console.log('No password entered or no pending file')
-            console.log('Password:', password ? `${password.length} chars` : 'null')
-            console.log('Pending file:', pendingPasswordFile ? pendingPasswordFile.name : 'null')
-          }
-
+          console.log('✅ PASSWORD REQUIRED - Showing modal')
+          // Show modal using portal - this will render outside React Query's error cycle
+          setShowPasswordModal(true)
           return
         } else {
           console.log('❌ Detail does not match password_required format')
@@ -2135,42 +2096,46 @@ export default function Upload() {
       )}
     </div>
 
-    {/* DEBUG: Indicator always visible */}
-    <div className="fixed top-4 right-4 z-[999] bg-red-500 text-white px-4 py-2 rounded font-mono text-xs">
-      Modal State: {showPasswordModal ? 'TRUE ✓' : 'FALSE ✗'}
-    </div>
-
-    {/* Password Input Modal - Outside main container for proper z-index */}
-    {showPasswordModal && (
-      <div
-        style={{ position: 'fixed', inset: 0, zIndex: 99999, backgroundColor: 'rgba(255,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-        onClick={() => {
+    {/* Password Modal using Portal */}
+    {showPasswordModal && typeof window !== 'undefined' && createPortal(
+      <PasswordInputModal
+        isOpen={true}
+        onClose={() => {
           setShowPasswordModal(false)
-          // setPendingPasswordFile(null)
-          // setPasswordError(null)
-          // setPasswordAttemptCount(0)
+          setPendingPasswordFile(null)
         }}
-      >
-        <div style={{ backgroundColor: 'yellow', padding: '2rem', borderRadius: '1rem', maxWidth: '400px', width: '100%', margin: '1rem', border: '5px solid red' }} onClick={(e) => e.stopPropagation()}>
-          <h2 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '1rem', color: 'red' }}>MODAL DE TESTE - PDF COM SENHA</h2>
-          <p style={{ marginBottom: '1rem', fontSize: '1.2rem' }}>Se você está vendo isso, o modal ESTÁ funcionando!</p>
-          <input
-            type="password"
-            className="w-full px-4 py-2 border rounded mb-4"
-            placeholder="Senha do PDF"
-            autoFocus
-          />
-          <button
-            className="w-full bg-orange-500 text-white py-2 rounded"
-            onClick={() => {
-              setShowPasswordModal(false)
-              alert('Implementação completa em breve')
-            }}
-          >
-            Desbloquear (TESTE)
-          </button>
-        </div>
-      </div>
+        onSubmit={async (password) => {
+          if (!pendingPasswordFile) return
+
+          try {
+            const response = await documentsApi.upload(pendingPasswordFile, password, passwordCreditCardId)
+
+            // Success - optionally save password if credit card selected
+            if (passwordCreditCardId) {
+              const savePassword = window.confirm('Deseja salvar esta senha no cartão para facilitar próximos uploads?')
+              if (savePassword) {
+                await creditCardsApi.saveInvoicePassword(passwordCreditCardId, password).catch(() => {})
+              }
+            }
+
+            setShowPasswordModal(false)
+            setPendingPasswordFile(null)
+            handleUploadSuccess(response)
+          } catch (error) {
+            throw error // PasswordInputModal will handle error display
+          }
+        }}
+        creditCardId={passwordCreditCardId}
+        creditCardName={
+          passwordCreditCardId
+            ? creditCards.find((c: { id: number; name: string }) => c.id === passwordCreditCardId)?.name
+            : undefined
+        }
+        error={null}
+        attemptCount={0}
+        maxAttempts={5}
+      />,
+      window.document.body
     )}
     </>
   )
