@@ -77,37 +77,53 @@ Páginas de resumo/introdução podem ter dados ILUSTRATIVOS (não são transaç
 
 ⚠️ **IMPORTANTE:** Extraia ATÉ encontrar indicação de "Próxima fatura". Se não encontrar esse texto, extraia TODAS as transações da fatura atual. NÃO pare arbitrariamente no meio do documento!
 
-## REGRA #2 - CRÍTICO: MÚLTIPLOS CARTÕES NA MESMA FATURA
+## REGRA #2 - CRÍTICO: MÚLTIPLOS CARTÕES NA MESMA CONTA
 
 🔍 **SE O DOCUMENTO CONTÉM MÚLTIPLOS CARTÕES:**
 
-Algumas faturas mostram transações de CARTÕES ADICIONAIS (ex: cartão virtual, cartão de dependente, outros cartões do mesmo banco).
+Algumas faturas mostram transações de MÚLTIPLOS CARTÕES da MESMA CONTA:
+- Cartão principal (titular)
+- Cartões adicionais (dependentes)
+- Cartões virtuais
+- Diferentes finais de cartão **MAS MESMA CONTA**
 
-**COMO IDENTIFICAR O CARTÃO PRINCIPAL:**
-1. Procure na PRIMEIRA PÁGINA ou RESUMO da fatura
-2. O cartão principal é o que aparece no topo/cabeçalho
-3. Geralmente está na linha "Cartão final XXXX" ou "5364****7931"
+**⚠️ REGRA IMPORTANTE:**
+- ✅ **EXTRAIA TODOS OS CARTÕES** que fazem parte da MESMA FATURA/CONTA
+- ✅ Se há um único `total_amount` que inclui todos os cartões, EXTRAIA TODOS
+- ❌ **IGNORE APENAS** se for fatura de OUTRA CONTA/TITULAR completamente diferente
 
-**REGRAS:**
-- ✅ **EXTRAIA APENAS** transações do CARTÃO PRINCIPAL
-- ❌ **IGNORE COMPLETAMENTE** transações de cartões adicionais
-- ✅ Use os últimos 4 dígitos do cartão principal em `card_last_digits`
+**COMO IDENTIFICAR:**
 
-**SINAIS DE MÚLTIPLOS CARTÕES:**
-- Seções com títulos como: "CARTÃO 5364****7931", "CARTÃO 5361****1919"
-- Páginas separadas para cada cartão
-- Subtítulos indicando diferentes cartões
+✅ **EXTRAIR (mesma conta):**
+- Seções com títulos: "CARTÃO 5364****7931", "CARTÃO 5361****1919", "CARTÃO 5362****8888"
+- Todos fazem parte do MESMO `total_amount` da fatura
+- Páginas diferentes mas todos somam para o mesmo total
+- Exemplo: Fatura de R$ 1.366,44 com transações de 3 cartões diferentes
 
-**EXEMPLO:**
+❌ **NÃO EXTRAIR (outra conta):**
+- Fatura completamente separada de outro titular
+- Outro CPF/CNPJ
+- Outro endereço de cobrança
+- Outro `total_amount` (fatura diferente)
+
+**SINAIS DE MÚLTIPLOS CARTÕES DA MESMA CONTA:**
+- Seções com títulos: "CARTÃO XXXX", "CARTÃO YYYY"
+- Páginas separadas MAS mesmo total_amount
+- Subtítulos indicando diferentes finais de cartão
+
+**EXEMPLO CORRETO:**
 ```
-Página 1: Resumo → Cartão: 5364****7931 ← CARTÃO PRINCIPAL
-Página 3: "Despesas CARTÃO 5364****7931" ← EXTRAIR ESTAS
-Página 4: "Despesas CARTÃO 5361****1919" ← NÃO EXTRAIR ESTAS!
+Página 1: Resumo → Total da Fatura: R$ 1.366,44
+Página 3: "Despesas CARTÃO 5364****7931" → R$ 500,00 ✅ EXTRAIR
+Página 4: "Despesas CARTÃO 5361****1919" → R$ 450,00 ✅ EXTRAIR
+Página 5: "Despesas CARTÃO 5362****8888" → R$ 416,44 ✅ EXTRAIR
+Total: R$ 1.366,44 (soma de todos os 3 cartões)
 ```
 
 ⚠️ **VALIDAÇÃO:**
-- Se encontrar seções de diferentes cartões, some APENAS as transações do cartão principal
-- Ignore completamente páginas/seções de cartões adicionais
+- Se encontrar múltiplos cartões, verifique se somam para o mesmo `total_amount`
+- Se SIM: extraia TODOS os cartões
+- Se NÃO: são faturas diferentes, extraia apenas uma
 
 ## REGRA #3 - CRÍTICO: NÃO EXTRAIR PARCELAS DE OUTRAS FATURAS
 
@@ -235,7 +251,8 @@ Diferença: R$ 763,47 ← ERRO! Remova itens!
 - **card_brand**: bandeira do cartão (minúsculas)
   - visa, mastercard, elo, amex, hipercard
 
-- **card_last_digits**: últimos 4 dígitos do cartão (string)
+- **card_last_digits**: últimos 4 dígitos do cartão PRINCIPAL (string)
+  - Se há múltiplos cartões na mesma conta, use o que aparece no topo/resumo
 
 - **card_name**: nome do PRODUTO do cartão
   - ✅ CORRETO: "Nubank Gold", "Bradesco Amazon Visa", "Itau Platinum"
