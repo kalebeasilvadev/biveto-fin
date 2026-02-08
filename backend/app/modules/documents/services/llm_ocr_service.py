@@ -186,12 +186,14 @@ class LLMOCRService:
 
         # Processar paginas separadamente
         all_items = []
+        all_page_results = []  # Store all page results for post-processing
         document_type = None
         card_info = None
         errors = []
 
         for page_num, (img_content, img_mime) in enumerate(images, 1):
             page_result = await provider.extract_from_image(img_content, img_mime)
+            all_page_results.append((page_num, page_result))
 
             if page_result.get('error'):
                 errors.append(f"Pagina {page_num}: {page_result['error']}")
@@ -204,6 +206,110 @@ class LLMOCRService:
 
         if not all_items and errors:
             return {'items': [], 'error': '; '.join(errors)}
+
+        # Post-processing: Filter items for main card only (if multiple cards detected)
+        # First, find the real card number (ignoring known placeholders)
+        CARD_PLACEHOLDERS = {'0000', '****', 'XXXX', '9999', '1234', 'xxxx'}
+
+        all_cards = set()
+        for page_num, page_result in all_page_results:
+            page_card = page_result.get('card_info', {}).get('card_last_digits')
+            if page_card and page_card not in CARD_PLACEHOLDERS:
+                all_cards.add(page_card)
+
+        # Determine the main card: prefer the first real card found, fallback to card_info
+        main_card = None
+        if all_cards:
+            # Use the first real card number found (from pages 2+, usually)
+            main_card = sorted(all_cards)[0]  # Use alphabetically first if multiple
+            print(f"[LLM_OCR] Found real card numbers: {all_cards}, using: {main_card}")
+        elif card_info and card_info.get('card_last_digits'):
+            main_card = card_info.get('card_last_digits')
+
+        if main_card:
+            # First pass: Remove pages with placeholder card numbers
+            # These often contain summary/example data, not real transactions
+            valid_page_results = []
+            skipped_pages = []
+            for page_num, page_result in all_page_results:
+                page_card = page_result.get('card_info', {}).get('card_last_digits')
+                # Skip pages with placeholder if we have a real card
+                if page_card in CARD_PLACEHOLDERS and main_card not in CARD_PLACEHOLDERS:
+                    skipped_pages.append(page_num)
+                    continue
+                valid_page_results.append((page_num, page_result))
+
+            if skipped_pages:
+                print(f"[LLM_OCR] Skipped placeholder pages: {skipped_pages}")
+
+            # Second pass: If multiple real cards detected, filter by main card
+            if len(all_cards) > 1:
+                print(f"[LLM_OCR] Multiple real cards detected: {all_cards}, keeping only: {main_card}")
+                # Keep only items from pages with the main card
+                filtered_items = []
+                for page_num, page_result in valid_page_results:
+                    page_card = page_result.get('card_info', {}).get('card_last_digits')
+                    page_items = page_result.get('items', [])
+                    if page_card == main_card or not page_card:  # Include if matches main card or no card info
+                        filtered_items.extend(page_items)
+                    else:
+                        print(f"[LLM_OCR] Skipping {len(page_items)} items from page {page_num} (card {page_card})")
+
+                print(f"[LLM_OCR] Filtered {len(all_items)} -> {len(filtered_items)} items")
+                all_items = filtered_items
+            elif len(valid_page_results) < len(all_page_results):
+                # Some pages were skipped due to placeholder, rebuild items list
+                all_items = []
+                for page_num, page_result in valid_page_results:
+                    all_items.extend(page_result.get('items', []))
+                print(f"[LLM_OCR] Filtered pages: kept {len(valid_page_results)}/{len(all_page_results)} pages, {len(all_items)} items")
+
+            # Update card_info to use the real card number if we found one
+            if main_card not in CARD_PLACEHOLDERS and card_info and card_info.get('card_last_digits') in CARD_PLACEHOLDERS:
+                old_card = card_info.get('card_last_digits')
+                print(f"[LLM_OCR] Updating card_last_digits from '{old_card}' to '{main_card}'")
+                card_info['card_last_digits'] = main_card
+
+        # Post-processing: Remove duplicate installments (same item, different installment number)
+        # Keep only the installment with the LOWEST installment_current (earliest)
+        if all_items:
+            seen_installments = {}  # key: (description, total), value: item with lowest current
+            non_installment_items = []
+
+            for item in all_items:
+                if item.get('is_installment') and item.get('installment_current') and item.get('installment_total'):
+                    # Normalize description for comparison
+                    desc = item.get('description', '').upper().strip()
+                    # Remove common suffixes that might vary
+                    for suffix in [' LTDA', ' S.A.', ' EIRELI', ' MEI', ' ME']:
+                        if desc.endswith(suffix):
+                            desc = desc[:-len(suffix)].strip()
+
+                    # Normalize spaces (some OCRs add/remove spaces inconsistently)
+                    import re
+                    desc = re.sub(r'\s+', '', desc)  # Remove all spaces for comparison
+
+                    total = item.get('installment_total')
+                    key = (desc, total)
+
+                    if key not in seen_installments:
+                        seen_installments[key] = item
+                    else:
+                        # Keep the one with lowest installment_current
+                        existing = seen_installments[key]
+                        if item.get('installment_current') < existing.get('installment_current'):
+                            print(f"[LLM_OCR] Replacing duplicate installment: {desc} {existing.get('installment_current')}/{total} -> {item.get('installment_current')}/{total}")
+                            seen_installments[key] = item
+                        else:
+                            print(f"[LLM_OCR] Skipping duplicate installment: {desc} {item.get('installment_current')}/{total} (keeping {existing.get('installment_current')}/{total})")
+                else:
+                    non_installment_items.append(item)
+
+            # Rebuild items list
+            filtered_items = list(seen_installments.values()) + non_installment_items
+            if len(filtered_items) < len(all_items):
+                print(f"[LLM_OCR] Removed {len(all_items) - len(filtered_items)} duplicate installments: {len(all_items)} -> {len(filtered_items)} items")
+                all_items = filtered_items
 
         return {
             'items': all_items,

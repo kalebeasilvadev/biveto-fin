@@ -29,6 +29,89 @@ Extrair **TODAS as transações da fatura ATUAL** e informações do cartão.
 - Transações em seções separadas de "preview"
 - Qualquer valor que não some para o total desta fatura
 
+## REGRA #2 - CRÍTICO: MÚLTIPLOS CARTÕES NA MESMA FATURA
+
+🔍 **SE O DOCUMENTO CONTÉM MÚLTIPLOS CARTÕES:**
+
+Algumas faturas mostram transações de CARTÕES ADICIONAIS (ex: cartão virtual, cartão de dependente, outros cartões do mesmo banco).
+
+**COMO IDENTIFICAR O CARTÃO PRINCIPAL:**
+1. Procure na PRIMEIRA PÁGINA ou RESUMO da fatura
+2. O cartão principal é o que aparece no topo/cabeçalho
+3. Geralmente está na linha "Cartão final XXXX" ou "5364****7931"
+
+**REGRAS:**
+- ✅ **EXTRAIA APENAS** transações do CARTÃO PRINCIPAL
+- ❌ **IGNORE COMPLETAMENTE** transações de cartões adicionais
+- ✅ Use os últimos 4 dígitos do cartão principal em `card_last_digits`
+
+**SINAIS DE MÚLTIPLOS CARTÕES:**
+- Seções com títulos como: "CARTÃO 5364****7931", "CARTÃO 5361****1919"
+- Páginas separadas para cada cartão
+- Subtítulos indicando diferentes cartões
+
+**EXEMPLO:**
+```
+Página 1: Resumo → Cartão: 5364****7931 ← CARTÃO PRINCIPAL
+Página 3: "Despesas CARTÃO 5364****7931" ← EXTRAIR ESTAS
+Página 4: "Despesas CARTÃO 5361****1919" ← NÃO EXTRAIR ESTAS!
+```
+
+⚠️ **VALIDAÇÃO:**
+- Se encontrar seções de diferentes cartões, some APENAS as transações do cartão principal
+- Ignore completamente páginas/seções de cartões adicionais
+
+## REGRA #3 - CRÍTICO: NÃO EXTRAIR PARCELAS DE OUTRAS FATURAS
+
+🛑 **PROBLEMA COMUM:** Algumas páginas mostram parcelas que NÃO fazem parte da fatura atual!
+
+**SINAIS DE PARCELAS DE OUTRAS FATURAS:**
+1. **Títulos de seção suspeitos:**
+   - "Lançamentos em outras faturas"
+   - "Próximas parcelas"
+   - "Parcelas futuras"
+   - "Resumo de parcelamentos"
+   - "Visão geral das parcelas"
+
+2. **Parcelas DUPLICADAS do mesmo parcelamento:**
+   - Se você já extraiu "LOJA ABC (Parcela 5 de 12)"
+   - E depois encontra "LOJA ABC (Parcela 6 de 12)" ou "LOJA ABC (Parcela 7 de 12)"
+   - A segunda/terceira são de OUTRAS faturas! **NÃO EXTRAIA!**
+
+3. **Datas inconsistentes:**
+   - Se a fatura é de Janeiro/2026 (invoice_month=1, invoice_year=2026)
+   - E você encontra parcelas com data de Outubro/Novembro/Dezembro/2025
+   - Essas parcelas são de faturas ANTERIORES! **NÃO EXTRAIA!**
+
+**REGRA DE OURO:**
+- ✅ **EXTRAIA APENAS A PRIMEIRA OCORRÊNCIA** de cada parcelamento
+- ❌ **IGNORE COMPLETAMENTE** parcelas posteriores do mesmo parcelamento
+- ✅ Se o mesmo estabelecimento aparecer 2x com parcelas diferentes, extraia apenas a MENOR parcela
+
+**EXEMPLO:**
+```
+Página 3: "Despesas da fatura ATUAL"
+  - LOJA ABC (Parcela 5 de 12) - R$ 100,00 - 04/set/2025 ← ✅ EXTRAIR
+  - RESTAURANTE XYZ (Parcela 3 de 6) - R$ 50,00 - 08/set/2025 ← ✅ EXTRAIR
+
+Página 5: "Lançamentos em outras faturas" ou sem título claro
+  - LOJA ABC (Parcela 6 de 12) - R$ 100,00 - 03/out/2025 ← ❌ NÃO EXTRAIR (duplicata!)
+  - LOJA ABC (Parcela 7 de 12) - R$ 100,00 - 03/nov/2025 ← ❌ NÃO EXTRAIR (duplicata!)
+  - RESTAURANTE XYZ (Parcela 4 de 6) - R$ 50,00 - 03/out/2025 ← ❌ NÃO EXTRAIR (duplicata!)
+```
+
+**IMPLEMENTAÇÃO:**
+1. Ao extrair, mantenha um registro dos parcelamentos já extraídos
+2. Para cada novo parcelamento encontrado:
+   - Verifique se já extraiu o mesmo estabelecimento
+   - Se sim, compare as parcelas
+   - Se a nova parcela é MAIOR que a já extraída, **IGNORE**
+3. Se encontrar página com título suspeito, PARE de extrair dessa página
+
+⚠️ **VALIDAÇÃO ADICIONAL:**
+- Ao final, verifique se há parcelas duplicadas do mesmo parcelamento
+- Se houver, mantenha apenas a com o MENOR número de parcela
+
 ⚠️ **VALIDAÇÃO OBRIGATÓRIA - PASSO FINAL:**
 
 ANTES de retornar o JSON:
