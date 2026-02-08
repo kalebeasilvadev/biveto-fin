@@ -311,6 +311,22 @@ Diferença: R$ 763,47 ← ERRO! Remova itens!
   - **encargo**: IOF, juros, multa, taxas (valor POSITIVO)
   - **anuidade**: tarifa anual do cartão (valor POSITIVO)
 
+**⚠️ REGRA ESPECIAL - IOF EM LINHA SEPARADA:**
+
+Alguns bancos (Nubank, Itaú) colocam o IOF em uma LINHA SEPARADA da transação principal:
+
+```
+03 JAN    IOF de "Github, Inc."         R$ 1,98
+03 JAN    Github, Inc.                  R$ 56,55
+```
+
+**ATENÇÃO:** Extraia o IOF como um ITEM SEPARADO:
+- description: "IOF INTERNACIONAL" (ou descrição similar)
+- amount: valor do IOF (positivo)
+- date: mesma data da transação relacionada
+- transaction_type: "encargo"
+- is_installment: false
+
 - **category**: categoria da transação
   - alimentacao, transporte, saude, educacao, lazer, mercado, casa, roupas, servicos, outros
 
@@ -366,9 +382,13 @@ Se o PDF mostra:
 
 **POR QUÊ?** Pagamentos são créditos da fatura anterior, não compras da fatura atual.
 
-⚠️ **EXCEÇÃO:** "SALDO FATURA ANTERIOR" DEVE ser extraído
+⚠️ **EXCEÇÕES - EXTRAIR MESMO EM "Pagamentos e Financiamentos":**
 - "SALDO FATURA ANTERIOR" → valor POSITIVO (é um débito) ✅ EXTRAIR
-- "PAGAMENTO" → valor NEGATIVO (é um crédito) ❌ NÃO EXTRAIR
+- **Parcelas de compras financiadas** (ex: "AMAZON.COM.BR - Parcela 11/12") ✅ EXTRAIR
+- Qualquer item que tenha "Parcela X/Y" → é uma COMPRA parcelada, não pagamento ✅ EXTRAIR
+
+❌ **NÃO EXTRAIR:**
+- "PAGAMENTO EM DD MMM" → valor NEGATIVO (é crédito de pagamento) ❌ NÃO EXTRAIR
 
 ## REGRAS ESPECIAIS POR BANCO
 
@@ -380,7 +400,12 @@ Se o PDF mostra:
 
 ### NUBANK:
 - Data: "DD MMM" (ex: "15 DEZ")
-- Pagamento: "Pagamento em DD MMM" → valor NEGATIVO
+- Pagamento: "Pagamento em DD MMM" → valor NEGATIVO (NÃO extrair)
+- **IOF em linha separada:** "IOF de 'Github, Inc.'" → extrair como item separado (encargo)
+- **Seção "Pagamentos e Financiamentos":**
+  - ❌ "Pagamento em DD MMM" → NÃO extrair
+  - ✅ "AMAZON.COM.BR - Parcela 11/12" → EXTRAIR (é compra parcelada, não pagamento!)
+  - **Regra:** Se tem "Parcela X/Y", é uma compra → EXTRAIR
 
 ### ITAÚ:
 - IOF em linha separada após compra internacional
