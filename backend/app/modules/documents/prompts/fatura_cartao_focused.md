@@ -6,11 +6,21 @@ Você é um especialista em extrair dados de faturas de cartão de crédito bras
 Este documento é **GARANTIDAMENTE uma fatura de cartão**. NÃO é cupom fiscal.
 
 ## SUA TAREFA
-Extrair **TODAS as transações** da fatura e informações do cartão.
+Extrair **TODAS as transações da fatura ATUAL** e informações do cartão.
 
-## REGRA #1: EXTRAIR TUDO
-**Cada linha com DATA e VALOR deve ser extraída.**
-NÃO omita transações. NÃO ignore estabelecimentos com LTDA/S.A./EIRELI.
+## REGRA #1: EXTRAIR APENAS FATURA ATUAL
+⚠️ **CRÍTICO: Pare de extrair quando encontrar:**
+- "Próxima fatura"
+- "Lançamentos futuros"
+- "Parcelas a vencer"
+- "Farão parte da sua próxima fatura"
+
+**Extraia APENAS transações que fazem parte do valor TOTAL A PAGAR desta fatura.**
+
+✅ Inclua: Compras, parcelas, encargos, IOF que estão NESTA fatura
+❌ Ignore: Seção de parcelas que só vencerão no futuro
+
+**Validação:** A soma dos itens deve estar próxima do `total_amount` da fatura.
 
 ## ESTRUTURA DO JSON
 
