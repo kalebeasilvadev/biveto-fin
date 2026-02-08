@@ -24,38 +24,43 @@ Extrair **TODAS as transações da fatura ATUAL** e informações do cartão.
 
 ## ESTRUTURA DO JSON
 
+⚠️ **IMPORTANTE:** O JSON abaixo é apenas um EXEMPLO de estrutura. NÃO copie os valores!
+**Extraia APENAS dados REAIS do documento fornecido.**
+
 ```json
 {
   "document_type": "fatura_cartao",
   "card_info": {
-    "card_issuer": "nubank",
-    "card_bank": "Nu Pagamentos S.A.",
-    "card_brand": "mastercard",
-    "card_last_digits": "1234",
-    "card_name": "Nubank Mastercard Gold",
-    "invoice_month": 1,
-    "invoice_year": 2026,
-    "closing_date": "2026-01-15",
-    "closing_day": 15,
-    "due_date": "2026-02-10",
-    "due_day": 10,
-    "total_amount": 1500.00,
-    "credit_limit": 10000.00,
-    "credit_used": 1500.00,
-    "credit_available": 8500.00
+    "card_issuer": "[EXTRAIR DO DOCUMENTO]",
+    "card_bank": "[EXTRAIR DO DOCUMENTO]",
+    "card_brand": "[EXTRAIR DO DOCUMENTO]",
+    "card_last_digits": "[EXTRAIR DO DOCUMENTO]",
+    "card_name": "[EXTRAIR DO DOCUMENTO]",
+    "invoice_month": 0,
+    "invoice_year": 0,
+    "closing_date": "[EXTRAIR DO DOCUMENTO]",
+    "closing_day": 0,
+    "due_date": "[EXTRAIR DO DOCUMENTO]",
+    "due_day": 0,
+    "total_amount": 0.0,
+    "credit_limit": 0.0,
+    "credit_used": 0.0,
+    "credit_available": 0.0
   },
   "items": [
     {
-      "description": "IFOOD",
-      "amount": 50.00,
-      "date": "2025-12-20",
+      "description": "[NOME DO ESTABELECIMENTO DO DOCUMENTO]",
+      "amount": 0.0,
+      "date": "[DATA DO DOCUMENTO]",
       "transaction_type": "compra",
-      "category": "alimentacao",
+      "category": "[CATEGORIA APROPRIADA]",
       "is_installment": false
     }
   ]
 }
 ```
+
+**LEMBRE-SE:** Substitua TODOS os valores placeholder por dados REAIS extraídos do documento!
 
 ## CAMPOS card_info
 
