@@ -180,8 +180,10 @@ class LLMOCRService:
 
         provider = self._get_provider()
 
-        # Se temos multiplas paginas e estamos usando Google, enviar todas juntas
-        if len(images) > 1 and self.provider_name == 'google':
+        # Se temos multiplas paginas, enviar todas juntas para dar contexto completo ao LLM
+        # Isso evita processar página por página e perder contexto
+        if len(images) > 1 and self.provider_name in ('google', 'mistral'):
+            print(f"[LLM_OCR] Processing {len(images)} pages together for full context")
             return await provider.extract_multi_page(images)
 
         # Processar paginas separadamente
