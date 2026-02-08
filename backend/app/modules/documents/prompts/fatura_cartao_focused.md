@@ -75,6 +75,8 @@ Páginas de resumo/introdução podem ter dados ILUSTRATIVOS (não são transaç
 - Transações em seções separadas de "preview"
 - Qualquer valor que não some para o total desta fatura
 
+⚠️ **IMPORTANTE:** Extraia ATÉ encontrar indicação de "Próxima fatura". Se não encontrar esse texto, extraia TODAS as transações da fatura atual. NÃO pare arbitrariamente no meio do documento!
+
 ## REGRA #2 - CRÍTICO: MÚLTIPLOS CARTÕES NA MESMA FATURA
 
 🔍 **SE O DOCUMENTO CONTÉM MÚLTIPLOS CARTÕES:**
@@ -429,22 +431,31 @@ NOSSO NÚMERO: 00154318096
 
 ## VALIDAÇÃO FINAL (OBRIGATÓRIO!)
 
-Antes de retornar, verifique:
+⚠️ **ANTES DE RETORNAR O JSON, EXECUTE ESTA CHECKLIST:**
 
 1. ✅ **TODAS as linhas de transação foram extraídas**
    - Conte as linhas no texto vs items no JSON
-   - Estabelecimentos com LTDA/S.A. foram incluídos?
+   - **VERIFIQUE NOVAMENTE:** Estabelecimentos com LTDA/S.A./EIRELI foram incluídos?
+   - Percorra TODO o documento procurando por transações que podem ter sido perdidas
 
 2. ✅ **Compras têm valores POSITIVOS**
 
 3. ✅ **Pagamentos têm valores NEGATIVOS**
 
 4. ✅ **Soma das compras ≈ card_info.total_amount**
+   - Se a soma está MENOR que o total (diferença > R$ 50), **FALTAM transações!**
+   - Procure novamente no documento por transações não extraídas
+   - Verifique se não pulou alguma página ou seção
 
 5. ✅ **Nenhum item tem amount: null**
 
 6. ✅ **Descrições estão COMPLETAS** (não truncadas)
+   - Remova informações de parcela: "(Parcela XX de YY)" ou "XX/YY"
 
 7. ✅ **"Total da Fatura Anterior" NÃO está nos items** (a menos que seja SALDO)
+
+8. ✅ **DUPLA VERIFICAÇÃO DE ESTABELECIMENTOS COM SUFIXOS:**
+   - Se encontrar "XXXX LTDA", "YYYY S.A.", "ZZZZ EIRELI" com valor específico (não redondo) e data, EXTRAIA!
+   - Exemplo: "CASAS BECKER LTDA" R$ 109,52 → transação REAL, não exemplo
 
 ## EXTRAIA OS DADOS AGORA:
