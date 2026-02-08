@@ -73,6 +73,7 @@ class ExtractionValidator:
 
         # Pipeline de validacao - primeiro remove itens invalidos
         items = self.remove_section_headers(items, card_info)
+        items = self.remove_addresses_and_boleto_data(items)
         items = self.fix_payment_amounts(items)
 
         if not is_cupom_fiscal:
@@ -930,5 +931,76 @@ class ExtractionValidator:
                 )
                 print(f"[Validator] WARNING: Extracao possivelmente incompleta "
                       f"({extracted_count}/{estimated_count} = {ratio:.0%})")
+
+        return result
+
+    def remove_addresses_and_boleto_data(self, items: list) -> list:
+        """Remove endereços e dados de boleto que foram extraídos incorretamente como transações
+
+        Args:
+            items: Lista de itens extraídos
+
+        Returns:
+            Lista filtrada sem endereços/boleto
+        """
+        if not items:
+            return items
+
+        result = []
+
+        # Padrões que indicam dados de boleto/endereço (não são transações)
+        ADDRESS_PATTERNS = [
+            r'\d{5}[-]?\d{3}',  # CEP (30190-131 ou 30190131)
+            r'\b[A-Z]{2}\s*/\s*[A-Z]{2}\b',  # Estado (MG / MG, SP / SP) - word boundaries to avoid .COM/BILL
+            r'AUTENTICACAO MECANICA',
+            r'NOSSO NUMERO',
+            r'CODIGO DE BARRAS',
+            r'LOCAL DE PAGAMENTO',
+            r'AGENCIA\s*/\s*CEDENTE',
+            r'BENEFICIARIO',
+            r'\d{5}\.\d{5}\s+\d{5}\.\d{6}',  # Código de barras numérico
+            r'AV\s+[A-Z\s]+\d+',  # Avenida com número (AV BARBACENA 1219)
+            r'RUA\s+[A-Z\s]+\d+',  # Rua com número
+        ]
+
+        CITY_NAMES = [
+            'BELO HORIZONTE', 'SAO PAULO', 'RIO DE JANEIRO', 'BRASILIA',
+            'CURITIBA', 'PORTO ALEGRE', 'SALVADOR', 'FORTALEZA', 'RECIFE',
+            'GOIANIA', 'MANAUS', 'BELEM', 'CAMPINAS', 'SANTOS'
+        ]
+
+        for item in items:
+            desc = item.get('description', '').upper()
+
+            # Verificar se é endereço/boleto
+            is_address = False
+
+            # 1. Contém padrões de boleto
+            for pattern in ADDRESS_PATTERNS:
+                if re.search(pattern, desc):
+                    is_address = True
+                    break
+
+            # 2. Contém nome de cidade (provável endereço)
+            if not is_address:
+                for city in CITY_NAMES:
+                    if city in desc:
+                        is_address = True
+                        break
+
+            # 3. Descrição muito longa com múltiplos números (provável endereço completo)
+            if not is_address and len(desc) > 50:
+                # Contar números na descrição
+                numbers = re.findall(r'\d+', desc)
+                if len(numbers) >= 3:  # Endereço tem: número, CEP, etc.
+                    is_address = True
+
+            if is_address:
+                print(f"[Validator] Removendo endereço/boleto: '{desc[:60]}...' R${item.get('amount', 0):.2f}")
+            else:
+                result.append(item)
+
+        if len(result) < len(items):
+            print(f"[Validator] Filtro de endereços: {len(items)} -> {len(result)} itens")
 
         return result

@@ -188,7 +188,6 @@ class LLMOCRService:
         all_items = []
         all_page_results = []  # Store all page results for post-processing
         document_type = None
-        card_info = None
         errors = []
 
         for page_num, (img_content, img_mime) in enumerate(images, 1):
@@ -201,8 +200,6 @@ class LLMOCRService:
                 all_items.extend(page_result['items'])
             if page_result.get('document_type') and not document_type:
                 document_type = page_result['document_type']
-            if page_result.get('card_info') and not card_info:
-                card_info = page_result['card_info']
 
         if not all_items and errors:
             return {'items': [], 'error': '; '.join(errors)}
@@ -211,20 +208,43 @@ class LLMOCRService:
         # First, find the real card number (ignoring known placeholders)
         CARD_PLACEHOLDERS = {'0000', '****', 'XXXX', '9999', '1234', 'xxxx'}
 
-        all_cards = set()
+        # Count occurrences of each card number to find the main card
+        from collections import Counter
+        card_counts = Counter()
         for page_num, page_result in all_page_results:
             page_card = page_result.get('card_info', {}).get('card_last_digits')
             if page_card and page_card not in CARD_PLACEHOLDERS:
-                all_cards.add(page_card)
+                card_counts[page_card] += 1
 
-        # Determine the main card: prefer the first real card found, fallback to card_info
+        all_cards = set(card_counts.keys())
+
+        # Determine the main card: use the one that appears most frequently
         main_card = None
+        card_info = None  # Will be set to the main card's card_info
+
         if all_cards:
-            # Use the first real card number found (from pages 2+, usually)
-            main_card = sorted(all_cards)[0]  # Use alphabetically first if multiple
-            print(f"[LLM_OCR] Found real card numbers: {all_cards}, using: {main_card}")
-        elif card_info and card_info.get('card_last_digits'):
-            main_card = card_info.get('card_last_digits')
+            # Use the card that appears most times (not just first occurrence)
+            main_card = card_counts.most_common(1)[0][0]
+            print(f"[LLM_OCR] Found real card numbers: {dict(card_counts)}, using most frequent: {main_card}")
+
+            # Get card_info from a page with the main card (prefer page with most complete info)
+            for page_num, page_result in all_page_results:
+                page_card = page_result.get('card_info', {}).get('card_last_digits')
+                if page_card == main_card:
+                    page_card_info = page_result.get('card_info')
+                    # Prefer card_info with more fields filled
+                    if page_card_info:
+                        if card_info is None:
+                            card_info = page_card_info
+                        elif page_card_info.get('credit_limit') and not card_info.get('credit_limit'):
+                            card_info = page_card_info
+
+        # Fallback: if no card_info found yet, use first available
+        if card_info is None:
+            for page_num, page_result in all_page_results:
+                if page_result.get('card_info'):
+                    card_info = page_result['card_info']
+                    break
 
         if main_card:
             # First pass: Remove pages with placeholder card numbers
@@ -263,12 +283,6 @@ class LLMOCRService:
                 for page_num, page_result in valid_page_results:
                     all_items.extend(page_result.get('items', []))
                 print(f"[LLM_OCR] Filtered pages: kept {len(valid_page_results)}/{len(all_page_results)} pages, {len(all_items)} items")
-
-            # Update card_info to use the real card number if we found one
-            if main_card not in CARD_PLACEHOLDERS and card_info and card_info.get('card_last_digits') in CARD_PLACEHOLDERS:
-                old_card = card_info.get('card_last_digits')
-                print(f"[LLM_OCR] Updating card_last_digits from '{old_card}' to '{main_card}'")
-                card_info['card_last_digits'] = main_card
 
         # Post-processing: Remove duplicate installments (same item, different installment number)
         # Keep only the installment with the LOWEST installment_current (earliest)

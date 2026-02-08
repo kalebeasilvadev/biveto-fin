@@ -331,6 +331,32 @@ Frases indicadoras:
 - Linhas de cabeçalho (Data | Descrição | Valor)
 - Avisos e mensagens promocionais
 - Informações de limite (vão em card_info)
+- **BOLETO BANCÁRIO** (código de barras, autenticação, endereços)
+- **INFORMAÇÕES DE PAGAMENTO** (QR Code, PIX, código de barras)
+- **ENDEREÇOS** (do banco, agências, locais de pagamento)
+- **CNPJ/DADOS CADASTRAIS** (do banco ou estabelecimentos)
+
+### 🚫 SINAIS DE SEÇÃO DE BOLETO/PAGAMENTO (NÃO EXTRAIR!)
+
+Se você encontrar estes textos, **PARE DE EXTRAIR** dessa página:
+- "AUTENTICAÇÃO MECÂNICA"
+- "CÓDIGO DE BARRAS"
+- "LOCAL DE PAGAMENTO"
+- "PAGAVEL EM QUALQUER BANCO"
+- "NOSSO NÚMERO"
+- "AGÊNCIA / CEDENTE"
+- "BENEFICIÁRIO"
+- Números de código de barras (ex: "07790.00116 01001.305208...")
+- Endereços com CEP (ex: "AV BARBACENA 1219... 30190131 BELO HORIZONTE")
+
+**EXEMPLO DE TEXTO QUE NÃO É TRANSAÇÃO:**
+```
+❌ NÃO EXTRAIR:
+AV BARBACENA 1219 STO AGOSTINHO 30190131 BELO HORIZONTE / MG
+AUTENTICAÇÃO MECÂNICA
+NOSSO NÚMERO: 00154318096
+```
+→ Isso é endereço do banco no boleto!
 
 ✅ **EXCEÇÃO:** "SALDO FATURA ANTERIOR" DEVE ser extraído (é transação válida)
 
