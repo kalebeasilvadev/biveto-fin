@@ -206,7 +206,7 @@ class LLMOCRService:
 
         # Post-processing: Filter items for main card only (if multiple cards detected)
         # First, find the real card number (ignoring known placeholders)
-        CARD_PLACEHOLDERS = {'0000', '****', 'XXXX', '9999', '1234', 'xxxx'}
+        CARD_PLACEHOLDERS = {'0000', '****', 'XXXX', '9999', '1234', 'xxxx', '1809', '0960'}
 
         # Count occurrences of each card number to find the main card
         from collections import Counter
@@ -247,16 +247,43 @@ class LLMOCRService:
                     break
 
         if main_card:
-            # First pass: Remove pages with placeholder card numbers
+            # First pass: Remove pages with placeholder card numbers or example data
             # These often contain summary/example data, not real transactions
             valid_page_results = []
             skipped_pages = []
             for page_num, page_result in all_page_results:
                 page_card = page_result.get('card_info', {}).get('card_last_digits')
+                page_items = page_result.get('items', [])
+
                 # Skip pages with placeholder if we have a real card
                 if page_card in CARD_PLACEHOLDERS and main_card not in CARD_PLACEHOLDERS:
-                    skipped_pages.append(page_num)
+                    skipped_pages.append((page_num, f"placeholder card {page_card}"))
                     continue
+
+                # Additional heuristic: Detect pages with example/simulation data
+                # Example data often has:
+                # 1. Round numbers (100.00, 200.00, 300.00)
+                # 2. No installments
+                # 3. Generic company names (LTDA, S.A., EIRELI, MEI)
+                if page_items and len(page_items) >= 3:
+                    round_values = sum(1 for item in page_items if item.get('amount', 0) % 100 == 0)
+                    no_installments = sum(1 for item in page_items if not item.get('is_installment'))
+                    generic_names = sum(1 for item in page_items
+                                      if any(suffix in item.get('description', '').upper()
+                                           for suffix in [' LTDA', ' S.A.', ' EIRELI', ' MEI']))
+
+                    # If > 50% are round values, no installments, and generic names → likely example data
+                    is_likely_example = (
+                        round_values >= len(page_items) * 0.5 and
+                        no_installments >= len(page_items) * 0.7 and
+                        generic_names >= len(page_items) * 0.5
+                    )
+
+                    if is_likely_example:
+                        skipped_pages.append((page_num, f"example data detected"))
+                        print(f"[LLM_OCR] Page {page_num} looks like example data (round:{round_values}, no_inst:{no_installments}, generic:{generic_names})")
+                        continue
+
                 valid_page_results.append((page_num, page_result))
 
             if skipped_pages:
