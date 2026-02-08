@@ -34,20 +34,25 @@ O documento pode conter:
 ❌ **NÃO EXTRAIA de páginas que têm:**
 - Título "Resumo da fatura" (apenas valores totais)
 - Texto "Olá, [Nome]! A sua fatura chegou!" (página de introdução)
-- Exemplos com valores redondos (R$ 100,00, R$ 200,00, R$ 300,00)
-- Empresas genéricas: "BARBER PRIME LTDA", "COMERCIAL XYZ S.A.", "RESTAURANTE EIRELI", "LOJA ABC MEI"
+- Exemplos ilustrativos com valores redondos repetitivos (R$ 100,00, R$ 200,00, R$ 300,00) E nomes genéricos
 - Seção de "Opções de parcelamento" (tabela de simulação)
 - Seção de "Encargos financeiros" (apenas taxas)
 - Boleto bancário (código de barras, endereços, NOSSO NÚMERO)
+- Pagamentos de fatura (ex: "PAGAMENTO EFETUADO", "PAGAMENTO RECEBIDO", "PAG BOLETO")
 
-**⚠️ DADOS DE EXEMPLO COMUNS NA PÁGINA 1 (NÃO EXTRAIR!):**
-- BARBER PRIME LTDA - R$ 100,00
-- COMERCIAL XYZ S.A. - R$ 200,00
-- RESTAURANTE EIRELI - R$ 150,00
-- LOJA ABC MEI - R$ 300,00
-- PAGAMENTO EFETUADO - R$ -500,00
+**⚠️ DADOS DE EXEMPLO ILUSTRATIVOS NA PÁGINA 1 (NÃO EXTRAIR!):**
 
-**Esses são EXEMPLOS ilustrativos, não transações reais!**
+Páginas de resumo/introdução podem ter dados ILUSTRATIVOS (não são transações reais):
+- Padrão de exemplo: valores redondos (100,00 / 200,00 / 300,00) com nomes genéricos simples
+- Exemplo: "BARBER PRIME" R$ 100,00, "COMERCIAL XYZ" R$ 200,00, "RESTAURANTE" R$ 150,00
+
+⚠️ **MAS ATENÇÃO:** Se o estabelecimento tem nome COMPLETO e ESPECÍFICO (ex: "CASAS BECKER LTDA", "LOJAS NOSSO LAR", "SOLARE INSTALACAO E MA"), mesmo com LTDA/S.A./EIRELI, **EXTRAIA!** São transações reais, não exemplos.
+
+**COMO DIFERENCIAR:**
+- ❌ EXEMPLO: "BARBER PRIME LTDA" + valor redondo (100,00) = genérico/ilustrativo
+- ✅ REAL: "CASAS BECKER LTDA" + valor específico (109,52) = transação real
+- ❌ EXEMPLO: "COMERCIAL XYZ S.A." = nome inventado
+- ✅ REAL: "SOLARE INSTALACAO E MA" = nome completo de empresa real
 
 ## REGRA #1 - CRÍTICO: EXTRAIR APENAS FATURA ATUAL
 
@@ -300,20 +305,25 @@ Diferença: R$ 763,47 ← ERRO! Remova itens!
 
 ## FORMATOS DE PARCELAS
 
+⚠️ **REGRA CRÍTICA:** SEMPRE remova informações de parcela da descrição! Use apenas installment_current e installment_total.
+
 ### Parcela na descrição (Nubank, Inter):
-- "LOJA ABC 2/10" → parcela 2 de 10
-- "RESTAURANTE XYZ 05/12" → parcela 5 de 12
-- ❌ NÃO incluir "2/10" na description, vai em installment_current/total
+- "LOJA ABC 2/10" → description: "LOJA ABC", installment_current: 2, installment_total: 10
+- "RESTAURANTE XYZ 05/12" → description: "RESTAURANTE XYZ", installment_current: 5, installment_total: 12
+- ❌ **ERRADO:** description: "LOJA ABC 2/10"
+- ✅ **CORRETO:** description: "LOJA ABC"
 
 ### Parcela em coluna separada (Santander, Bradesco):
 ```
 Data  | Descrição           | Parcela | Valor
 12/12 | LOJA ABC           | 01/12   | 100,00
 ```
-- installment_current = 1, installment_total = 12
+- description: "LOJA ABC", installment_current: 1, installment_total: 12
 
 ### Parcela entre parênteses (Inter):
-- "PRODUTO XYZ (Parcela 05 de 12)" → parcela 5 de 12
+- "PRODUTO XYZ (Parcela 05 de 12)" → description: "PRODUTO XYZ", installment_current: 5, installment_total: 12
+- ❌ **ERRADO:** description: "PRODUTO XYZ (Parcela 05 de 12)"
+- ✅ **CORRETO:** description: "PRODUTO XYZ"
 
 ## REGRAS CRÍTICAS DE VALORES
 
@@ -323,20 +333,23 @@ Se o PDF mostra:
 - "-R$ 100,00" para COMPRA → extraia como **100.00** (positivo)
 - "R$ 500,00" para PAGAMENTO → extraia como **-500.00** (negativo)
 
-### Identificação de PAGAMENTOS (MUITO IMPORTANTE!)
+### 🚫 NÃO EXTRAIR PAGAMENTOS! (MUITO IMPORTANTE!)
 
-Pagamentos SEMPRE têm valor NEGATIVO e transaction_type = "pagamento":
+⚠️ **CRÍTICO:** Pagamentos de fatura anterior NÃO devem ser extraídos como items!
 
-Frases indicadoras:
+**NÃO EXTRAIA transações com estas descrições:**
 - "PAGAMENTO EFETUADO"
 - "PAGAMENTO RECEBIDO"
 - "PAG BOLETO BANCARIO"
 - "PAGAMENTO DE FATURA"
 - "PAGAMENTO EM DD MMM"
+- Qualquer transação com a palavra "PAGAMENTO" + valor NEGATIVO
 
-⚠️ **ATENÇÃO:** "SALDO FATURA ANTERIOR" ≠ PAGAMENTO
-- "SALDO FATURA ANTERIOR" → valor POSITIVO (é um débito)
-- "PAGAMENTO RECEBIDO" → valor NEGATIVO (é um crédito)
+**POR QUÊ?** Pagamentos são créditos da fatura anterior, não compras da fatura atual.
+
+⚠️ **EXCEÇÃO:** "SALDO FATURA ANTERIOR" DEVE ser extraído
+- "SALDO FATURA ANTERIOR" → valor POSITIVO (é um débito) ✅ EXTRAIR
+- "PAGAMENTO" → valor NEGATIVO (é um crédito) ❌ NÃO EXTRAIR
 
 ## REGRAS ESPECIAIS POR BANCO
 

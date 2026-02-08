@@ -408,12 +408,6 @@ class ResponseParser:
             try:
                 due = datetime.strptime(result['due_date'], '%Y-%m-%d')
                 result['due_day'] = due.day
-                old_month = result.get('invoice_month')
-                old_year = result.get('invoice_year')
-                result['invoice_month'] = due.month
-                result['invoice_year'] = due.year
-                if old_month != due.month or old_year != due.year:
-                    print(f"[Parser] Corrigido invoice_month/year de {old_month}/{old_year} para {due.month}/{due.year}")
             except ValueError as e:
                 print(f"[Parser] Erro ao extrair due_day: {e}")
 
