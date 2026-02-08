@@ -31,7 +31,108 @@ const accountTypeLabels: Record<string, string> = {
   investment: 'Investimento',
 }
 
-// Inline Password Modal Component
+// Password Input Screen Component
+function PasswordScreen({ pendingFile, error, onSubmit, onCancel }: {
+  pendingFile: File | null
+  error: string | null
+  onSubmit: (password: string) => Promise<void>
+  onCancel: () => void
+}) {
+  const [password, setPassword] = useState('')
+  const [showPwd, setShowPwd] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!password.trim() || isSubmitting) return
+
+    setIsSubmitting(true)
+    try {
+      await onSubmit(password.trim())
+    } catch {
+      setIsSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="max-w-lg mx-auto space-y-6 pb-20 mt-10">
+      <div className="card space-y-6">
+        <div className="text-center space-y-4 pt-4">
+          <div className="w-20 h-20 mx-auto rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
+            <Lock size={40} className="text-orange-600 dark:text-orange-400" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">PDF Protegido</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+              Este PDF requer senha para ser lido
+            </p>
+            {pendingFile && (
+              <p className="text-xs text-gray-400 mt-1">{pendingFile.name}</p>
+            )}
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Senha do PDF
+            </label>
+            <div className="relative">
+              <input
+                type={showPwd ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-4 py-3 pr-12 border border-gray-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-gray-900 dark:text-white placeholder-gray-400"
+                placeholder="Digite a senha"
+                autoFocus
+                disabled={isSubmitting}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPwd(!showPwd)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-gray-400 hover:text-gray-600"
+              >
+                {showPwd ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+          </div>
+
+          {error && (
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
+              <p className="text-sm text-red-900 dark:text-red-200">{error}</p>
+            </div>
+          )}
+
+          <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+            <p className="text-xs text-blue-900 dark:text-blue-200">
+              <strong>Esta senha é apenas para desbloquear o PDF.</strong> Não tem relação com senha do cartão.
+            </p>
+          </div>
+
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={onCancel}
+              className="flex-1 py-3 rounded-xl font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 dark:text-gray-200 dark:bg-slate-700"
+              disabled={isSubmitting}
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="flex-1 py-3 rounded-xl font-semibold text-white bg-orange-500 hover:bg-orange-600"
+              disabled={!password.trim() || isSubmitting}
+            >
+              {isSubmitting ? 'Processando...' : 'Desbloquear'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+// Inline Password Modal Component (deprecated - using screen instead)
 function InlinePasswordModal({ onSubmit, onClose }: {
   onSubmit: (password: string) => Promise<void>
   onClose: () => void
@@ -437,9 +538,9 @@ export default function Upload() {
 
         // Check if detail is an object with error property
         if (detail && typeof detail === 'object' && 'error' in detail && detail.error === 'password_required') {
-          console.log('✅ PASSWORD REQUIRED - Showing modal')
-          // Show modal using portal - this will render outside React Query's error cycle
-          setShowPasswordModal(true)
+          console.log('✅ PASSWORD REQUIRED - Changing to password mode')
+          // Change mode to password screen
+          setMode('password')
           return
         } else {
           console.log('❌ Detail does not match password_required format')
@@ -1575,6 +1676,56 @@ export default function Upload() {
   }
 
   // Render transaction form (manual or confirmation)
+  // Password input screen
+  if (mode === 'password') {
+    return <PasswordScreen
+      pendingFile={pendingPasswordFile}
+      error={uploadError}
+      onSubmit={async (password: string) => {
+        if (!pendingPasswordFile) return
+
+        setMode('processing')
+        setUploadError(null)
+
+        try {
+          const response = await documentsApi.upload(pendingPasswordFile, password, passwordCreditCardId)
+
+          if (passwordCreditCardId && window.confirm('Salvar senha no cartão?')) {
+            await creditCardsApi.saveInvoicePassword(passwordCreditCardId, password).catch(() => {})
+          }
+
+          setPendingPasswordFile(null)
+          handleUploadSuccess(response)
+        } catch (error) {
+          setMode('password')
+          setUploadError(getApiErrorMessage(error, 'Senha incorreta'))
+        }
+      }}
+      onCancel={resetForm}
+    />
+  }
+
+  // Processing screen
+  if (mode === 'processing') {
+    return (
+      <div className="max-w-lg mx-auto space-y-6 pb-20 mt-20">
+        <div className="card space-y-6 text-center py-12">
+          <div className="w-20 h-20 mx-auto rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+            <div className="animate-spin">
+              <Repeat size={40} className="text-blue-600 dark:text-blue-400" />
+            </div>
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">Processando PDF</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              Aguarde enquanto extraímos os dados...
+            </p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   const isManual = mode === 'manual'
   const isPending = isManual ? createMutation.isPending : confirmMutation.isPending
 
