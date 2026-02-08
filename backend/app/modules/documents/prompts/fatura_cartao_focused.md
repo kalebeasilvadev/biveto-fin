@@ -8,19 +8,48 @@ Este documento é **GARANTIDAMENTE uma fatura de cartão**. NÃO é cupom fiscal
 ## SUA TAREFA
 Extrair **TODAS as transações da fatura ATUAL** e informações do cartão.
 
-## REGRA #1: EXTRAIR APENAS FATURA ATUAL
-⚠️ **CRÍTICO: Pare de extrair quando encontrar:**
-- "Próxima fatura"
-- "Lançamentos futuros"
-- "Parcelas a vencer"
-- "Farão parte da sua próxima fatura"
+## REGRA #1 - CRÍTICO: EXTRAIR APENAS FATURA ATUAL
 
-**Extraia APENAS transações que fazem parte do valor TOTAL A PAGAR desta fatura.**
+🛑 **PARE IMEDIATAMENTE de extrair quando encontrar:**
+- Texto "Próxima fatura"
+- Texto "Lançamentos futuros"
+- Texto "Parcelas a vencer"
+- Texto "Farão parte da sua próxima fatura"
+- Qualquer texto indicando transações FUTURAS
 
-✅ Inclua: Compras, parcelas, encargos, IOF que estão NESTA fatura
-❌ Ignore: Seção de parcelas que só vencerão no futuro
+🚫 **NÃO extraia transações que aparecem DEPOIS dessas palavras-chave.**
 
-**Validação:** A soma dos itens deve estar próxima do `total_amount` da fatura.
+✅ **Extraia SOMENTE:**
+- Transações da seção PRINCIPAL da fatura
+- Transações que estão ANTES da seção "Próxima fatura"
+- Transações que fazem parte do `total_amount` desta fatura
+
+❌ **NÃO extraia:**
+- Parcelas futuras (próximo mês)
+- Transações em seções separadas de "preview"
+- Qualquer valor que não some para o total desta fatura
+
+⚠️ **VALIDAÇÃO OBRIGATÓRIA - PASSO FINAL:**
+
+ANTES de retornar o JSON:
+1. Some TODOS os valores positivos dos items
+2. Compare com o `total_amount`
+3. Se a diferença for > R$ 100: VOCÊ EXTRAIU ITENS ERRADOS!
+4. Remova itens de "Próxima fatura" até a soma bater
+
+**EXEMPLO DE VALIDAÇÃO:**
+```
+total_amount: R$ 1.366,44
+Soma dos items: R$ 2.129,91
+Diferença: R$ 763,47 ← ERRO! Remova itens!
+```
+
+**Itens de "Próxima fatura" geralmente têm:**
+- Data futura (próximo mês)
+- Aparecem DEPOIS do texto "Próxima fatura"
+- São preview de parcelas que ainda vão vencer
+
+**Remova esses itens antes de retornar!**
 
 ## ESTRUTURA DO JSON
 
