@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { documentsApi, transactionsApi, accountsApi, categoriesApi, familyApi, creditCardsApi, invoicesApi, recurringApi, benefitCardsApi, receiptsApi, getApiErrorMessage } from '../services/api'
 import { useUploadStore } from '../stores/uploadStore'
-import { X, CreditCard, Repeat, Plus, AlertCircle, Check, Wallet } from 'lucide-react'
+import { X, CreditCard, Repeat, Plus, AlertCircle, Check, Wallet, Lock, Eye, EyeOff } from 'lucide-react'
 import {
   Document,
   TransactionFormData,
@@ -22,13 +22,97 @@ import {
 import DuplicateResolutionModal from '../components/upload/DuplicateResolutionModal'
 import OwnershipSelector from '../components/shared/OwnershipSelector'
 import { HelpButton } from '../components/help'
-import PasswordInputModal from '../components/PasswordInputModal'
+// PasswordInputModal now defined inline below
 
 const accountTypeLabels: Record<string, string> = {
   wallet: 'Carteira',
   bank: 'Banco',
   credit_card: 'Cartão',
   investment: 'Investimento',
+}
+
+// Inline Password Modal Component
+function InlinePasswordModal({ onSubmit, onClose }: {
+  onSubmit: (password: string) => Promise<void>
+  onClose: () => void
+}) {
+  const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!password.trim() || isSubmitting) return
+
+    setIsSubmitting(true)
+    try {
+      await onSubmit(password.trim())
+    } catch {
+      setIsSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div className="bg-white dark:bg-slate-800 rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-slide-up sm:animate-scale-in">
+        <div className="relative p-6 pb-4 text-center border-b border-gray-100 dark:border-slate-700">
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-full hover:bg-gray-100 dark:hover:bg-slate-700"
+          >
+            <X size={20} />
+          </button>
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
+            <Lock size={28} className="text-orange-600 dark:text-orange-400" />
+          </div>
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white">PDF Protegido</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Digite a senha para continuar</p>
+        </div>
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Senha do PDF
+            </label>
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Digite a senha"
+                className="w-full px-4 py-3 pr-12 border border-gray-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
+                autoFocus
+                disabled={isSubmitting}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-gray-400"
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+          </div>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 py-3 px-4 rounded-xl font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 dark:text-gray-200 dark:bg-slate-700"
+              disabled={isSubmitting}
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="flex-1 py-3 px-4 rounded-xl font-semibold text-white bg-orange-500 hover:bg-orange-600"
+              disabled={!password.trim() || isSubmitting}
+            >
+              {isSubmitting ? 'Verificando...' : 'Desbloquear'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
 }
 
 export default function Upload() {
@@ -2096,23 +2180,18 @@ export default function Upload() {
       )}
     </div>
 
-    {/* Password Modal using Portal */}
+    {/* Password Modal using Portal - Inline implementation */}
     {showPasswordModal && typeof window !== 'undefined' && createPortal(
-      <PasswordInputModal
-        isOpen={true}
-        onClose={() => {
-          setShowPasswordModal(false)
-          setPendingPasswordFile(null)
-        }}
-        onSubmit={async (password) => {
+      <InlinePasswordModal
+        onSubmit={async (password: string) => {
           if (!pendingPasswordFile) return
 
           try {
             const response = await documentsApi.upload(pendingPasswordFile, password, passwordCreditCardId)
 
-            // Success - optionally save password if credit card selected
+            // Success - optionally save password
             if (passwordCreditCardId) {
-              const savePassword = window.confirm('Deseja salvar esta senha no cartão para facilitar próximos uploads?')
+              const savePassword = window.confirm('Deseja salvar esta senha no cartão?')
               if (savePassword) {
                 await creditCardsApi.saveInvoicePassword(passwordCreditCardId, password).catch(() => {})
               }
@@ -2122,18 +2201,14 @@ export default function Upload() {
             setPendingPasswordFile(null)
             handleUploadSuccess(response)
           } catch (error) {
-            throw error // PasswordInputModal will handle error display
+            alert('Senha incorreta. Tente novamente.')
+            throw error
           }
         }}
-        creditCardId={passwordCreditCardId}
-        creditCardName={
-          passwordCreditCardId
-            ? creditCards.find((c: { id: number; name: string }) => c.id === passwordCreditCardId)?.name
-            : undefined
-        }
-        error={null}
-        attemptCount={0}
-        maxAttempts={5}
+        onClose={() => {
+          setShowPasswordModal(false)
+          setPendingPasswordFile(null)
+        }}
       />,
       window.document.body
     )}
