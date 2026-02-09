@@ -148,6 +148,14 @@ class ResponseParser:
             if card_info and isinstance(card_info, dict):
                 result['card_info'] = self._normalize_card_info(card_info)
 
+                # Corrigir datas de parcelas usando o mês/ano da fatura
+                if result['card_info'].get('invoice_month') and result['card_info'].get('invoice_year'):
+                    result['items'] = self._fix_installment_dates(
+                        result['items'],
+                        result['card_info']['invoice_month'],
+                        result['card_info']['invoice_year']
+                    )
+
             # Parse merchant_info for cupom fiscal (needed for payment_info)
             merchant_info = data.get('merchant_info')
             if merchant_info and isinstance(merchant_info, dict):
@@ -359,6 +367,46 @@ class ResponseParser:
                     return category
 
         return None
+
+    def _fix_installment_dates(self, items: list[dict], invoice_month: int, invoice_year: int) -> list[dict]:
+        """
+        Corrige datas de transações parceladas para usar o mês da fatura.
+
+        Problema: O LLM extrai a data do código da parcela (ex: "AM07/10" = julho)
+        ao invés da data da linha na fatura (janeiro).
+
+        Solução: Para parcelas, usar o mês/ano da fatura como referência.
+        """
+        from datetime import date
+
+        fixed_items = []
+        for item in items:
+            if item.get('is_installment') and item.get('date'):
+                try:
+                    # Parse data atual
+                    item_date = datetime.strptime(item['date'], '%Y-%m-%d')
+
+                    # Se a data está muito fora do mês da fatura (diferença > 2 meses),
+                    # provavelmente é a data original da compra, não a data da fatura
+                    month_diff = abs((invoice_year * 12 + invoice_month) - (item_date.year * 12 + item_date.month))
+
+                    if month_diff > 2:
+                        # Usar mês/ano da fatura, mantendo o dia (ou 1 se inválido)
+                        try:
+                            corrected_date = date(invoice_year, invoice_month, item_date.day)
+                        except ValueError:
+                            # Dia inválido para o mês (ex: 31 em fev) - usar dia 1
+                            corrected_date = date(invoice_year, invoice_month, 1)
+
+                        print(f"[Parser] Corrigindo data de parcela: {item['date']} -> {corrected_date.strftime('%Y-%m-%d')} "
+                              f"({item.get('description', 'N/A')[:50]})")
+                        item['date'] = corrected_date.strftime('%Y-%m-%d')
+                except (ValueError, TypeError) as e:
+                    print(f"[Parser] Erro ao corrigir data de parcela: {e}")
+
+            fixed_items.append(item)
+
+        return fixed_items
 
     def _normalize_card_info(self, card_info: dict) -> dict:
         """Normaliza informacoes do cartao"""
