@@ -112,6 +112,8 @@ export default function Invoices() {
   const [transactionToMove, setTransactionToMove] = useState<{ id: number; description: string } | null>(null)
   const [showEditTransactionModal, setShowEditTransactionModal] = useState(false)
   const [transactionToEdit, setTransactionToEdit] = useState<any | null>(null)
+  const [showDeleteTransactionModal, setShowDeleteTransactionModal] = useState(false)
+  const [transactionToDelete, setTransactionToDelete] = useState<{ id: number; description: string } | null>(null)
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null)
   const [sortField, setSortField] = useState<SortField>('total_amount')
@@ -199,6 +201,19 @@ export default function Invoices() {
       queryClient.invalidateQueries({ queryKey: ['credit-cards'] })
       setShowEditTransactionModal(false)
       setTransactionToEdit(null)
+    },
+  })
+
+  const deleteTransactionMutation = useMutation({
+    mutationFn: (transactionId: number) => transactionsApi.delete(transactionId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invoices'] })
+      queryClient.invalidateQueries({ queryKey: ['invoice'] })
+      queryClient.invalidateQueries({ queryKey: ['transactions'] })
+      queryClient.invalidateQueries({ queryKey: ['credit-cards'] })
+      queryClient.invalidateQueries({ queryKey: ['analytics'] })
+      setShowDeleteTransactionModal(false)
+      setTransactionToDelete(null)
     },
   })
 
@@ -964,6 +979,19 @@ export default function Invoices() {
                               >
                                 <ArrowRightLeft size={14} className="text-gray-500" />
                               </button>
+                              <button
+                                onClick={() => {
+                                  setTransactionToDelete({
+                                    id: t.id,
+                                    description: t.description || t.merchant_name || 'Transação',
+                                  })
+                                  setShowDeleteTransactionModal(true)
+                                }}
+                                className="p-1.5 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors"
+                                title="Excluir transação"
+                              >
+                                <Trash2 size={14} className="text-red-600 dark:text-red-400" />
+                              </button>
                             </div>
                           </div>
                         </div>
@@ -1333,6 +1361,55 @@ export default function Invoices() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Transaction Modal */}
+      {showDeleteTransactionModal && transactionToDelete && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
+              Excluir Transação
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+              Tem certeza que deseja excluir esta transação?
+            </p>
+            <p className="text-sm font-medium text-gray-900 dark:text-white mb-4">
+              {transactionToDelete.description}
+            </p>
+
+            <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg p-3 mb-4">
+              <p className="text-sm text-amber-800 dark:text-amber-200">
+                <strong>Dica:</strong> Use esta opção para remover transações duplicadas ou projetadas incorretamente.
+              </p>
+            </div>
+
+            <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg p-3 mb-4">
+              <p className="text-sm text-red-800 dark:text-red-200">
+                Atenção: Esta ação não pode ser desfeita. A transação será removida permanentemente.
+              </p>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDeleteTransactionModal(false)
+                  setTransactionToDelete(null)
+                }}
+                className="btn-secondary flex-1"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => deleteTransactionMutation.mutate(transactionToDelete.id)}
+                className="btn-primary flex-1 bg-red-600 hover:bg-red-700"
+                disabled={deleteTransactionMutation.isPending}
+              >
+                {deleteTransactionMutation.isPending ? 'Excluindo...' : 'Excluir'}
+              </button>
+            </div>
           </div>
         </div>
       )}
