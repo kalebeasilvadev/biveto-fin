@@ -26,10 +26,14 @@ O documento pode conter:
 - Título "Despesas da fatura" ou "Transações" ou "Lançamentos"
 - Tabela com colunas: Data | Descrição/Movimentação | Valor
 - Número do cartão ESPECÍFICO (ex: "CARTÃO 5364****7931")
-- **IMPORTANTE**: Uma mesma página pode ter MÚLTIPLAS seções de transações:
-  - Seção 1: Lançamentos do mês atual (janeiro/fevereiro 2026)
-  - Seção 2: Parcelas recorrentes de compras anteriores
-  - **EXTRAIA TODAS AS SEÇÕES** da mesma página!
+- **⚠️ CRÍTICO - MÚLTIPLAS SEÇÕES/COLUNAS NA MESMA PÁGINA:**
+  - Uma mesma página pode ter 2 OU 3 COLUNAS/SEÇÕES de transações lado a lado
+  - Exemplo comum:
+    * **Coluna ESQUERDA**: Parcelas de compras anteriores que continuam sendo cobradas (ex: parcela 7/12 de uma compra de julho)
+    * **Coluna DIREITA**: Compras novas do mês atual
+  - **VOCÊ DEVE EXTRAIR TODAS AS COLUNAS/SEÇÕES!**
+  - NÃO extraia apenas uma coluna e ignore as outras!
+  - Verifique se há múltiplas listas de transações na mesma página e EXTRAIA TODAS!
 
 ❌ **NÃO EXTRAIA de páginas que têm:**
 - Título "Resumo da fatura" (apenas valores totais)
@@ -53,6 +57,22 @@ Páginas de resumo/introdução podem ter dados ILUSTRATIVOS (não são transaç
 - ✅ REAL: "CASAS BECKER LTDA" + valor específico (109,52) = transação real
 - ❌ EXEMPLO: "COMERCIAL XYZ S.A." = nome inventado
 - ✅ REAL: "SOLARE INSTALACAO E MA" = nome completo de empresa real
+
+## EXEMPLO DE LAYOUT COM MÚLTIPLAS COLUNAS
+
+Faturas do Itaú, Bradesco e outros bancos frequentemente têm este layout:
+
+```
+Lançamentos: compras e saques              Lançamentos: compras e saques
+COLUNA ESQUERDA                            COLUNA DIREITA
+(Parcelas continuando)                     (Compras do mês)
+
+09/07 MOTOCHEFE 07/12     574,13          23/01 Wellhub Gympass    189,90
+20/07 PRIME GLOBAL 07/10  148,00          26/01 TESOURA DE O-CT     95,98
+13/09 FASTSHO 05/12       107,33          26/01 PAPELARIA PR-CT A   36,98
+```
+
+**⚠️ VOCÊ DEVE EXTRAIR AMBAS AS COLUNAS!** Caso contrário, a soma não baterá com o total da fatura.
 
 ## REGRA #1 - CRÍTICO: EXTRAIR APENAS FATURA ATUAL
 
