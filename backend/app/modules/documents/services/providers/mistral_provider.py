@@ -207,15 +207,61 @@ class MistralProvider(BaseProvider):
             else:
                 prompt_path = prompts_dir / "fatura_cartao_focused.md"
 
-        # Carregar prompt
+        # Carregar prompt base
         if prompt_path.exists():
             prompt_text = prompt_path.read_text(encoding="utf-8")
-            print(f"[MistralProvider] Prompt carregado: {prompt_path.name}")
-            return prompt_text, doc_type
+            print(f"[MistralProvider] Prompt base carregado: {prompt_path.name}")
+        else:
+            # Fallback: prompt generico
+            print(f"[MistralProvider] AVISO: Prompt {prompt_path} nao encontrado, usando self.prompt")
+            prompt_text = self.prompt
 
-        # Fallback final: prompt generico
-        print(f"[MistralProvider] AVISO: Prompt {prompt_path} nao encontrado, usando self.prompt")
-        return self.prompt, doc_type
+        # Se for fatura de cartão, tentar carregar prompt específico do banco
+        if doc_type == "fatura_cartao":
+            bank_name = self._detect_bank(ocr_text)
+            if bank_name:
+                bank_prompt_path = prompts_dir / "banks" / f"{bank_name}.md"
+                if bank_prompt_path.exists():
+                    bank_prompt = bank_prompt_path.read_text(encoding="utf-8")
+                    # Compor: prompt geral + prompt específico do banco
+                    prompt_text = f"{prompt_text}\n\n{bank_prompt}"
+                    print(f"[MistralProvider] Prompt específico do banco '{bank_name}' adicionado")
+                else:
+                    print(f"[MistralProvider] Banco '{bank_name}' detectado mas sem prompt específico")
+
+        return prompt_text, doc_type
+
+    def _detect_bank(self, ocr_text: str) -> str | None:
+        """Detecta o banco emissor da fatura a partir do texto OCR.
+
+        Returns:
+            Nome do banco em lowercase (ex: "itau", "nubank", "bradesco")
+            ou None se não detectar
+        """
+        text_lower = ocr_text.lower()
+
+        # Mapeamento de indicadores para nomes de bancos
+        bank_indicators = {
+            'itau': ['banco itau', 'itaú', 'itau unibanco', 'financeira itau cbd'],
+            'nubank': ['nubank', 'nu pagamentos'],
+            'bradesco': ['bradesco', 'banco bradesco'],
+            'santander': ['santander', 'banco santander'],
+            'inter': ['banco inter', 'inter'],
+            'c6': ['c6 bank', 'banco c6', 'c6bank'],
+            'picpay': ['picpay', 'pic pay'],
+            'neon': ['neon', 'banco neon'],
+            'next': ['next', 'banco next'],
+            'will': ['will bank', 'banco will'],
+            'pan': ['banco pan', 'bancopan'],
+        }
+
+        for bank_name, indicators in bank_indicators.items():
+            for indicator in indicators:
+                if indicator in text_lower:
+                    print(f"[MistralProvider] Banco detectado: {bank_name} (indicador: '{indicator}')")
+                    return bank_name
+
+        return None
 
     def _detect_document_type(self, ocr_text: str) -> str:
         """Detecta se é cupom fiscal ou fatura de cartão."""

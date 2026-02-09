@@ -21,9 +21,66 @@ class GoogleProvider(BaseProvider):
         self.max_retries = DEFAULT_MAX_RETRIES
         self.retry_delay = DEFAULT_RETRY_DELAY
         self._client = None
-        self.prompt = prompt
+        self.base_prompt = prompt  # Prompt base (geral)
+        self.prompt = prompt  # Prompt atual (pode ser composto)
         self.response_schema = response_schema
         self._parse_response = parse_response_fn or (lambda x: {'items': [], 'error': 'No parser'})
+
+    def _detect_bank(self, text: str) -> str | None:
+        """Detecta o banco emissor da fatura a partir do texto.
+
+        Returns:
+            Nome do banco em lowercase (ex: "itau", "nubank") ou None
+        """
+        text_lower = text.lower()
+
+        bank_indicators = {
+            'itau': ['banco itau', 'itaú', 'itau unibanco', 'financeira itau cbd'],
+            'nubank': ['nubank', 'nu pagamentos'],
+            'bradesco': ['bradesco', 'banco bradesco'],
+            'santander': ['santander', 'banco santander'],
+            'inter': ['banco inter', 'inter'],
+            'c6': ['c6 bank', 'banco c6', 'c6bank'],
+            'picpay': ['picpay', 'pic pay'],
+            'neon': ['neon', 'banco neon'],
+            'next': ['next', 'banco next'],
+            'will': ['will bank', 'banco will'],
+            'pan': ['banco pan', 'bancopan'],
+        }
+
+        for bank_name, indicators in bank_indicators.items():
+            for indicator in indicators:
+                if indicator in text_lower:
+                    print(f"[GoogleProvider] Banco detectado: {bank_name}")
+                    return bank_name
+
+        return None
+
+    def _compose_prompt_with_bank(self, bank_name: str | None) -> str:
+        """Compõe prompt base + prompt específico do banco (se existir).
+
+        Args:
+            bank_name: Nome do banco detectado (ex: "itau")
+
+        Returns:
+            Prompt composto
+        """
+        from pathlib import Path
+
+        prompt_text = self.base_prompt
+
+        if bank_name:
+            prompts_dir = Path(__file__).parent.parent.parent / "prompts"
+            bank_prompt_path = prompts_dir / "banks" / f"{bank_name}.md"
+
+            if bank_prompt_path.exists():
+                bank_prompt = bank_prompt_path.read_text(encoding="utf-8")
+                prompt_text = f"{prompt_text}\n\n{bank_prompt}"
+                print(f"[GoogleProvider] Prompt específico do banco '{bank_name}' adicionado")
+            else:
+                print(f"[GoogleProvider] Banco '{bank_name}' sem prompt específico")
+
+        return prompt_text
 
     def _get_client(self):
         """Obtem cliente Google Genai (lazy initialization)"""
@@ -112,8 +169,32 @@ class GoogleProvider(BaseProvider):
 
             temp_file = await asyncio.to_thread(_write_temp)
 
-            # Upload do PDF para o Gemini (em thread separada)
-            print(f"[GoogleProvider] Uploading PDF to Gemini...")
+            # PASSO 1: Fazer OCR rápido para detectar o banco
+            print(f"[GoogleProvider] Step 1: Quick OCR to detect bank...")
+            ocr_prompt = "Extract all text from this document. Return just the plain text, no JSON."
+            uploaded_file_ocr = await asyncio.to_thread(
+                self._upload_file_sync, client, temp_file, "application/pdf"
+            )
+
+            ocr_config = types.GenerateContentConfig(
+                temperature=0.0,
+                max_output_tokens=8000,
+            )
+            ocr_response = await asyncio.to_thread(
+                self._generate_content_sync, client,
+                self.model,
+                [types.Part.from_uri(uploaded_file_ocr.uri, uploaded_file_ocr.mime_type), ocr_prompt],
+                ocr_config
+            )
+            ocr_text = ocr_response.text if ocr_response else ""
+            print(f"[GoogleProvider] OCR text extracted: {len(ocr_text)} chars")
+
+            # Detectar banco e compor prompt
+            bank_name = self._detect_bank(ocr_text)
+            composed_prompt = self._compose_prompt_with_bank(bank_name)
+
+            # PASSO 2: Fazer extração estruturada com prompt composto
+            print(f"[GoogleProvider] Step 2: Structured extraction with composed prompt...")
             uploaded_file = await asyncio.to_thread(
                 self._upload_file_sync, client, temp_file, "application/pdf"
             )
@@ -125,7 +206,7 @@ class GoogleProvider(BaseProvider):
                     file_uri=uploaded_file.uri,
                     mime_type=uploaded_file.mime_type,
                 ),
-                self.prompt,
+                composed_prompt,  # Usar prompt composto
             ]
             config = types.GenerateContentConfig(
                 temperature=0.1,
