@@ -169,45 +169,45 @@ class GoogleProvider(BaseProvider):
 
             temp_file = await asyncio.to_thread(_write_temp)
 
-            # PASSO 1: Fazer OCR rápido para detectar o banco
-            print(f"[GoogleProvider] Step 1: Quick OCR to detect bank...")
-            ocr_prompt = "Extract all text from this document. Return just the plain text, no JSON."
-            uploaded_file_ocr = await asyncio.to_thread(
-                self._upload_file_sync, client, temp_file, "application/pdf"
-            )
+            # PASSO 1: Usar PyMuPDF para extrair texto preservando layout de colunas
+            print(f"[GoogleProvider] Step 1: Extract text with PyMuPDF (preserves columns)...")
+            from ..pdf_text_extractor import PDFTextExtractor
 
-            ocr_config = types.GenerateContentConfig(
-                temperature=0.0,
-                max_output_tokens=8000,
-            )
-            ocr_response = await asyncio.to_thread(
-                self._generate_content_sync, client,
-                self.model,
-                [types.Part.from_uri(uploaded_file_ocr.uri, uploaded_file_ocr.mime_type), ocr_prompt],
-                ocr_config
-            )
-            ocr_text = ocr_response.text if ocr_response else ""
-            print(f"[GoogleProvider] OCR text extracted: {len(ocr_text)} chars")
+            pdf_bytes = await asyncio.to_thread(_read_file_sync, temp_file)
+            ocr_text = PDFTextExtractor.extract_text_with_layout(pdf_bytes, password)
+            print(f"[GoogleProvider] Text extracted with layout: {len(ocr_text)} chars")
 
-            # Detectar banco e compor prompt
+            # Log das primeiras linhas para debug
+            lines_preview = '\n'.join(ocr_text.split('\n')[:30])
+            print(f"[GoogleProvider] Text preview:\n{lines_preview}\n...")
+
+            def _read_file_sync(path):
+                with open(path, 'rb') as f:
+                    return f.read()
+
+            # PASSO 2: Detectar banco e compor prompt
             bank_name = self._detect_bank(ocr_text)
             composed_prompt = self._compose_prompt_with_bank(bank_name)
 
-            # PASSO 2: Fazer extração estruturada com prompt composto
-            print(f"[GoogleProvider] Step 2: Structured extraction with composed prompt...")
-            uploaded_file = await asyncio.to_thread(
-                self._upload_file_sync, client, temp_file, "application/pdf"
-            )
-            print(f"[GoogleProvider] PDF uploaded: uri={uploaded_file.uri}")
+            # PASSO 3: Fazer extração estruturada usando TEXTO (não imagem)
+            print(f"[GoogleProvider] Step 2: Structured extraction from TEXT (not image)...")
 
-            # Preparar conteudo e config
-            contents = [
-                types.Part.from_uri(
-                    file_uri=uploaded_file.uri,
-                    mime_type=uploaded_file.mime_type,
-                ),
-                composed_prompt,  # Usar prompt composto
-            ]
+            # Criar prompt final com o texto do documento
+            final_prompt = f"""{composed_prompt}
+
+## TEXTO EXTRAÍDO DO DOCUMENTO
+
+Abaixo está o texto completo extraído do PDF com layout preservado.
+As colunas estão representadas lado a lado na mesma linha.
+
+```
+{ocr_text}
+```
+
+Agora extraia TODAS as transações deste texto no formato JSON especificado."""
+
+            # Preparar conteudo e config (apenas texto, sem imagem)
+            contents = [final_prompt]
             config = types.GenerateContentConfig(
                 temperature=0.1,
                 response_mime_type="application/json",
