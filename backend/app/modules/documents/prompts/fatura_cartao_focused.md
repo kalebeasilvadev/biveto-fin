@@ -67,12 +67,21 @@ Lançamentos: compras e saques              Lançamentos: compras e saques
 COLUNA ESQUERDA                            COLUNA DIREITA
 (Parcelas continuando)                     (Compras do mês)
 
-09/07 MOTOCHEFE 07/12     574,13          23/01 Wellhub Gympass    189,90
-20/07 PRIME GLOBAL 07/10  148,00          26/01 TESOURA DE O-CT     95,98
-13/09 FASTSHO 05/12       107,33          26/01 PAPELARIA PR-CT A   36,98
+09/07 MOTOCHEFE 07/12     574,13 ✅        23/01 Wellhub Gympass    189,90 ✅
+20/07 PRIME GLOBAL 07/10  148,00 ✅        26/01 TESOURA DE O-CT     95,98 ✅
+13/09 FASTSHO 05/12       107,33 ✅        26/01 PAPELARIA PR-CT A   36,98 ✅
 ```
 
-**⚠️ VOCÊ DEVE EXTRAIR AMBAS AS COLUNAS!** Caso contrário, a soma não baterá com o total da fatura.
+**🚨 VOCÊ DEVE EXTRAIR AMBAS AS COLUNAS!** Caso contrário, a soma não baterá com o total da fatura.
+
+**ERRO COMUM:** Extrair apenas a coluna da direita e ignorar a esquerda.
+- ❌ Se extrair só a direita: Soma = R$ 322,86 (falta R$ 829,46!)
+- ✅ Se extrair ambas: Soma = R$ 1.152,32 (correto!)
+
+**COMO SABER SE HÁ MÚLTIPLAS COLUNAS:**
+- Se você vê o mesmo título ("Lançamentos") repetido na mesma página → são colunas diferentes!
+- Se as datas estão desalinhadas (ex: algumas em julho, outras em janeiro) → provavelmente são colunas separadas
+- Se a soma não bate com total_amount → você esqueceu uma coluna!
 
 ## REGRA #1 - CRÍTICO: EXTRAIR APENAS FATURA ATUAL
 
@@ -198,23 +207,44 @@ Página 5: "Lançamentos em outras faturas" ou sem título claro
 
 ⚠️ **VALIDAÇÃO OBRIGATÓRIA - PASSO FINAL:**
 
-ANTES de retornar o JSON:
-1. Some TODOS os valores positivos dos items
-2. Compare com o `total_amount`
-3. Se a diferença for > R$ 100: VOCÊ EXTRAIU ITENS ERRADOS!
-4. Remova itens de "Próxima fatura" até a soma bater
+🚨 **VOCÊ DEVE FAZER ESTA VALIDAÇÃO ANTES DE RETORNAR O JSON:**
+
+1. **Some TODOS os valores** dos items (positivos - negativos)
+2. **Compare** o resultado com `total_amount`
+3. **Verifique a diferença:**
+
+**SE SOMA > total_amount (extraiu demais):**
+- ERRO! Você incluiu transações da próxima fatura
+- Remova itens com datas futuras ou que aparecem após "Próxima fatura"
+
+**SE SOMA < total_amount (extraiu de menos) ← ERRO MAIS COMUM:**
+- ERRO! Você esqueceu de extrair alguma seção/coluna!
+- **VOLTE AO DOCUMENTO** e procure:
+  * Segunda coluna de transações que você ignorou
+  * Parcelas continuando de meses anteriores (geralmente na coluna esquerda)
+  * Seção de transações que você pulou
+- **LEMBRE-SE:** O layout pode ter 2-3 colunas na mesma página!
 
 **EXEMPLO DE VALIDAÇÃO:**
 ```
+❌ ERRO - Extraiu DEMAIS:
 total_amount: R$ 1.366,44
 Soma dos items: R$ 2.129,91
-Diferença: R$ 763,47 ← ERRO! Remova itens!
+Diferença: +R$ 763,47 → Remova itens de "Próxima fatura"!
+
+❌ ERRO - Extraiu DE MENOS (MAIS COMUM):
+total_amount: R$ 2.368,14
+Soma dos items: R$ 1.794,01
+Diferença: -R$ 574,13 → FALTA extrair transações! Verifique outras colunas!
+
+✅ CORRETO:
+total_amount: R$ 2.368,14
+Soma dos items: R$ 2.368,14
+Diferença: R$ 0,00 → Perfeito!
 ```
 
-**Itens de "Próxima fatura" geralmente têm:**
-- Data futura (próximo mês)
-- Aparecem DEPOIS do texto "Próxima fatura"
-- São preview de parcelas que ainda vão vencer
+**⚠️ MARGEM DE ERRO ACEITÁVEL:** Máximo ±R$ 5,00 por conta de arredondamentos.
+**SE DIFERENÇA > R$ 50:** Você definitivamente esqueceu ou incluiu transações erradas!
 
 **Remova esses itens antes de retornar!**
 
