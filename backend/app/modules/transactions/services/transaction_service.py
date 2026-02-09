@@ -288,7 +288,61 @@ class TransactionService:
 
                 return transaction
 
+        # BUSCAR SÉRIE PROJETADA EXISTENTE antes de criar nova
+        # Isso evita criar séries duplicadas quando transações reais chegam
+        if not series:
+            potential_series = await installment_service.find_matching_series_fuzzy(
+                user=user,
+                merchant_name=data.merchant_name or data.description or "Compra",
+                installment_amount=data.amount,
+                installment_total=installment_total,
+                credit_card_id=credit_card_id,
+            )
+
+            if potential_series:
+                # Encontrou série similar! Verificar se tem parcela projetada para confirmar
+                existing_installment = await installment_service.find_existing_installment(
+                    potential_series, installment_current
+                )
+
+                if existing_installment and not existing_installment.is_paid:
+                    # Confirmar parcela projetada
+                    transaction = await installment_service.confirm_existing_installment(
+                        user=user,
+                        series=potential_series,
+                        installment_number=installment_current,
+                        document_id=None,
+                        actual_amount=data.amount,
+                        actual_date=data.date,
+                    )
+
+                    # Atualizar campos adicionais
+                    if data.category_id:
+                        transaction.category_id = data.category_id
+                    if merchant_id:
+                        transaction.merchant_id = merchant_id
+                    if data.notes:
+                        transaction.notes = data.notes
+                    if data.tags:
+                        transaction.tags = data.tags
+                    if invoice and transaction.invoice_id != invoice.id:
+                        transaction.invoice_id = invoice.id
+
+                    await self.db.flush()
+                    await self.db.refresh(transaction)
+
+                    # Atualizar total da fatura
+                    if invoice and invoice_service:
+                        await invoice_service.update_invoice_total(invoice, force_recalculate=True)
+
+                    return transaction
+                else:
+                    # Série existe mas parcela já foi confirmada ou não existe
+                    # Usar a série existente para criar a transação
+                    series = potential_series
+
         # NOVO FLUXO: Criar transação primeiro, depois criar série vinculada a ela
+        # (apenas se não encontrou série existente acima)
 
         # PASSO 1: Criar a transação primeiro (sem série)
         transaction = Transaction(

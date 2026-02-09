@@ -36,11 +36,54 @@ class DuplicateDetectionService:
     # Constantes para detecção de duplicatas em TRANSAÇÕES INDIVIDUAIS
     MAX_TRANSACTION_AMOUNT_DIFF = 0.05  # R$ 0,05 diferença máxima entre valores
     MIN_DESCRIPTION_SIMILARITY = 80.0    # 80% similaridade mínima na descrição (fuzzy)
-    MAX_DATE_DIFFERENCE_DAYS = 3         # 3 dias de diferença máxima entre datas
+    MAX_DATE_DIFFERENCE_DAYS = 3         # 3 dias de diferença máxima entre datas (transações normais)
+    MAX_DATE_DIFFERENCE_DAYS_INSTALLMENTS = 45  # 45 dias para parcelas (permite matching entre meses)
 
     def __init__(self, db: AsyncSession):
         self.db = db
         self.installment_service = InstallmentService(db)
+
+    def _normalize_description(self, description: str) -> str:
+        """
+        Normaliza descrição de transação para comparação fuzzy.
+
+        Remove:
+        - Acentos
+        - Padrões de parcela (3/12, PARC.3/12, "(Parcela 3 de 12)", "- Parcela 3/12")
+        - Caracteres especiais extras
+        - Espaços duplicados
+        """
+        import unicodedata
+        import re
+
+        if not description:
+            return ""
+
+        # Remove acentos
+        description = unicodedata.normalize('NFD', description)
+        description = ''.join(c for c in description if unicodedata.category(c) != 'Mn')
+
+        # Lowercase
+        description = description.lower()
+
+        # Remove padrões de parcela (do mais específico ao mais genérico)
+        parcela_patterns = [
+            r'\s*-?\s*parcela\s+\d+\s*/\s*\d+',  # "- Parcela 3/12" ou "Parcela 3/12"
+            r'\s*\(parcela\s*\d+\s*de\s*\d+\)',  # "(Parcela 3 de 12)"
+            r'\s*parc\.?\s*\d+\s*/\s*\d+',       # "PARC.3/12" ou "PARC 3/12"
+            r'\s*\(\s*\d+\s*/\s*\d+\s*\)',       # "(3/12)"
+            r'\s*\d+\s*/\s*\d+\s*$',              # "3/12" no final
+        ]
+        for pattern in parcela_patterns:
+            description = re.sub(pattern, '', description, flags=re.IGNORECASE)
+
+        # Remove caracteres especiais, mantendo apenas letras, números e espaços
+        description = re.sub(r'[^\w\s]', ' ', description)
+
+        # Remove espaços duplicados
+        description = re.sub(r'\s+', ' ', description).strip()
+
+        return description
 
     async def find_duplicate_groups(
         self,
@@ -272,17 +315,31 @@ class DuplicateDetectionService:
 
         days_apart = abs((tx_a.date - tx_b.date).days)
 
-        if days_apart > self.MAX_DATE_DIFFERENCE_DAYS:
+        # Usar tolerância maior para parcelas (permite matching entre meses diferentes)
+        is_installment = (
+            (tx_a.installment_number is not None and tx_a.installment_total is not None) or
+            (tx_b.installment_number is not None and tx_b.installment_total is not None)
+        )
+        max_date_diff = (
+            self.MAX_DATE_DIFFERENCE_DAYS_INSTALLMENTS if is_installment
+            else self.MAX_DATE_DIFFERENCE_DAYS
+        )
+
+        if days_apart > max_date_diff:
             return False, 0.0
 
         # Soft Scoring: Similaridade de descrição
         if not tx_a.description or not tx_b.description:
             return False, 0.0
 
-        # Usar fuzzy matching para comparar descrições
+        # Normalizar descrições antes do fuzzy matching (remove padrões de parcela)
+        normalized_desc_a = self._normalize_description(tx_a.description)
+        normalized_desc_b = self._normalize_description(tx_b.description)
+
+        # Usar fuzzy matching para comparar descrições normalizadas
         description_similarity = fuzz.partial_ratio(
-            tx_a.description.lower(),
-            tx_b.description.lower()
+            normalized_desc_a,
+            normalized_desc_b
         )
 
         if description_similarity < self.MIN_DESCRIPTION_SIMILARITY:
@@ -309,8 +366,8 @@ class DuplicateDetectionService:
         if days_apart == 0:
             score += 0.1
         else:
-            # Quanto menor a diferença, maior o score
-            date_score = 1.0 - (days_apart / self.MAX_DATE_DIFFERENCE_DAYS)
+            # Quanto menor a diferença, maior o score (usar tolerância apropriada)
+            date_score = 1.0 - (days_apart / max_date_diff)
             score += date_score * 0.1
 
         return True, score
