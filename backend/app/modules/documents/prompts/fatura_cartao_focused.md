@@ -8,6 +8,23 @@ Este documento é **GARANTIDAMENTE uma fatura de cartão**. NÃO é cupom fiscal
 ## SUA TAREFA
 Extrair **TODAS as transações da fatura ATUAL** e informações do cartão.
 
+### 🚨 PROCESSO OBRIGATÓRIO DE EXTRAÇÃO:
+
+1. **PRIMEIRO**: Leia TODO o documento e identifique TODAS as seções/colunas de transações
+   - NÃO comece a extrair imediatamente!
+   - Procure por MÚLTIPLAS tabelas/colunas na mesma página
+   - Liste mentalmente: "Vejo X seções de transações"
+
+2. **SEGUNDO**: Para CADA seção/coluna que você identificou:
+   - Extraia TODAS as linhas da coluna
+   - Não pule nenhuma linha
+   - Não assuma que colunas com datas antigas são de "próxima fatura"
+
+3. **TERCEIRO**: Valide a soma:
+   - Some todos os valores extraídos
+   - Compare com `total_amount`
+   - Se diferença > R$ 50: VOLTE ao documento e procure seções que você perdeu!
+
 ## ⚠️ ATENÇÃO: VOCÊ ESTÁ VENDO O DOCUMENTO COMPLETO (TODAS AS PÁGINAS)
 
 O documento pode conter:
@@ -461,11 +478,33 @@ Se o PDF mostra:
 - IOF em linha separada após compra internacional
 - **CRÍTICO:** Ao ver "| IOF | R$ XX,XX |", extraia XX,XX (NÃO use valores de outras linhas)
 - IOF é sempre POSITIVO (é um encargo)
-- **🚨 LAYOUT CRÍTICO:** Página 2 do Itaú tem DUAS colunas lado a lado com o MESMO título "Lançamentos: compras e saques":
-  * Coluna ESQUERDA: Parcelas de compras antigas continuando (ex: MOTOCHEFE 07/12, PRIME GLOBAL 07/10)
-  * Coluna DIREITA: Compras novas do mês (ex: Wellhub, TESOURA, PAPELARIA)
-  * **AMBAS AS COLUNAS SÃO DA FATURA ATUAL!** Extraia as duas!
-  * NÃO confunda com "Próxima fatura" que aparece DEPOIS em uma seção separada
+- **🚨 LAYOUT CRÍTICO DO ITAÚ - DUAS COLUNAS:**
+
+Página 2 do Itaú tem DUAS colunas lado a lado com títulos IDÊNTICOS. Ambas dizem "Lançamentos: compras e saques":
+
+```
+📄 PÁGINA 2 DO ITAÚ:
+
+Lançamentos: compras e saques          Lançamentos: compras e saques
+COLUNA ESQUERDA (extrair!)             COLUNA DIREITA (extrair!)
+09/07 MOTOCHEFE 07/12    574,13 ✅    23/01 Wellhub         189,90 ✅
+20/07 PRIME GLOBAL 07/10 148,00 ✅    26/01 TESOURA          95,98 ✅
+13/09 FASTSHO 05/12      107,33 ✅    26/01 PAPELARIA        36,98 ✅
+26/09 GpPneus 05/08      241,00 ✅
+08/10 PAYGO 04/06        144,90 ✅
+(mais parcelas...)
+```
+
+**⚠️ VOCÊ DEVE EXTRAIR AMBAS AS COLUNAS!**
+- Coluna esquerda: ~6-10 transações (parcelas continuando) = ~R$ 1.500-1.800
+- Coluna direita: ~3-5 transações (compras do mês) = ~R$ 300-500
+- Total esperado: ~R$ 2.000-2.500
+
+**ERRO COMUM:** Extrair apenas a coluna direita
+- ❌ Se extrair só direita: Soma = ~R$ 400 (falta ~R$ 1.900!)
+- ✅ Se extrair ambas: Soma = ~R$ 2.300 (correto!)
+
+**NÃO confunda** com a seção "Compras parceladas - próximas faturas" que aparece DEPOIS (página 3) e NÃO deve ser extraída!
 
 ### SANTANDER:
 - Coluna "Parcela" separada
