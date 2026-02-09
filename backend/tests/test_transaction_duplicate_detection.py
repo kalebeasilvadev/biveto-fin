@@ -26,6 +26,8 @@ def create_mock_transaction(
     amount: float,
     tx_date: date,
     installment_series_id: int | None = None,
+    installment_number: int | None = None,
+    installment_total: int | None = None,
     created_at: datetime | None = None,
 ) -> Transaction:
     """Cria uma transação mock para testes"""
@@ -35,6 +37,8 @@ def create_mock_transaction(
     tx.amount = Decimal(str(amount))
     tx.date = tx_date
     tx.installment_series_id = installment_series_id
+    tx.installment_number = installment_number
+    tx.installment_total = installment_total
     tx.created_at = created_at or datetime.now(UTC)
     return tx
 
