@@ -354,11 +354,35 @@ class LLMOCRService:
                 print(f"[LLM_OCR] Removed {len(all_items) - len(filtered_items)} duplicate installments: {len(all_items)} -> {len(filtered_items)} items")
                 all_items = filtered_items
 
-        return {
+        # Validação de soma para faturas de cartão
+        validation_warning = None
+        if document_type == 'fatura_cartao' and card_info and card_info.get('total_amount'):
+            total_amount = card_info.get('total_amount')
+            items_sum = sum(item.get('amount', 0) for item in all_items)
+            difference = abs(total_amount - items_sum)
+
+            print(f"[LLM_OCR] Sum validation: total={total_amount:.2f}, sum={items_sum:.2f}, diff={difference:.2f}")
+
+            if difference > 50:
+                validation_warning = {
+                    'type': 'sum_mismatch',
+                    'expected': total_amount,
+                    'actual': items_sum,
+                    'difference': difference,
+                    'message': f"ALERTA: Soma dos itens (R$ {items_sum:.2f}) difere do total da fatura (R$ {total_amount:.2f}) em R$ {difference:.2f}. Possível causa: LLM ignorou alguma coluna/seção de transações."
+                }
+                print(f"[LLM_OCR] ⚠️ {validation_warning['message']}")
+
+        result = {
             'items': all_items,
             'document_type': document_type,
             'card_info': card_info,
         }
+
+        if validation_warning:
+            result['validation_warning'] = validation_warning
+
+        return result
 
     async def extract_from_multiple_images(
         self,

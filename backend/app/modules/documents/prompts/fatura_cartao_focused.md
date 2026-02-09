@@ -461,6 +461,11 @@ Se o PDF mostra:
 - IOF em linha separada após compra internacional
 - **CRÍTICO:** Ao ver "| IOF | R$ XX,XX |", extraia XX,XX (NÃO use valores de outras linhas)
 - IOF é sempre POSITIVO (é um encargo)
+- **🚨 LAYOUT CRÍTICO:** Página 2 do Itaú tem DUAS colunas lado a lado com o MESMO título "Lançamentos: compras e saques":
+  * Coluna ESQUERDA: Parcelas de compras antigas continuando (ex: MOTOCHEFE 07/12, PRIME GLOBAL 07/10)
+  * Coluna DIREITA: Compras novas do mês (ex: Wellhub, TESOURA, PAPELARIA)
+  * **AMBAS AS COLUNAS SÃO DA FATURA ATUAL!** Extraia as duas!
+  * NÃO confunda com "Próxima fatura" que aparece DEPOIS em uma seção separada
 
 ### SANTANDER:
 - Coluna "Parcela" separada
