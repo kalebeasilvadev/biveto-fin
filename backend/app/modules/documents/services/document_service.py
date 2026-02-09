@@ -119,6 +119,30 @@ async def process_document_background(document_id: int, user_id: int, file_path:
                 document.error_message = extraction_data.get('error') if extraction_data else 'Extracao falhou'
                 print(f"[DOC_BG] Documento {document_id} falhou: {document.error_message}")
             else:
+                # Validar se a soma dos itens bate com o total da fatura
+                if extraction_data.get('document_type') == 'fatura_cartao':
+                    total_amount = extraction_data.get('card_info', {}).get('total_amount')
+                    items = extraction_data.get('items', [])
+
+                    if total_amount and items:
+                        items_sum = sum(item.get('amount', 0) for item in items)
+                        difference = abs(total_amount - items_sum)
+
+                        print(f"[DOC_BG] Validação de soma: total_fatura=R$ {total_amount:.2f}, soma_items=R$ {items_sum:.2f}, diff=R$ {difference:.2f}")
+
+                        # Se diferença > R$ 50, há itens faltando ou sobrando
+                        if difference > 50:
+                            print(f"[DOC_BG] ⚠️ ALERTA: Diferença de R$ {difference:.2f} detectada!")
+                            print(f"[DOC_BG] Possível causa: LLM ignorou alguma coluna/seção de transações")
+                            # Adicionar flag nos extracted_data para o frontend alertar o usuário
+                            extraction_data['validation_warning'] = {
+                                'type': 'sum_mismatch',
+                                'expected': total_amount,
+                                'actual': items_sum,
+                                'difference': difference,
+                                'message': f"A soma das transações (R$ {items_sum:.2f}) não bate com o total da fatura (R$ {total_amount:.2f}). Diferença: R$ {difference:.2f}"
+                            }
+
                 document.status = DocumentStatus.COMPLETED
                 document.document_type = extraction_data.get('document_type')
                 # Salvar dados extraidos para recuperacao posterior
