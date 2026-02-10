@@ -220,19 +220,23 @@ class RecurringDetectorService:
         if amount2 is None:
             return True  # Sem valor cadastrado, aceitar
 
+        # Converter ambos para float para evitar TypeError com Decimal
+        amount1_float = float(amount1)
+        amount2_float = float(amount2)
+
         # Valores exatos
-        if abs(amount1 - amount2) < 0.01:
+        if abs(amount1_float - amount2_float) < 0.01:
             return True
 
         # Diferença percentual
-        max_amount = max(abs(amount1), abs(amount2))
+        max_amount = max(abs(amount1_float), abs(amount2_float))
         if max_amount > 0:
-            diff_percentage = abs(amount1 - amount2) / max_amount
+            diff_percentage = abs(amount1_float - amount2_float) / max_amount
             if diff_percentage <= 0.10:  # 10% de tolerância
                 return True
 
         # Diferença absoluta pequena (até R$ 5,00)
-        if abs(amount1 - amount2) <= 5.0:
+        if abs(amount1_float - amount2_float) <= 5.0:
             return True
 
         return False
