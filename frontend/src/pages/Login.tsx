@@ -120,7 +120,7 @@ export default function Login() {
           </form>
 
           <p className="text-center text-sm text-gray-500 dark:text-gray-400 mt-4">
-            Acesso restrito por convite
+            Gerencie suas finanças com clareza
           </p>
         </div>
       </div>
