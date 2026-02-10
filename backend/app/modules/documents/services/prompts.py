@@ -77,11 +77,32 @@ Para cada lancamento, extraia:
 ### 4. REGRA CRITICA: Parcelas
 
 #### 4.1 Formato de Parcelas
-- **Santander/Itaú/Bradesco:** coluna separada ou junto ao estabelecimento
-  - Exemplo: "MOTOCHEFE BRASILIA07/12" → estabelecimento="MOTOCHEFE BRASILIA", parcela=07/12
-  - Exemplo: "09/07 MOTOCHEFE BRASILIA 07/12 574,13" → data=09/07, parcela=07/12, valor=574,13
-  - **IMPORTANTE:** Não ignore linhas por terem formato diferente! Extraia TODAS as transações.
-- **Nubank:** na descrição (ex: "LOJA ABC 2/6")
+
+**Santander/Itaú/Bradesco** - Formato em colunas:
+```
+DATA  ESTABELECIMENTO       VALOR
+09/07 MOTOCHEFE BRASILIA07/12  574,13
+      VEÍCULOS .BRASILIA
+```
+
+**Como ler:**
+- Coluna 1: Data (DD/MM)
+- Coluna 2: Estabelecimento + Parcela (ex: "BRASILIA07/12" = estabelecimento termina em BRASILIA, parcela 07/12)
+- Linha seguinte: Categoria (ignore, já extraímos automaticamente)
+- Coluna 3: Valor
+
+**Parsing correto:**
+- `description`: "MOTOCHEFE BRASILIA" (remova sufixo de parcela)
+- `date`: "2025-07-09" (se mês > mês_fatura, use ano-1)
+- `amount`: 574.13
+- `installment_current`: 7
+- `installment_total`: 12
+
+**⚠️ CUIDADO:** Não confunda com parcelas da seção "Próximas faturas"!
+- "MOTOCHEFE 07/12" em "Lançamentos atuais" → ✅ EXTRAIR
+- "MOTOCHEFE 08/12" em "Próximas faturas" → ❌ IGNORAR
+
+**Nubank:** na descrição (ex: "LOJA ABC 2/6")
 
 #### 4.2 Parcelas Consecutivas (AGRUPAR!)
 Se encontrar MESMO estabelecimento, MESMA data, valores IGUAIS, parcelas SEQUENCIAIS:
@@ -109,8 +130,31 @@ Se encontrar MESMO estabelecimento, MESMA data, valores IGUAIS, parcelas SEQUENC
    - Na seção atual → EXTRAIR
    - Na seção "próximas faturas" → IGNORAR
 
-### 5. Validacao
-A soma dos itens (compra, anuidade, encargo) DEVE ≈ total_amount.
+### 5. Validacao CRITICA
+
+**A soma dos itens DEVE ser igual ao total_amount!**
+
+**PROCESSO DE VALIDAÇÃO:**
+1. Extraia TODOS os itens da seção "Lançamentos atuais"
+2. Calcule a soma: `sum(items.amount where transaction_type in ['compra', 'anuidade', 'encargo'])`
+3. Compare com `total_amount`
+4. Se NÃO bater (diferença > R$ 10):
+   - **VOCÊ ESQUECEU ALGUM ITEM!**
+   - Volte e procure o item faltante
+   - **NÃO IGNORE nenhuma linha** por ter formato diferente!
+
+**Exemplo comum de item "escondido" no Itaú:**
+```
+09/07 MOTOCHEFE BRASILIA07/12 574,13
+VEÍCULOS .BRASILIA
+```
+- Data: 09/07 (9 de julho de 2025)
+- Estabelecimento: MOTOCHEFE BRASILIA
+- Parcela: 07/12
+- Valor: 574,13
+- Categoria: VEÍCULOS
+
+**⚠️ NÃO PULE este item!** Mesmo que o formato seja confuso.
 
 ---
 
