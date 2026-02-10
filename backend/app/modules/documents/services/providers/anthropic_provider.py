@@ -82,6 +82,6 @@ class AnthropicProvider(BaseProvider):
 
         return {'items': [], 'error': f'Falha apos {self.max_retries} tentativas: {last_error}'}
 
-    async def extract_from_pdf(self, pdf_content: bytes, filename: str = "document.pdf") -> dict:
+    async def extract_from_pdf(self, pdf_content: bytes, filename: str = "document.pdf", password: str | None = None) -> dict:
         """Anthropic nao suporta PDF direto - retorna None para usar fallback"""
         return None

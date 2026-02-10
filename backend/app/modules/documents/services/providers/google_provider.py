@@ -148,7 +148,7 @@ class GoogleProvider(BaseProvider):
 
         return {'items': [], 'error': f'Falha apos {self.max_retries} tentativas: {last_error}'}
 
-    async def extract_from_pdf(self, pdf_content: bytes, filename: str = "document.pdf") -> dict:
+    async def extract_from_pdf(self, pdf_content: bytes, filename: str = "document.pdf", password: str | None = None) -> dict:
         """Extrai dados de um PDF via upload para o Gemini (non-blocking)"""
         try:
             from google.genai import types
@@ -161,6 +161,11 @@ class GoogleProvider(BaseProvider):
 
         temp_file = None
         try:
+            # Helper function para ler arquivo (definida ANTES do uso)
+            def _read_file_sync(path):
+                with open(path, 'rb') as f:
+                    return f.read()
+
             # Salvar PDF em arquivo temporario (em thread separada)
             def _write_temp():
                 with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as f:
@@ -180,10 +185,6 @@ class GoogleProvider(BaseProvider):
             # Log das primeiras linhas para debug
             lines_preview = '\n'.join(ocr_text.split('\n')[:30])
             print(f"[GoogleProvider] Text preview:\n{lines_preview}\n...")
-
-            def _read_file_sync(path):
-                with open(path, 'rb') as f:
-                    return f.read()
 
             # PASSO 2: Detectar banco e compor prompt
             bank_name = self._detect_bank(ocr_text)

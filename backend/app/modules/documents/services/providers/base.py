@@ -22,12 +22,13 @@ class BaseProvider(ABC):
         pass
 
     @abstractmethod
-    async def extract_from_pdf(self, pdf_content: bytes, filename: str = "document.pdf") -> dict:
+    async def extract_from_pdf(self, pdf_content: bytes, filename: str = "document.pdf", password: str | None = None) -> dict:
         """Extrai dados de um PDF
 
         Args:
             pdf_content: Conteudo binario do PDF
             filename: Nome do arquivo
+            password: Senha do PDF (opcional)
 
         Returns:
             Dict com 'items', 'card_info', 'document_type' ou 'error'
