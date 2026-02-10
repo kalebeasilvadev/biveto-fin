@@ -649,10 +649,15 @@ class ExtractionValidator:
 
         result_items = list(non_installment_items)
 
-        for (desc_norm, item_date), group in groups.items():
+        for key, group in groups.items():
+            # Como cada parcela agora tem chave única (desc, date, total, current),
+            # nunca haverá mais de 1 item por grupo
             if len(group) == 1:
                 result_items.append(group[0])
                 continue
+
+            # Se por algum motivo houver >1 item com mesma chave exata, aplicar lógica antiga
+            desc_norm = key[0]
 
             sorted_group = sorted(group, key=lambda x: x.get('installment_current', 0))
 
