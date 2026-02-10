@@ -112,6 +112,16 @@ class ResponseParser:
 
             data = json.loads(content)
 
+            # Se o LLM retornou um array ao invés de objeto, converter
+            if isinstance(data, list):
+                print(f"[Parser] LLM retornou array ao invés de objeto, convertendo...")
+                # Assumir que é uma lista de transações
+                data = {
+                    'document_type': 'fatura_cartao',
+                    'items': data,
+                    'card_info': None
+                }
+
             # Verificar se é resposta placeholder
             if self._is_placeholder_response(data):
                 return {

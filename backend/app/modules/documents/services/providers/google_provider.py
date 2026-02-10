@@ -205,7 +205,16 @@ As colunas estão representadas lado a lado na mesma linha.
 {ocr_text}
 ```
 
-Agora extraia TODAS as transações deste texto no formato JSON especificado."""
+Agora extraia TODAS as transações deste texto.
+
+⚠️ IMPORTANTE: Retorne um OBJETO JSON com esta estrutura:
+{{
+  "document_type": "fatura_cartao",
+  "card_info": {{ ... }},
+  "items": [{{ ... }}]
+}}
+
+NÃO retorne apenas um array! Retorne um objeto completo."""
 
             # Preparar conteudo e config (apenas texto, sem imagem)
             contents = [final_prompt]
