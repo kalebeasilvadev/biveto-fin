@@ -173,8 +173,8 @@ class RecurringDetectorService:
 
         Verifica em ordem:
         1. Se é um serviço conhecido, verifica se existe recorrência com mesmo nome do serviço
-        2. Match por descrição similar ao nome da recorrência
-        3. Match por descrição similar à descrição da recorrência
+        2. Match por descrição similar ao nome da recorrência (com validação de valor)
+        3. Match por descrição similar à descrição da recorrência (com validação de valor)
         """
         description_normalized = self._normalize_description(description)
 
@@ -186,22 +186,56 @@ class RecurringDetectorService:
             if known_service:
                 known_service_name_normalized = self._normalize_description(known_service.name)
                 if recurring_name_normalized == known_service_name_normalized:
-                    return recurring
+                    # Validar valor se disponível
+                    if self._amount_matches(amount, recurring.amount):
+                        return recurring
                 # Também verifica se o nome da recorrência contém o nome do serviço conhecido
                 if self._descriptions_match(recurring_name_normalized, known_service_name_normalized):
-                    return recurring
+                    if self._amount_matches(amount, recurring.amount):
+                        return recurring
 
             # Match por nome similar (descrição da fatura vs nome da recorrência)
+            # IMPORTANTE: Agora também valida o valor para evitar falsos positivos
             if self._descriptions_match(description_normalized, recurring_name_normalized):
-                return recurring
+                if self._amount_matches(amount, recurring.amount):
+                    return recurring
 
             # Match por descrição similar (se tiver)
             if recurring.description:
                 recurring_desc_normalized = self._normalize_description(recurring.description)
                 if self._descriptions_match(description_normalized, recurring_desc_normalized):
-                    return recurring
+                    if self._amount_matches(amount, recurring.amount):
+                        return recurring
 
         return None
+
+    def _amount_matches(self, amount1: float, amount2: float | None) -> bool:
+        """Verifica se dois valores são similares o suficiente.
+
+        Considera match se:
+        - Valores são exatamente iguais
+        - Diferença é menor que 10% OU menor que R$ 5,00
+        - amount2 é None (não há valor cadastrado para comparar)
+        """
+        if amount2 is None:
+            return True  # Sem valor cadastrado, aceitar
+
+        # Valores exatos
+        if abs(amount1 - amount2) < 0.01:
+            return True
+
+        # Diferença percentual
+        max_amount = max(abs(amount1), abs(amount2))
+        if max_amount > 0:
+            diff_percentage = abs(amount1 - amount2) / max_amount
+            if diff_percentage <= 0.10:  # 10% de tolerância
+                return True
+
+        # Diferença absoluta pequena (até R$ 5,00)
+        if abs(amount1 - amount2) <= 5.0:
+            return True
+
+        return False
 
     def _analyze_duplicates(
         self,
@@ -293,8 +327,14 @@ class RecurringDetectorService:
         description: str,
     ) -> float:
         """Calcula a confiança da detecção"""
+        if user_recurring and known_service:
+            # Match perfeito: serviço conhecido + recorrência cadastrada
+            return 0.99
+
         if user_recurring:
-            return 0.99  # Alta confiança se usuário já cadastrou
+            # Apenas recorrência cadastrada (sem serviço conhecido)
+            # Confiança menor pois pode ser match incorreto por similaridade
+            return 0.85
 
         if known_service:
             # Verificar quão bem o padrão combina
@@ -322,16 +362,23 @@ class RecurringDetectorService:
         if desc1 == desc2:
             return True
 
-        # Um contém o outro
-        if desc1 in desc2 or desc2 in desc1:
-            return True
+        # Ambas as descrições devem ter pelo menos 4 caracteres
+        if len(desc1) < 4 or len(desc2) < 4:
+            return False
 
-        # Pelo menos 70% de overlap
-        if len(desc1) > 3 and len(desc2) > 3:
-            shorter = min(desc1, desc2, key=len)
-            longer = max(desc1, desc2, key=len)
-            if shorter in longer:
-                return True
+        # Um contém o outro - MAS com threshold mínimo
+        # Para evitar falsos positivos, o menor deve ter pelo menos 60% do tamanho do maior
+        shorter = min(desc1, desc2, key=len)
+        longer = max(desc1, desc2, key=len)
+
+        # Se a string menor é muito pequena em relação à maior, não considerar match
+        size_ratio = len(shorter) / len(longer) if len(longer) > 0 else 0
+        if size_ratio < 0.6:
+            return False
+
+        # Agora verifica se um contém o outro
+        if shorter in longer:
+            return True
 
         return False
 
@@ -343,8 +390,11 @@ class RecurringDetectorService:
             description = item.get('description', '')
             # Extrair parte principal da descrição (sem sufixos numéricos)
             desc_key = self._normalize_description(description)
-            # Truncar para pegar só a parte principal (evita agrupar coisas diferentes)
-            desc_key = desc_key[:20] if len(desc_key) > 20 else desc_key
+
+            # Remove apenas sufixos numéricos de parcelamento (ex: "02/06", "04/12")
+            # mas mantém o resto da descrição intacta
+            desc_key = re.sub(r'\d{2}\d{2}$', '', desc_key)  # Remove padrões como "0206", "0412"
+
             groups[desc_key].append(item)
 
         return groups

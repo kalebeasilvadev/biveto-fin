@@ -77,12 +77,37 @@ Para cada lancamento, extraia:
 ### 4. REGRA CRITICA: Parcelas
 
 #### 4.1 Formato de Parcelas
-- Santander/Itau/Bradesco: coluna separada "Parcela" (ex: 01/12)
-- Nubank: na descricao (ex: "LOJA ABC 2/6")
+- **Santander/Itaú/Bradesco:** coluna separada ou junto ao estabelecimento
+  - Exemplo: "MOTOCHEFE BRASILIA07/12" → estabelecimento="MOTOCHEFE BRASILIA", parcela=07/12
+  - Exemplo: "09/07 MOTOCHEFE BRASILIA 07/12 574,13" → data=09/07, parcela=07/12, valor=574,13
+  - **IMPORTANTE:** Não ignore linhas por terem formato diferente! Extraia TODAS as transações.
+- **Nubank:** na descrição (ex: "LOJA ABC 2/6")
 
 #### 4.2 Parcelas Consecutivas (AGRUPAR!)
 Se encontrar MESMO estabelecimento, MESMA data, valores IGUAIS, parcelas SEQUENCIAIS:
 → **EXTRAIA APENAS 1 ITEM** usando a PRIMEIRA parcela!
+
+#### 4.3 🚨 CRÍTICO: "Compras Parceladas - Próximas Faturas" (Itaú, Bradesco, Santander)
+
+**ATENÇÃO:** Algumas faturas mostram seções separadas:
+- **"Lançamentos atuais"** / **"Compras e saques"** / **"Lançamentos no cartão"** → EXTRAIR ✅
+- **"Compras parceladas - próximas faturas"** → **IGNORAR COMPLETAMENTE** ❌
+- **"Próxima fatura"** / **"Demais faturas"** → **IGNORAR COMPLETAMENTE** ❌
+
+**Por quê?** Essas seções mostram parcelas FUTURAS que virão nas próximas faturas.
+
+**Como identificar:**
+- **Títulos de seção:** "Próximas faturas", "Compras parceladas - próximas faturas", "Demais faturas"
+- Mesmas compras aparecem 2x com números de parcela diferentes:
+  - Ex: MOTOCHEFE 07/12 (parcela atual ✅ EXTRAIR)
+  - Ex: MOTOCHEFE 08/12 (próxima fatura ❌ IGNORAR - está em seção separada)
+
+**REGRA FINAL:**
+1. Extraia TODOS os itens da seção de **lançamentos atuais**
+2. Ignore COMPLETAMENTE qualquer seção de "próximas faturas"
+3. Se um estabelecimento aparecer 2x, verifique a seção:
+   - Na seção atual → EXTRAIR
+   - Na seção "próximas faturas" → IGNORAR
 
 ### 5. Validacao
 A soma dos itens (compra, anuidade, encargo) DEVE ≈ total_amount.

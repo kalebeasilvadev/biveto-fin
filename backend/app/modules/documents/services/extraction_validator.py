@@ -545,13 +545,21 @@ class ExtractionValidator:
                 seen_exact.add(exact_key)
                 unique_items.append(item)
 
-        # Agrupar por (desc, amount, date) para manter compras diferentes em datas diferentes
-        # So agrupa parcelas da MESMA compra (mesmo desc, amount E date)
+        # Agrupar por (desc, amount, date, installment) para manter compras diferentes em datas diferentes
+        # CRITICAL: Incluir número da parcela na chave para não remover parcelas consecutivas!
+        # Ex: "MOTOCHEFE 07/12" e "MOTOCHEFE 08/12" são diferentes!
         groups = {}
         for item in unique_items:
             desc_normalized = self._normalize_description(item['description'])
-            # Incluir data na chave: compras em datas diferentes sao compras distintas
-            key = (desc_normalized, item['amount'], item.get('date'))
+            # IMPORTANTE: Incluir número e total da parcela na chave
+            # Isso evita remover parcelas consecutivas que aparecem na mesma fatura
+            key = (
+                desc_normalized,
+                item['amount'],
+                item.get('date'),
+                item.get('installment_current'),  # ✅ ADICIONADO
+                item.get('installment_total'),     # ✅ ADICIONADO
+            )
             if key not in groups:
                 groups[key] = []
             groups[key].append(item)
@@ -629,7 +637,11 @@ class ExtractionValidator:
         for item in installment_items:
             desc_norm = self._normalize_description(item.get('description', ''))
             item_date = item.get('date', '')
-            key = (desc_norm, item_date)
+            # CRITICAL: Incluir número da parcela e total para evitar agrupar parcelas diferentes
+            # Ex: "MOTOCHEFE 07/12" e "MOTOCHEFE 08/12" são diferentes!
+            installment_current = item.get('installment_current', 0)
+            installment_total = item.get('installment_total', 0)
+            key = (desc_norm, item_date, installment_total, installment_current)
 
             if key not in groups:
                 groups[key] = []
