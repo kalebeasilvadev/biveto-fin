@@ -144,8 +144,11 @@ class LLMOCRService:
             if 'total_amount' in result:
                 print(f"[LLM_OCR] DEBUG: result['total_amount']={result.get('total_amount')}")
 
+            # Extrair OCR text (disponível quando Mistral provider é usado)
+            ocr_text = result.pop('_ocr_text', None)
+
             if items:
-                items = self.validator.validate_and_clean(items, card_info, document_type, total_amount)
+                items = self.validator.validate_and_clean(items, card_info, document_type, total_amount, ocr_text=ocr_text)
                 result['items'] = items
 
                 # Validar resultado final

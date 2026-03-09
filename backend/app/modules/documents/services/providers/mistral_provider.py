@@ -663,7 +663,13 @@ class MistralProvider(BaseProvider):
                     result = self._parse_response(response_text)
 
                     if result.get('items'):
+                        result['_ocr_text'] = ocr_text
                         result['_ocr_text_preview'] = ocr_text[:500] + "..." if len(ocr_text) > 500 else ocr_text
+
+                        # Verificar se soma bate com total_amount - retry com feedback se divergir
+                        result = await self._retry_if_sum_mismatch(
+                            result, client, full_prompt, ocr_text
+                        )
 
                     return result
 
@@ -689,3 +695,66 @@ class MistralProvider(BaseProvider):
                 'document_type': None,
                 'error': f'Mistral error: {str(e)}'
             }
+
+    async def _retry_if_sum_mismatch(
+        self, result: dict, client, full_prompt: str, ocr_text: str
+    ) -> dict:
+        """Retry LLM extraction once if sum of items diverges from total_amount by > R$50."""
+        card_info = result.get('card_info') or {}
+        total_amount = card_info.get('total_amount')
+        if not total_amount or not result.get('items'):
+            return result
+
+        items_sum = sum(
+            item.get('amount', 0) for item in result['items']
+            if item.get('amount', 0) > 0
+        )
+        diff = total_amount - items_sum
+
+        if abs(diff) <= 50:
+            return result
+
+        print(f"[MistralProvider] Sum mismatch: items_sum={items_sum:.2f}, total={total_amount:.2f}, faltam={diff:.2f}")
+        print(f"[MistralProvider] Retrying with feedback...")
+
+        feedback = (
+            f"\n\n## ⚠️ ERRO NA EXTRAÇÃO ANTERIOR - CORRIJA AGORA\n\n"
+            f"A soma dos itens extraídos foi R$ {items_sum:.2f}, mas o total_amount da fatura é R$ {total_amount:.2f}.\n"
+            f"**Faltam R$ {diff:.2f} em transações!**\n\n"
+            f"**O QUE VOCÊ PROVAVELMENTE ERROU:**\n"
+            f"- Esqueceu de extrair a COLUNA ESQUERDA da página 2 (parcelas de meses anteriores)\n"
+            f"- O PRIMEIRO item da coluna esquerda foi pulado\n"
+            f"- Verifique se MOTOCHEFE, PRIME GLOBAL e outros itens com datas antigas (07, 09, 10) estão presentes\n\n"
+            f"**REFAÇA A EXTRAÇÃO COMPLETA. Extraia TODOS os itens de TODAS as colunas.**\n"
+        )
+
+        retry_prompt = full_prompt + feedback
+
+        try:
+            retry_response = await asyncio.to_thread(
+                self._chat_sync, client, retry_prompt
+            )
+            retry_text = retry_response.choices[0].message.content
+            print(f"[MistralProvider] Retry LLM retornou {len(retry_text)} caracteres")
+
+            retry_result = self._parse_response(retry_text)
+
+            if retry_result.get('items'):
+                retry_sum = sum(
+                    item.get('amount', 0) for item in retry_result['items']
+                    if item.get('amount', 0) > 0
+                )
+                retry_diff = abs(retry_sum - total_amount)
+                original_diff = abs(diff)
+
+                if retry_diff < original_diff:
+                    print(f"[MistralProvider] Retry improved: diff {original_diff:.2f} -> {retry_diff:.2f}")
+                    retry_result['_ocr_text'] = ocr_text
+                    retry_result['_ocr_text_preview'] = ocr_text[:500] + "..." if len(ocr_text) > 500 else ocr_text
+                    return retry_result
+                else:
+                    print(f"[MistralProvider] Retry did not improve: {retry_diff:.2f} >= {original_diff:.2f}, keeping original")
+        except Exception as e:
+            print(f"[MistralProvider] Retry failed: {e}")
+
+        return result

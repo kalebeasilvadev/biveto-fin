@@ -124,11 +124,36 @@ O Itaú mostra créditos com valor negativo:
 
 **⚠️ NÃO IGNORE valores pequenos!** Mesmo R$ 0,10 deve ser extraído.
 
+### 8. FORMATO DE DATAS DO ITAÚ (CRÍTICO!)
+
+A coluna DATA no Itaú mostra o formato **DD/MM** (dia/mês) da data ORIGINAL da compra.
+
+**⚠️ REGRA OBRIGATÓRIA:**
+- O formato é DD/MM onde MM é o MÊS REAL da compra original
+- NÃO use o mês da fatura para todas as transações!
+- Para parcelas de compras antigas, o mês será ANTERIOR ao mês da fatura
+
+**EXEMPLOS (fatura de fevereiro/2026):**
+- "09/07 MOTOCHEFE" → date: "2025-07-09" (julho 2025, NÃO fevereiro 2026!)
+- "13/09 FASTSHO" → date: "2025-09-13" (setembro 2025)
+- "08/10 PAYGO" → date: "2025-10-08" (outubro 2025)
+- "01/01 nuuvem" → date: "2026-01-01" (janeiro 2026)
+- "13/02 Karacas" → date: "2026-02-13" (fevereiro 2026)
+
+**REGRA PARA DETERMINAR O ANO:**
+- Se o mês da transação > mês da fatura → use invoice_year - 1
+- Se o mês da transação <= mês da fatura → use invoice_year
+
+**❌ ERRO COMUM:** Ignorar o mês (MM) e usar o mês da fatura para todas as transações.
+Exemplo errado: "09/07 MOTOCHEFE" na fatura de fev/2026 → "2026-02-09" ← ERRADO!
+Exemplo correto: "09/07 MOTOCHEFE" na fatura de fev/2026 → "2025-07-09" ← CORRETO!
+
 ## RESUMO DA ESTRATÉGIA
 
 Para faturas do Itaú:
 1. ✅ Identifique as DUAS colunas na página 2
 2. ✅ Processe coluna ESQUERDA (parcelas antigas)
 3. ✅ Processe coluna DIREITA (compras novas)
-4. ✅ Valide: soma deve estar entre R$ 2.300-2.400 para esta fatura exemplo
-5. ✅ Se diferença > R$ 50: procure transações que você esqueceu
+4. ✅ Use a data DD/MM REAL de cada transação (NÃO substitua o mês!)
+5. ✅ Valide: soma deve estar próxima do total_amount
+6. ✅ Se diferença > R$ 50: procure transações que você esqueceu

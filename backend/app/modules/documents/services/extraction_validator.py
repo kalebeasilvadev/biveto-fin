@@ -57,7 +57,7 @@ SECTION_HEADER_PATTERNS = [
 class ExtractionValidator:
     """Valida e corrige dados extraidos de faturas"""
 
-    def validate_and_clean(self, items: list, card_info: dict | None, document_type: str | None = None, total_amount: float | None = None) -> list:
+    def validate_and_clean(self, items: list, card_info: dict | None, document_type: str | None = None, total_amount: float | None = None, ocr_text: str | None = None) -> list:
         """Aplica todas as validacoes e limpezas nos itens extraidos
 
         Args:
@@ -100,6 +100,10 @@ class ExtractionValidator:
 
         total_for_filter = card_info.get('total_amount') if card_info else total_amount
         items = self.filter_summary_items(items, total_for_filter)
+
+        # Corrigir datas usando texto OCR (pós todas as outras validações)
+        if not is_cupom_fiscal and ocr_text:
+            items = self.fix_dates_from_ocr_text(items, card_info, ocr_text)
 
         return items
 
@@ -1021,3 +1025,135 @@ class ExtractionValidator:
             print(f"[Validator] Filtro de endereços: {len(items)} -> {len(result)} itens")
 
         return result
+
+    def fix_dates_from_ocr_text(self, items: list, card_info: dict | None, ocr_text: str) -> list:
+        """Corrige datas extraídas usando o texto OCR original.
+
+        O LLM frequentemente ignora o mês (MM) do formato DD/MM e usa o mês da fatura.
+        Este método cruza os itens com o texto OCR para recuperar a data DD/MM real.
+        """
+        if not items or not ocr_text or not card_info:
+            return items
+
+        invoice_month = card_info.get('invoice_month')
+        invoice_year = card_info.get('invoice_year')
+        if not invoice_month or not invoice_year:
+            return items
+
+        # Extrair seção relevante do OCR (antes de "próximas faturas")
+        ocr_relevant = ocr_text
+        for marker in ['próximas faturas', 'proximas faturas', 'Compras parceladas -']:
+            idx = ocr_text.lower().find(marker.lower())
+            if idx > 0:
+                ocr_relevant = ocr_text[:idx]
+                break
+
+        # Parsear linhas do OCR com padrão DD/MM + descrição + valor
+        # Formatos: "09/07 MOTOCHEFE BRASILIA08/12 574,13"
+        # Ou markdown table: "| 09/07 | MOTOCHEFE ... | 574,13 |"
+        ocr_transactions = []
+        for line in ocr_relevant.split('\n'):
+            line = line.strip().strip('|').strip()
+            if not line:
+                continue
+
+            # Padrão: DD/MM no início da linha (com possível pipe de tabela)
+            match = re.match(
+                r'\|?\s*(\d{1,2})/(\d{2})\s+(.+?)\s+([\d.]+,\d{2})\s*\|?\s*$',
+                line
+            )
+            if not match:
+                # Tentar formato com pipes separados: | DD/MM | desc | valor |
+                match = re.match(
+                    r'\|?\s*(\d{1,2})/(\d{2})\s*\|(.+?)\|([\d.]+,\d{2})\s*\|?',
+                    line
+                )
+            if match:
+                day_str, month_str, desc_part, value_str = match.groups()
+                try:
+                    day = int(day_str)
+                    month = int(month_str)
+                    value = float(value_str.replace('.', '').replace(',', '.'))
+                    if 1 <= day <= 31 and 1 <= month <= 12:
+                        ocr_transactions.append({
+                            'day': day,
+                            'month': month,
+                            'desc': desc_part.strip(),
+                            'amount': value,
+                        })
+                except (ValueError, IndexError):
+                    continue
+
+        if not ocr_transactions:
+            return items
+
+        print(f"[Validator] OCR date fix: encontradas {len(ocr_transactions)} transações no texto OCR")
+
+        # Rastrear quais linhas OCR já foram usadas (evitar match duplo)
+        used_ocr_indices = set()
+        fixed_count = 0
+
+        for item in items:
+            item_amount = item.get('amount', 0)
+            item_date = item.get('date', '')
+            item_desc = item.get('description', '')
+
+            if not item_date or item_amount <= 0:
+                continue
+
+            # Procurar match no OCR por valor + descrição
+            best_idx = None
+            best_score = 0
+
+            desc_norm = re.sub(r'[^a-z0-9]', '', item_desc.lower())
+
+            for i, ocr_tx in enumerate(ocr_transactions):
+                if i in used_ocr_indices:
+                    continue
+
+                # Match por valor (tolerância de 0.01)
+                if abs(ocr_tx['amount'] - item_amount) > 0.01:
+                    continue
+
+                # Match por descrição (substring dos primeiros chars)
+                ocr_desc_norm = re.sub(r'[^a-z0-9]', '', ocr_tx['desc'].lower())
+                # Verificar se compartilham prefixo significativo
+                min_len = min(len(desc_norm), len(ocr_desc_norm), 8)
+                if min_len < 3:
+                    continue
+
+                if desc_norm[:min_len] == ocr_desc_norm[:min_len]:
+                    score = min_len + 10  # Boost para match de prefixo
+                elif desc_norm[:5] in ocr_desc_norm or ocr_desc_norm[:5] in desc_norm:
+                    score = 5
+                else:
+                    continue
+
+                if score > best_score:
+                    best_score = score
+                    best_idx = i
+
+            if best_idx is not None:
+                ocr_tx = ocr_transactions[best_idx]
+                used_ocr_indices.add(best_idx)
+
+                ocr_month = ocr_tx['month']
+                ocr_day = ocr_tx['day']
+
+                # Determinar o ano correto
+                if ocr_month > invoice_month:
+                    year = invoice_year - 1
+                else:
+                    year = invoice_year
+
+                correct_date = f"{year}-{ocr_month:02d}-{ocr_day:02d}"
+
+                if correct_date != item_date:
+                    print(f"[Validator] Date fix: '{item_desc[:30]}' {item_date} -> {correct_date}")
+                    item['date'] = correct_date
+                    fixed_count += 1
+
+        if fixed_count > 0:
+            print(f"[Validator] OCR date fix: {fixed_count} datas corrigidas")
+
+        return items
