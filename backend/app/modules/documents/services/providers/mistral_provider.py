@@ -566,14 +566,17 @@ class MistralProvider(BaseProvider):
         base = (
             "Extraia TODAS as transações desta fatura de cartão de crédito brasileiro.\n\n"
             "REGRAS CRÍTICAS:\n"
-            "- Extraia APENAS lançamentos ATUAIS (seção 'Lançamentos: compras e saques' e 'Lançamentos: produtos e serviços')\n"
+            "- Extraia APENAS lançamentos ATUAIS (seção 'Lançamentos' ou 'compras e saques' e 'produtos e serviços')\n"
             "- NÃO extraia a seção 'Compras parceladas - próximas faturas'\n"
+            "- NÃO extraia 'PAG BOLETO BANCARIO' ou pagamentos de fatura anterior\n"
             "- Se há DUAS COLUNAS de lançamentos, extraia AMBAS\n"
             "- Itens com mesma descrição mas valores diferentes são compras DISTINTAS\n"
             "- A soma dos amounts deve ser igual ao total_amount da fatura\n"
             "- Datas: use formato YYYY-MM-DD. O formato DD/MM na fatura indica dia/mês REAL da compra\n"
             "- Para determinar o ano: se mês da transação > mês da fatura, use ano anterior\n"
             "- Valores negativos para créditos/estornos\n"
+            "- BRADESCO/AMEX: '-' APÓS o valor indica crédito/pagamento (NÃO extrair pagamentos, usar amount negativo para créditos)\n"
+            "- BRADESCO/AMEX: Ignore a coluna 'Cidade' da tabela (não é descrição)\n"
         )
         if bank_prompt:
             base += f"\n{bank_prompt}"

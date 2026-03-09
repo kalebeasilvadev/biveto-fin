@@ -94,6 +94,7 @@ class ExtractionValidator:
             items = self.filter_duplicate_installments(items)
             items = self.filter_consecutive_installments(items)
             items = self.remove_cancelled_purchases(items, card_info)
+            items = self.fix_hidden_credits(items, card_info)
 
         items = self.remove_total_items(items, card_info)
         items = self.fix_suspicious_installments(items)
@@ -514,6 +515,65 @@ class ExtractionValidator:
 
         if fixed_count > 0:
             print(f"[Validator] Total de {fixed_count} parcelamentos corrigidos (Bradesco/AMEX)")
+
+        return items
+
+    def fix_hidden_credits(self, items: list, card_info: dict | None) -> list:
+        """Detecta itens que deveriam ser créditos/estornos mas estão com valor positivo.
+
+        Quando a soma dos itens é MAIOR que o total_amount, verifica se inverter o sinal
+        de algum item faz a soma bater. Isso acontece em faturas Bradesco onde o OCR
+        não captura o '-' após o valor de créditos.
+        """
+        if not items or not card_info:
+            return items
+
+        total_amount = card_info.get('total_amount')
+        if not total_amount or total_amount <= 0:
+            return items
+
+        # Calcular soma atual (apenas positivos)
+        items_sum = sum(
+            item.get('amount', 0)
+            for item in items
+            if item.get('amount', 0) > 0
+        )
+
+        diff = items_sum - total_amount
+
+        # Se soma está acima do total por mais de R$10
+        if diff < 10:
+            return items
+
+        # Verificar se inverter o sinal de um item fecha a conta
+        # Quando +X vira -X, a soma muda em 2*X
+        target_amount = diff / 2.0
+
+        best_match = None
+        best_diff = float('inf')
+
+        for item in items:
+            amount = item.get('amount', 0)
+            if amount <= 0:
+                continue
+            # Não inverter parcelas (são compras reais)
+            if item.get('is_installment'):
+                continue
+
+            item_diff = abs(amount - target_amount)
+            if item_diff < best_diff and item_diff < 1.0:  # tolerância de R$1
+                best_diff = item_diff
+                best_match = item
+
+        if best_match:
+            old_amount = best_match['amount']
+            best_match['amount'] = -old_amount
+            best_match['transaction_type'] = 'credito'
+
+            new_sum = items_sum - 2 * old_amount
+            print(f"[Validator] Crédito oculto detectado: '{best_match.get('description', '')[:40]}' "
+                  f"R${old_amount:.2f} -> R${-old_amount:.2f} "
+                  f"(soma: {items_sum:.2f} -> {new_sum:.2f}, total: {total_amount:.2f})")
 
         return items
 
@@ -971,7 +1031,7 @@ class ExtractionValidator:
 
         # Padrões que indicam dados de boleto/endereço (não são transações)
         ADDRESS_PATTERNS = [
-            r'\d{5}[-]?\d{3}',  # CEP (30190-131 ou 30190131)
+            r'\b\d{5}-\d{3}\b',  # CEP com hífen (30190-131) — exige hífen para evitar falsos positivos com códigos
             r'\b[A-Z]{2}\s*/\s*[A-Z]{2}\b',  # Estado (MG / MG, SP / SP) - word boundaries to avoid .COM/BILL
             r'AUTENTICACAO MECANICA',
             r'NOSSO NUMERO',
