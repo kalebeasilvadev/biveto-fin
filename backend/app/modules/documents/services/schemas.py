@@ -82,3 +82,38 @@ class FaturaExtracao(BaseModel):
     items: list[FaturaItem] = Field(
         description="Lista de transacoes/itens extraidos"
     )
+
+
+# Schema simplificado para document_annotation do Mistral OCR
+# Sem campos de cupom fiscal para não confundir o modelo
+class AnnotationItem(BaseModel):
+    """Item de fatura para document_annotation."""
+    description: str = Field(description="Nome do estabelecimento ou descricao da transacao, exatamente como no documento")
+    amount: float = Field(description="Valor em reais. NEGATIVO para creditos e estornos")
+    date: Optional[str] = Field(default=None, description="Data da transacao no formato YYYY-MM-DD")
+    category: str = Field(
+        description="Categoria: alimentacao, transporte, mercado, veiculos, educacao, "
+                    "vestuario, turismo_e_entretenimento, diversos, servicos, saude, outros"
+    )
+    transaction_type: str = Field(
+        default="compra",
+        description="Tipo: compra, estorno, anuidade, pagamento, credito"
+    )
+    is_installment: bool = Field(default=False, description="Se e parcelado")
+    installment_current: Optional[int] = Field(default=None, description="Parcela atual (ex: 8 de 8/12)")
+    installment_total: Optional[int] = Field(default=None, description="Total de parcelas (ex: 12 de 8/12)")
+
+
+class AnnotationExtracao(BaseModel):
+    """Schema simplificado para document_annotation do Mistral OCR."""
+    document_type: str = Field(
+        default="fatura_cartao",
+        description="Tipo do documento"
+    )
+    card_info: Optional[CardInfo] = Field(
+        default=None,
+        description="Informacoes do cartao de credito"
+    )
+    items: list[AnnotationItem] = Field(
+        description="Lista de TODAS as transacoes dos lancamentos atuais (NAO incluir proximas faturas)"
+    )
