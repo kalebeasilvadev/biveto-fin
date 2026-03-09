@@ -1002,12 +1002,21 @@ class ExtractionValidator:
                     is_address = True
                     break
 
-            # 2. Contém nome de cidade (provável endereço)
+            # 2. Contém nome de cidade E parece ser endereço (não apenas transação com nome de cidade)
             if not is_address:
                 for city in CITY_NAMES:
                     if city in desc:
-                        is_address = True
-                        break
+                        # Verificar se tem indicadores de endereço real
+                        has_address_indicator = bool(re.search(
+                            r'(RUA|AV\b|AVENIDA|PRACA|PCA|QD|QUADRA|LOTE|BLOCO|CONJ|CJ|BAIRRO|CEP|\d{5}[-]?\d{3})',
+                            desc
+                        ))
+                        if has_address_indicator:
+                            is_address = True
+                            break
+                        # Se não tem indicador de endereço, provavelmente é uma transação
+                        # com nome de cidade (ex: "MOTOCHEFE BRASILIA08/12")
+                        continue
 
             # 3. Descrição muito longa com múltiplos números (provável endereço completo)
             if not is_address and len(desc) > 50:
