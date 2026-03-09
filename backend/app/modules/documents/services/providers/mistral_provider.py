@@ -696,6 +696,70 @@ class MistralProvider(BaseProvider):
                 'error': f'Mistral error: {str(e)}'
             }
 
+    def _find_missing_amounts_in_ocr(self, ocr_text: str, extracted_items: list) -> list[str]:
+        """Scan OCR text for amounts that were not extracted, to provide targeted retry feedback."""
+        import re
+
+        # Extract all monetary amounts from OCR text (format: 123,45 or 1.234,56)
+        amount_pattern = re.compile(r'(\d{1,3}(?:\.\d{3})*,\d{2})')
+        ocr_amounts = []
+        for match in amount_pattern.finditer(ocr_text):
+            raw = match.group(1)
+            # Convert Brazilian format to float
+            value = float(raw.replace('.', '').replace(',', '.'))
+            if 5 <= value <= 10000:  # Reasonable transaction range
+                ocr_amounts.append(value)
+
+        # Get all extracted amounts
+        extracted_amounts = [item.get('amount', 0) for item in extracted_items]
+
+        # Find amounts in OCR that don't match any extracted amount (with tolerance)
+        missing = []
+        used_extracted = list(extracted_amounts)
+        for ocr_amt in ocr_amounts:
+            matched = False
+            for i, ext_amt in enumerate(used_extracted):
+                if abs(ocr_amt - ext_amt) < 0.02:
+                    used_extracted.pop(i)
+                    matched = True
+                    break
+            if not matched:
+                missing.append(ocr_amt)
+
+        # Deduplicate and sort by value descending
+        seen = set()
+        unique_missing = []
+        for amt in missing:
+            rounded = round(amt, 2)
+            if rounded not in seen:
+                seen.add(rounded)
+                unique_missing.append(rounded)
+        unique_missing.sort(reverse=True)
+
+        # Find context (nearby text) for each missing amount
+        results = []
+        for amt in unique_missing[:10]:  # Limit to top 10
+            # Search for this amount in OCR text to get context
+            amt_str_comma = f"{amt:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+            # Also try without thousand separator
+            amt_str_simple = f"{amt:.2f}".replace('.', ',')
+
+            context = ""
+            for pattern_str in [amt_str_comma, amt_str_simple]:
+                idx = ocr_text.find(pattern_str)
+                if idx >= 0:
+                    start = max(0, idx - 40)
+                    end = min(len(ocr_text), idx + len(pattern_str) + 5)
+                    context = ocr_text[start:end].replace('\n', ' ').strip()
+                    break
+
+            if context:
+                results.append(f"  - R$ {amt:.2f} → contexto OCR: \"{context}\"")
+            else:
+                results.append(f"  - R$ {amt:.2f}")
+
+        return results
+
     async def _retry_if_sum_mismatch(
         self, result: dict, client, full_prompt: str, ocr_text: str
     ) -> dict:
@@ -717,16 +781,25 @@ class MistralProvider(BaseProvider):
         print(f"[MistralProvider] Sum mismatch: items_sum={items_sum:.2f}, total={total_amount:.2f}, faltam={diff:.2f}")
         print(f"[MistralProvider] Retrying with feedback...")
 
+        # Identify specific missing amounts from OCR text
+        missing_amounts_info = self._find_missing_amounts_in_ocr(ocr_text, result['items'])
+        missing_details = "\n".join(missing_amounts_info) if missing_amounts_info else "  (não foi possível identificar os valores específicos)"
+
         feedback = (
             f"\n\n## ⚠️ ERRO NA EXTRAÇÃO ANTERIOR - CORRIJA AGORA\n\n"
             f"A soma dos itens extraídos foi R$ {items_sum:.2f}, mas o total_amount da fatura é R$ {total_amount:.2f}.\n"
             f"**Faltam R$ {diff:.2f} em transações!**\n\n"
-            f"**O QUE VOCÊ PROVAVELMENTE ERROU:**\n"
-            f"- Esqueceu de extrair a COLUNA ESQUERDA da página 2 (parcelas de meses anteriores)\n"
-            f"- O PRIMEIRO item da coluna esquerda foi pulado\n"
-            f"- Verifique se MOTOCHEFE, PRIME GLOBAL e outros itens com datas antigas (07, 09, 10) estão presentes\n\n"
-            f"**REFAÇA A EXTRAÇÃO COMPLETA. Extraia TODOS os itens de TODAS as colunas.**\n"
+            f"**VALORES ENCONTRADOS NO OCR MAS NÃO EXTRAÍDOS:**\n"
+            f"{missing_details}\n\n"
+            f"**POSSÍVEIS CAUSAS:**\n"
+            f"- A página 2 tem DUAS COLUNAS lado a lado. Você extraiu AMBAS?\n"
+            f"- NÃO confunda a seção 'Compras parceladas - próximas faturas' (que NÃO deve ser extraída) com os lançamentos ATUAIS\n"
+            f"- Os lançamentos ATUAIS aparecem ANTES da linha 'Total dos lançamentos atuais'\n"
+            f"- As 'próximas faturas' aparecem DEPOIS, com parcelas de número MAIOR (ex: 09/12 em vez de 08/12)\n\n"
+            f"**REFAÇA A EXTRAÇÃO COMPLETA. Extraia TODOS os itens de TODAS as colunas de lançamentos atuais.**\n"
         )
+
+        print(f"[MistralProvider] Missing amounts from OCR:\n{missing_details}")
 
         retry_prompt = full_prompt + feedback
 
