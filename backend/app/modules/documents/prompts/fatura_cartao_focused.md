@@ -331,11 +331,11 @@ Diferença: R$ 0,00 → Perfeito!
 
 ### Informações da Fatura:
 
-- **invoice_month / invoice_year**: mês e ano de REFERÊNCIA (período de consumo)
-  - **IMPORTANTE:** É o mês do FECHAMENTO, não do vencimento!
-  - Procure por: "Referência", "Competência", "Período", "Mês Ref"
-  - Se não explícito: use o mês do fechamento
-  - Exemplo: fechamento em 15/01/2026, vencimento em 10/02/2026 → referência = Janeiro/2026
+- **invoice_month / invoice_year**: mês e ano de REFERÊNCIA da fatura
+  - **IMPORTANTE:** Use o mês do VENCIMENTO (due_date), NÃO o mês do fechamento!
+  - Procure por: "Vencimento", "Data de Vencimento", "Pagar até"
+  - Exemplo: fechamento em 26/02/2026, vencimento em 10/03/2026 → invoice_month = 3, invoice_year = 2026
+  - Exemplo: fechamento em 15/01/2026, vencimento em 10/02/2026 → invoice_month = 2, invoice_year = 2026
 
 - **due_date**: data de vencimento (YYYY-MM-DD)
 - **due_day**: dia do vencimento (1-31)
