@@ -90,6 +90,7 @@ class ExtractionValidator:
         else:
             # Validacoes especificas de faturas de cartao
             items = self.fix_inverted_sign_convention(items, card_info)
+            items = self.fix_iof_sign(items)
             items = self.fix_bradesco_installments(items, card_info)
             items = self.filter_duplicate_installments(items)
             items = self.filter_consecutive_installments(items)
@@ -105,6 +106,7 @@ class ExtractionValidator:
         # Corrigir datas usando texto OCR (pós todas as outras validações)
         if not is_cupom_fiscal and ocr_text:
             items = self.fix_dates_from_ocr_text(items, card_info, ocr_text)
+            items = self.fix_nubank_dates(items, card_info, ocr_text)
 
         return items
 
@@ -418,6 +420,24 @@ class ExtractionValidator:
                     item['amount'] = -amount
                     item['transaction_type'] = 'pagamento'
                     item['category'] = 'pagamento'
+
+        return items
+
+    def fix_iof_sign(self, items: list) -> list:
+        """Corrige IOF extraido com valor negativo — IOF é sempre encargo POSITIVO."""
+        if not items:
+            return items
+
+        for item in items:
+            desc = (item.get('description') or '').lower()
+            if 'iof' in desc:
+                amount = item.get('amount', 0)
+                if amount < 0:
+                    print(f"[Validator] IOF com valor negativo corrigido: '{item.get('description', '')[:40]}' {amount} -> {-amount}")
+                    item['amount'] = -amount
+                if item.get('transaction_type') not in ('encargo',):
+                    item['transaction_type'] = 'encargo'
+                item['is_installment'] = False
 
         return items
 
@@ -1224,5 +1244,130 @@ class ExtractionValidator:
 
         if fixed_count > 0:
             print(f"[Validator] OCR date fix: {fixed_count} datas corrigidas")
+
+        return items
+
+    def fix_nubank_dates(self, items: list, card_info: dict | None, ocr_text: str) -> list:
+        """Corrige anos errados em faturas Nubank usando o texto OCR.
+
+        O Nubank usa formato "DD MMM" sem ano. O LLM frequentemente usa o ano errado.
+        Este método:
+        1. Detecta se é Nubank pelo OCR text
+        2. Parseia as datas "DD MMM" do OCR
+        3. Cruza com os itens e corrige o ano usando a regra invoice_month/invoice_year
+        """
+        if not items or not ocr_text or not card_info:
+            return items
+
+        # Verificar se é Nubank
+        card_issuer = (card_info.get('card_issuer') or '').lower()
+        if 'nubank' not in card_issuer and 'nubank' not in ocr_text.lower() and 'nu pagamentos' not in ocr_text.lower():
+            return items
+
+        invoice_month = card_info.get('invoice_month')
+        invoice_year = card_info.get('invoice_year')
+        if not invoice_month or not invoice_year:
+            return items
+
+        MONTH_MAP = {
+            'jan': 1, 'fev': 2, 'mar': 3, 'abr': 4, 'mai': 5, 'jun': 6,
+            'jul': 7, 'ago': 8, 'set': 9, 'out': 10, 'nov': 11, 'dez': 12,
+        }
+
+        # Parsear transações do OCR no formato "DD MMM  Descrição  R$ XX,XX"
+        ocr_transactions = []
+        for line in ocr_text.split('\n'):
+            line = line.strip()
+            if not line:
+                continue
+
+            # Padrão: "DD MMM  descrição  R$ XX,XX" ou "DD MMM  descrição  XX,XX"
+            match = re.match(
+                r'(\d{1,2})\s+(JAN|FEV|MAR|ABR|MAI|JUN|JUL|AGO|SET|OUT|NOV|DEZ)\s+(.+?)\s+R?\$?\s*([\d.]+,\d{2})\s*$',
+                line,
+                re.IGNORECASE
+            )
+            if match:
+                day_str, month_str, desc_part, value_str = match.groups()
+                try:
+                    day = int(day_str)
+                    month = MONTH_MAP.get(month_str.lower())
+                    value = float(value_str.replace('.', '').replace(',', '.'))
+                    if month and 1 <= day <= 31:
+                        ocr_transactions.append({
+                            'day': day,
+                            'month': month,
+                            'desc': desc_part.strip(),
+                            'amount': value,
+                        })
+                except (ValueError, IndexError):
+                    continue
+
+        if not ocr_transactions:
+            return items
+
+        print(f"[Validator] Nubank date fix: encontradas {len(ocr_transactions)} transações no OCR")
+
+        used_ocr_indices = set()
+        fixed_count = 0
+
+        for item in items:
+            item_amount = abs(item.get('amount', 0))
+            item_date = item.get('date', '')
+            item_desc = item.get('description', '')
+
+            if not item_date or item_amount == 0:
+                continue
+
+            # Procurar match no OCR
+            best_idx = None
+            best_score = 0
+            desc_norm = re.sub(r'[^a-z0-9]', '', item_desc.lower())
+
+            for i, ocr_tx in enumerate(ocr_transactions):
+                if i in used_ocr_indices:
+                    continue
+
+                if abs(ocr_tx['amount'] - item_amount) > 0.02:
+                    continue
+
+                ocr_desc_norm = re.sub(r'[^a-z0-9]', '', ocr_tx['desc'].lower())
+                min_len = min(len(desc_norm), len(ocr_desc_norm), 8)
+                if min_len < 3:
+                    continue
+
+                if desc_norm[:min_len] == ocr_desc_norm[:min_len]:
+                    score = min_len + 10
+                elif desc_norm[:5] in ocr_desc_norm or ocr_desc_norm[:5] in desc_norm:
+                    score = 5
+                else:
+                    continue
+
+                if score > best_score:
+                    best_score = score
+                    best_idx = i
+
+            if best_idx is not None:
+                ocr_tx = ocr_transactions[best_idx]
+                used_ocr_indices.add(best_idx)
+
+                ocr_month = ocr_tx['month']
+                ocr_day = ocr_tx['day']
+
+                # Determinar o ano correto
+                if ocr_month > invoice_month:
+                    year = invoice_year - 1
+                else:
+                    year = invoice_year
+
+                correct_date = f"{year}-{ocr_month:02d}-{ocr_day:02d}"
+
+                if correct_date != item_date:
+                    print(f"[Validator] Nubank date fix: '{item_desc[:30]}' {item_date} -> {correct_date}")
+                    item['date'] = correct_date
+                    fixed_count += 1
+
+        if fixed_count > 0:
+            print(f"[Validator] Nubank date fix: {fixed_count} datas corrigidas")
 
         return items

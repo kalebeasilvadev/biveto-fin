@@ -804,8 +804,8 @@ class InstallmentService:
             if series.paid_count >= series.installment_count:
                 series.status = InstallmentSeriesStatus.COMPLETED
 
-        # Atualizar valor se diferente (diferença maior que 1 centavo)
-        if actual_amount and abs(float(existing.amount) - actual_amount) > 0.01:
+        # Atualizar valor com o valor real da fatura (corrige arredondamentos de projeção)
+        if actual_amount and float(existing.amount) != actual_amount:
             existing.amount = actual_amount
 
         # Atualizar data se fornecida e diferente

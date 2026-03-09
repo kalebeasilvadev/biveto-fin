@@ -583,12 +583,13 @@ class TransactionService:
                     detail="Documento nao encontrado",
                 )
 
-            # Verificar idempotencia - duas verificacoes:
+            # Verificar idempotencia - tres verificacoes:
             # 1. Mesmo documento: description + amount (evita re-processar mesmo item)
             # 2. Qualquer documento: description + amount + date (evita duplicatas de PDFs reenviados)
+            # 3. Fuzzy: mesma invoice, valor igual, descricao similar (evita duplicata com parcela projetada)
             # NOTA: Se force_duplicate=True, pular verificacoes
             if data.merchant_name and not data.force_duplicate:
-                # Verificacao 1: Mesmo documento
+                # Verificacao 1: Mesmo documento (exata)
                 existing_same_doc = await self.db.execute(
                     select(Transaction).where(
                         Transaction.document_id == data.document_id,
@@ -601,6 +602,22 @@ class TransactionService:
                         status_code=status.HTTP_409_CONFLICT,
                         detail=f"Item ja adicionado: {data.merchant_name}",
                     )
+
+                # Verificacao 1b: Mesmo documento, descricao fuzzy (ex: "79SLS3754156" vs "795LS3754156 01/05 - Parcela 3/5")
+                existing_same_doc_fuzzy = await self.db.execute(
+                    select(Transaction).where(
+                        Transaction.document_id == data.document_id,
+                        Transaction.amount == data.amount,
+                    )
+                )
+                for existing_tx in existing_same_doc_fuzzy.scalars().all():
+                    if existing_tx.description and self._descriptions_match_fuzzy(
+                        data.merchant_name, existing_tx.description
+                    ):
+                        raise HTTPException(
+                            status_code=status.HTTP_409_CONFLICT,
+                            detail=f"Item ja adicionado (similar): {data.merchant_name}",
+                        )
 
                 # Verificacao 2: Qualquer documento do usuario com mesmo description + amount + date
                 existing_any_doc = await self.db.execute(
@@ -985,6 +1002,9 @@ class TransactionService:
                 # Atualizar a transacao existente ao inves de criar nova
                 existing_projected.document_id = data.document_id
                 existing_projected.is_paid = True
+                # Atualizar valor com o real da fatura (corrige arredondamentos de projeção)
+                if float(existing_projected.amount) != data.amount:
+                    existing_projected.amount = data.amount
                 if data.category_id:
                     existing_projected.category_id = data.category_id
                 if merchant_id:
@@ -1802,6 +1822,52 @@ class TransactionService:
         # Transfer ou outros casos
         return None
 
+    @staticmethod
+    def _descriptions_match_fuzzy(desc1: str, desc2: str) -> bool:
+        """
+        Verifica se duas descrições se referem à mesma transação usando fuzzy matching.
+
+        Lida com casos como:
+        - "79SLS3754156" vs "795LS3754156 01/05 - Parcela 3/5"
+        - "CIATOY BRINQUEDOS LT" vs "CIATOY BRINQUEDOS LT02/04 - Parcela 4/4"
+        - "GRUTA" vs "GRUTA BSB 01/03 - Parcela 3/3"
+        """
+        import re
+
+        if not desc1 or not desc2:
+            return False
+
+        d1 = desc1.lower().strip()
+        d2 = desc2.lower().strip()
+
+        # Match exato
+        if d1 == d2:
+            return True
+
+        # Remove sufixo de parcela " - Parcela X/Y" e padrão "DD/DD" do final
+        def clean(s: str) -> str:
+            s = re.sub(r'\s*-\s*parcela\s*\d+/\d+.*$', '', s, flags=re.IGNORECASE)
+            s = re.sub(r'\d{2}/\d{2}\s*$', '', s)  # Remove "01/05" do final
+            return s.strip()
+
+        c1 = clean(d1)
+        c2 = clean(d2)
+
+        # Um contém o outro (após limpeza)
+        if c1 and c2 and (c1 in c2 or c2 in c1):
+            return True
+
+        # Comparação por palavras significativas (>= 4 chars)
+        words1 = {w for w in c1.split() if len(w) >= 4}
+        words2 = {w for w in c2.split() if len(w) >= 4}
+        if words1 and words2:
+            common = words1 & words2
+            total = max(len(words1), len(words2))
+            if total > 0 and len(common) / total >= 0.5:
+                return True
+
+        return False
+
     async def _find_matching_projected_transaction(
         self,
         user: User,
@@ -1823,24 +1889,16 @@ class TransactionService:
         - Valor similar (+/-5%)
         - Data proxima (+/-15 dias)
         - is_paid = False (transacao futura/projetada)
-        - Descricao similar (se disponivel)
+        - Descricao similar (fuzzy matching)
         """
-        # DEBUG: Log dos parâmetros
-        print(f"[PROJECTED DEBUG] Buscando transacao projetada: merchant='{merchant_name}', "
-              f"amount={amount}, date={transaction_date}, card_id={credit_card_id}")
-
         if not merchant_name:
-            print("[PROJECTED DEBUG] Retornando None - merchant_name vazio")
             return None
 
-        normalized_merchant = merchant_name.lower().strip()[:50]  # Primeiros 50 chars
+        normalized_merchant = merchant_name.lower().strip()[:50]
         min_amount = amount * 0.95
         max_amount = amount * 1.05
         min_date = transaction_date - timedelta(days=15)
         max_date = transaction_date + timedelta(days=15)
-
-        print(f"[PROJECTED DEBUG] Buscando: amount=[{min_amount:.2f}, {max_amount:.2f}], "
-              f"date=[{min_date}, {max_date}], normalized='{normalized_merchant}'")
 
         query = select(Transaction).where(
             and_(
@@ -1849,8 +1907,8 @@ class TransactionService:
                 Transaction.amount <= max_amount,
                 Transaction.date >= min_date,
                 Transaction.date <= max_date,
-                Transaction.is_paid == False,  # Transacao futura/projetada
-                Transaction.document_id.is_(None),  # Nao vinculada a documento ainda
+                Transaction.is_paid == False,
+                Transaction.document_id.is_(None),
             )
         )
 
@@ -1860,17 +1918,10 @@ class TransactionService:
         result = await self.db.execute(query)
         candidates = list(result.scalars().all())
 
-        # DEBUG: Log dos candidatos
-        print(f"[PROJECTED DEBUG] Candidatos encontrados: {len(candidates)}")
-        for c in candidates[:5]:  # Mostrar max 5
-            print(f"  - id={c.id}, desc='{c.description}', amount={c.amount}, "
-                  f"date={c.date}, series_id={c.installment_series_id}")
-
         if not candidates:
-            print("[PROJECTED DEBUG] Nenhum candidato encontrado")
             return None
 
-        # Buscar melhor match por descricao
+        # Buscar melhor match por descricao (com fuzzy matching)
         best_match = None
         best_score = 0
 
@@ -1881,11 +1932,14 @@ class TransactionService:
                 # Verifica se o merchant esta na descricao
                 if normalized_merchant in tx_desc:
                     score += 10
-                # Verifica palavras em comum
-                merchant_words = set(normalized_merchant.split())
-                desc_words = set(tx_desc.split())
-                common_words = merchant_words & desc_words
-                score += len(common_words) * 2
+                elif self._descriptions_match_fuzzy(merchant_name, tx.description):
+                    score += 8  # Fuzzy match
+                else:
+                    # Verifica palavras em comum
+                    merchant_words = set(normalized_merchant.split())
+                    desc_words = set(tx_desc.split())
+                    common_words = merchant_words & desc_words
+                    score += len(common_words) * 2
 
             # Bonus por data exata
             if tx.date == transaction_date:
@@ -1903,11 +1957,7 @@ class TransactionService:
                 best_score = score
                 best_match = tx
 
-        # Retorna match apenas se tiver score minimo
-        print(f"[PROJECTED DEBUG] Melhor match: id={best_match.id if best_match else None}, score={best_score}")
         if best_score >= 5:
-            print(f"[PROJECTED DEBUG] Match encontrado! tx_id={best_match.id}")
             return best_match
 
-        print(f"[PROJECTED DEBUG] Score insuficiente ({best_score} < 5), retornando None")
         return None
