@@ -14,8 +14,8 @@ from app.models.notification import (
     NotificationType,
     NotificationPriority,
 )
-from app.modules.notifications.schemas.notification import (
 from app.core.utils import utc_now
+from app.modules.notifications.schemas.notification import (
     NotificationCreate,
     NotificationResponse,
     NotificationSummary,

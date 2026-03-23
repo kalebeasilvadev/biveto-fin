@@ -32,8 +32,8 @@ from app.modules.grocery.schemas.shopping_list import (
     ShoppingListItemResponse,
     ShoppingListGenerateRequest,
 )
-from app.modules.household.utils import (
 from app.core.utils import utc_now
+from app.modules.household.utils import (
     get_household_user_ids,
     get_household_member,
 )
