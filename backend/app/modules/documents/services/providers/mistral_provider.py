@@ -39,7 +39,10 @@ async def get_mistral_client():
             raise ValueError("MISTRAL_API_KEY nao configurada")
 
         try:
-            from mistralai import Mistral
+            try:
+                from mistralai import Mistral
+            except ImportError:
+                from mistralai.client import Mistral
 
             # Cliente singleton - a biblioteca Mistral gerencia conexoes internamente
             _mistral_client = Mistral(api_key=api_key)
