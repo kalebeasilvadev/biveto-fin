@@ -290,11 +290,13 @@ Pré-requisito: validar que queries SQL do 2.1 produzem números idênticos aos 
 
 ### 3.4 Quebrar financial_agent_service.py ⏸️ (próxima iteração)
 
-Refatoração grande (3.539 linhas → 4 arquivos). Fazer após 3.3 quando FinancialAggregationService existir.
+Refatoração grande (3.539 linhas → 4 arquivos). **53 testes criados** como rede de segurança.
+Testes cobrem: parse_query, classify_intent, suggestions, prompt building, chat orchestration, edge cases.
 
+- [x] Testes criados (53 passing)
 - [ ] Extrair: chat_context_builder, chat_prompt_builder, chat_suggestion_engine, chat_service
 
-**Tempo estimado:** 1 semana
+**Tempo estimado:** Sessão dedicada de ~2 horas
 
 ---
 
