@@ -405,7 +405,10 @@ class LLMOCRService:
                     desc = re.sub(r'\s+', '', desc)  # Remove all spaces for comparison
 
                     total = item.get('installment_total')
-                    key = (desc, total)
+                    amount = item.get('amount', 0)
+                    # Include amount in key — same merchant can have different purchases
+                    # with different amounts (e.g., EC *PICHAU R$166.64 and R$85.61)
+                    key = (desc, total, amount)
 
                     if key not in seen_installments:
                         seen_installments[key] = item
@@ -413,10 +416,10 @@ class LLMOCRService:
                         # Keep the one with lowest installment_current
                         existing = seen_installments[key]
                         if item.get('installment_current') < existing.get('installment_current'):
-                            print(f"[LLM_OCR] Replacing duplicate installment: {desc} {existing.get('installment_current')}/{total} -> {item.get('installment_current')}/{total}")
+                            print(f"[LLM_OCR] Replacing duplicate installment: {desc} {existing.get('installment_current')}/{total} R${amount} -> {item.get('installment_current')}/{total} R${amount}")
                             seen_installments[key] = item
                         else:
-                            print(f"[LLM_OCR] Skipping duplicate installment: {desc} {item.get('installment_current')}/{total} (keeping {existing.get('installment_current')}/{total})")
+                            print(f"[LLM_OCR] Skipping duplicate installment: {desc} {item.get('installment_current')}/{total} R${amount} (keeping {existing.get('installment_current')}/{total})")
                 else:
                     non_installment_items.append(item)
 

@@ -661,7 +661,7 @@ class MistralProvider(BaseProvider):
             if item.get('amount', 0) > 0
         )
 
-        if total_amount and abs(total_amount - items_sum) <= 50:
+        if total_amount and abs(total_amount - items_sum) <= 100:
             print(f"[MistralProvider] ✅ document_annotation SUCCESS: {len(result['items'])} items, "
                   f"sum={items_sum:.2f}, total={total_amount:.2f}, diff={abs(total_amount - items_sum):.2f}")
             result['_ocr_text'] = ocr_text
@@ -670,7 +670,7 @@ class MistralProvider(BaseProvider):
         else:
             diff = abs(total_amount - items_sum) if total_amount else 0
             print(f"[MistralProvider] ⚠️ document_annotation sum mismatch: "
-                  f"sum={items_sum:.2f}, total={total_amount}, diff={diff:.2f} — falling back to LLM")
+                  f"sum={items_sum:.2f}, total={total_amount}, diff={diff:.2f} (>R$100) — falling back to LLM")
             # Return annotation result as candidate (might still be better than LLM)
             result['_ocr_text'] = ocr_text
             result['_ocr_text_preview'] = ocr_text[:500] + "..." if len(ocr_text) > 500 else ocr_text
@@ -721,14 +721,11 @@ class MistralProvider(BaseProvider):
                 client, uploaded_file, bank_prompt=""
             )
 
-            # If annotation returned no OCR text, do a separate OCR call
+            # If annotation returned no OCR text, do a separate OCR call (reuse file_id)
             if not ocr_text.strip():
-                print(f"[MistralProvider] Annotation didn't return OCR text, doing separate OCR...")
-                uploaded_file2 = await asyncio.to_thread(
-                    self._upload_sync, client, pdf_content, filename
-                )
+                print(f"[MistralProvider] Annotation didn't return OCR text, doing separate OCR (reusing file_id)...")
                 ocr_response = await asyncio.to_thread(
-                    self._ocr_sync, client, uploaded_file2.id
+                    self._ocr_sync, client, uploaded_file.id
                 )
                 if hasattr(ocr_response, 'pages'):
                     for page in ocr_response.pages:
