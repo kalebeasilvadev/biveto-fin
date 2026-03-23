@@ -788,10 +788,16 @@ class MistralProvider(BaseProvider):
                         await asyncio.sleep(wait_time)
                         continue
                     else:
+                        # LLM failed — use annotation as fallback if available
+                        if annotation_result and annotation_result.get('items'):
+                            print(f"[MistralProvider] LLM failed ({type(e).__name__}), using annotation fallback ({len(annotation_result['items'])} items)")
+                            annotation_result.pop('_annotation_candidate', None)
+                            return annotation_result
                         raise
 
-            # If LLM failed but annotation had a candidate, use it
-            if annotation_result:
+            # If LLM loop exhausted but annotation had a candidate, use it
+            if annotation_result and annotation_result.get('items'):
+                print(f"[MistralProvider] LLM exhausted retries, using annotation fallback ({len(annotation_result['items'])} items)")
                 annotation_result.pop('_annotation_candidate', None)
                 return annotation_result
 
