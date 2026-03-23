@@ -265,7 +265,7 @@ class AnalyticsService:
         result = await self.db.execute(
             select(
                 Transaction.category_id,
-                func.cast(func.coalesce(func.sum(Transaction.amount), 0), func.numeric(12, 2)).label("total"),
+                func.coalesce(func.sum(Transaction.amount), 0).label("total"),
                 func.count(Transaction.id).label("count"),
             )
             .where(*base_filter)
@@ -316,7 +316,7 @@ class AnalyticsService:
         result = await self.db.execute(
             select(
                 Transaction.merchant_id,
-                func.cast(func.coalesce(func.sum(Transaction.amount), 0), func.numeric(12, 2)).label("total"),
+                func.coalesce(func.sum(Transaction.amount), 0).label("total"),
                 func.count(Transaction.id).label("count"),
             )
             .where(*base_filter)
