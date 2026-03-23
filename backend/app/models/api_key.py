@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from app.core.utils import utc_now
 from enum import Enum
 from sqlalchemy import String, Boolean, DateTime, ForeignKey, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -49,7 +50,7 @@ class APIKey(Base):
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Timestamps
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     # Relationship
@@ -60,7 +61,7 @@ class APIKey(Base):
         """Verifica se a API Key está ativa e não expirada"""
         if self.status != APIKeyStatus.active.value:
             return False
-        if self.expires_at and self.expires_at < datetime.now(timezone.utc):
+        if self.expires_at and self.expires_at < utc_now():
             return False
         return True
 

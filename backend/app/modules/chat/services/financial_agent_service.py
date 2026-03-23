@@ -40,6 +40,7 @@ from app.models.grocery import (
 # Envelope module removed - functionality merged into Budgets module
 from app.models.automation_rule import AutomationRule, AutomationExecution
 from app.modules.chat.schemas.chat import ChatResponse
+from app.core.utils import utc_now
 
 # Limite de mensagens por conversa para evitar vazamento de memória
 MAX_MESSAGES_PER_CONVERSATION = 10
@@ -2340,7 +2341,7 @@ COMO RESPONDER:
         # Atualizar título da conversa se for a primeira mensagem
         if not conversation.title:
             conversation.title = message[:100] if len(message) <= 100 else message[:97] + "..."
-            conversation.updated_at = datetime.now(timezone.utc)
+            conversation.updated_at = utc_now()
 
         await self.db.commit()
 

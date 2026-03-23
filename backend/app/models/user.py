@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from app.core.utils import utc_now
 from sqlalchemy import String, Boolean, DateTime, Date, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from ..core.database import Base
@@ -17,9 +18,9 @@ class User(Base):
     license_id: Mapped[int | None] = mapped_column(ForeignKey("licenses.id"), nullable=True)
     reset_token: Mapped[str | None] = mapped_column(String(64), nullable=True)
     reset_token_expires: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)
+        DateTime, default=utc_now, onupdate=utc_now
     )
 
     # License relationship - keep selectin for auth checks

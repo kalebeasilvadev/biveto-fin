@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from sqlalchemy import String, DateTime, Boolean, Numeric, JSON
 from sqlalchemy.orm import Mapped, mapped_column
 from app.core.database import Base
+from app.core.utils import utc_now
 
 
 class KnownRecurringService(Base):
@@ -23,7 +24,7 @@ class KnownRecurringService(Base):
     logo_url: Mapped[str | None] = mapped_column(String(500))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)
+        DateTime, default=utc_now, onupdate=utc_now
     )

@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from app.core.utils import utc_now
 from enum import Enum
 from sqlalchemy import String, Boolean, DateTime, Integer, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -39,7 +40,7 @@ class HouseholdMember(Base):
     )
     role: Mapped[str] = mapped_column(String(20), default=HouseholdRole.MEMBER.value)
     nickname: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    joined_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    joined_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     invited_by_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )

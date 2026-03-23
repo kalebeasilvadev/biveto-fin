@@ -15,6 +15,7 @@ from app.models.notification import (
     NotificationPriority,
 )
 from app.modules.notifications.schemas.notification import (
+from app.core.utils import utc_now
     NotificationCreate,
     NotificationResponse,
     NotificationSummary,
@@ -176,7 +177,7 @@ class NotificationService:
             return None
 
         notification.is_read = True
-        notification.read_at = datetime.now(timezone.utc)
+        notification.read_at = utc_now()
         await self.db.flush()
 
         return self._build_notification_response(notification)
@@ -189,7 +190,7 @@ class NotificationService:
                 Notification.user_id == user.id,
                 Notification.is_read == False,
             )
-            .values(is_read=True, read_at=datetime.now(timezone.utc))
+            .values(is_read=True, read_at=utc_now())
         )
         result = await self.db.execute(stmt)
         await self.db.flush()
@@ -210,7 +211,7 @@ class NotificationService:
             return False
 
         notification.is_dismissed = True
-        notification.dismissed_at = datetime.now(timezone.utc)
+        notification.dismissed_at = utc_now()
         await self.db.flush()
 
         return True

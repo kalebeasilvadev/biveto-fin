@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from app.core.utils import utc_now
 from sqlalchemy import String, ForeignKey, DateTime, Numeric, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from ..core.database import Base
@@ -37,7 +38,7 @@ class TransactionPayment(Base):
 
     # Ordem de exibicao
     sequence: Mapped[int] = mapped_column(Integer, default=1)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
     # Relationships
     transaction: Mapped["Transaction"] = relationship(back_populates="payments")

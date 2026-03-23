@@ -34,6 +34,7 @@ from app.modules.automations.schemas import (
 )
 from app.models.notification import NotificationType, NotificationPriority
 from app.modules.notifications.services import NotificationService
+from app.core.utils import utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -161,7 +162,7 @@ class AutomationService:
             rule.consecutive_failures = 0
             rule.last_error = None
 
-        rule.updated_at = datetime.now(timezone.utc)
+        rule.updated_at = utc_now()
         await self.session.commit()
         await self.session.refresh(rule)
 
@@ -194,7 +195,7 @@ class AutomationService:
             rule.consecutive_failures = 0
             rule.last_error = None
 
-        rule.updated_at = datetime.now(timezone.utc)
+        rule.updated_at = utc_now()
         await self.session.commit()
         await self.session.refresh(rule)
 
@@ -209,7 +210,7 @@ class AutomationService:
         context: dict | None = None
     ) -> AutomationExecution:
         """Execute an automation rule."""
-        start_time = datetime.now(timezone.utc)
+        start_time = utc_now()
         execution = AutomationExecution(
             rule_id=rule.id,
             trigger_reason=trigger_reason,
@@ -235,7 +236,7 @@ class AutomationService:
                 execution.result_data = result
 
                 # Update rule stats
-                rule.last_executed_at = datetime.now(timezone.utc)
+                rule.last_executed_at = utc_now()
                 rule.execution_count += 1
                 rule.consecutive_failures = 0
                 rule.last_error = None
@@ -253,7 +254,7 @@ class AutomationService:
             # Auto-disable if too many failures
             if rule.consecutive_failures >= rule.max_consecutive_failures:
                 rule.is_active = False
-                rule.auto_disabled_at = datetime.now(timezone.utc)
+                rule.auto_disabled_at = utc_now()
                 logger.warning(
                     f"Auto-disabled rule {rule.id} after {rule.consecutive_failures} failures"
                 )
@@ -277,7 +278,7 @@ class AutomationService:
                     logger.error(f"Failed to send auto-disable notification for rule {rule.id}: {notif_err}")
 
         finally:
-            end_time = datetime.now(timezone.utc)
+            end_time = utc_now()
             execution.duration_ms = int((end_time - start_time).total_seconds() * 1000)
 
         await self.session.commit()
@@ -460,7 +461,7 @@ class AutomationService:
             }
 
         # Create transfer transactions
-        now = datetime.now(timezone.utc)
+        now = utc_now()
         today = date.today()
 
         # Expense from source account
@@ -612,7 +613,7 @@ class AutomationService:
             return {"action": "generate", "status": "skipped", "reason": "account_not_found"}
 
         # Create transaction
-        now = datetime.now(timezone.utc)
+        now = utc_now()
         today = date.today()
 
         transaction = Transaction(

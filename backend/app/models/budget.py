@@ -6,6 +6,7 @@ Evolução: Incorpora funcionalidades de Envelopes (histórico, status dinâmico
 transferências, subsídio diário) para uma experiência mais completa de orçamento.
 """
 from datetime import datetime, date, timezone
+from app.core.utils import utc_now
 from decimal import Decimal
 from enum import Enum
 from sqlalchemy import String, ForeignKey, DateTime, Date, Numeric, Integer, Boolean, Text, Index
@@ -59,8 +60,8 @@ class Budget(Base):
     notes: Mapped[str | None] = mapped_column(Text)
     ownership_type: Mapped[str] = mapped_column(String(20), default="personal")  # personal, household
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, onupdate=utc_now)
 
     # Relationships
     user: Mapped["User"] = relationship(back_populates="budgets")
@@ -91,8 +92,8 @@ class BudgetItem(Base):
     priority: Mapped[int] = mapped_column(Integer, default=0)  # Ordem de prioridade
     notes: Mapped[str | None] = mapped_column(String(200))
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, onupdate=utc_now)
 
     # Relationships
     budget: Mapped["Budget"] = relationship(back_populates="items")

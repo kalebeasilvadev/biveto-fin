@@ -19,6 +19,7 @@ from app.modules.benefit_cards.schemas.benefit_card import (
     BalanceAdjustmentResponse,
 )
 from app.modules.household.utils.household_helpers import validate_create_permission
+from app.core.utils import utc_now
 
 router = APIRouter()
 
@@ -514,5 +515,5 @@ async def adjust_balance(
         new_balance=adjustment_result["new_balance"],
         transaction_id=adjustment_result["transaction_id"],
         reason=adjustment_result["reason"],
-        timestamp=datetime.now(timezone.utc)
+        timestamp=utc_now()
     )

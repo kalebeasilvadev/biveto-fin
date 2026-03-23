@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from app.core.utils import utc_now
 from enum import Enum
 from sqlalchemy import String, ForeignKey, DateTime, Numeric, Boolean, Integer, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -70,9 +71,9 @@ class CreditCard(Base):
     # Status
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)
+        DateTime, default=utc_now, onupdate=utc_now
     )
 
     # Relationships

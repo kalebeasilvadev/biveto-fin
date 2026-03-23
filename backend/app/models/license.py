@@ -1,4 +1,5 @@
 from datetime import datetime, date, timezone
+from app.core.utils import utc_now
 from enum import Enum
 import secrets
 from sqlalchemy import String, Boolean, DateTime, Date, Integer, Text, ForeignKey
@@ -62,9 +63,9 @@ class License(Base):
 
     # Metadados
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)
+        DateTime, default=utc_now, onupdate=utc_now
     )
 
     # Relationships

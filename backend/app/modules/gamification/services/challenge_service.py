@@ -9,6 +9,7 @@ from app.models.gamification import (
     ChallengeStatus, ChallengeDifficulty
 )
 from app.models.transaction import Transaction
+from app.core.utils import utc_now
 from ..schemas import (
     ChallengeResponse, ChallengeListResponse,
     ChallengeDifficulty as ChallengeDifficultySchema,
@@ -53,7 +54,7 @@ class ChallengeService:
             participated_ids.add(uc.challenge_id)
 
             # Verificar se expirou
-            now = datetime.now(timezone.utc)
+            now = utc_now()
             if uc.status == ChallengeStatus.ACTIVE.value and uc.expires_at < now:
                 uc.status = ChallengeStatus.FAILED.value
                 await self.db.flush()
@@ -194,7 +195,7 @@ class ChallengeService:
             return None
 
         # Criar desafio do usuário
-        now = datetime.now(timezone.utc)
+        now = utc_now()
         expires_at = now + timedelta(days=definition.duration_days)
 
         # Progresso inicial baseado no tipo
@@ -366,7 +367,7 @@ class ChallengeService:
     ):
         """Marca desafio como completado e concede recompensas"""
         uc.status = ChallengeStatus.COMPLETED.value
-        uc.completed_at = datetime.now(timezone.utc)
+        uc.completed_at = utc_now()
 
         # Adicionar pontos
         points_service = PointsService(self.db)

@@ -26,6 +26,7 @@ from app.modules.budgets.schemas.budget import (
     BudgetTransferRequest, BudgetTransferResponse, BudgetItemHistoryResponse
 )
 from app.modules.household.utils import (
+from app.core.utils import utc_now
     get_household_user_ids,
     get_household_member,
     build_ownership_filter,
@@ -703,7 +704,7 @@ class BudgetService:
             to_item=to_item_response,
             amount=data.amount,
             notes=data.notes,
-            created_at=datetime.now(timezone.utc)
+            created_at=utc_now()
         )
 
     async def get_item_history(

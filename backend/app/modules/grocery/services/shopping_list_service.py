@@ -33,6 +33,7 @@ from app.modules.grocery.schemas.shopping_list import (
     ShoppingListGenerateRequest,
 )
 from app.modules.household.utils import (
+from app.core.utils import utc_now
     get_household_user_ids,
     get_household_member,
 )
@@ -171,7 +172,7 @@ class ShoppingListService:
                 value = value.value
                 # Set completed_at when completing
                 if value == ShoppingListStatus.COMPLETED.value:
-                    lst.completed_at = datetime.now(timezone.utc)
+                    lst.completed_at = utc_now()
             setattr(lst, field, value)
 
         await self.db.flush()

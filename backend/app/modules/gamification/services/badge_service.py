@@ -11,6 +11,7 @@ from app.models.gamification import (
 from app.models.transaction import Transaction
 from app.models.goal import Goal, GoalStatus
 from app.models.debt import Debt, DebtStatus
+from app.core.utils import utc_now
 from ..schemas import BadgeResponse, BadgeCategory as BadgeCategorySchema
 from .points_service import PointsService
 
@@ -167,7 +168,7 @@ class BadgeService:
         user_badge = UserBadge(
             user_id=user.id,
             badge_id=badge_id,
-            earned_at=datetime.now(timezone.utc)
+            earned_at=utc_now()
         )
         self.db.add(user_badge)
 
@@ -372,7 +373,7 @@ class BadgeService:
 
         count = 0
         for badge in unseen_badges:
-            badge.seen_at = datetime.now(timezone.utc)
+            badge.seen_at = utc_now()
             count += 1
 
         await self.db.flush()

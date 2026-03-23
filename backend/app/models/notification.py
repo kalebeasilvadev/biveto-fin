@@ -1,4 +1,5 @@
 from datetime import datetime, time, timezone
+from app.core.utils import utc_now
 from enum import Enum
 from sqlalchemy import (
     String,
@@ -117,7 +118,7 @@ class Notification(Base):
     # Metadados extras (JSON)
     extra_data: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
     # Relationships
     user: Mapped["User"] = relationship(back_populates="notifications")
@@ -157,9 +158,9 @@ class NotificationPreference(Base):
         Integer, nullable=True
     )  # Ex: alertar X dias antes do vencimento
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)
+        DateTime, default=utc_now, onupdate=utc_now
     )
 
     # Relationships
@@ -196,9 +197,9 @@ class NotificationSettings(Base):
     email_unsubscribed: Mapped[bool] = mapped_column(Boolean, default=False)
     push_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)
+        DateTime, default=utc_now, onupdate=utc_now
     )
 
     # Relationships
@@ -228,7 +229,7 @@ class PushSubscription(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     failed_count: Mapped[int] = mapped_column(Integer, default=0)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     # Relationships

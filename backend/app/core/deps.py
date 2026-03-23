@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from app.core.utils import utc_now
 from typing import Annotated
 from fastapi import Depends, HTTPException, status, Header, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -128,7 +129,7 @@ async def get_user_from_api_key(
         )
 
     # Atualiza estatísticas de uso
-    api_key.last_used_at = datetime.now(timezone.utc)
+    api_key.last_used_at = utc_now()
     api_key.usage_count += 1
     api_key.last_ip = request.client.host if request.client else None
     await db.commit()
@@ -173,7 +174,7 @@ async def get_api_key_object(
         )
 
     # Atualiza estatísticas
-    api_key.last_used_at = datetime.now(timezone.utc)
+    api_key.last_used_at = utc_now()
     api_key.usage_count += 1
     api_key.last_ip = request.client.host if request.client else None
     await db.commit()

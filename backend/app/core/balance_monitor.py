@@ -9,6 +9,7 @@ import logging
 from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.account import Account
+from app.core.utils import utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +88,7 @@ class BalanceMonitor:
             f"current_balance={current:.2f}, "
             f"debit_amount={amount:.2f}, "
             f"resulting_balance={resulting:.2f}, "
-            f"timestamp={datetime.now(timezone.utc).isoformat()}"
+            f"timestamp={utc_now().isoformat()}"
         )
 
 
@@ -134,7 +135,7 @@ async def create_balance_adjustment(
         account_id=account.id,
         type=TransactionType.INCOME if adjustment_amount > 0 else TransactionType.EXPENSE,
         amount=abs(adjustment_amount),
-        date=datetime.now(timezone.utc).date(),
+        date=utc_now().date(),
         description=f"Ajuste de saldo: {reason}",
         category_id=None,  # Sem categoria (é ajuste manual)
         is_recurring=False,

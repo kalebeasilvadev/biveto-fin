@@ -12,6 +12,7 @@ Sistema de gamificação com:
 from sqlalchemy import String, ForeignKey, DateTime, Date, Integer, Boolean, JSON, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime, date, timezone
+from app.core.utils import utc_now
 from enum import Enum
 from ..core.database import Base
 
@@ -83,7 +84,7 @@ class BadgeDefinition(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_secret: Mapped[bool] = mapped_column(Boolean, default=False)  # Não mostra até desbloquear
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
     # Relationships
     user_badges: Mapped[list["UserBadge"]] = relationship(back_populates="badge", lazy="noload")
@@ -103,7 +104,7 @@ class UserBadge(Base):
         index=True
     )
 
-    earned_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    earned_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     seen_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)  # Quando viu a notificação
 
     # Índice único para evitar duplicatas
@@ -139,11 +140,11 @@ class UserStreak(Base):
     freeze_available: Mapped[int] = mapped_column(Integer, default=1)
     freeze_used_at: Mapped[date | None] = mapped_column(Date, nullable=True)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc)
+        default=utc_now,
+        onupdate=utc_now
     )
 
     # Índice composto
@@ -208,7 +209,7 @@ class ChallengeDefinition(Base):
     is_recurring: Mapped[bool] = mapped_column(Boolean, default=True)  # Mensal
 
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
     # Relationships
     badge_reward: Mapped["BadgeDefinition | None"] = relationship()
@@ -236,7 +237,7 @@ class UserChallenge(Base):
     # Ex: {"days_completed": 5, "days_required": 7}
     # Ex: {"amount_saved": 500, "target": 1000}
 
-    started_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    started_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
@@ -265,8 +266,8 @@ class UserPoints(Base):
 
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc)
+        default=utc_now,
+        onupdate=utc_now
     )
 
     user: Mapped["User"] = relationship(back_populates="points")
@@ -292,7 +293,7 @@ class PointsTransaction(Base):
     # "badge", "challenge", "streak", "purchase"
     reference_id: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
 
 # =============================================================================

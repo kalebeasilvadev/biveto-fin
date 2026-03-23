@@ -23,6 +23,7 @@ from app.modules.receipts.schemas.receipt import (
 from app.modules.installments.services.installment_service import InstallmentService
 from app.modules.credit_cards.services.invoice_service import InvoiceService
 from app.core.balance_monitor import BalanceMonitor
+from app.core.utils import utc_now
 
 
 class ReceiptService:
@@ -123,7 +124,7 @@ class ReceiptService:
             subtotal=data.subtotal,
             discount=data.discount,
             status=ReceiptStatus.CONFIRMED.value,
-            confirmed_at=datetime.now(timezone.utc),
+            confirmed_at=utc_now(),
         )
         self.db.add(receipt)
         await self.db.flush()  # Para obter o ID

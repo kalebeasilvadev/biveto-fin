@@ -3,6 +3,7 @@ Automation Rule model for financial automations.
 """
 
 from datetime import datetime, timezone
+from app.core.utils import utc_now
 from decimal import Decimal
 from enum import Enum
 
@@ -180,10 +181,10 @@ class AutomationRule(Base):
     auto_disabled_at: Mapped[datetime | None] = mapped_column(default=None)
 
     # Timestamps
-    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc)
+        default=utc_now,
+        onupdate=utc_now
     )
 
     # Ownership
@@ -220,7 +221,7 @@ class AutomationExecution(Base):
     )
 
     # Execution details
-    executed_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
+    executed_at: Mapped[datetime] = mapped_column(default=utc_now)
     trigger_reason: Mapped[str] = mapped_column(String(100))
     """
     What triggered this execution:

@@ -15,6 +15,7 @@ from app.core.celery_config import celery_app
 from app.core.database import async_session_maker
 from app.models.user import User
 from app.models.notification import Notification, NotificationSettings
+from app.core.utils import utc_now
 
 
 def run_async(coro):
@@ -52,7 +53,7 @@ def send_email_notification(notification_id: int):
             # await send_notification_email(user.email, notification)
 
             notification.sent_email = True
-            notification.sent_at = datetime.now(timezone.utc)
+            notification.sent_at = utc_now()
             await db.commit()
             return True
 
