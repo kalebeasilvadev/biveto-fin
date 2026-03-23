@@ -1,4 +1,4 @@
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from decimal import Decimal
 from enum import Enum
 from sqlalchemy import String, ForeignKey, DateTime, Date, Text, Numeric, Integer, Boolean
@@ -94,7 +94,7 @@ class GroceryProduct(Base):
     necessity_type: Mapped[str] = mapped_column(String(20), default=NecessityType.ESSENTIAL.value)
     default_unit: Mapped[str] = mapped_column(String(10), default="un")  # kg, un, L, etc.
     is_system: Mapped[bool] = mapped_column(Boolean, default=False)  # Produto padrão do sistema
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Relationships
     user: Mapped["User | None"] = relationship(lazy="noload")
@@ -155,7 +155,7 @@ class GroceryPurchase(Base):
     # Metadata
     purchase_date: Mapped[date] = mapped_column(Date, index=True)
     ownership_type: Mapped[str] = mapped_column(String(20), default="personal")  # personal/household
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Relationships
     user: Mapped["User"] = relationship(lazy="noload")
@@ -194,7 +194,7 @@ class GroceryPriceHistory(Base):
     price: Mapped[float] = mapped_column(Numeric(10, 2))
     unit: Mapped[str] = mapped_column(String(10), default="un")
     recorded_at: Mapped[date] = mapped_column(Date, index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Relationships
     product: Mapped["GroceryProduct"] = relationship(
@@ -223,9 +223,9 @@ class ShoppingList(Base):
     source: Mapped[str] = mapped_column(String(20), default=ShoppingListSource.MANUAL.value)
     ownership_type: Mapped[str] = mapped_column(String(20), default="household")  # sempre household
     notes: Mapped[str | None] = mapped_column(Text)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+        DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)
     )
     completed_at: Mapped[datetime | None] = mapped_column(DateTime)
 
@@ -286,7 +286,7 @@ class ShoppingListItem(Base):
     is_checked: Mapped[bool] = mapped_column(Boolean, default=False)
     priority: Mapped[int] = mapped_column(Integer, default=0)  # 0 = normal, higher = more important
     notes: Mapped[str | None] = mapped_column(String(200))
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Relationships
     shopping_list: Mapped["ShoppingList"] = relationship(

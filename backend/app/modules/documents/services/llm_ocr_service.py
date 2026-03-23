@@ -131,6 +131,24 @@ class LLMOCRService:
             if not result or result.get('error'):
                 return result or {'items': [], 'error': 'Extracao falhou'}
 
+            # 2.5. Quality-based retry: 0 items from multi-page PDF -> try fallback provider
+            items_before_retry = result.get('items', [])
+            if is_pdf and not items_before_retry:
+                pdf_page_count = self._get_pdf_page_count(image_content)
+                if pdf_page_count > 1:
+                    fallback_provider = self._get_fallback_provider()
+                    if fallback_provider:
+                        print(f"[LLM_OCR] 0 items extracted from {pdf_page_count}-page PDF, retrying with fallback provider")
+                        try:
+                            retry_result = await fallback_provider.extract_from_pdf(image_content, filename, password)
+                            if retry_result and not retry_result.get('error') and retry_result.get('items'):
+                                print(f"[LLM_OCR] Fallback succeeded: {len(retry_result['items'])} items extracted")
+                                result = retry_result
+                            else:
+                                print(f"[LLM_OCR] Fallback also returned 0 items or error")
+                        except Exception as retry_err:
+                            print(f"[LLM_OCR] Fallback retry failed: {type(retry_err).__name__}: {retry_err}")
+
             # 3. Aplicar validacoes e limpezas
             items = result.get('items', [])
             card_info = result.get('card_info')
@@ -156,6 +174,17 @@ class LLMOCRService:
                 if not validation['is_valid']:
                     print(f"[LLM_OCR] AVISO: Validacao falhou - diff={validation['difference']:.2f}")
 
+                # Divergence warning: sum of amounts vs card_info total
+                if card_info and card_info.get('total_amount') is not None:
+                    items_sum = sum(item.get('amount', 0) for item in items)
+                    card_total = card_info['total_amount']
+                    divergence = abs(items_sum - card_total)
+                    if divergence > 100:
+                        print(
+                            f"[LLM_OCR] WARNING: items sum R$ {items_sum:.2f} diverges from "
+                            f"card_info.total R$ {card_total:.2f} by R$ {divergence:.2f} (>R$100)"
+                        )
+
             return result
 
         except Exception as e:
@@ -163,6 +192,46 @@ class LLMOCRService:
             import traceback
             traceback.print_exc()
             return {'items': [], 'error': str(e)}
+
+    def _get_fallback_provider(self):
+        """Returns a fallback provider for retry, or None if unavailable.
+
+        Strategy:
+        - google -> try mistral (if api key exists)
+        - mistral -> try google (if api key exists)
+        - otherwise -> None
+        """
+        parse_fn = self.parser.parse
+
+        if self.provider_name == 'google' and settings.mistral_api_key:
+            print("[LLM_OCR] Fallback provider: mistral")
+            return MistralProvider(
+                model=None,
+                prompt=self._provider.prompt if self._provider else EXTRACTION_PROMPT,
+                parse_response_fn=parse_fn,
+            )
+        elif self.provider_name == 'mistral' and settings.google_api_key:
+            print("[LLM_OCR] Fallback provider: google")
+            return GoogleProvider(
+                model='gemini-2.0-flash',
+                prompt=self._provider.prompt if self._provider else EXTRACTION_PROMPT,
+                response_schema=FaturaExtracao,
+                parse_response_fn=parse_fn,
+            )
+
+        print("[LLM_OCR] No fallback provider available")
+        return None
+
+    def _get_pdf_page_count(self, pdf_bytes: bytes) -> int:
+        """Returns the number of pages in a PDF, or 0 on error."""
+        try:
+            import fitz
+            doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+            count = len(doc)
+            doc.close()
+            return count
+        except Exception:
+            return 0
 
     async def _process_pdf_as_images(self, pdf_content: bytes, password: str | None = None) -> dict:
         """Fallback: converte PDF para imagens e processa

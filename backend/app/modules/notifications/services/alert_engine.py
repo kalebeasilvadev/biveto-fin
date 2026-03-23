@@ -151,20 +151,28 @@ class AlertEngine:
         items_result = await self.db.execute(items_query)
         items = items_result.scalars().all()
 
+        # Fetch ALL category spending in ONE query (instead of N queries)
+        category_ids = [item.category_id for item in items if item.limit_amount > 0 and item.category_id]
+        spending_by_category: dict[int, Decimal] = {}
+        if category_ids:
+            spending_query = select(
+                Transaction.category_id,
+                func.coalesce(func.sum(Transaction.amount), 0).label("spent"),
+            ).where(
+                Transaction.user_id == user.id,
+                Transaction.category_id.in_(category_ids),
+                Transaction.type == "expense",
+                func.extract("year", Transaction.date) == today.year,
+                func.extract("month", Transaction.date) == today.month,
+            ).group_by(Transaction.category_id)
+            spending_result = await self.db.execute(spending_query)
+            spending_by_category = {row.category_id: row.spent for row in spending_result.all()}
+
         for item in items:
             if item.limit_amount <= 0:
                 continue
 
-            # Calculate spending for this category
-            spending_query = select(func.sum(Transaction.amount)).where(
-                Transaction.user_id == user.id,
-                Transaction.category_id == item.category_id,
-                Transaction.type == "expense",
-                func.extract("year", Transaction.date) == today.year,
-                func.extract("month", Transaction.date) == today.month,
-            )
-            spending_result = await self.db.execute(spending_query)
-            spent = spending_result.scalar() or Decimal(0)
+            spent = spending_by_category.get(item.category_id, Decimal(0))
 
             percentage = float(spent / item.limit_amount * 100)
 

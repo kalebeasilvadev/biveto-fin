@@ -6,7 +6,7 @@ Este módulo NÃO bloqueia transações, apenas:
 3. Permite ajustes manuais
 """
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.account import Account
 
@@ -87,7 +87,7 @@ class BalanceMonitor:
             f"current_balance={current:.2f}, "
             f"debit_amount={amount:.2f}, "
             f"resulting_balance={resulting:.2f}, "
-            f"timestamp={datetime.utcnow().isoformat()}"
+            f"timestamp={datetime.now(timezone.utc).isoformat()}"
         )
 
 
@@ -134,7 +134,7 @@ async def create_balance_adjustment(
         account_id=account.id,
         type=TransactionType.INCOME if adjustment_amount > 0 else TransactionType.EXPENSE,
         amount=abs(adjustment_amount),
-        date=datetime.utcnow().date(),
+        date=datetime.now(timezone.utc).date(),
         description=f"Ajuste de saldo: {reason}",
         category_id=None,  # Sem categoria (é ajuste manual)
         is_recurring=False,

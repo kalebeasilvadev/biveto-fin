@@ -2,7 +2,7 @@
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from app.models.user import User
 from app.models.gamification import (
     ChallengeDefinition, UserChallenge,
@@ -53,7 +53,7 @@ class ChallengeService:
             participated_ids.add(uc.challenge_id)
 
             # Verificar se expirou
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
             if uc.status == ChallengeStatus.ACTIVE.value and uc.expires_at < now:
                 uc.status = ChallengeStatus.FAILED.value
                 await self.db.flush()
@@ -194,7 +194,7 @@ class ChallengeService:
             return None
 
         # Criar desafio do usuário
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         expires_at = now + timedelta(days=definition.duration_days)
 
         # Progresso inicial baseado no tipo
@@ -366,7 +366,7 @@ class ChallengeService:
     ):
         """Marca desafio como completado e concede recompensas"""
         uc.status = ChallengeStatus.COMPLETED.value
-        uc.completed_at = datetime.utcnow()
+        uc.completed_at = datetime.now(timezone.utc)
 
         # Adicionar pontos
         points_service = PointsService(self.db)

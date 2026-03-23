@@ -8,7 +8,7 @@ import json
 import httpx
 import uuid
 import re
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 from dateutil.relativedelta import relativedelta
 from decimal import Decimal
@@ -84,7 +84,7 @@ class FinancialAgentService:
 
     def __init__(self, db: AsyncSession):
         self.db = db
-        self.provider = settings.vision_provider
+        self.provider = settings.chat_provider or settings.vision_provider
 
     # ========== ROUTER/COORDENADOR: Classificação de Intent ==========
 
@@ -2340,7 +2340,7 @@ COMO RESPONDER:
         # Atualizar título da conversa se for a primeira mensagem
         if not conversation.title:
             conversation.title = message[:100] if len(message) <= 100 else message[:97] + "..."
-            conversation.updated_at = datetime.utcnow()
+            conversation.updated_at = datetime.now(timezone.utc)
 
         await self.db.commit()
 
@@ -3362,7 +3362,7 @@ PONTOS IMPORTANTES:
             elif self.provider == "mistral":
                 return await self._call_mistral(system_prompt, messages)
             else:
-                return "Desculpe, nenhum provider de IA esta configurado. Configure GOOGLE_API_KEY ou MISTRAL_API_KEY e defina VISION_PROVIDER."
+                return "Desculpe, nenhum provider de IA esta configurado. Configure GOOGLE_API_KEY ou MISTRAL_API_KEY e defina CHAT_PROVIDER ou VISION_PROVIDER."
         except Exception as e:
             return f"Desculpe, ocorreu um erro ao processar sua mensagem: {str(e)}"
 

@@ -59,7 +59,7 @@ db-upgrade: ## Aplica migrações
 	cd backend && . venv/bin/activate && alembic upgrade head
 
 db-reset: ## Reseta banco de dados (SQLite)
-	rm -f backend/financeiro.db
+	rm -f backend/biveto.db
 	cd backend && . venv/bin/activate && python -c "from app.main import *; import asyncio; asyncio.run(engine.dispose())"
 
 # ==================== Testes ====================

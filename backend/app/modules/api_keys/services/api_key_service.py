@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
@@ -59,7 +59,7 @@ class APIKeyService:
         # Calcula expiração
         expires_at = None
         if data.expires_in_days:
-            expires_at = datetime.utcnow() + timedelta(days=data.expires_in_days)
+            expires_at = datetime.now(timezone.utc) + timedelta(days=data.expires_in_days)
 
         # Cria o registro
         api_key = APIKey(
@@ -124,7 +124,7 @@ class APIKeyService:
             )
 
         api_key.status = APIKeyStatus.revoked.value
-        api_key.revoked_at = datetime.utcnow()
+        api_key.revoked_at = datetime.now(timezone.utc)
 
         await self.db.commit()
         await self.db.refresh(api_key)

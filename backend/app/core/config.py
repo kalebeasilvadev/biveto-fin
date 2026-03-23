@@ -58,6 +58,17 @@ class Settings(BaseSettings):
     # Biveto API Key (para integrações internas)
     biveto_api_key: str | None = None
 
+    # Chat provider (separate from vision/extraction provider)
+    # Default: uses vision_provider. Override to use cheaper model for text-only chat.
+    chat_provider: str | None = None  # None = same as vision_provider
+    chat_model: str | None = None  # None = same as vision_model
+
+    # Google PDF processing mode: "text" (extract text, send as string) or "native" (send PDF directly)
+    google_pdf_mode: str = "text"  # "text" = current behavior, "native" = direct PDF upload
+
+    # Scheduler (APScheduler — replaces Celery Beat)
+    scheduler_dry_run: bool = False  # When True, log what would be sent but don't send
+
     class Config:
         env_file = ".env"
         case_sensitive = False

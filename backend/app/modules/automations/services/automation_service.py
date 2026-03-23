@@ -6,7 +6,7 @@ Handles CRUD operations for automation rules and their execution.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from decimal import Decimal
 from typing import Any
 
@@ -32,6 +32,7 @@ from app.modules.automations.schemas import (
     AutomationExecutionResponse,
     AutomationTestResult,
 )
+from app.models.notification import NotificationType, NotificationPriority
 from app.modules.notifications.services import NotificationService
 
 logger = logging.getLogger(__name__)
@@ -160,7 +161,7 @@ class AutomationService:
             rule.consecutive_failures = 0
             rule.last_error = None
 
-        rule.updated_at = datetime.utcnow()
+        rule.updated_at = datetime.now(timezone.utc)
         await self.session.commit()
         await self.session.refresh(rule)
 
@@ -193,7 +194,7 @@ class AutomationService:
             rule.consecutive_failures = 0
             rule.last_error = None
 
-        rule.updated_at = datetime.utcnow()
+        rule.updated_at = datetime.now(timezone.utc)
         await self.session.commit()
         await self.session.refresh(rule)
 
@@ -208,7 +209,7 @@ class AutomationService:
         context: dict | None = None
     ) -> AutomationExecution:
         """Execute an automation rule."""
-        start_time = datetime.utcnow()
+        start_time = datetime.now(timezone.utc)
         execution = AutomationExecution(
             rule_id=rule.id,
             trigger_reason=trigger_reason,
@@ -234,7 +235,7 @@ class AutomationService:
                 execution.result_data = result
 
                 # Update rule stats
-                rule.last_executed_at = datetime.utcnow()
+                rule.last_executed_at = datetime.now(timezone.utc)
                 rule.execution_count += 1
                 rule.consecutive_failures = 0
                 rule.last_error = None
@@ -252,13 +253,31 @@ class AutomationService:
             # Auto-disable if too many failures
             if rule.consecutive_failures >= rule.max_consecutive_failures:
                 rule.is_active = False
-                rule.auto_disabled_at = datetime.utcnow()
+                rule.auto_disabled_at = datetime.now(timezone.utc)
                 logger.warning(
                     f"Auto-disabled rule {rule.id} after {rule.consecutive_failures} failures"
                 )
 
+                # Notify user about auto-disabled automation
+                try:
+                    notification_service = NotificationService(self.session)
+                    await notification_service.send_notification(
+                        user_id=rule.user_id,
+                        notification_type=NotificationType.AUTOMATION_DISABLED,
+                        title=f"Automação '{rule.name}' desabilitada",
+                        message=(
+                            f"A automação foi desabilitada após {rule.consecutive_failures} "
+                            f"falhas consecutivas. Verifique as condições e reative quando corrigido."
+                        ),
+                        entity_type="automation_rule",
+                        entity_id=rule.id,
+                        priority=NotificationPriority.HIGH,
+                    )
+                except Exception as notif_err:
+                    logger.error(f"Failed to send auto-disable notification for rule {rule.id}: {notif_err}")
+
         finally:
-            end_time = datetime.utcnow()
+            end_time = datetime.now(timezone.utc)
             execution.duration_ms = int((end_time - start_time).total_seconds() * 1000)
 
         await self.session.commit()
@@ -441,7 +460,7 @@ class AutomationService:
             }
 
         # Create transfer transactions
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         today = date.today()
 
         # Expense from source account
@@ -593,7 +612,7 @@ class AutomationService:
             return {"action": "generate", "status": "skipped", "reason": "account_not_found"}
 
         # Create transaction
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         today = date.today()
 
         transaction = Transaction(

@@ -1,4 +1,4 @@
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from decimal import Decimal
 from enum import Enum
 from sqlalchemy import String, ForeignKey, DateTime, Date, Text, Numeric
@@ -57,7 +57,7 @@ class Receipt(Base):
     )
 
     # Timestamps
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime)
 
     # Relationships
@@ -137,7 +137,7 @@ class ReceiptPayment(Base):
         ForeignKey("installment_series.id", ondelete="SET NULL"), index=True
     )
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Relationships
     receipt: Mapped["Receipt"] = relationship(back_populates="payments")

@@ -165,21 +165,26 @@ async def migrate_credit_card_transactions():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: em produção usamos Alembic para migrations
-    # Não precisamos criar tabelas aqui
+    from .core.scheduler import start_scheduler, shutdown_scheduler
+
+    # Startup
     try:
-        # Apenas testar a conexão (opcional)
         async with engine.begin() as conn:
             pass
-
-        # Migrar transações de cartão para faturas (se houver pendentes)
-        await migrate_credit_card_transactions()
     except Exception as e:
-        # Se falhar conexão no startup, continuar mesmo assim
-        # O app pode se recuperar quando o banco estiver disponível
         print(f"Aviso: Conexão inicial com banco falhou: {e}")
+
+    # Start APScheduler (replaces Celery Beat)
+    # Migration de cartões roda via scheduler 30s após boot (não bloqueia startup)
+    try:
+        await start_scheduler()
+    except Exception as e:
+        print(f"Aviso: Scheduler não iniciou: {e}")
+
     yield
+
     # Shutdown
+    shutdown_scheduler()
     await engine.dispose()
 
 
@@ -237,7 +242,13 @@ app.include_router(api_router, prefix=settings.api_v1_prefix)
 
 @app.get("/health")
 async def health_check():
-    return {"status": "ok", "environment": settings.environment}
+    from .core.scheduler import scheduler
+    return {
+        "status": "ok",
+        "environment": settings.environment,
+        "scheduler_active": scheduler.running,
+        "scheduler_jobs": len(scheduler.get_jobs()) if scheduler.running else 0,
+    }
 
 
 # Servir frontend em produção

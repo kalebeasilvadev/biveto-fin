@@ -5,7 +5,7 @@ Implementa funcionalidades baseadas em YNAB e Dave Ramsey
 Evolução: Incorpora funcionalidades de Envelopes (histórico, status dinâmico,
 transferências, subsídio diário) para uma experiência mais completa de orçamento.
 """
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from calendar import monthrange
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -703,7 +703,7 @@ class BudgetService:
             to_item=to_item_response,
             amount=data.amount,
             notes=data.notes,
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc)
         )
 
     async def get_item_history(

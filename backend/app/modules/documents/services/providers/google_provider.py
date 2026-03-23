@@ -157,7 +157,8 @@ class GoogleProvider(BaseProvider):
             return None  # Sinaliza para usar fallback
 
         client = self._get_client()
-        print(f"[GoogleProvider] Using PDF upload method, model={self.model}")
+        use_native = settings.google_pdf_mode == "native"
+        print(f"[GoogleProvider] Using PDF {'native' if use_native else 'text'} mode, model={self.model}")
 
         temp_file = None
         try:
@@ -174,27 +175,67 @@ class GoogleProvider(BaseProvider):
 
             temp_file = await asyncio.to_thread(_write_temp)
 
-            # PASSO 1: Usar PyMuPDF para extrair texto preservando layout de colunas
-            print(f"[GoogleProvider] Step 1: Extract text with PyMuPDF (preserves columns)...")
-            from ..pdf_text_extractor import PDFTextExtractor
+            # Try native mode: send PDF bytes directly to Gemini
+            if use_native and not password:
+                print(f"[GoogleProvider] Native mode: sending PDF bytes directly to Gemini...")
 
-            pdf_bytes = await asyncio.to_thread(_read_file_sync, temp_file)
-            ocr_text = PDFTextExtractor.extract_text_with_layout(pdf_bytes, password)
-            print(f"[GoogleProvider] Text extracted with layout: {len(ocr_text)} chars")
+                # Extract text only for bank detection (lightweight)
+                from ..pdf_text_extractor import PDFTextExtractor
+                pdf_bytes = await asyncio.to_thread(_read_file_sync, temp_file)
+                try:
+                    ocr_text = PDFTextExtractor.extract_text_with_layout(pdf_bytes, password)
+                    bank_name = self._detect_bank(ocr_text)
+                except Exception:
+                    bank_name = None
 
-            # Log das primeiras linhas para debug
-            lines_preview = '\n'.join(ocr_text.split('\n')[:30])
-            print(f"[GoogleProvider] Text preview:\n{lines_preview}\n...")
+                composed_prompt = self._compose_prompt_with_bank(bank_name)
 
-            # PASSO 2: Detectar banco e compor prompt
-            bank_name = self._detect_bank(ocr_text)
-            composed_prompt = self._compose_prompt_with_bank(bank_name)
+                native_prompt = f"""{composed_prompt}
 
-            # PASSO 3: Fazer extração estruturada usando TEXTO (não imagem)
-            print(f"[GoogleProvider] Step 2: Structured extraction from TEXT (not image)...")
+⚠️ IMPORTANTE: Retorne um OBJETO JSON com esta estrutura:
+{{
+  "document_type": "fatura_cartao",
+  "card_info": {{ ... }},
+  "items": [{{ ... }}]
+}}
 
-            # Criar prompt final com o texto do documento
-            final_prompt = f"""{composed_prompt}
+NÃO retorne apenas um array! Retorne um objeto completo.
+Extraia TODAS as transações do documento PDF anexado."""
+
+                contents = [
+                    types.Part.from_bytes(data=pdf_content, mime_type="application/pdf"),
+                    native_prompt,
+                ]
+                config = types.GenerateContentConfig(
+                    temperature=0.1,
+                    response_mime_type="application/json",
+                    response_schema=self.response_schema,
+                )
+            else:
+                if use_native and password:
+                    print(f"[GoogleProvider] Password-protected PDF, falling back to text mode...")
+
+                # PASSO 1: Usar PyMuPDF para extrair texto preservando layout de colunas
+                print(f"[GoogleProvider] Step 1: Extract text with PyMuPDF (preserves columns)...")
+                from ..pdf_text_extractor import PDFTextExtractor
+
+                pdf_bytes = await asyncio.to_thread(_read_file_sync, temp_file)
+                ocr_text = PDFTextExtractor.extract_text_with_layout(pdf_bytes, password)
+                print(f"[GoogleProvider] Text extracted with layout: {len(ocr_text)} chars")
+
+                # Log das primeiras linhas para debug
+                lines_preview = '\n'.join(ocr_text.split('\n')[:30])
+                print(f"[GoogleProvider] Text preview:\n{lines_preview}\n...")
+
+                # PASSO 2: Detectar banco e compor prompt
+                bank_name = self._detect_bank(ocr_text)
+                composed_prompt = self._compose_prompt_with_bank(bank_name)
+
+                # PASSO 3: Fazer extração estruturada usando TEXTO (não imagem)
+                print(f"[GoogleProvider] Step 2: Structured extraction from TEXT (not image)...")
+
+                # Criar prompt final com o texto do documento
+                final_prompt = f"""{composed_prompt}
 
 ## TEXTO EXTRAÍDO DO DOCUMENTO
 
@@ -216,13 +257,13 @@ Agora extraia TODAS as transações deste texto.
 
 NÃO retorne apenas um array! Retorne um objeto completo."""
 
-            # Preparar conteudo e config (apenas texto, sem imagem)
-            contents = [final_prompt]
-            config = types.GenerateContentConfig(
-                temperature=0.1,
-                response_mime_type="application/json",
-                response_schema=self.response_schema,
-            )
+                # Preparar conteudo e config (apenas texto, sem imagem)
+                contents = [final_prompt]
+                config = types.GenerateContentConfig(
+                    temperature=0.1,
+                    response_mime_type="application/json",
+                    response_schema=self.response_schema,
+                )
 
             last_error = None
             for attempt in range(self.max_retries):

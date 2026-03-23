@@ -2,7 +2,7 @@
 Modelo de Gestão de Dívidas (Debt)
 Baseado nas metodologias Dave Ramsey (Snowball/Avalanche) e Gustavo Cerbasi
 """
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from decimal import Decimal
 from enum import Enum
 from sqlalchemy import String, ForeignKey, DateTime, Date, Numeric, Integer, Boolean, Text
@@ -78,8 +78,8 @@ class Debt(Base):
         ForeignKey("installment_series.id", ondelete="SET NULL")
     )  # Vincula a série de parcelas se aplicável
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     # Relationships
     user: Mapped["User"] = relationship(back_populates="debts")
@@ -133,7 +133,7 @@ class DebtPayment(Base):
     # Vinculação opcional a transação
     transaction_id: Mapped[int | None] = mapped_column(ForeignKey("transactions.id", ondelete="SET NULL"))
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Relationships
     debt: Mapped["Debt"] = relationship(back_populates="payments")

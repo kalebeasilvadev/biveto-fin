@@ -1,7 +1,7 @@
 """
 Shopping List Service - CRUD and AI generation for shopping lists
 """
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from collections import defaultdict
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -171,7 +171,7 @@ class ShoppingListService:
                 value = value.value
                 # Set completed_at when completing
                 if value == ShoppingListStatus.COMPLETED.value:
-                    lst.completed_at = datetime.utcnow()
+                    lst.completed_at = datetime.now(timezone.utc)
             setattr(lst, field, value)
 
         await self.db.flush()

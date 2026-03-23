@@ -1,4 +1,5 @@
 from __future__ import annotations
+from datetime import datetime, timezone
 from decimal import Decimal
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import select, or_, and_, func, case
@@ -513,5 +514,5 @@ async def adjust_balance(
         new_balance=adjustment_result["new_balance"],
         transaction_id=adjustment_result["transaction_id"],
         reason=adjustment_result["reason"],
-        timestamp=datetime.utcnow()
+        timestamp=datetime.now(timezone.utc)
     )

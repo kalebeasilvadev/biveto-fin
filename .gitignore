@@ -78,3 +78,13 @@ mcp-config.json
 frontend/certs/
 Nubank_2026-01-12 2.csv
 credencial_test.txt
+
+# Test PDFs and scripts in root (should be in backend/tests/)
+/*.pdf
+/credencial_test.txt
+/extracao.json
+/payload_batch_confirm.json
+/response_batch_confirm.json
+/test-upload-no-password.js
+/test-upload-with-password.js
+/*.png

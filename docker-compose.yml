@@ -3,17 +3,17 @@ version: '3.8'
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: financeiro_postgres
+    container_name: biveto_postgres
     environment:
-      POSTGRES_USER: financeiro
-      POSTGRES_PASSWORD: financeiro_secret
-      POSTGRES_DB: financeiro_db
+      POSTGRES_USER: biveto
+      POSTGRES_PASSWORD: biveto_secret
+      POSTGRES_DB: biveto_db
     ports:
       - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U financeiro -d financeiro_db"]
+      test: ["CMD-SHELL", "pg_isready -U biveto -d biveto_db"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -26,4 +26,4 @@ services:
 
 volumes:
   postgres_data:
-    name: financeiro_postgres_data
+    name: biveto_postgres_data

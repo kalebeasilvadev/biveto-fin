@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -123,7 +123,7 @@ class ReceiptService:
             subtotal=data.subtotal,
             discount=data.discount,
             status=ReceiptStatus.CONFIRMED.value,
-            confirmed_at=datetime.utcnow(),
+            confirmed_at=datetime.now(timezone.utc),
         )
         self.db.add(receipt)
         await self.db.flush()  # Para obter o ID

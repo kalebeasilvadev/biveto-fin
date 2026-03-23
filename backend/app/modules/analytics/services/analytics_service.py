@@ -91,9 +91,9 @@ class AnalyticsService:
         ) or 0)
         variable_expenses = debit_cash_expenses - fixed_expenses
 
-        # Agrupar por categoria e merchant (sem queries adicionais - usa dados em memoria)
-        categories = self._group_by_category_sync(transactions, payment_transaction_ids)
-        top_merchants = self._group_by_merchant_sync(transactions, payment_transaction_ids)
+        # Agrupar por categoria e merchant via SQL GROUP BY (mais eficiente)
+        categories = await self._group_by_category_sql(user_ids, household_user_ids, period_start, period_end, payment_transaction_ids)
+        top_merchants = await self._group_by_merchant_sql(user_ids, household_user_ids, period_start, period_end, payment_transaction_ids)
 
         # Buscar nomes de categorias e merchants em batch
         category_ids = [c["category_id"] for c in categories if c["category_id"]]
@@ -235,55 +235,138 @@ class AnalyticsService:
         except Exception:
             return 0.0
 
+    async def _group_by_category_sql(
+        self, user_ids: list[int], household_user_ids: list[int],
+        start_date: date, end_date: date, payment_exclude_ids: set[int]
+    ) -> list[dict]:
+        """Group expenses by category using SQL GROUP BY (replaces in-memory version)."""
+        # Build base filter
+        base_filter = [
+            Transaction.date >= start_date,
+            Transaction.date <= end_date,
+            Transaction.type == TransactionType.EXPENSE.value,
+            Transaction.type != TransactionType.TRANSFER.value,
+        ]
+
+        if household_user_ids:
+            base_filter.append(
+                or_(
+                    and_(Transaction.user_id.in_(user_ids), Transaction.ownership_type == "personal"),
+                    and_(Transaction.user_id.in_(user_ids), Transaction.ownership_type == "household"),
+                )
+            )
+        else:
+            base_filter.append(Transaction.user_id.in_(user_ids))
+
+        # Exclude invoice payments
+        if payment_exclude_ids:
+            base_filter.append(Transaction.id.notin_(payment_exclude_ids))
+
+        result = await self.db.execute(
+            select(
+                Transaction.category_id,
+                func.cast(func.coalesce(func.sum(Transaction.amount), 0), func.numeric(12, 2)).label("total"),
+                func.count(Transaction.id).label("count"),
+            )
+            .where(*base_filter)
+            .group_by(Transaction.category_id)
+            .order_by(func.sum(Transaction.amount).desc())
+        )
+        rows = result.all()
+
+        grand_total = float(sum(r.total for r in rows)) if rows else 0
+
+        return [
+            {
+                "category_id": row.category_id,
+                "category_name": "",
+                "total": float(row.total),
+                "count": row.count,
+                "percentage": (float(row.total) / grand_total * 100) if grand_total > 0 else 0,
+                "average": float(row.total) / row.count if row.count > 0 else 0,
+            }
+            for row in rows
+        ]
+
+    async def _group_by_merchant_sql(
+        self, user_ids: list[int], household_user_ids: list[int],
+        start_date: date, end_date: date, payment_exclude_ids: set[int]
+    ) -> list[dict]:
+        """Group expenses by merchant using SQL GROUP BY (replaces in-memory version)."""
+        base_filter = [
+            Transaction.date >= start_date,
+            Transaction.date <= end_date,
+            Transaction.type == TransactionType.EXPENSE.value,
+            Transaction.type != TransactionType.TRANSFER.value,
+        ]
+
+        if household_user_ids:
+            base_filter.append(
+                or_(
+                    and_(Transaction.user_id.in_(user_ids), Transaction.ownership_type == "personal"),
+                    and_(Transaction.user_id.in_(user_ids), Transaction.ownership_type == "household"),
+                )
+            )
+        else:
+            base_filter.append(Transaction.user_id.in_(user_ids))
+
+        if payment_exclude_ids:
+            base_filter.append(Transaction.id.notin_(payment_exclude_ids))
+
+        result = await self.db.execute(
+            select(
+                Transaction.merchant_id,
+                func.cast(func.coalesce(func.sum(Transaction.amount), 0), func.numeric(12, 2)).label("total"),
+                func.count(Transaction.id).label("count"),
+            )
+            .where(*base_filter)
+            .group_by(Transaction.merchant_id)
+            .order_by(func.sum(Transaction.amount).desc())
+        )
+        rows = result.all()
+
+        return [
+            {
+                "merchant_id": row.merchant_id,
+                "merchant_name": "",
+                "total": float(row.total),
+                "count": row.count,
+            }
+            for row in rows
+        ]
+
+    # Legacy methods kept for reference — will be removed after validation
     def _group_by_category_sync(
         self, transactions: list[Transaction], exclude_ids: set[int]
     ) -> list[dict]:
-        """Agrupa por categoria sem queries (sync). Exclui transfers."""
+        """DEPRECATED: Use _group_by_category_sql instead. Kept for comparison."""
         from collections import defaultdict
-
         by_category: dict[int | None, list[Transaction]] = defaultdict(list)
         for t in transactions:
-            # Excluir transfers da análise por categoria
             if t.type == TransactionType.EXPENSE and t.type != TransactionType.TRANSFER and t.id not in exclude_ids:
                 by_category[t.category_id].append(t)
-
         total = float(sum(t.amount for t in transactions if t.type == TransactionType.EXPENSE and t.type != TransactionType.TRANSFER and t.id not in exclude_ids) or 0)
-
         summaries = []
         for category_id, txs in by_category.items():
             cat_total = float(sum(t.amount for t in txs) or 0)
             summaries.append({
-                "category_id": category_id,
-                "category_name": "",  # Sera preenchido depois
-                "total": cat_total,
-                "count": len(txs),
-                "percentage": (cat_total / total * 100) if total > 0 else 0,
-                "average": cat_total / len(txs) if txs else 0,
+                "category_id": category_id, "category_name": "", "total": cat_total, "count": len(txs),
+                "percentage": (cat_total / total * 100) if total > 0 else 0, "average": cat_total / len(txs) if txs else 0,
             })
-
         return sorted(summaries, key=lambda x: x["total"], reverse=True)
 
     def _group_by_merchant_sync(
         self, transactions: list[Transaction], exclude_ids: set[int]
     ) -> list[dict]:
-        """Agrupa por merchant sem queries (sync). Exclui transfers."""
+        """DEPRECATED: Use _group_by_merchant_sql instead. Kept for comparison."""
         from collections import defaultdict
-
         by_merchant: dict[int | None, list[Transaction]] = defaultdict(list)
         for t in transactions:
-            # Excluir transfers da análise por merchant
             if t.type == TransactionType.EXPENSE and t.type != TransactionType.TRANSFER and t.id not in exclude_ids:
                 by_merchant[t.merchant_id].append(t)
-
         summaries = []
         for merchant_id, txs in by_merchant.items():
-            summaries.append({
-                "merchant_id": merchant_id,
-                "merchant_name": "",  # Sera preenchido depois
-                "total": float(sum(t.amount for t in txs) or 0),
-                "count": len(txs),
-            })
-
+            summaries.append({"merchant_id": merchant_id, "merchant_name": "", "total": float(sum(t.amount for t in txs) or 0), "count": len(txs)})
         return sorted(summaries, key=lambda x: x["total"], reverse=True)
 
     async def _get_category_names(self, category_ids: list[int]) -> dict[int, str]:

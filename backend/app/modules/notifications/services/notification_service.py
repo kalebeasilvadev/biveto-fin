@@ -1,4 +1,4 @@
-from datetime import datetime, time
+from datetime import datetime, time, timezone
 from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, update, delete, and_, or_
@@ -176,7 +176,7 @@ class NotificationService:
             return None
 
         notification.is_read = True
-        notification.read_at = datetime.utcnow()
+        notification.read_at = datetime.now(timezone.utc)
         await self.db.flush()
 
         return self._build_notification_response(notification)
@@ -189,7 +189,7 @@ class NotificationService:
                 Notification.user_id == user.id,
                 Notification.is_read == False,
             )
-            .values(is_read=True, read_at=datetime.utcnow())
+            .values(is_read=True, read_at=datetime.now(timezone.utc))
         )
         result = await self.db.execute(stmt)
         await self.db.flush()
@@ -210,7 +210,7 @@ class NotificationService:
             return False
 
         notification.is_dismissed = True
-        notification.dismissed_at = datetime.utcnow()
+        notification.dismissed_at = datetime.now(timezone.utc)
         await self.db.flush()
 
         return True

@@ -8,7 +8,7 @@ These tasks handle sending notifications via different channels:
 """
 
 import asyncio
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from sqlalchemy import select, func
 
 from app.core.celery_config import celery_app
@@ -52,7 +52,7 @@ def send_email_notification(notification_id: int):
             # await send_notification_email(user.email, notification)
 
             notification.sent_email = True
-            notification.sent_at = datetime.utcnow()
+            notification.sent_at = datetime.now(timezone.utc)
             await db.commit()
             return True
 

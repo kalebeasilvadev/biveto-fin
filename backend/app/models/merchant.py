@@ -1,5 +1,5 @@
-from datetime import datetime
-from sqlalchemy import String, DateTime, Integer
+from datetime import datetime, timezone
+from sqlalchemy import String, DateTime, Integer, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from ..core.database import Base
 
@@ -11,9 +11,9 @@ class Merchant(Base):
     name: Mapped[str] = mapped_column(String(200), index=True)
     normalized_name: Mapped[str] = mapped_column(String(200), index=True)  # lowercase, sem acentos
     cnpj: Mapped[str | None] = mapped_column(String(18))
-    category_id: Mapped[int | None] = mapped_column(Integer)  # sugestão padrão
+    category_id: Mapped[int | None] = mapped_column(ForeignKey("categories.id", ondelete="SET NULL"), index=True)  # sugestão padrão
     logo_url: Mapped[str | None] = mapped_column(String(500))
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Relationships
     transactions: Mapped[list["Transaction"]] = relationship(back_populates="merchant", lazy="noload")

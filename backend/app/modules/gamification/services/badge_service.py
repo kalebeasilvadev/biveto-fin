@@ -2,7 +2,7 @@
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
-from datetime import datetime
+from datetime import datetime, timezone
 from app.models.user import User
 from app.models.gamification import (
     BadgeDefinition, UserBadge, UserStreak,
@@ -167,7 +167,7 @@ class BadgeService:
         user_badge = UserBadge(
             user_id=user.id,
             badge_id=badge_id,
-            earned_at=datetime.utcnow()
+            earned_at=datetime.now(timezone.utc)
         )
         self.db.add(user_badge)
 
@@ -372,7 +372,7 @@ class BadgeService:
 
         count = 0
         for badge in unseen_badges:
-            badge.seen_at = datetime.utcnow()
+            badge.seen_at = datetime.now(timezone.utc)
             count += 1
 
         await self.db.flush()

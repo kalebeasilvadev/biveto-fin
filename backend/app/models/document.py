@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from sqlalchemy import String, ForeignKey, DateTime, Text, JSON, Float
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -37,7 +37,7 @@ class Document(Base):
     status: Mapped[str] = mapped_column(String(20), default=DocumentStatus.PENDING)
     document_type: Mapped[str | None] = mapped_column(String(20))
     error_message: Mapped[str | None] = mapped_column(Text)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
     processed_at: Mapped[datetime | None] = mapped_column(DateTime)
     # Dados extraidos (para async processing)
     extracted_data: Mapped[dict | None] = mapped_column(JSON)
@@ -81,8 +81,8 @@ class DocumentExtraction(Base):
     installments: Mapped[int | None] = mapped_column()
     raw_text: Mapped[str | None] = mapped_column(Text)  # OCR bruto para debug
 
-    suggested_category_id: Mapped[int | None] = mapped_column()
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    suggested_category_id: Mapped[int | None] = mapped_column(ForeignKey("categories.id", ondelete="SET NULL"), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Relationships
     document: Mapped["Document"] = relationship(back_populates="extractions")
