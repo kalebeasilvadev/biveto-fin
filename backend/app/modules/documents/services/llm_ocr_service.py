@@ -113,11 +113,29 @@ class LLMOCRService:
 
         try:
             is_pdf = mime_type == 'application/pdf' or mime_type.endswith('/pdf')
-            provider = self._get_provider()
+
+            # Smart routing: detect bank from PDF text and route complex layouts to Gemini
+            actual_provider_name = self.provider_name
+            if is_pdf:
+                detected_bank = self._quick_detect_bank(image_content)
+                if detected_bank in ('itau',) and self.provider_name != 'google':
+                    from app.core.config import settings
+                    if settings.google_api_key:
+                        print(f"[LLM_OCR] Bank '{detected_bank}' detected — routing to Gemini native PDF (better for two-column layouts)")
+                        actual_provider_name = 'google'
+                        # Force Gemini native PDF mode for Itaú
+                        import os
+                        os.environ['GOOGLE_PDF_MODE'] = 'native'
+
+            # Use routed provider
+            if actual_provider_name != self.provider_name:
+                provider = self._create_provider(actual_provider_name)
+            else:
+                provider = self._get_provider()
 
             # 1. Tentar processar diretamente (PDF ou imagem)
             if is_pdf:
-                print(f"[LLM_OCR] Processing PDF via {self.provider_name}")
+                print(f"[LLM_OCR] Processing PDF via {actual_provider_name}")
                 result = await provider.extract_from_pdf(image_content, filename, password)
 
                 # Se provider retornou None, precisa converter para imagens
@@ -192,6 +210,56 @@ class LLMOCRService:
             import traceback
             traceback.print_exc()
             return {'items': [], 'error': str(e)}
+
+    def _quick_detect_bank(self, pdf_bytes: bytes) -> str | None:
+        """Quick bank detection from PDF text (< 100ms). Used for smart routing."""
+        try:
+            import fitz
+            doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+            # Read first 2 pages only (bank info is always on page 1)
+            text = ""
+            for i in range(min(2, len(doc))):
+                text += doc[i].get_text()
+            doc.close()
+
+            text_lower = text.lower()
+            bank_indicators = {
+                'itau': ['banco itau', 'itaú', 'itau unibanco', 'financeira itau cbd'],
+                'nubank': ['nubank', 'nu pagamentos'],
+                'bradesco': ['bradesco', 'banco bradesco'],
+                'pan': ['banco pan', 'bancopan'],
+                'santander': ['santander', 'banco santander'],
+            }
+            for bank, indicators in bank_indicators.items():
+                for indicator in indicators:
+                    if indicator in text_lower:
+                        print(f"[LLM_OCR] Quick bank detection: {bank}")
+                        return bank
+            return None
+        except Exception as e:
+            print(f"[LLM_OCR] Quick bank detection failed: {e}")
+            return None
+
+    def _create_provider(self, provider_name: str):
+        """Create a specific provider instance (used for smart routing)."""
+        parse_fn = self.parser.parse
+        default_prompt = EXTRACTION_PROMPT
+
+        if provider_name == 'google':
+            return GoogleProvider(
+                model='gemini-2.0-flash',
+                prompt=default_prompt,
+                response_schema=FaturaExtracao,
+                parse_response_fn=parse_fn,
+            )
+        elif provider_name == 'mistral':
+            return MistralProvider(
+                model=None,
+                prompt=default_prompt,
+                parse_response_fn=parse_fn,
+            )
+        else:
+            raise ValueError(f"Provider not supported for routing: {provider_name}")
 
     def _get_fallback_provider(self):
         """Returns a fallback provider for retry, or None if unavailable.
