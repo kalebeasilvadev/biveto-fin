@@ -157,7 +157,27 @@ class GoogleProvider(BaseProvider):
             return None  # Sinaliza para usar fallback
 
         client = self._get_client()
+
+        # Auto-detect best PDF mode: native for banks with complex layouts, text for others
         use_native = settings.google_pdf_mode == "native"
+        if not use_native:
+            # Quick bank detection to auto-select native mode for complex layouts
+            try:
+                import fitz
+                doc = fitz.open(stream=pdf_content, filetype="pdf")
+                quick_text = ""
+                for i in range(min(2, len(doc))):
+                    quick_text += doc[i].get_text()
+                doc.close()
+                quick_lower = quick_text.lower()
+                # Banks where native PDF mode produces better results (complex two-column layouts)
+                native_banks = ['banco itau', 'itaú', 'itau unibanco', 'financeira itau cbd']
+                if any(ind in quick_lower for ind in native_banks):
+                    use_native = True
+                    print(f"[GoogleProvider] Auto-detected Itaú layout — switching to native PDF mode")
+            except Exception:
+                pass
+
         print(f"[GoogleProvider] Using PDF {'native' if use_native else 'text'} mode, model={self.model}")
 
         temp_file = None

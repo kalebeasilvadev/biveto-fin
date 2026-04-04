@@ -27,19 +27,24 @@ A tabela tem este formato:
 O Bradesco usa **"-" (hífen) APÓS o valor** para indicar créditos e pagamentos:
 
 ```
-| 10/02 | PAG BOLETO BANCARIO |  |  |  | 6.273,12 - |   ← O "-" indica PAGAMENTO
+| 10/02 | PAG BOLETO BANCARIO |  |  |  | 6.273,12 - |   ← PAGAMENTO da fatura anterior → NÃO EXTRAIR
+| 23/02 | MERCADOLIVRE*FLASHCOMP |  |  |  | 250,20 -  |   ← ESTORNO/CRÉDITO → EXTRAIR com amount NEGATIVO (-250.20)
 ```
 
-- **Se o valor tem "-" depois:** É pagamento/crédito → **NÃO EXTRAIR** (ou amount negativo)
-- **Se o valor NÃO tem "-":** É compra → EXTRAIR com amount positivo
+**REGRA:**
+- **"PAG BOLETO BANCARIO" com "-":** É pagamento da fatura anterior → **NÃO EXTRAIR**
+- **Qualquer OUTRO item com "-" após o valor:** É estorno/crédito/devolução → **EXTRAIR com amount NEGATIVO**
+- **Itens SEM "-":** São compras → EXTRAIR com amount positivo
 
-**⚠️ ATENÇÃO:** Alguns créditos/estornos podem NÃO ter o "-" visível. Se a soma ficar ACIMA do total_amount, verifique se há itens que deveriam ser créditos.
+**⚠️ CRÍTICO:** Estornos e créditos (ex: devoluções do Mercado Livre, cashback) DEVEM ser extraídos com valor NEGATIVO. A soma final (compras + estornos) deve bater com o total_amount.
 
-### 2. NÃO EXTRAIR PAGAMENTOS
+### 2. NÃO EXTRAIR PAGAMENTOS DE FATURA ANTERIOR
 
-Estas transações são pagamentos da fatura anterior e NÃO devem ser extraídas:
-- "PAG BOLETO BANCARIO" com "-" → É o pagamento da fatura anterior
-- Qualquer item com "-" após o valor na coluna R$
+**APENAS** estas transações NÃO devem ser extraídas:
+- "PAG BOLETO BANCARIO" com "-" → Pagamento da fatura anterior
+- "PAGAMENTO RECEBIDO" com "-" → Pagamento da fatura anterior
+
+**TODOS os outros itens com "-" (estornos, créditos, devoluções) DEVEM ser extraídos com amount negativo!**
 
 ### 3. PARCELAS CONCATENADAS NA DESCRIÇÃO
 
@@ -97,12 +102,13 @@ A soma dos itens extraídos (apenas compras, SEM pagamentos) deve ser igual ao "
 
 **Se a soma está ACIMA do total:**
 - Verifique se incluiu pagamentos (PAG BOLETO) que deveriam ser excluídos
-- Verifique se algum item deveria ser crédito/estorno (negativo)
+- Verifique se algum item com "-" deveria ter amount NEGATIVO (estornos, devoluções)
 - Compare com o valor "Compras/Débitos" do Resumo da fatura
 
 **Se a soma está ABAIXO do total:**
 - Verifique se esqueceu alguma transação da tabela
 - Conte as linhas no texto vs itens extraídos
+- Verifique se esqueceu estornos/créditos com valor negativo
 
 ### 8. SEÇÃO "TOTAL PARCELADOS PARA PRÓXIMAS FATURAS"
 
@@ -118,8 +124,9 @@ Total parcelados para próximas faturas R$ 23.171,13
 Para faturas do Bradesco:
 1. ✅ Pule a página 1 (resumo e boleto)
 2. ✅ Extraia TODAS as transações da tabela de "Lançamentos" (página 2)
-3. ✅ EXCLUA linhas com "-" após o valor (pagamentos)
-4. ✅ Separe parcela da descrição (DD/DD no final)
-5. ✅ Ignore a coluna "Cidade"
-6. ✅ Valide: soma deve ser igual ao "Total para [NOME]"
-7. ✅ NÃO extraia "Total parcelados para próximas faturas"
+3. ✅ EXCLUA apenas "PAG BOLETO BANCARIO" com "-" (pagamento de fatura anterior)
+4. ✅ Itens com "-" que NÃO são pagamento → EXTRAIR com amount NEGATIVO (estornos, créditos)
+5. ✅ Separe parcela da descrição (DD/DD no final)
+6. ✅ Ignore a coluna "Cidade"
+7. ✅ Valide: soma (compras + estornos) deve ser igual ao "Total para [NOME]"
+8. ✅ NÃO extraia "Total parcelados para próximas faturas"

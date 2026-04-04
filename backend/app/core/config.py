@@ -64,7 +64,7 @@ class Settings(BaseSettings):
     chat_model: str | None = None  # None = same as vision_model
 
     # Google PDF processing mode: "text" (extract text, send as string) or "native" (send PDF directly)
-    google_pdf_mode: str = "text"  # "text" = current behavior, "native" = direct PDF upload
+    google_pdf_mode: str = "text"  # "text" = extract text with PyMuPDF then send to LLM, "native" = direct PDF upload
 
     # Scheduler (APScheduler — replaces Celery Beat)
     scheduler_dry_run: bool = False  # When True, log what would be sent but don't send
