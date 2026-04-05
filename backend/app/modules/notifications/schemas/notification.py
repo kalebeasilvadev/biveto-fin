@@ -211,6 +211,15 @@ NOTIFICATION_TYPE_INFO = {
         "label": "Fatura vencida",
         "description": "Alerta quando a fatura do cartão está vencida",
     },
+    NotificationType.INVOICE_MISSING_CURRENT: {
+        "label": "Fatura do mês não carregada",
+        "description": "Lembrete no início do mês sobre faturas do mês anterior que ainda não foram carregadas",
+    },
+    NotificationType.INVOICE_MISSING_PRE_DUE: {
+        "label": "Fatura não carregada perto do vencimento",
+        "description": "Alerta quando o vencimento do cartão se aproxima e a fatura ainda não foi carregada",
+        "default_days_before": 3,
+    },
     NotificationType.BUDGET_WARNING_80: {
         "label": "Orçamento em 80%",
         "description": "Alerta quando você atinge 80% do orçamento de uma categoria",

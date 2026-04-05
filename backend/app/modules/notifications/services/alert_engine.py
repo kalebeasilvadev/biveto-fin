@@ -51,6 +51,8 @@ class AlertEngine:
         count += await self.check_goal_milestones(user)
         count += await self.check_low_balance(user)
         count += await self.check_recurring_due(user)
+        count += await self.check_missing_invoices_start_of_month(user)
+        count += await self.check_missing_invoices_pre_due(user)
         return count
 
     async def check_invoice_due_dates(self, user: User) -> int:
@@ -405,6 +407,212 @@ class AlertEngine:
                 count += 1
 
         return count
+
+    # === Faturas pendentes de carregamento ===
+
+    # Delay base (em minutos) entre notificacoes no job de inicio de mes,
+    # para espalhar a entrega de push e nao virar enxurrada no celular.
+    _START_OF_MONTH_STAGGER_MINUTES = 5
+
+    async def check_missing_invoices_start_of_month(self, user: User) -> int:
+        """
+        Lembrete "inicio do mes": para cada cartao cujo mes anterior ja fechou
+        e a fatura ainda nao foi carregada, cria 1 notificacao (granular por cartao).
+
+        So cria notificacoes no dia 1 do mes - em outros dias e no-op.
+        As notificacoes sao escalonadas via scheduled_for para evitar burst de push.
+        """
+        today = date.today()
+        if today.day != 1:
+            return 0
+
+        # Importacao local para evitar ciclo credit_cards <-> notifications
+        from app.modules.credit_cards.services.expected_invoice_service import (
+            ExpectedInvoiceService,
+        )
+
+        # Mes anterior
+        prev_month_ref = today - timedelta(days=1)
+        ref_year = prev_month_ref.year
+        ref_month = prev_month_ref.month
+
+        service = ExpectedInvoiceService(self.db)
+        pending = await service.get_pending_for_user(user, ref_year, ref_month)
+
+        count = 0
+        now = utc_now()
+
+        for idx, dto in enumerate(pending):
+            if await self._missing_invoice_notification_exists(
+                user_id=user.id,
+                notification_type=NotificationType.INVOICE_MISSING_CURRENT,
+                credit_card_id=dto.credit_card_id,
+                reference_month=dto.reference_month,
+                reference_year=dto.reference_year,
+            ):
+                continue
+
+            scheduled_for = now + timedelta(
+                minutes=idx * self._START_OF_MONTH_STAGGER_MINUTES
+            )
+
+            await self._create_missing_invoice_notification(
+                user_id=user.id,
+                notification_type=NotificationType.INVOICE_MISSING_CURRENT,
+                title=f"Fatura de {self._month_name(ref_month)} não carregada",
+                message=(
+                    f"A fatura do seu {dto.credit_card_name} de "
+                    f"{self._month_name(ref_month)}/{ref_year} ainda não foi carregada."
+                ),
+                dto=dto,
+                scheduled_for=scheduled_for,
+                priority=NotificationPriority.NORMAL,
+                icon="file-warning",
+                color="orange",
+            )
+            count += 1
+
+        return count
+
+    async def check_missing_invoices_pre_due(self, user: User) -> int:
+        """
+        Lembrete "pre-vencimento": para cada cartao cujo vencimento e daqui a 3 dias
+        e a fatura ainda nao foi carregada, cria 1 notificacao urgente.
+
+        Seguro de ser chamado diariamente - filtra internamente por due_date alvo.
+        """
+        # Importacao local para evitar ciclo
+        from app.modules.credit_cards.services.expected_invoice_service import (
+            ExpectedInvoiceService,
+        )
+
+        service = ExpectedInvoiceService(self.db)
+        pending = await service.get_cards_due_in_days(user, days_ahead=3)
+
+        count = 0
+        for dto in pending:
+            if await self._missing_invoice_notification_exists(
+                user_id=user.id,
+                notification_type=NotificationType.INVOICE_MISSING_PRE_DUE,
+                credit_card_id=dto.credit_card_id,
+                reference_month=dto.reference_month,
+                reference_year=dto.reference_year,
+            ):
+                continue
+
+            days_until_due = (dto.due_date - date.today()).days
+            await self._create_missing_invoice_notification(
+                user_id=user.id,
+                notification_type=NotificationType.INVOICE_MISSING_PRE_DUE,
+                title=f"{dto.credit_card_name} vence em {days_until_due} dias",
+                message=(
+                    f"Seu {dto.credit_card_name} vence em {days_until_due} dias "
+                    f"({dto.due_date.strftime('%d/%m')}) e a fatura ainda não foi carregada. "
+                    "Sem ela não dá pra conferir os lançamentos."
+                ),
+                dto=dto,
+                priority=NotificationPriority.HIGH,
+                icon="alert-triangle",
+                color="red",
+            )
+            count += 1
+
+        return count
+
+    async def _create_missing_invoice_notification(
+        self,
+        user_id: int,
+        notification_type: NotificationType,
+        title: str,
+        message: str,
+        dto,  # ExpectedInvoiceDTO
+        priority: NotificationPriority,
+        icon: str,
+        color: str,
+        scheduled_for: datetime | None = None,
+    ) -> Notification:
+        """
+        Cria uma notificacao de "fatura pendente" usando credit_card como entity
+        e armazenando ref_month/ref_year/trigger em extra_data (chave de dedup).
+
+        Usa o modelo diretamente em vez de NotificationService.send_notification
+        porque precisamos gravar extra_data e scheduled_for de forma consistente.
+        """
+        # Respeita preferencia do usuario (se desabilitou esse tipo, nao cria).
+        preference = await self.notification_service._get_or_create_preference(
+            user_id, notification_type
+        )
+        if preference.frequency == "disabled":
+            return None
+
+        notification = Notification(
+            user_id=user_id,
+            type=notification_type.value,
+            title=title,
+            message=message,
+            icon=icon,
+            color=color,
+            priority=priority.value,
+            entity_type="credit_card",
+            entity_id=dto.credit_card_id,
+            action_url=(
+                f"/invoices?year={dto.reference_year}"
+                f"&month={dto.reference_month}"
+                f"&card={dto.credit_card_id}"
+            ),
+            action_label="Carregar fatura",
+            scheduled_for=scheduled_for,
+            extra_data={
+                "ref_month": dto.reference_month,
+                "ref_year": dto.reference_year,
+                "trigger": notification_type.value,
+                "due_date": dto.due_date.isoformat(),
+            },
+            sent_in_app=preference.in_app_enabled,
+        )
+        self.db.add(notification)
+        await self.db.flush()
+        return notification
+
+    async def _missing_invoice_notification_exists(
+        self,
+        user_id: int,
+        notification_type: NotificationType,
+        credit_card_id: int,
+        reference_month: int,
+        reference_year: int,
+    ) -> bool:
+        """
+        Dedup especifico para notificacoes de fatura pendente.
+        Chave logica: (user, type, card_id, ref_month, ref_year).
+
+        Considera apenas notificacoes ativas (nao dispensadas).
+        """
+        from sqlalchemy import cast, String
+        query = select(Notification).where(
+            Notification.user_id == user_id,
+            Notification.type == notification_type.value,
+            Notification.entity_type == "credit_card",
+            Notification.entity_id == credit_card_id,
+            Notification.is_dismissed == False,  # noqa: E712
+        )
+        result = await self.db.execute(query)
+        for notification in result.scalars().all():
+            data = notification.extra_data or {}
+            if (
+                data.get("ref_month") == reference_month
+                and data.get("ref_year") == reference_year
+            ):
+                return True
+        return False
+
+    @staticmethod
+    def _month_name(month: int) -> str:
+        names = [
+            "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+            "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
+        ]
+        return names[month - 1]
 
     async def _notification_exists(
         self,

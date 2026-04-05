@@ -13,6 +13,10 @@ from app.models.account import Account, AccountType
 from app.models.transaction import Transaction
 from app.models.document import Document
 from app.modules.credit_cards.services.invoice_service import InvoiceService
+from app.modules.credit_cards.services.expected_invoice_service import (
+    ExpectedInvoiceService,
+    ExpectedInvoiceState,
+)
 from app.modules.credit_cards.schemas.invoice import (
     InvoiceCreate,
     InvoiceFromDocument,
@@ -166,6 +170,82 @@ async def list_invoices(
         ))
 
     return responses
+
+
+class ExpectedInvoiceItem(BaseModel):
+    """Item retornado pelo endpoint /overview - pode ser materializado ou fantasma."""
+    credit_card_id: int
+    credit_card_name: str
+    reference_month: int
+    reference_year: int
+    closing_date: date
+    due_date: date
+    state: str  # not_created | created_no_document | created_with_document | paid | future
+    is_pending: bool
+    is_phantom: bool
+    # Somente quando materializada:
+    invoice_id: int | None = None
+    document_id: int | None = None
+    total_amount: float | None = None
+    paid_amount: float | None = None
+    status: str | None = None
+
+
+class InvoiceOverviewResponse(BaseModel):
+    """Resposta do endpoint overview: lista unificada + resumo."""
+    reference_month: int
+    reference_year: int
+    items: list[ExpectedInvoiceItem]
+    total_cards: int
+    pending_count: int  # quantos estao em estado not_created ou created_no_document
+
+
+@router.get("/overview", response_model=InvoiceOverviewResponse)
+async def invoices_overview(
+    current_user: CurrentUser,
+    db: DbSession,
+    year: int = Query(..., description="Ano de referencia"),
+    month: int = Query(..., ge=1, le=12, description="Mes de referencia (1-12)"),
+):
+    """
+    Retorna a visao unificada de faturas para um mes: materializadas + fantasmas.
+
+    Uma "fatura fantasma" representa um cartao cujo periodo de cobranca ja fechou
+    mas para o qual ainda nao existe nenhum CreditCardInvoice - ou seja, o usuario
+    esqueceu de carregar. O frontend usa isso para mostrar "placeholders" com CTA.
+    """
+    service = ExpectedInvoiceService(db)
+    dtos = await service.get_overview(current_user, year, month)
+
+    items = [
+        ExpectedInvoiceItem(
+            credit_card_id=dto.credit_card_id,
+            credit_card_name=dto.credit_card_name,
+            reference_month=dto.reference_month,
+            reference_year=dto.reference_year,
+            closing_date=dto.closing_date,
+            due_date=dto.due_date,
+            state=dto.state.value,
+            is_pending=dto.is_pending,
+            is_phantom=dto.is_phantom,
+            invoice_id=dto.invoice_id,
+            document_id=dto.document_id,
+            total_amount=float(dto.total_amount) if dto.total_amount is not None else None,
+            paid_amount=float(dto.paid_amount) if dto.paid_amount is not None else None,
+            status=dto.status,
+        )
+        for dto in dtos
+    ]
+
+    pending_count = sum(1 for item in items if item.is_pending)
+
+    return InvoiceOverviewResponse(
+        reference_month=month,
+        reference_year=year,
+        items=items,
+        total_cards=len(items),
+        pending_count=pending_count,
+    )
 
 
 @router.get("/{invoice_id}", response_model=InvoiceDetailResponse)

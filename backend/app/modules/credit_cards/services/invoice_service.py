@@ -899,6 +899,24 @@ class InvoiceService:
         await self.db.flush()
         await self.db.refresh(invoice)
 
+        # Fecha o loop: dispensa notificacoes "fatura pendente" desta
+        # (card, ref_month, ref_year) agora que o PDF foi anexado.
+        # Import local para evitar circular entre credit_cards e notifications.
+        try:
+            from app.modules.notifications.services.notification_service import (
+                NotificationService,
+            )
+            await NotificationService(self.db).resolve_pending_for_invoice(
+                user_id=user.id,
+                credit_card_id=credit_card.id,
+                reference_month=reference_month,
+                reference_year=reference_year,
+            )
+        except Exception:
+            # Nao falhar a criacao da fatura se o resolve der erro.
+            # O job de expiracao periodico compensa cenarios de falha aqui.
+            pass
+
         return invoice
 
     async def project_recurring_to_invoices(

@@ -40,6 +40,8 @@ export const invoicesApi = {
     limit?: number
     offset?: number
   }) => api.get('/invoices', { params }),
+  overview: (year: number, month: number) =>
+    api.get('/invoices/overview', { params: { year, month } }),
   get: (id: number) => api.get(`/invoices/${id}`),
   create: (data: unknown) => api.post('/invoices', data),
   createFromDocument: (data: unknown) => api.post('/invoices/from-document', data),

@@ -22,6 +22,10 @@ import {
   ArrowUp,
   ArrowDown,
   Pencil,
+  FileText,
+  FileWarning,
+  FilePlus,
+  Upload,
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import EmptyState from '../components/EmptyState'
@@ -42,6 +46,44 @@ interface Invoice {
   remaining_amount: number
   status: 'open' | 'closed' | 'paid' | 'partial' | 'overdue'
   transaction_count: number
+  document_id: number | null
+}
+
+// Item "fantasma" - fatura esperada mas nunca criada (sem registro no banco).
+// Vindo do endpoint /invoices/overview quando state === 'not_created'.
+interface PhantomInvoice {
+  isPhantom: true
+  credit_card_id: number
+  credit_card_name: string
+  reference_month: number
+  reference_year: number
+  closing_date: string
+  due_date: string
+}
+
+type InvoiceOverviewItem = {
+  credit_card_id: number
+  credit_card_name: string
+  reference_month: number
+  reference_year: number
+  closing_date: string
+  due_date: string
+  state: 'not_created' | 'created_no_document' | 'created_with_document' | 'paid' | 'future'
+  is_pending: boolean
+  is_phantom: boolean
+  invoice_id: number | null
+  document_id: number | null
+  total_amount: number | null
+  paid_amount: number | null
+  status: string | null
+}
+
+type InvoiceOverviewResponse = {
+  reference_month: number
+  reference_year: number
+  items: InvoiceOverviewItem[]
+  total_cards: number
+  pending_count: number
 }
 
 interface InvoiceDetail extends Invoice {
@@ -92,15 +134,33 @@ export default function Invoices() {
   const queryClient = useQueryClient()
   const [searchParams, setSearchParams] = useSearchParams()
 
-  // Read card filter from URL query parameter
+  // Read filters from URL query parameters (deep-link de notificacao)
   const cardFromUrl = searchParams.get('card')
+  const yearFromUrl = searchParams.get('year')
+  const monthFromUrl = searchParams.get('month')
 
   // State
   const [selectedCardId, setSelectedCardId] = useState<number | null>(
     cardFromUrl ? Number(cardFromUrl) : null
   )
-  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear())
-  const [selectedTab, setSelectedTab] = useState<string | null>(null)
+  const [selectedYear, setSelectedYear] = useState<number>(
+    yearFromUrl ? Number(yearFromUrl) : new Date().getFullYear()
+  )
+  const [selectedTab, setSelectedTab] = useState<string | null>(
+    yearFromUrl && monthFromUrl ? `${yearFromUrl}-${Number(monthFromUrl)}` : null
+  )
+  // ID do cartao a ser destacado na tabela (vindo do deep-link)
+  const [highlightedCardId, setHighlightedCardId] = useState<number | null>(
+    cardFromUrl ? Number(cardFromUrl) : null
+  )
+
+  // Remove o destaque apos 3 segundos
+  useEffect(() => {
+    if (highlightedCardId) {
+      const timer = setTimeout(() => setHighlightedCardId(null), 3000)
+      return () => clearTimeout(timer)
+    }
+  }, [highlightedCardId])
   const [showDetailModal, setShowDetailModal] = useState(false)
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<number | null>(null)
   const [showPayModal, setShowPayModal] = useState(false)
@@ -143,6 +203,21 @@ export default function Invoices() {
     }),
     staleTime: 0, // Always refetch to ensure fresh data
   })
+
+  // Overview do mes atualmente selecionado: inclui fantasmas (faturas esperadas
+  // mas ainda nao criadas) e estado derivado de cada item.
+  const selectedTabParts = selectedTab?.split('-').map(Number)
+  const overviewYear = selectedTabParts?.[0]
+  const overviewMonth = selectedTabParts?.[1]
+
+  const { data: overviewData } = useQuery({
+    queryKey: ['invoice-overview', overviewYear, overviewMonth],
+    queryFn: () => invoicesApi.overview(overviewYear!, overviewMonth!),
+    enabled: !!overviewYear && !!overviewMonth,
+    staleTime: 0,
+  })
+
+  const overview: InvoiceOverviewResponse | null = overviewData?.data || null
 
   const { data: invoiceDetailData } = useQuery({
     queryKey: ['invoice', selectedInvoiceId],
@@ -255,7 +330,16 @@ export default function Invoices() {
   // Past months only show if they have unpaid invoices
   const monthTabs = useMemo(() => {
     const { month: currentMonth, year: currentYear } = getCurrentPeriod()
-    const tabs: { key: string; label: string; month: number; year: number; isOverdue: boolean; isCurrent: boolean; hasInvoices: boolean }[] = []
+    const tabs: {
+      key: string
+      label: string
+      month: number
+      year: number
+      isOverdue: boolean
+      isCurrent: boolean
+      hasInvoices: boolean
+      hasMissingDocument: boolean  // existe fatura sem PDF carregado (laranja)
+    }[] = []
 
     // Generate 12 months for the selected year
     for (let month = 1; month <= 12; month++) {
@@ -269,6 +353,8 @@ export default function Invoices() {
 
       const hasInvoices = monthInvoices.length > 0
       const isOverdue = monthInvoices.some(inv => inv.status === 'overdue')
+      // Laranja: existe fatura criada mas sem PDF anexado
+      const hasMissingDocument = monthInvoices.some(inv => inv.document_id == null)
 
       // Show all months (removed skip logic)
 
@@ -280,6 +366,7 @@ export default function Invoices() {
         isOverdue,
         isCurrent,
         hasInvoices,
+        hasMissingDocument,
       })
     }
 
@@ -356,6 +443,31 @@ export default function Invoices() {
       return sortDirection === 'asc' ? comparison : -comparison
     })
   }, [invoices, selectedTab, sortField, sortDirection])
+
+  // Fantasmas: faturas esperadas para o mes selecionado que nao tem registro
+  // materializado em credit_card_invoices. Vem do endpoint /overview.
+  const phantomInvoices = useMemo<PhantomInvoice[]>(() => {
+    if (!overview) return []
+    return overview.items
+      .filter(item => item.is_phantom && item.state === 'not_created')
+      .map(item => ({
+        isPhantom: true as const,
+        credit_card_id: item.credit_card_id,
+        credit_card_name: item.credit_card_name,
+        reference_month: item.reference_month,
+        reference_year: item.reference_year,
+        closing_date: item.closing_date,
+        due_date: item.due_date,
+      }))
+  }, [overview])
+
+  // Contagem de pendencias para o mes selecionado: inclui nao-criadas
+  // (fantasmas) + faturas materializadas sem document_id (oca).
+  const pendingCount = useMemo(() => {
+    if (overview) return overview.pending_count
+    // Fallback: conta faturas sem documento na lista geral
+    return filteredInvoices.filter(inv => inv.document_id == null).length
+  }, [overview, filteredInvoices])
 
   // Handle column header click for sorting
   const handleSort = (field: SortField) => {
@@ -567,10 +679,28 @@ export default function Invoices() {
                 >
                   <span className="flex items-center justify-center gap-1">
                     {tab.label}
+                    {/* Vermelho: tem fatura vencida neste mes */}
                     {tab.isOverdue && (
-                      <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                      <span
+                        className="w-1.5 h-1.5 rounded-full bg-red-500"
+                        title="Mes com fatura vencida"
+                      />
                     )}
-                    {tab.isCurrent && !tab.isOverdue && tab.hasInvoices && (
+                    {/* Laranja: tem fatura criada sem PDF carregado */}
+                    {!tab.isOverdue && tab.hasMissingDocument && (
+                      <span
+                        className="w-1.5 h-1.5 rounded-full bg-orange-500"
+                        title="Fatura sem PDF carregado"
+                      />
+                    )}
+                    {/* Verde: tudo carregado (mostra apenas quando ha faturas e nada pendente) */}
+                    {!tab.isOverdue && !tab.hasMissingDocument && tab.hasInvoices && (
+                      <span
+                        className="w-1.5 h-1.5 rounded-full bg-green-500"
+                        title="Mes com tudo carregado"
+                      />
+                    )}
+                    {tab.isCurrent && !tab.isOverdue && !tab.hasMissingDocument && !tab.hasInvoices && (
                       <span className="w-1.5 h-1.5 rounded-full bg-primary-500" />
                     )}
                   </span>
@@ -599,6 +729,17 @@ export default function Invoices() {
                 <span className="text-xs text-gray-500 dark:text-gray-400">Cartões</span>
                 <p className="font-semibold text-gray-900 dark:text-white">{tabSummary.count}</p>
               </div>
+              {pendingCount > 0 && (
+                <div
+                  className="flex items-center gap-1 sm:gap-2 text-orange-600 dark:text-orange-400"
+                  title="Faturas esperadas que ainda nao tem PDF carregado"
+                >
+                  <FileWarning size={14} className="sm:w-4 sm:h-4" />
+                  <span className="text-xs sm:text-sm font-medium">
+                    Faltam fatura: {pendingCount}
+                  </span>
+                </div>
+              )}
               {tabSummary.overdueCount > 0 && (
                 <div className="ml-auto flex items-center gap-1 sm:gap-2 text-red-600 dark:text-red-400">
                   <AlertTriangle size={14} className="sm:w-4 sm:h-4" />
@@ -632,6 +773,12 @@ export default function Invoices() {
                       Status
                       {renderSortIcon('status')}
                     </div>
+                  </th>
+                  <th
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider select-none"
+                    title="Indica se a fatura tem o PDF/documento carregado"
+                  >
+                    Documento
                   </th>
                   <th
                     className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-700 select-none"
@@ -692,7 +839,8 @@ export default function Invoices() {
                       key={invoice.id}
                       className={clsx(
                         'hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors cursor-pointer',
-                        isOverdue && 'bg-red-50/50 dark:bg-red-900/10'
+                        isOverdue && 'bg-red-50/50 dark:bg-red-900/10',
+                        highlightedCardId === invoice.credit_card_id && 'ring-2 ring-primary-400 dark:ring-primary-500 animate-pulse'
                       )}
                       onClick={() => handleViewDetails(invoice)}
                     >
@@ -717,6 +865,25 @@ export default function Invoices() {
                           <StatusIcon size={12} />
                           {config.label}
                         </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        {invoice.document_id != null ? (
+                          <span
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300"
+                            title="PDF carregado"
+                          >
+                            <FileText size={12} />
+                            PDF
+                          </span>
+                        ) : (
+                          <span
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300"
+                            title="Fatura sem PDF anexado"
+                          >
+                            <FileWarning size={12} />
+                            Sem PDF
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-right">
                         <span className="text-sm font-medium text-gray-900 dark:text-white">
@@ -817,10 +984,66 @@ export default function Invoices() {
                     </tr>
                   )
                 })}
+
+                {/* Linhas-fantasma: cartoes cuja fatura deveria existir para este mes mas ainda nao foi criada. */}
+                {phantomInvoices.map((phantom) => (
+                  <tr
+                    key={`phantom-${phantom.credit_card_id}-${phantom.reference_year}-${phantom.reference_month}`}
+                    className={clsx(
+                      'opacity-60 hover:opacity-100 hover:bg-orange-50 dark:hover:bg-orange-900/10 transition-all',
+                      highlightedCardId === phantom.credit_card_id && 'opacity-100 ring-2 ring-primary-400 dark:ring-primary-500 animate-pulse'
+                    )}
+                    title="Fatura esperada ainda nao carregada - clique para carregar"
+                  >
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <CreditCard size={16} className="text-orange-500" />
+                        <span className="font-medium text-sm text-gray-700 dark:text-gray-300">
+                          {phantom.credit_card_name}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300">
+                        <Clock size={12} />
+                        Aguardando fatura
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300"
+                        title="Nenhum registro de fatura existe para este periodo"
+                      >
+                        <FilePlus size={12} />
+                        Carregar
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right text-sm text-gray-400 dark:text-gray-500">—</td>
+                    <td className="px-4 py-3 text-right text-sm text-gray-400 dark:text-gray-500">—</td>
+                    <td className="px-4 py-3 text-right text-sm text-gray-400 dark:text-gray-500">—</td>
+                    <td className="px-4 py-3 text-center text-sm text-gray-500 dark:text-gray-400">
+                      {formatShortDate(phantom.due_date)}
+                    </td>
+                    <td className="px-4 py-3 text-center text-sm text-gray-400 dark:text-gray-500">—</td>
+                    <td className="px-4 py-3">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          // Deep-link para upload pre-selecionando o cartao
+                          window.location.href = `/documents?upload=1&card=${phantom.credit_card_id}`
+                        }}
+                        className="p-2 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-lg text-orange-600 hover:bg-orange-100 dark:hover:bg-orange-900/30 transition-colors"
+                        title="Carregar fatura"
+                      >
+                        <Upload size={16} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
 
-            {filteredInvoices.length === 0 && (
+            {filteredInvoices.length === 0 && phantomInvoices.length === 0 && (
               <div className="px-4 py-12 text-center text-gray-500 dark:text-gray-400">
                 Nenhuma fatura neste período
               </div>

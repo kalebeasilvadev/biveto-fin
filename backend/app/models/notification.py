@@ -24,6 +24,10 @@ class NotificationType(str, Enum):
     INVOICE_DUE_1_DAY = "invoice_due_1_day"
     INVOICE_OVERDUE = "invoice_overdue"
 
+    # Faturas pendentes de carregamento
+    INVOICE_MISSING_CURRENT = "invoice_missing_current"  # Dia 1: fatura do mês anterior ainda não carregada
+    INVOICE_MISSING_PRE_DUE = "invoice_missing_pre_due"  # D-3 vencimento: fatura do mês ainda não carregada
+
     # Orçamento
     BUDGET_WARNING_80 = "budget_warning_80"
     BUDGET_EXCEEDED = "budget_exceeded"

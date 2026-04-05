@@ -196,6 +196,55 @@ class NotificationService:
         await self.db.flush()
         return result.rowcount
 
+    async def resolve_pending_for_invoice(
+        self,
+        user_id: int,
+        credit_card_id: int,
+        reference_month: int,
+        reference_year: int,
+    ) -> int:
+        """
+        Marca como dispensadas todas as notificacoes de "fatura pendente"
+        (INVOICE_MISSING_CURRENT e INVOICE_MISSING_PRE_DUE) que correspondem
+        a uma fatura especifica que acabou de ser carregada.
+
+        Chamada apos um documento ser anexado a uma fatura (fecha o loop UX:
+        o usuario sobe o PDF e o lembrete some automaticamente).
+
+        Retorna o numero de notificacoes marcadas como dispensadas.
+        """
+        # Busca notificacoes ativas dos tipos "missing" para este cartao
+        # cuja extra_data aponta para o (ref_month, ref_year) alvo.
+        query = select(Notification).where(
+            Notification.user_id == user_id,
+            Notification.is_dismissed == False,
+            Notification.type.in_([
+                NotificationType.INVOICE_MISSING_CURRENT.value,
+                NotificationType.INVOICE_MISSING_PRE_DUE.value,
+            ]),
+            Notification.entity_type == "credit_card",
+            Notification.entity_id == credit_card_id,
+        )
+        result = await self.db.execute(query)
+        candidates = result.scalars().all()
+
+        dismissed = 0
+        now = utc_now()
+        for notification in candidates:
+            data = notification.extra_data or {}
+            if (
+                data.get("ref_month") == reference_month
+                and data.get("ref_year") == reference_year
+            ):
+                notification.is_dismissed = True
+                notification.dismissed_at = now
+                dismissed += 1
+
+        if dismissed:
+            await self.db.flush()
+
+        return dismissed
+
     async def dismiss_notification(
         self, user: User, notification_id: int
     ) -> bool:

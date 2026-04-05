@@ -83,4 +83,21 @@ celery_app.conf.beat_schedule = {
         "task": "automations.process_thresholds",
         "schedule": crontab(hour="*/6", minute=45),
     },
+    # Remind about missing invoices on the 1st of each month at 10:00 local
+    # (13:00 UTC for America/Sao_Paulo). Notifications are staggered 5min apart
+    # inside the task to avoid a burst of pushes.
+    "check-missing-invoices-start-of-month": {
+        "task": "app.modules.notifications.tasks.alert_tasks.check_missing_invoices_start_of_month",
+        "schedule": crontab(hour=13, minute=0, day_of_month=1),
+    },
+    # Remind about missing invoices 3 days before due date - daily at 10:00 local
+    "check-missing-invoices-pre-due": {
+        "task": "app.modules.notifications.tasks.alert_tasks.check_missing_invoices_pre_due",
+        "schedule": crontab(hour=13, minute=10),
+    },
+    # Expire obsolete missing-invoice notifications daily
+    "expire-missing-invoice-notifications": {
+        "task": "app.modules.notifications.tasks.alert_tasks.expire_missing_invoice_notifications",
+        "schedule": crontab(hour=4, minute=0),
+    },
 }
