@@ -210,8 +210,13 @@ export default function Invoices() {
   const overviewYear = selectedTabParts?.[0]
   const overviewMonth = selectedTabParts?.[1]
 
+  // IMPORTANTE: queryKey usa o prefixo ['invoices', ...] para que qualquer
+  // invalidateQueries(['invoices']) existente em mutations (upload, pagamento,
+  // exclusao, etc) capture tambem esta query automaticamente. Nao renomear para
+  // uma key separada como ['invoice-overview'] - isso quebra o refresh apos
+  // anexar documento a uma fatura.
   const { data: overviewData } = useQuery({
-    queryKey: ['invoice-overview', overviewYear, overviewMonth],
+    queryKey: ['invoices', 'overview', overviewYear, overviewMonth],
     queryFn: () => invoicesApi.overview(overviewYear!, overviewMonth!),
     enabled: !!overviewYear && !!overviewMonth,
     staleTime: 0,
