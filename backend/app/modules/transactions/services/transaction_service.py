@@ -698,6 +698,36 @@ class TransactionService:
                     closing_date=closing_date,
                     due_date=due_date,
                 )
+
+                # Se o documento veio de um PDF de fatura e a invoice ainda
+                # nao tem documento vinculado, vincular agora. Isso garante
+                # que a UI deixe de marcar a fatura como "pendente de PDF"
+                # e dispensa as notificacoes missing_invoice_* relacionadas.
+                #
+                # Guard defensivo: so vincula se document_id ainda e None
+                # (evita sobrescrever vinculo anterior, e e idempotente em
+                # loops de batch-confirm onde o mesmo invoice e referenciado
+                # varias vezes no identity map do SQLAlchemy).
+                if data.document_id and invoice.document_id is None:
+                    invoice.document_id = data.document_id
+                    await self.db.flush()
+
+                    # Fecha o loop das notificacoes "fatura pendente"
+                    try:
+                        from app.modules.notifications.services.notification_service import (
+                            NotificationService,
+                        )
+                        await NotificationService(self.db).resolve_pending_for_invoice(
+                            user_id=user.id,
+                            credit_card_id=credit_card.id,
+                            reference_month=reference_month,
+                            reference_year=reference_year,
+                        )
+                    except Exception:
+                        # Nao falhar a criacao da transacao se o resolve
+                        # der erro - o job de expiracao periodico compensa.
+                        pass
+
                 result["invoice"] = invoice
 
         # Se e uma transacao parcelada
