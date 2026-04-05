@@ -335,6 +335,9 @@ export default function Invoices() {
   // Past months only show if they have unpaid invoices
   const monthTabs = useMemo(() => {
     const { month: currentMonth, year: currentYear } = getCurrentPeriod()
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
     const tabs: {
       key: string
       label: string
@@ -343,7 +346,7 @@ export default function Invoices() {
       isOverdue: boolean
       isCurrent: boolean
       hasInvoices: boolean
-      hasMissingDocument: boolean  // existe fatura sem PDF carregado (laranja)
+      hasMissingDocument: boolean  // existe fatura JA FECHADA sem PDF carregado (laranja)
     }[] = []
 
     // Generate 12 months for the selected year
@@ -358,8 +361,16 @@ export default function Invoices() {
 
       const hasInvoices = monthInvoices.length > 0
       const isOverdue = monthInvoices.some(inv => inv.status === 'overdue')
-      // Laranja: existe fatura criada mas sem PDF anexado
-      const hasMissingDocument = monthInvoices.some(inv => inv.document_id == null)
+
+      // Laranja: fatura JA FECHADA (closing_date <= hoje) e sem PDF carregado.
+      // Faturas ainda em periodo aberto nao contam como pendentes - e normal
+      // nao ter PDF ainda, o banco nem emitiu.
+      const hasMissingDocument = monthInvoices.some(inv => {
+        if (inv.document_id != null) return false
+        if (!inv.closing_date) return false
+        const closing = new Date(inv.closing_date + 'T00:00:00')
+        return closing <= today
+      })
 
       // Show all months (removed skip logic)
 
@@ -473,6 +484,20 @@ export default function Invoices() {
     // Fallback: conta faturas sem documento na lista geral
     return filteredInvoices.filter(inv => inv.document_id == null).length
   }, [overview, filteredInvoices])
+
+  // Mapa credit_card_id -> state derivado pelo backend. Fonte da verdade para
+  // decidir se o badge "Sem PDF" deve aparecer (fatura ja fechou) ou nao
+  // (fatura ainda em aberto - normal nao ter PDF). Sem esse mapa, o frontend
+  // mostra "Sem PDF" em faturas futuras, contradizendo o contador do header.
+  const stateByCardId = useMemo<Map<number, InvoiceOverviewItem['state']>>(() => {
+    const map = new Map<number, InvoiceOverviewItem['state']>()
+    if (overview) {
+      for (const item of overview.items) {
+        map.set(item.credit_card_id, item.state)
+      }
+    }
+    return map
+  }, [overview])
 
   // Handle column header click for sorting
   const handleSort = (field: SortField) => {
@@ -872,23 +897,49 @@ export default function Invoices() {
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        {invoice.document_id != null ? (
-                          <span
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300"
-                            title="PDF carregado"
-                          >
-                            <FileText size={12} />
-                            PDF
-                          </span>
-                        ) : (
-                          <span
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300"
-                            title="Fatura sem PDF anexado"
-                          >
-                            <FileWarning size={12} />
-                            Sem PDF
-                          </span>
-                        )}
+                        {(() => {
+                          // Estado autoritativo do backend (quando disponivel).
+                          // Fallback: document_id direto da fatura.
+                          const state = stateByCardId.get(invoice.credit_card_id)
+                          const hasPdf = invoice.document_id != null
+
+                          if (hasPdf || state === 'created_with_document') {
+                            return (
+                              <span
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300"
+                                title="PDF carregado"
+                              >
+                                <FileText size={12} />
+                                PDF
+                              </span>
+                            )
+                          }
+
+                          // Fatura ainda em periodo aberto (fechamento nao ocorreu).
+                          // Nao faz sentido cobrar PDF - mostra estado neutro.
+                          if (state === 'future') {
+                            return (
+                              <span
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-gray-400"
+                                title="Fatura ainda em aberto (fechamento nao ocorreu)"
+                              >
+                                <Clock size={12} />
+                                Em aberto
+                              </span>
+                            )
+                          }
+
+                          // Fatura ja fechou e nao tem PDF - pendente de verdade.
+                          return (
+                            <span
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300"
+                              title="Fatura fechada sem PDF anexado"
+                            >
+                              <FileWarning size={12} />
+                              Sem PDF
+                            </span>
+                          )
+                        })()}
                       </td>
                       <td className="px-4 py-3 text-right">
                         <span className="text-sm font-medium text-gray-900 dark:text-white">
