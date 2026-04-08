@@ -46,6 +46,8 @@ class FaturaItem(BaseModel):
     )
     discount_amount: Optional[float] = Field(default=None, description="Valor do desconto aplicado neste item")
     original_amount: Optional[float] = Field(default=None, description="Valor original antes do desconto")
+    # Identificação do cartão (para faturas com múltiplos cartões)
+    card_last_digits: Optional[str] = Field(default=None, description="Ultimos 4 digitos do cartao ao qual esta transacao pertence")
 
 
 class CardInfo(BaseModel):
@@ -102,6 +104,7 @@ class AnnotationItem(BaseModel):
     is_installment: bool = Field(default=False, description="Se e parcelado")
     installment_current: Optional[int] = Field(default=None, description="Parcela atual (ex: 8 de 8/12)")
     installment_total: Optional[int] = Field(default=None, description="Total de parcelas (ex: 12 de 8/12)")
+    card_last_digits: Optional[str] = Field(default=None, description="Ultimos 4 digitos do cartao ao qual esta transacao pertence")
 
 
 class AnnotationExtracao(BaseModel):

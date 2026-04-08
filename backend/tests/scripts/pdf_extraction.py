@@ -104,7 +104,8 @@ async def main():
         installment = ""
         if item.get('is_installment'):
             installment = f" [{item.get('installment_current')}/{item.get('installment_total')}]"
-        print(f"  {i+1:2}. {item.get('description', ''):35} R$ {amt:>8.2f}  {item.get('date', ''):10}{installment}")
+        card_digits = f" [card:{item.get('card_last_digits')}]" if item.get('card_last_digits') else ""
+        print(f"  {i+1:2}. {item.get('description', ''):35} R$ {amt:>8.2f}  {item.get('date', ''):10}{installment}{card_digits}")
 
     total = card_info.get('total_amount', 0) if card_info else 0
     diff = total - items_sum

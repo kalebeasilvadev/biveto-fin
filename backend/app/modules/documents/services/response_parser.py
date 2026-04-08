@@ -271,6 +271,11 @@ class ResponseParser:
         if future_installments and isinstance(future_installments, list):
             normalized['future_installments'] = future_installments
 
+        # card_last_digits - últimos 4 dígitos do cartão (para faturas multi-cartão)
+        card_digits = item.get('card_last_digits')
+        if card_digits:
+            normalized['card_last_digits'] = str(card_digits)[-4:]
+
         # Campos específicos de cupom fiscal (grocery tracking)
         if item.get('quantity') is not None:
             normalized['quantity'] = float(item['quantity'])

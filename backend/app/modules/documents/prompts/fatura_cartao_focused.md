@@ -297,7 +297,8 @@ Diferença: R$ 0,00 → Perfeito!
       "date": "[DATA DO DOCUMENTO]",
       "transaction_type": "compra",
       "category": "[CATEGORIA APROPRIADA]",
-      "is_installment": false
+      "is_installment": false,
+      "card_last_digits": "[ÚLTIMOS 4 DÍGITOS DO CARTÃO]"
     }
   ]
 }
@@ -404,6 +405,12 @@ Alguns bancos (Nubank, Itaú) colocam o IOF em uma LINHA SEPARADA da transação
 
 - **installment_total**: total de parcelas (se parcelado)
   - Ex: "2/10" → installment_total = 10
+
+- **card_last_digits**: últimos 4 dígitos do cartão ao qual esta transação pertence
+  - ⚠️ **OBRIGATÓRIO** — SEMPRE preencha este campo, mesmo que haja apenas 1 cartão
+  - Extraia do header da seção: "CARTÃO 5364****7931" → card_last_digits: "7931"
+  - Use APENAS os 4 últimos dígitos (string), sem máscara
+  - Se a fatura tem múltiplos cartões, cada item deve ter o card_last_digits do SEU cartão
 
 ## FORMATOS DE PARCELAS
 

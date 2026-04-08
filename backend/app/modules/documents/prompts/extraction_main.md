@@ -47,6 +47,7 @@ Para cada lancamento, extraia:
 - date: data no formato YYYY-MM-DD
 - transaction_type: tipo do lancamento
 - category: categoria
+- card_last_digits: últimos 4 dígitos do cartão ao qual esta transação pertence (OBRIGATÓRIO para fatura_cartao, mesmo com 1 só cartão. Extraia do header da seção: "CARTÃO 5364****7931" → "7931")
 
 ### 2.1 DATAS DAS TRANSACOES (MUITO IMPORTANTE!)
 
