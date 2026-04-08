@@ -31,7 +31,7 @@ async def main():
 
     from app.modules.documents.services.llm_ocr_service import LLMOCRService
 
-    service = LLMOCRService(provider='mistral')
+    service = LLMOCRService(provider='google')
 
     print("\n--- Iniciando extração ---")
     result = await service.extract_from_image(

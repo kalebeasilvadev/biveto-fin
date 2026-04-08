@@ -957,15 +957,22 @@ class DocumentService:
             result = await parser.parse_file(content, filename, mime_type)
         else:
             # Usar LLM com visao para imagens/PDFs
-            # Mistral como provider principal (melhor OCR para todos os tipos)
-            if settings.mistral_api_key:
-                selected_provider = 'mistral'
+            # Respeitar vision_provider configurado (default: google)
+            selected_provider = settings.vision_provider
+            if selected_provider == 'mistral' and settings.mistral_api_key:
                 selected_model = settings.mistral_llm_model
-                print(f"[DOC_SVC] Using Mistral for extraction")
-            else:
+            elif selected_provider == 'google' and settings.google_api_key:
+                selected_model = settings.vision_model or 'gemini-2.0-flash'
+            elif settings.google_api_key:
                 selected_provider = 'google'
                 selected_model = settings.vision_model or 'gemini-2.0-flash'
-                print(f"[DOC_SVC] Using Google for extraction (Mistral not configured)")
+            elif settings.mistral_api_key:
+                selected_provider = 'mistral'
+                selected_model = settings.mistral_llm_model
+            else:
+                selected_provider = 'google'
+                selected_model = 'gemini-2.0-flash'
+            print(f"[DOC_SVC] Using {selected_provider} for extraction")
 
             from app.modules.documents.services.llm_ocr_service import LLMOCRService
             llm_service = LLMOCRService(provider=selected_provider, model=selected_model)
