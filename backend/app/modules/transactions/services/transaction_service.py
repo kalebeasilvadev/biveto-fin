@@ -132,7 +132,7 @@ class TransactionService:
 
         # Atualizar total da fatura se houver
         if invoice and invoice_service:
-            await invoice_service.update_invoice_total(invoice)
+            await invoice_service.update_invoice_total(invoice, force_recalculate=True)
 
         # Criar recorrencia se solicitado
         if data.create_recurring and data.recurring_frequency:
@@ -405,7 +405,7 @@ class TransactionService:
 
         # Atualizar total da fatura se houver
         if invoice and invoice_service:
-            await invoice_service.update_invoice_total(invoice)
+            await invoice_service.update_invoice_total(invoice, force_recalculate=True)
 
         return transaction
 
@@ -1099,8 +1099,10 @@ class TransactionService:
             )
 
         # Atualizar total da fatura se houver
+        # force_recalculate=True pois estamos adicionando transações de documento
+        # e a fatura pode já ter document_id de extração anterior
         if invoice and invoice_service:
-            await invoice_service.update_invoice_total(invoice)
+            await invoice_service.update_invoice_total(invoice, force_recalculate=True)
 
         # Aplicar income splits se solicitado (gera despesas pendentes)
         # Apenas para receitas simples (nao parceladas)

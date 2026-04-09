@@ -21,7 +21,9 @@ from app.modules.transactions.schemas.transaction import (
 )
 from app.modules.transactions.services.transaction_service import TransactionService
 from app.models.credit_card import CreditCard
-from sqlalchemy import select
+from app.models.transaction import Transaction
+from app.models.installment import InstallmentSeries
+from sqlalchemy import select, delete, func, and_
 
 router = APIRouter()
 
@@ -373,6 +375,79 @@ async def batch_confirm_transactions(
                 error=str(e),
             ))
             error_count += 1
+
+    # Limpar transações projetadas das faturas que receberam transações reais do PDF.
+    # O PDF é a fonte de verdade — projetadas que sobraram são duplicatas.
+    if success_count > 0:
+        # Coletar invoice_ids das transações criadas com sucesso
+        confirmed_invoice_ids: set[int] = set()
+        for r in results:
+            if r.success and r.transaction_id:
+                tx_result = await db.execute(
+                    select(Transaction.invoice_id).where(Transaction.id == r.transaction_id)
+                )
+                inv_id = tx_result.scalar_one_or_none()
+                if inv_id:
+                    confirmed_invoice_ids.add(inv_id)
+
+        for invoice_id in confirmed_invoice_ids:
+            # Buscar projetadas que sobraram nesta fatura
+            projected_result = await db.execute(
+                select(Transaction).where(
+                    Transaction.invoice_id == invoice_id,
+                    Transaction.is_paid == False,
+                )
+            )
+            projected_txs = projected_result.scalars().all()
+
+            if projected_txs:
+                print(f"[BATCH_CONFIRM] Removendo {len(projected_txs)} transações projetadas "
+                      f"da fatura {invoice_id} (PDF é fonte de verdade)")
+
+                # Ajustar installment_series: decrementar contadores
+                series_to_update: dict[int, int] = {}  # series_id -> count to decrement
+                for tx in projected_txs:
+                    if tx.installment_series_id:
+                        series_to_update[tx.installment_series_id] = \
+                            series_to_update.get(tx.installment_series_id, 0) + 1
+
+                # Deletar as projetadas
+                await db.execute(
+                    delete(Transaction).where(
+                        Transaction.invoice_id == invoice_id,
+                        Transaction.is_paid == False,
+                    )
+                )
+
+                # Recalcular paid_count das séries afetadas (count real de is_paid=True)
+                for series_id in series_to_update:
+                    paid_count_result = await db.execute(
+                        select(func.count()).where(
+                            Transaction.installment_series_id == series_id,
+                            Transaction.is_paid == True,
+                        )
+                    )
+                    actual_paid = paid_count_result.scalar() or 0
+                    await db.execute(
+                        InstallmentSeries.__table__.update()
+                        .where(InstallmentSeries.id == series_id)
+                        .values(paid_count=actual_paid)
+                    )
+                    print(f"[BATCH_CONFIRM] Série {series_id}: paid_count atualizado para {actual_paid}")
+
+                await db.flush()
+
+                # Recalcular total da fatura
+                from app.modules.credit_cards.services.invoice_service import InvoiceService
+                from app.models.credit_card_invoice import CreditCardInvoice
+                invoice_result = await db.execute(
+                    select(CreditCardInvoice).where(CreditCardInvoice.id == invoice_id)
+                )
+                invoice = invoice_result.scalar_one_or_none()
+                if invoice:
+                    invoice_service = InvoiceService(db)
+                    await invoice_service.update_invoice_total(invoice, force_recalculate=True)
+                    print(f"[BATCH_CONFIRM] Fatura {invoice_id}: total recalculado para {invoice.total_amount}")
 
     await db.commit()  # ← COMMIT para persistir todas as mudanças nas faturas!
 
