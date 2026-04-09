@@ -115,6 +115,7 @@ export default function ExtractedItemsList({
     description: string
     category: string
     amount: string
+    is_credit: boolean
     is_installment: boolean
     installment_current: string
     installment_total: string
@@ -149,6 +150,7 @@ export default function ExtractedItemsList({
       description: item.description || '',
       category: item.category || 'outros',
       amount: Math.abs(item.amount).toString(),
+      is_credit: item.amount < 0,
       is_installment: item.is_installment || false,
       installment_current: item.installment_current?.toString() || '',
       installment_total: item.installment_total?.toString() || '',
@@ -158,8 +160,8 @@ export default function ExtractedItemsList({
 
   const saveEdit = (index: number, item: ExtractedItem) => {
     if (!editForm || !onUpdateItem) return
-    const amount = parseFloat(editForm.amount) || item.amount
-    const finalAmount = item.amount < 0 ? -Math.abs(amount) : Math.abs(amount)
+    const amount = parseFloat(editForm.amount) || Math.abs(item.amount)
+    const finalAmount = editForm.is_credit ? -Math.abs(amount) : Math.abs(amount)
     onUpdateItem(index, {
       description: editForm.description.trim() || item.description,
       category: editForm.category,
@@ -662,6 +664,22 @@ export default function ExtractedItemsList({
                 onChange={(e) => setEditForm({ ...editForm, amount: e.target.value })}
                 className="w-full text-sm px-3 py-2.5 rounded-lg border border-slate-700 bg-slate-800 text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               />
+            </div>
+
+            {/* Crédito/Estorno */}
+            <div className="mb-4">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={editForm.is_credit}
+                  onChange={(e) => setEditForm({ ...editForm, is_credit: e.target.checked })}
+                  className="w-5 h-5 rounded border-slate-600 bg-slate-800 text-green-600 focus:ring-green-500"
+                />
+                <span className="text-sm text-gray-300">É crédito/estorno</span>
+                {editForm.is_credit && (
+                  <span className="text-xs text-green-400 ml-auto">valor será negativo</span>
+                )}
+              </label>
             </div>
 
             {/* Parcelamento */}
