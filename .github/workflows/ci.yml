@@ -64,4 +64,4 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          VITE_API_URL: https://app-financeiro-api.fly.dev
+          VITE_API_URL: http://localhost:8000

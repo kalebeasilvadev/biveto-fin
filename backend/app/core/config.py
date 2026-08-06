@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     api_v1_prefix: str = "/api/v1"
 
     # CORS - origens permitidas (separadas por vírgula)
-    cors_origins: str = "http://localhost:3000,https://app-financeiro-web.fly.dev"
+    cors_origins: str = "http://localhost:3000"
 
     # Document Processing
     max_upload_size_mb: int = 10

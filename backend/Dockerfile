@@ -61,5 +61,5 @@ RUN mkdir -p uploads data
 # Expose port
 EXPOSE 8080
 
-# Start server (migrations run via fly.toml release_command)
+# Start server (rode "alembic upgrade head" antes de iniciar, se necessario)
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]

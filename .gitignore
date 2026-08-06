@@ -47,9 +47,6 @@ Thumbs.db
 # Docker
 docker-compose.override.yml
 
-# Fly.io
-fly.lock
-
 # Claude Code
 .claude/
 
@@ -78,6 +75,9 @@ mcp-config.json
 frontend/certs/
 Nubank_2026-01-12 2.csv
 credencial_test.txt
+
+# Amostras locais (faturas/prints usados em testes manuais)
+local-samples/
 
 # Test PDFs and scripts in root (should be in backend/tests/)
 /*.pdf

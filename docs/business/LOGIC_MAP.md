@@ -64,7 +64,6 @@ biveto-app/
 | **OpenAI** | Provider alternativo (opcional) | `services/llm_ocr_service.py:605-647` |
 | **Anthropic** | Provider alternativo (opcional) | `services/llm_ocr_service.py:649-698` |
 | **SMTP (Hostinger)** | Email (convites, reset senha) | `services/email_service.py:154-213` |
-| **Fly.io** | Deploy em produção | `fly.toml` |
 
 ---
 

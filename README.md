@@ -59,7 +59,7 @@ O Biveto e uma aplicacao web de gestao financeira que permite:
 | Python | 3.12 | Linguagem |
 | FastAPI | 0.109 | Framework web |
 | SQLAlchemy | 2.0 | ORM (async) |
-| PostgreSQL | 15+ | Banco de dados |
+| SQLite / PostgreSQL | - | Banco de dados (SQLite por padrao) |
 | Pydantic | 2.0 | Validacao |
 | JWT | - | Autenticacao |
 
@@ -165,8 +165,9 @@ biveto-app/
 ### Pre-requisitos
 - Python 3.12+
 - Node.js 20+
-- PostgreSQL 15+
 - API Keys (Google, OpenAI, ou Mistral)
+
+> O banco padrao e SQLite (sem instalacao extra). Para usar PostgreSQL local, suba o container com `make docker-up`.
 
 ### Backend
 
@@ -219,8 +220,9 @@ npm run dev
 ### Variaveis de Ambiente - Backend
 
 ```env
-# Database
-DATABASE_URL=postgresql+asyncpg://user:pass@localhost:5432/biveto
+# Database (SQLite por padrao; PostgreSQL local via make docker-up)
+DATABASE_URL=sqlite+aiosqlite:///./financeiro.db
+# DATABASE_URL=postgresql+asyncpg://biveto:biveto_secret@localhost:5433/biveto_db
 
 # JWT
 SECRET_KEY=your-secret-key
@@ -245,70 +247,6 @@ SMTP_PASSWORD=xxx
 ```env
 VITE_API_URL=http://localhost:8000
 ```
-
-## Deploy no Fly.io
-
-### Configuracao Inicial
-
-1. Instale o CLI do Fly.io:
-```bash
-curl -L https://fly.io/install.sh | sh
-```
-
-2. Faca login:
-```bash
-fly auth login
-```
-
-3. Crie os apps (apenas primeira vez):
-```bash
-# Backend
-cd backend
-fly launch --no-deploy
-
-# Frontend
-cd ../frontend
-fly launch --no-deploy
-```
-
-4. Configure os secrets do backend:
-```bash
-cd backend
-fly secrets set SECRET_KEY="sua-chave-secreta-super-segura"
-fly secrets set DATABASE_URL="postgres://..."
-fly secrets set GOOGLE_API_KEY="sua-api-key"
-```
-
-5. Crie o banco de dados PostgreSQL:
-```bash
-fly postgres create --name biveto-db
-fly postgres attach biveto-db -a biveto-api
-```
-
-### Deploy Manual
-
-```bash
-# Backend
-cd backend
-fly deploy
-
-# Frontend
-cd frontend
-fly deploy
-```
-
-### Deploy Automatico (GitHub Actions)
-
-1. Gere um token no Fly.io:
-```bash
-fly tokens create deploy
-```
-
-2. Adicione o token como secret no GitHub:
-   - Va em Settings > Secrets and variables > Actions
-   - Adicione `FLY_API_TOKEN` com o token gerado
-
-3. Push para a branch `main` dispara o deploy automaticamente.
 
 ## Documentacao
 
