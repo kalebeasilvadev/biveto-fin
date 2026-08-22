@@ -59,7 +59,7 @@ docker-compose.override.yml
 # Playwright E2E tests
 playwright-report/
 test-results/
-e2e/.auth/
+**/e2e/.auth/
 
 # Screenshots/prints (temp files)
 *.png
