@@ -1,4 +1,6 @@
-.PHONY: help install dev backend frontend docker-up docker-down docker-clean create-admin admin cleanup-uploads
+# NOTA: este Makefile é POSIX-only (Linux/Mac/Git Bash). No Windows/PowerShell,
+# use os comandos equivalentes documentados em docs/onboarding/01-COMECE-AQUI.md.
+.PHONY: help install dev backend frontend docker-up docker-down docker-clean create-admin cleanup-uploads lint mcp-server
 
 # Cores
 GREEN  := $(shell tput -Txterm setaf 2)
@@ -38,7 +40,7 @@ frontend: ## Inicia o frontend (Vite)
 
 docker-up: ## Inicia containers Docker (PostgreSQL)
 	docker-compose up -d
-	@echo "PostgreSQL: localhost:5432"
+	@echo "PostgreSQL: localhost:5433 (mapeado para nao colidir com Postgres local)"
 
 docker-down: ## Para containers Docker
 	docker-compose down
@@ -70,10 +72,14 @@ test: ## Executa testes do backend
 test-cov: ## Executa testes com cobertura
 	cd backend && . venv/bin/activate && pytest --cov=app --cov-report=html
 
+lint: ## Roda linters (ruff no backend, eslint no frontend) — o mesmo que o CI cobra
+	cd backend && . venv/bin/activate && ruff check app/
+	cd frontend && npm run lint
+
 # ==================== MCP Server ====================
 
-mcp-server: ## Inicia o servidor MCP para integração com assistentes IA
-	cd backend && . venv/bin/activate && python mcp_server.py
+mcp-server: ## Inicia o servidor MCP (read-only, consome a API — requer backend rodando e BIVETO_API_KEY)
+	cd mcp-biveto-db && pip install -q -r requirements.txt && python server.py
 
 # ==================== Build ====================
 
@@ -90,14 +96,9 @@ clean: ## Remove arquivos temporários
 	rm -rf backend/venv 2>/dev/null || true
 
 cleanup-uploads: ## Remove uploads com mais de 30 dias (uso: make cleanup-uploads [DAYS=30] [DRY_RUN=1])
-	cd backend && . .venv/bin/activate && python scripts/cleanup_uploads.py --days $(or $(DAYS),30) $(if $(DRY_RUN),--dry-run,)
+	cd backend && . venv/bin/activate && python scripts/cleanup_uploads.py --days $(or $(DAYS),30) $(if $(DRY_RUN),--dry-run,)
 
 # ==================== Admin ====================
 
 create-admin: ## Cria usuário admin (uso: make create-admin email=x senha=y nome=z)
 	cd backend && . venv/bin/activate && python scripts/create_admin.py "$(email)" "$(senha)" "$(nome)"
-
-# ==================== Admin Panel ====================
-
-admin: ## Inicia o painel admin (porta 5174)
-	cd admin/frontend && npm run dev -- --port 5174

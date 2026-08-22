@@ -34,8 +34,11 @@ modules/<nome>/
 ├── routers/    # endpoints FastAPI: validam entrada, chamam o service, traduzem exceções em HTTP
 ├── services/   # TODA a regra de negócio e as queries SQLAlchemy
 ├── schemas/    # Pydantic v2: formatos de request/response
-└── models/     # ⚠️ quase sempre VAZIO — os models de verdade estão em app/models/ (centralizados)
+├── models/     # ⚠️ quase sempre VAZIO — os models de verdade estão em app/models/ (centralizados)
+└── prompts/    # opcional (documents, grocery): prompts de LLM como arquivos Markdown
 ```
+
+Jobs agendados não ficam nos módulos: vivem em `app/core/scheduler.py` (APScheduler), que importa os services dos módulos.
 
 **Fluxo de uma requisição** (ex.: `POST /api/v1/transactions`):
 
@@ -96,6 +99,6 @@ Roteiro para uma entidade nova (ex.: "assinatura de academia"):
 5. **Teste** — adicione um teste em `backend/tests/` (o `conftest.py` dá `db_session` e `client` prontos com SQLite in-memory).
 6. **API client** — adicione as chamadas em `frontend/src/services/`.
 7. **Página** — crie em `src/pages/`, registre a rota em `App.tsx` e o item de menu em `Layout.tsx`; use `useQuery`/`useMutation`.
-8. Rode `pytest` (backend) e `npx tsc --noEmit && npm run build` (frontend) antes do PR — é o que o CI verifica.
+8. Rode `ruff check app/` + `pytest` (backend) e `npm run lint` + `npx tsc --noEmit && npm run build` (frontend) antes do PR — é exatamente o que o CI verifica.
 
 Próximo: [03-DECISOES-E-MOTIVOS.md](03-DECISOES-E-MOTIVOS.md) para entender os porquês.

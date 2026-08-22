@@ -46,7 +46,12 @@ O detalhe está em [`docs/development/CONVENTIONS.md`](docs/development/CONVENTI
 
 ## O que o CI faz hoje
 
-Em todo push/PR para `main` (`.github/workflows/ci.yml`): `pytest` do backend (SQLite) e `tsc --noEmit` + `vite build` do frontend. **Lint ainda não roda no CI** — é a dívida técnica #1 do [backlog](docs/onboarding/04-SUSTENTACAO.md#backlog-de-dívidas-técnicas-conhecidas); até lá, rode `ruff check app/` por disciplina.
+Em todo push/PR para `main` (`.github/workflows/ci.yml`):
+
+- **Backend:** `ruff check app/` (lint, bloqueia) + `pytest` (SQLite)
+- **Frontend:** `npm run lint` (eslint — *erros* bloqueiam; warnings não) + `tsc --noEmit` + `vite build`
+
+Rode os quatro localmente antes do PR (`make lint` e `make test` no Linux/Mac). Não introduza warnings novos de eslint — a meta é zerá-los, não acumulá-los.
 
 ## Dúvidas
 

@@ -88,11 +88,10 @@ function getBaseURL(): string {
     return `https://${backendHost}/api/v1`
   }
 
-  // Se estiver acessando via Cloudflare Tunnel (trycloudflare.com)
-  if (hostname.endsWith('.trycloudflare.com')) {
-    // Usar variável de ambiente ou URL hardcoded temporária para dev
-    const cloudflareBackend = import.meta.env.VITE_CLOUDFLARE_BACKEND || 'https://oldest-guaranteed-being-incidence.trycloudflare.com'
-    return `${cloudflareBackend}/api/v1`
+  // Se estiver acessando via Cloudflare Tunnel (trycloudflare.com),
+  // o backend precisa ser informado via VITE_CLOUDFLARE_BACKEND (URLs de túnel mudam a cada sessão)
+  if (hostname.endsWith('.trycloudflare.com') && import.meta.env.VITE_CLOUDFLARE_BACKEND) {
+    return `${import.meta.env.VITE_CLOUDFLARE_BACKEND}/api/v1`
   }
 
   // Se estiver acessando via IP de rede local, usa backend direto com HTTPS
