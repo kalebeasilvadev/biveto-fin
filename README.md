@@ -1,8 +1,11 @@
 # Biveto App
 
+[![CI](https://github.com/kalebeasilvadev/biveto-fin/actions/workflows/ci.yml/badge.svg)](https://github.com/kalebeasilvadev/biveto-fin/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
 Sistema completo de gestao financeira pessoal com suporte a familias, extracao inteligente de documentos via IA e assistente financeiro.
 
-> **Novo no time?** Comece pelo **[guia de onboarding](docs/onboarding/README.md)** (o que e o app, setup Windows/Linux, mapa do codigo, decisoes de arquitetura) e pelo **[CONTRIBUTING.md](CONTRIBUTING.md)** (fluxo de branches, PRs e definition of done). Esses guias, escritos em ago/2026, sao a referencia mais atual — alguns numeros abaixo (contagem de modulos/paginas) estao defasados.
+> **Novo no time?** Comece pelo **[guia de onboarding](docs/onboarding/README.md)** (o que e o app, setup Windows/Linux, mapa do codigo, decisoes de arquitetura) e pelo **[CONTRIBUTING.md](CONTRIBUTING.md)** (fluxo de branches, PRs e definition of done).
 
 ## Visao Geral
 
@@ -22,33 +25,35 @@ O Biveto e uma aplicacao web de gestao financeira que permite:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        FRONTEND (React)                         │
-│  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐            │
-│  │ Pages   │  │Components│  │ Stores  │  │Services │            │
-│  │ (22)    │  │ (18)    │  │ Zustand │  │ Axios   │            │
-│  └─────────┘  └─────────┘  └─────────┘  └─────────┘            │
+│                     FRONTEND (React + PWA)                      │
+│  ┌─────────┐  ┌──────────┐  ┌─────────┐  ┌─────────┐           │
+│  │ Pages   │  │Components│  │ Stores  │  │Services │           │
+│  │ (37)    │  │por domain│  │ Zustand │  │ Axios   │           │
+│  └─────────┘  └──────────┘  └─────────┘  └─────────┘           │
 └─────────────────────────────┬───────────────────────────────────┘
                               │ REST API (JWT)
 ┌─────────────────────────────▼───────────────────────────────────┐
 │                        BACKEND (FastAPI)                        │
 │  ┌─────────────────────────────────────────────────────────┐   │
-│  │                      Modules (20)                        │   │
+│  │                      Modules (29)                        │   │
 │  │  auth, accounts, transactions, documents, credit_cards   │   │
-│  │  budgets, goals, debts, recurring, analytics, chat       │   │
-│  │  income, installments, known_services, household         │   │
-│  │  admin, api_keys, mcp, categories                        │   │
+│  │  benefit_cards, budgets, goals, debts, recurring,        │   │
+│  │  analytics, chat, income, income_splits, installments,   │   │
+│  │  known_services, household, admin, api_keys, mcp,        │   │
+│  │  categories, grocery, gamification, notifications,       │   │
+│  │  automations, receipts, calendar, review                 │   │
 │  └─────────────────────────────────────────────────────────┘   │
 │  ┌─────────────────────────────────────────────────────────┐   │
 │  │                    Core Services                         │   │
-│  │  • LLM Vision (Google, OpenAI, Anthropic, Mistral)      │   │
-│  │  • JWT Authentication                                    │   │
-│  │  • Rate Limiting                                         │   │
-│  │  • Email Service                                         │   │
+│  │  • LLM Vision (Gemini padrao; Mistral alternativo)      │   │
+│  │  • JWT Authentication + API Keys                        │   │
+│  │  • APScheduler (jobs agendados)                         │   │
+│  │  • Rate Limiting / Email Service                        │   │
 │  └─────────────────────────────────────────────────────────┘   │
 └─────────────────────────────┬───────────────────────────────────┘
                               │ SQLAlchemy 2.0 (async)
 ┌─────────────────────────────▼───────────────────────────────────┐
-│                        PostgreSQL                               │
+│                  SQLite (dev) / PostgreSQL (prod)               │
 │  Users, Accounts, Transactions, CreditCards, Invoices, etc.    │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -58,7 +63,7 @@ O Biveto e uma aplicacao web de gestao financeira que permite:
 ### Backend
 | Tecnologia | Versao | Proposito |
 |------------|--------|-----------|
-| Python | 3.12 | Linguagem |
+| Python | 3.11+ | Linguagem |
 | FastAPI | 0.109 | Framework web |
 | SQLAlchemy | 2.0 | ORM (async) |
 | SQLite / PostgreSQL | - | Banco de dados (SQLite por padrao) |
@@ -78,10 +83,9 @@ O Biveto e uma aplicacao web de gestao financeira que permite:
 ### Integracao IA
 | Provider | Modelo | Uso |
 |----------|--------|-----|
-| Google | Gemini 2.0 Flash | Extracao de documentos |
-| OpenAI | GPT-4o | Extracao (alternativo) |
-| Anthropic | Claude 3.5 | Extracao (alternativo) |
-| Mistral | OCR + Large | Extracao (recomendado) |
+| Google | Gemini Flash | Extracao de documentos e chat (**padrao** — 2.2x mais rapido nos benchmarks internos, camada gratuita) |
+| Mistral | OCR + Large | Extracao (alternativo, SDK instalado) |
+| OpenAI / Anthropic | - | Providers implementados mas sem SDK instalado (ver ADR-004 em [docs/onboarding](docs/onboarding/03-DECISOES-E-MOTIVOS.md)) |
 
 ## Estrutura do Projeto
 
@@ -165,9 +169,9 @@ biveto-app/
 ## Quick Start
 
 ### Pre-requisitos
-- Python 3.12+
+- Python 3.11+
 - Node.js 20+
-- API Keys (Google, OpenAI, ou Mistral)
+- API Key do Google (opcional — necessaria apenas para extracao de documentos e chat IA; gratuita em https://aistudio.google.com/apikey)
 
 > O banco padrao e SQLite (sem instalacao extra). Para usar PostgreSQL local, suba o container com `make docker-up`.
 
@@ -188,8 +192,11 @@ pip install -r requirements.txt
 cp .env.example .env
 # Editar .env com suas configuracoes
 
-# Rodar migracoes
+# Rodar migracoes (cria o banco SQLite com todas as tabelas)
 alembic upgrade head
+
+# Criar seu usuario (o registro publico e desabilitado — entrada por convite)
+python scripts/create_admin.py voce@exemplo.com 'SuaSenha@123' 'Seu Nome'
 
 # Iniciar servidor
 uvicorn app.main:app --reload --port 8000
@@ -262,7 +269,7 @@ Toda documentacao esta centralizada na pasta [`docs/`](./docs/README.md).
 | [Getting Started](./docs/development/GETTING_STARTED.md) | Guia para desenvolvedores |
 | [Convencoes](./docs/development/CONVENTIONS.md) | Padroes de codigo |
 | [Backend](./docs/backend/README.md) | Documentacao do backend |
-| [Modulos](./docs/backend/MODULES.md) | Descricao dos 20 modulos |
+| [Modulos](./docs/backend/MODULES.md) | Descricao dos modulos (29 atualmente — lista completa no [mapa do codigo](./docs/onboarding/02-MAPA-DO-CODIGO.md)) |
 | [Frontend](./docs/frontend/README.md) | Documentacao do frontend |
 | [Regras de Negocio](./docs/business/LOGIC_MAP.md) | Mapa logico do sistema |
 | [Integracoes](./docs/integrations/MISTRAL_INTEGRATION.md) | Integracao com Mistral OCR |
@@ -274,12 +281,11 @@ Toda documentacao esta centralizada na pasta [`docs/`](./docs/README.md).
 # Rodar testes
 pytest
 
-# Verificar tipos
-mypy app
+# Lint (mesmas regras do CI)
+ruff check .
 
-# Formatar codigo
-black app
-isort app
+# Formatar codigo (formatador oficial do projeto — compativel com Black)
+ruff format .
 ```
 
 ### Frontend
@@ -296,4 +302,4 @@ npm run lint
 
 ## Licenca
 
-Projeto privado - Todos os direitos reservados.
+Distribuido sob a licenca [MIT](LICENSE) — livre para usar, modificar e distribuir, mantendo o aviso de copyright.
