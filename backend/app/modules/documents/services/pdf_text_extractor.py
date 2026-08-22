@@ -1,4 +1,5 @@
 """Extrator de texto estruturado de PDFs preservando layout de colunas"""
+
 import fitz  # PyMuPDF
 
 
@@ -51,7 +52,9 @@ class PDFTextExtractor:
             return ""
 
     @staticmethod
-    def extract_text_blocks_with_positions(pdf_bytes: bytes, password: str | None = None) -> list[dict]:
+    def extract_text_blocks_with_positions(
+        pdf_bytes: bytes, password: str | None = None
+    ) -> list[dict]:
         """
         Extrai blocos de texto com suas posições (x, y).
         Útil para identificar colunas baseado na posição horizontal.
@@ -82,12 +85,14 @@ class PDFTextExtractor:
                         for line in block.get("lines", []):
                             text = " ".join([span["text"] for span in line.get("spans", [])])
                             if text.strip():
-                                all_blocks.append({
-                                    "text": text.strip(),
-                                    "x": line["bbox"][0],  # x0
-                                    "y": line["bbox"][1],  # y0
-                                    "page": page_num + 1,
-                                })
+                                all_blocks.append(
+                                    {
+                                        "text": text.strip(),
+                                        "x": line["bbox"][0],  # x0
+                                        "y": line["bbox"][1],  # y0
+                                        "page": page_num + 1,
+                                    }
+                                )
 
             pdf_document.close()
 

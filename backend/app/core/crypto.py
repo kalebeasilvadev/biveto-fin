@@ -3,6 +3,7 @@ Cryptography utilities for encrypting/decrypting sensitive data.
 
 Uses Fernet symmetric encryption with a key derived from the application's secret_key.
 """
+
 import base64
 import hashlib
 

@@ -5,6 +5,7 @@ Este módulo NÃO bloqueia transações, apenas:
 2. Envia alertas ao usuário
 3. Permite ajustes manuais
 """
+
 import logging
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,11 +20,7 @@ class BalanceMonitor:
     """Monitor de saldo - não bloqueia, apenas alerta"""
 
     @staticmethod
-    def check_negative_balance(
-        account: Account,
-        amount: float,
-        operation: str = "débito"
-    ) -> dict:
+    def check_negative_balance(account: Account, amount: float, operation: str = "débito") -> dict:
         """Verifica se débito resultará em saldo negativo
 
         NÃO BLOQUEIA a operação, apenas retorna informações
@@ -45,7 +42,7 @@ class BalanceMonitor:
             "current_balance": current,
             "debit_amount": debit,
             "resulting_balance": resulting,
-            "alert_message": None
+            "alert_message": None,
         }
 
         if resulting < 0:
@@ -68,10 +65,7 @@ class BalanceMonitor:
 
     @staticmethod
     def log_negative_balance_event(
-        account: Account,
-        amount: float,
-        operation: str,
-        user_id: int
+        account: Account, amount: float, operation: str, user_id: int
     ) -> None:
         """Registra evento de saldo negativo para auditoria
 
@@ -94,11 +88,7 @@ class BalanceMonitor:
 
 
 async def create_balance_adjustment(
-    db: AsyncSession,
-    account: Account,
-    adjustment_amount: float,
-    reason: str,
-    user_id: int
+    db: AsyncSession, account: Account, adjustment_amount: float, reason: str, user_id: int
 ) -> dict:
     """Cria ajuste de saldo (correção manual)
 
@@ -140,7 +130,7 @@ async def create_balance_adjustment(
         description=f"Ajuste de saldo: {reason}",
         category_id=None,  # Sem categoria (é ajuste manual)
         is_recurring=False,
-        tags=["ajuste_saldo", "correcao_manual"]
+        tags=["ajuste_saldo", "correcao_manual"],
     )
 
     db.add(adjustment)
@@ -167,5 +157,5 @@ async def create_balance_adjustment(
         "adjustment": adjustment_amount,
         "new_balance": new_balance,
         "transaction_id": adjustment.id,
-        "reason": reason
+        "reason": reason,
     }

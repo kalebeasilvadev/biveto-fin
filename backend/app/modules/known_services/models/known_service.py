@@ -1,4 +1,5 @@
 """Modelo para serviços recorrentes conhecidos (Netflix, Spotify, etc)"""
+
 from datetime import datetime
 
 from sqlalchemy import JSON, Boolean, DateTime, String
@@ -10,6 +11,7 @@ from app.core.utils import utc_now
 
 class KnownRecurringService(Base):
     """Catálogo global de serviços recorrentes conhecidos"""
+
     __tablename__ = "known_recurring_services"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -27,6 +29,4 @@ class KnownRecurringService(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=utc_now, onupdate=utc_now
-    )
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, onupdate=utc_now)

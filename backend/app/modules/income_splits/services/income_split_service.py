@@ -2,6 +2,7 @@
 Service for managing income split rules and applying splits to income transactions.
 Creates pending expense transactions linked to the original income.
 """
+
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 

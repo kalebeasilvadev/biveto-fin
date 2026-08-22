@@ -1,4 +1,5 @@
 """Schemas para o Agente IA Financeiro"""
+
 from datetime import datetime
 from enum import Enum
 

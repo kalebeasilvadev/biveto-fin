@@ -1,4 +1,5 @@
 """Schemas para Goal (Metas Financeiras)"""
+
 from datetime import date, datetime
 from decimal import Decimal
 
@@ -33,7 +34,7 @@ class GoalBase(BaseModel):
     description: str | None = None
     type: GoalType = GoalType.SAVINGS
     icon: str | None = None
-    color: str | None = Field(None, pattern=r'^#[0-9A-Fa-f]{6}$')
+    color: str | None = Field(None, pattern=r"^#[0-9A-Fa-f]{6}$")
     target_amount: Decimal = Field(..., gt=0)
     initial_amount: Decimal = Field(default=Decimal(0), ge=0)
     target_date: date | None = None
@@ -50,7 +51,7 @@ class GoalUpdate(BaseModel):
     description: str | None = None
     type: GoalType | None = None
     icon: str | None = None
-    color: str | None = Field(None, pattern=r'^#[0-9A-Fa-f]{6}$')
+    color: str | None = Field(None, pattern=r"^#[0-9A-Fa-f]{6}$")
     target_amount: Decimal | None = Field(None, gt=0)
     target_date: date | None = None
     priority: int | None = Field(None, ge=0)
@@ -84,12 +85,14 @@ class GoalResponse(GoalBase):
 
 class GoalDetailResponse(GoalResponse):
     """Resposta detalhada com contribuições"""
+
     contributions: list[GoalContributionResponse] = []
     projection: "GoalProjection | None" = None
 
 
 class GoalProjection(BaseModel):
     """Projeção de quando a meta será atingida"""
+
     current_pace_date: date | None  # Data prevista no ritmo atual
     target_pace_date: date | None  # Data prevista se seguir contribuição sugerida
     monthly_needed: Decimal  # Valor mensal necessário para atingir no prazo
@@ -98,6 +101,7 @@ class GoalProjection(BaseModel):
 
 class GoalSummary(BaseModel):
     """Resumo de todas as metas para dashboard"""
+
     total_goals: int
     active_goals: int
     completed_goals: int
@@ -110,6 +114,7 @@ class GoalSummary(BaseModel):
 
 class GoalMilestone(BaseModel):
     """Próximo marco a ser atingido"""
+
     goal_id: int
     goal_name: str
     amount_to_milestone: Decimal
@@ -118,6 +123,7 @@ class GoalMilestone(BaseModel):
 
 class EmergencyFundCalculation(BaseModel):
     """Cálculo de fundo de emergência (Baby Step 3 - Ramsey)"""
+
     monthly_expenses: Decimal
     recommended_3_months: Decimal
     recommended_6_months: Decimal
@@ -131,6 +137,7 @@ class PNIFCalculation(BaseModel):
     Cálculo do PNIF - Patrimônio Necessário para Independência Financeira
     Metodologia Gustavo Cerbasi
     """
+
     annual_expenses: Decimal
     expected_return_rate: float  # Taxa de retorno anual esperada
     pnif_amount: Decimal  # Patrimônio necessário

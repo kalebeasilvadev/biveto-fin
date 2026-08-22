@@ -1,6 +1,7 @@
 """
 Shopping List Service - CRUD and AI generation for shopping lists
 """
+
 from collections import defaultdict
 from datetime import date, timedelta
 
@@ -67,21 +68,22 @@ class ShoppingListService:
         if status_filter:
             query = query.where(ShoppingList.status == status_filter.value)
 
-        query = query.options(
-            selectinload(ShoppingList.items),
-            selectinload(ShoppingList.user),
-        ).order_by(
-            ShoppingList.updated_at.desc()
-        ).offset(offset).limit(limit)
+        query = (
+            query.options(
+                selectinload(ShoppingList.items),
+                selectinload(ShoppingList.user),
+            )
+            .order_by(ShoppingList.updated_at.desc())
+            .offset(offset)
+            .limit(limit)
+        )
 
         result = await self.db.execute(query)
         lists = result.scalars().all()
 
         return [self._build_list_response(lst) for lst in lists]
 
-    async def get_shopping_list(
-        self, user: User, list_id: int
-    ) -> ShoppingListResponse | None:
+    async def get_shopping_list(self, user: User, list_id: int) -> ShoppingListResponse | None:
         """Get a single shopping list with items"""
         query = select(ShoppingList).where(ShoppingList.id == list_id)
 
@@ -107,9 +109,7 @@ class ShoppingListService:
             return None
         return self._build_list_response(lst)
 
-    async def create_shopping_list(
-        self, user: User, data: ShoppingListCreate
-    ) -> ShoppingList:
+    async def create_shopping_list(self, user: User, data: ShoppingListCreate) -> ShoppingList:
         """Create a new shopping list"""
         shopping_list = ShoppingList(
             user_id=user.id,
@@ -154,15 +154,16 @@ class ShoppingListService:
                 or_(
                     ShoppingList.user_id == user.id,
                     ShoppingList.license_id == user.license_id,
-                ) if user.license_id else ShoppingList.user_id == user.id
+                )
+                if user.license_id
+                else ShoppingList.user_id == user.id,
             )
         )
         lst = result.scalar_one_or_none()
 
         if not lst:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Lista não encontrada"
+                status_code=status.HTTP_404_NOT_FOUND, detail="Lista não encontrada"
             )
 
         for field, value in data.model_dump(exclude_unset=True).items():
@@ -190,7 +191,7 @@ class ShoppingListService:
         if not lst:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Lista não encontrada ou você não tem permissão para excluí-la"
+                detail="Lista não encontrada ou você não tem permissão para excluí-la",
             )
 
         await self.db.delete(lst)
@@ -208,15 +209,16 @@ class ShoppingListService:
                 or_(
                     ShoppingList.user_id == user.id,
                     ShoppingList.license_id == user.license_id,
-                ) if user.license_id else ShoppingList.user_id == user.id
+                )
+                if user.license_id
+                else ShoppingList.user_id == user.id,
             )
         )
         lst = result.scalar_one_or_none()
 
         if not lst:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Lista não encontrada"
+                status_code=status.HTTP_404_NOT_FOUND, detail="Lista não encontrada"
             )
 
         # Get estimated price from history if not provided
@@ -249,25 +251,23 @@ class ShoppingListService:
         """Update a shopping list item"""
         # Verify access to list
         result = await self.db.execute(
-            select(ShoppingListItem).where(
+            select(ShoppingListItem)
+            .where(
                 ShoppingListItem.id == item_id,
                 ShoppingListItem.list_id == list_id,
-            ).options(selectinload(ShoppingListItem.shopping_list))
+            )
+            .options(selectinload(ShoppingListItem.shopping_list))
         )
         item = result.scalar_one_or_none()
 
         if not item:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Item não encontrado"
-            )
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item não encontrado")
 
         # Check access
         lst = item.shopping_list
         if lst.user_id != user.id and lst.license_id != user.license_id:
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Sem permissão para editar esta lista"
+                status_code=status.HTTP_403_FORBIDDEN, detail="Sem permissão para editar esta lista"
             )
 
         for field, value in data.model_dump(exclude_unset=True).items():
@@ -282,25 +282,23 @@ class ShoppingListService:
     async def delete_item(self, user: User, list_id: int, item_id: int) -> None:
         """Delete an item from shopping list"""
         result = await self.db.execute(
-            select(ShoppingListItem).where(
+            select(ShoppingListItem)
+            .where(
                 ShoppingListItem.id == item_id,
                 ShoppingListItem.list_id == list_id,
-            ).options(selectinload(ShoppingListItem.shopping_list))
+            )
+            .options(selectinload(ShoppingListItem.shopping_list))
         )
         item = result.scalar_one_or_none()
 
         if not item:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Item não encontrado"
-            )
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item não encontrado")
 
         # Check access
         lst = item.shopping_list
         if lst.user_id != user.id and lst.license_id != user.license_id:
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Sem permissão para editar esta lista"
+                status_code=status.HTTP_403_FORBIDDEN, detail="Sem permissão para editar esta lista"
             )
 
         await self.db.delete(item)
@@ -316,9 +314,7 @@ class ShoppingListService:
         # Get purchases from the specified period (90 days by default)
         start_date = date.today() - timedelta(days=request.period_days)
 
-        query = select(GroceryPurchase).where(
-            GroceryPurchase.purchase_date >= start_date
-        )
+        query = select(GroceryPurchase).where(GroceryPurchase.purchase_date >= start_date)
 
         if household_user_ids:
             query = query.where(GroceryPurchase.user_id.in_(household_user_ids))
@@ -326,31 +322,33 @@ class ShoppingListService:
             query = query.where(GroceryPurchase.user_id == user.id)
 
         if not request.include_non_essential:
-            query = query.where(
-                GroceryPurchase.necessity_type == NecessityType.ESSENTIAL.value
-            )
+            query = query.where(GroceryPurchase.necessity_type == NecessityType.ESSENTIAL.value)
 
         result = await self.db.execute(query)
         purchases = result.scalars().all()
 
         # Group by product and collect purchase dates for cycle calculation
-        product_stats: dict[str, dict] = defaultdict(lambda: {
-            "purchases": [],  # List of purchases to calculate cycle
-            "total_quantity": 0,
-            "category": GroceryCategory.OTHER.value,
-            "necessity_type": NecessityType.ESSENTIAL.value,
-            "unit": "un",
-            "product_id": None,
-            "last_price": None,
-        })
+        product_stats: dict[str, dict] = defaultdict(
+            lambda: {
+                "purchases": [],  # List of purchases to calculate cycle
+                "total_quantity": 0,
+                "category": GroceryCategory.OTHER.value,
+                "necessity_type": NecessityType.ESSENTIAL.value,
+                "unit": "un",
+                "product_id": None,
+                "last_price": None,
+            }
+        )
 
         for purchase in purchases:
             name = purchase.product_name.lower().strip()
             stats = product_stats[name]
-            stats["purchases"].append({
-                "date": purchase.purchase_date,
-                "quantity": float(purchase.quantity),
-            })
+            stats["purchases"].append(
+                {
+                    "date": purchase.purchase_date,
+                    "quantity": float(purchase.quantity),
+                }
+            )
             stats["total_quantity"] += float(purchase.quantity)
             stats["category"] = purchase.category
             stats["necessity_type"] = purchase.necessity_type
@@ -397,19 +395,21 @@ class ShoppingListService:
             # Calculate average quantity
             avg_quantity = stats["total_quantity"] / purchase_count
 
-            items_to_add.append({
-                "name": name.title(),
-                "quantity": round(avg_quantity, 2),
-                "unit": stats["unit"],
-                "category": stats["category"],
-                "necessity_type": stats["necessity_type"],
-                "product_id": stats["product_id"],
-                "estimated_price": stats["last_price"],
-                "frequency": purchase_count,
-                "urgency_score": urgency_score,
-                "avg_cycle_days": round(avg_cycle, 1),
-                "days_since_last": days_since_last,
-            })
+            items_to_add.append(
+                {
+                    "name": name.title(),
+                    "quantity": round(avg_quantity, 2),
+                    "unit": stats["unit"],
+                    "category": stats["category"],
+                    "necessity_type": stats["necessity_type"],
+                    "product_id": stats["product_id"],
+                    "estimated_price": stats["last_price"],
+                    "frequency": purchase_count,
+                    "urgency_score": urgency_score,
+                    "avg_cycle_days": round(avg_cycle, 1),
+                    "days_since_last": days_since_last,
+                }
+            )
 
         # Sort by: essentials first, then urgency (highest first)
         items_to_add.sort(
@@ -430,8 +430,8 @@ class ShoppingListService:
             source=ShoppingListSource.AI_GENERATED.value,
             ownership_type="household",
             notes=f"Gerada com base nos últimos {request.period_days} dias. "
-                  f"Itens ordenados por urgência de recompra. "
-                  f"Total: {len(items_to_add)} itens.",
+            f"Itens ordenados por urgência de recompra. "
+            f"Total: {len(items_to_add)} itens.",
         )
         self.db.add(shopping_list)
         await self.db.flush()
@@ -466,9 +466,10 @@ class ShoppingListService:
     async def _get_latest_price(self, product_id: int) -> float | None:
         """Get the latest price for a product"""
         result = await self.db.execute(
-            select(GroceryPriceHistory).where(
-                GroceryPriceHistory.product_id == product_id
-            ).order_by(GroceryPriceHistory.recorded_at.desc()).limit(1)
+            select(GroceryPriceHistory)
+            .where(GroceryPriceHistory.product_id == product_id)
+            .order_by(GroceryPriceHistory.recorded_at.desc())
+            .limit(1)
         )
         history = result.scalar_one_or_none()
         return float(history.price) if history else None
@@ -483,9 +484,7 @@ class ShoppingListService:
         total_items = len(items)
         checked_items = sum(1 for i in items if i.is_checked)
         progress = (checked_items / total_items * 100) if total_items > 0 else 0
-        estimated_total = sum(
-            (i.estimated_price or 0) * i.quantity for i in items
-        )
+        estimated_total = sum((i.estimated_price or 0) * i.quantity for i in items)
 
         return ShoppingListResponse(
             id=lst.id,

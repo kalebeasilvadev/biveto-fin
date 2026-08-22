@@ -51,9 +51,11 @@ installments/
 from app.modules.installments import (
     router,
     InstallmentService,
-    InstallmentSeriesCreate, InstallmentSeriesResponse,
+    InstallmentSeriesCreate,
+    InstallmentSeriesResponse,
     InstallmentSeriesDetailResponse,
-    ConfirmInstallmentRequest, MarkInstallmentsPaidRequest,
+    ConfirmInstallmentRequest,
+    MarkInstallmentsPaidRequest,
     CreateFutureInstallmentsRequest,
 )
 ```

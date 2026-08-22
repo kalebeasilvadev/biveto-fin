@@ -1,6 +1,7 @@
 """
 Grocery Service - CRUD operations for products and purchases
 """
+
 import unicodedata
 from datetime import date
 from decimal import Decimal
@@ -52,8 +53,8 @@ from app.modules.household.utils import (
 def normalize_text(text: str) -> str:
     """Normalize text for matching (lowercase, remove accents)"""
     text = text.lower().strip()
-    text = unicodedata.normalize('NFKD', text)
-    text = ''.join(c for c in text if not unicodedata.combining(c))
+    text = unicodedata.normalize("NFKD", text)
+    text = "".join(c for c in text if not unicodedata.combining(c))
     return text
 
 
@@ -73,17 +74,12 @@ class GroceryService:
     ) -> list[GroceryProductResponse]:
         """List products (user's + system products)"""
         query = select(GroceryProduct).where(
-            or_(
-                GroceryProduct.user_id == user.id,
-                GroceryProduct.is_system == True
-            )
+            or_(GroceryProduct.user_id == user.id, GroceryProduct.is_system == True)
         )
 
         if search:
             normalized_search = normalize_text(search)
-            query = query.where(
-                GroceryProduct.normalized_name.ilike(f"%{normalized_search}%")
-            )
+            query = query.where(GroceryProduct.normalized_name.ilike(f"%{normalized_search}%"))
 
         if category:
             query = query.where(GroceryProduct.category == category.value)
@@ -99,10 +95,7 @@ class GroceryService:
         result = await self.db.execute(
             select(GroceryProduct).where(
                 GroceryProduct.id == product_id,
-                or_(
-                    GroceryProduct.user_id == user.id,
-                    GroceryProduct.is_system == True
-                )
+                or_(GroceryProduct.user_id == user.id, GroceryProduct.is_system == True),
             )
         )
         product = result.scalar_one_or_none()
@@ -142,7 +135,7 @@ class GroceryService:
         if not product:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Produto não encontrado ou não pode ser editado"
+                detail="Produto não encontrado ou não pode ser editado",
             )
 
         for field, value in data.model_dump(exclude_unset=True).items():
@@ -170,7 +163,7 @@ class GroceryService:
         if not product:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Produto não encontrado ou não pode ser excluído"
+                detail="Produto não encontrado ou não pode ser excluído",
             )
 
         await self.db.delete(product)
@@ -192,12 +185,12 @@ class GroceryService:
                 or_(
                     and_(
                         GroceryProduct.user_id == user.id,
-                        GroceryProduct.normalized_name == normalized
+                        GroceryProduct.normalized_name == normalized,
                     ),
                     and_(
                         GroceryProduct.is_system == True,
-                        GroceryProduct.normalized_name == normalized
-                    )
+                        GroceryProduct.normalized_name == normalized,
+                    ),
                 )
             )
         )
@@ -277,14 +270,13 @@ class GroceryService:
         if merchant_id:
             query = query.where(GroceryPurchase.merchant_id == merchant_id)
         if search:
-            query = query.where(
-                GroceryPurchase.product_name.ilike(f"%{search}%")
-            )
+            query = query.where(GroceryPurchase.product_name.ilike(f"%{search}%"))
 
-        query = query.order_by(
-            GroceryPurchase.purchase_date.desc(),
-            GroceryPurchase.id.desc()
-        ).offset(offset).limit(limit)
+        query = (
+            query.order_by(GroceryPurchase.purchase_date.desc(), GroceryPurchase.id.desc())
+            .offset(offset)
+            .limit(limit)
+        )
 
         # Load merchant relationship
         query = query.options(selectinload(GroceryPurchase.merchant))
@@ -299,17 +291,21 @@ class GroceryService:
         household_user_ids = await get_household_user_ids(self.db, user)
         member = await get_household_member(self.db, user)
 
-        query = select(GroceryPurchase).where(
-            GroceryPurchase.id == purchase_id,
-            build_ownership_filter(
-                GroceryPurchase,
-                GroceryPurchase.user_id,
-                GroceryPurchase.ownership_type,
-                user.id,
-                household_user_ids,
-                member,
+        query = (
+            select(GroceryPurchase)
+            .where(
+                GroceryPurchase.id == purchase_id,
+                build_ownership_filter(
+                    GroceryPurchase,
+                    GroceryPurchase.user_id,
+                    GroceryPurchase.ownership_type,
+                    user.id,
+                    household_user_ids,
+                    member,
+                ),
             )
-        ).options(selectinload(GroceryPurchase.merchant))
+            .options(selectinload(GroceryPurchase.merchant))
+        )
 
         result = await self.db.execute(query)
         purchase = result.scalar_one_or_none()
@@ -428,8 +424,7 @@ class GroceryService:
 
         if not purchase:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Compra não encontrada"
+                status_code=status.HTTP_404_NOT_FOUND, detail="Compra não encontrada"
             )
 
         for field, value in data.model_dump(exclude_unset=True).items():
@@ -453,8 +448,7 @@ class GroceryService:
 
         if not purchase:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Compra não encontrada"
+                status_code=status.HTTP_404_NOT_FOUND, detail="Compra não encontrada"
             )
 
         await self.db.delete(purchase)
@@ -483,7 +477,7 @@ class GroceryService:
                 user.id,
                 household_user_ids,
                 member,
-            )
+            ),
         )
 
         result = await self.db.execute(query)
@@ -492,11 +486,13 @@ class GroceryService:
         # Calculate totals
         total = sum(float(p.total_price) for p in purchases)
         essential_total = sum(
-            float(p.total_price) for p in purchases
+            float(p.total_price)
+            for p in purchases
             if p.necessity_type == NecessityType.ESSENTIAL.value
         )
         non_essential_total = sum(
-            float(p.total_price) for p in purchases
+            float(p.total_price)
+            for p in purchases
             if p.necessity_type == NecessityType.NON_ESSENTIAL.value
         )
 
@@ -525,14 +521,18 @@ class GroceryService:
                 necessity_type=NecessityType.ESSENTIAL.value,
                 necessity_type_display=NECESSITY_TYPE_DISPLAY[NecessityType.ESSENTIAL.value],
                 total=essential_total,
-                count=sum(1 for p in purchases if p.necessity_type == NecessityType.ESSENTIAL.value),
+                count=sum(
+                    1 for p in purchases if p.necessity_type == NecessityType.ESSENTIAL.value
+                ),
                 percentage=(essential_total / total * 100) if total > 0 else 0,
             ),
             NecessitySummary(
                 necessity_type=NecessityType.NON_ESSENTIAL.value,
                 necessity_type_display=NECESSITY_TYPE_DISPLAY[NecessityType.NON_ESSENTIAL.value],
                 total=non_essential_total,
-                count=sum(1 for p in purchases if p.necessity_type == NecessityType.NON_ESSENTIAL.value),
+                count=sum(
+                    1 for p in purchases if p.necessity_type == NecessityType.NON_ESSENTIAL.value
+                ),
                 percentage=(non_essential_total / total * 100) if total > 0 else 0,
             ),
         ]
@@ -781,9 +781,7 @@ class GroceryService:
         category_names_lower = [name.lower() for name in category_names]
 
         # Find category IDs matching the names
-        category_query = select(Category).where(
-            func.lower(Category.name).in_(category_names_lower)
-        )
+        category_query = select(Category).where(func.lower(Category.name).in_(category_names_lower))
         category_result = await self.db.execute(category_query)
         categories = category_result.scalars().all()
 
@@ -855,23 +853,27 @@ class GroceryService:
                 created_count += 1
                 detail_status = "created"
 
-            details.append(BackfillTransactionDetail(
-                transaction_id=tx.id,
-                description=tx.description,
-                amount=float(tx.amount),
-                date=tx.date.isoformat(),
-                status=detail_status,
-            ))
+            details.append(
+                BackfillTransactionDetail(
+                    transaction_id=tx.id,
+                    description=tx.description,
+                    amount=float(tx.amount),
+                    date=tx.date.isoformat(),
+                    status=detail_status,
+                )
+            )
 
         # Add skipped transactions
         for tx in already_have:
-            details.append(BackfillTransactionDetail(
-                transaction_id=tx.id,
-                description=tx.description,
-                amount=float(tx.amount),
-                date=tx.date.isoformat(),
-                status="skipped",
-            ))
+            details.append(
+                BackfillTransactionDetail(
+                    transaction_id=tx.id,
+                    description=tx.description,
+                    amount=float(tx.amount),
+                    date=tx.date.isoformat(),
+                    status="skipped",
+                )
+            )
 
         if not request.dry_run and created_count > 0:
             await self.db.commit()

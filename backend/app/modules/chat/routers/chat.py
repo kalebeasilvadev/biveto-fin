@@ -1,4 +1,5 @@
 """Router para o Agente IA Financeiro"""
+
 from fastapi import APIRouter
 
 from app.core.deps import CurrentUser, DbSession
@@ -43,5 +44,5 @@ async def get_suggestions(
 
     return {
         "suggestions": suggestions,
-        "welcome_message": "Ola! Sou o Fin, seu assistente financeiro pessoal. Como posso ajudar voce hoje?"
+        "welcome_message": "Ola! Sou o Fin, seu assistente financeiro pessoal. Como posso ajudar voce hoje?",
     }

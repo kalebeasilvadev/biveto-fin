@@ -1,9 +1,11 @@
 """Conversor de PDF para imagens"""
+
 import asyncio
 
 
 class PasswordRequiredException(Exception):
     """Raised when PDF requires password"""
+
     pass
 
 
@@ -18,6 +20,7 @@ def check_pdf_needs_password(pdf_content: bytes) -> bool:
     """
     try:
         import fitz
+
         pdf_doc = fitz.open(stream=pdf_content, filetype="pdf")
         needs_pass = pdf_doc.needs_pass
         pdf_doc.close()
@@ -26,7 +29,9 @@ def check_pdf_needs_password(pdf_content: bytes) -> bool:
         return False
 
 
-def convert_pdf_to_images_sync(pdf_content: bytes, password: str | None = None) -> tuple[list[tuple[bytes, str]], str | None]:
+def convert_pdf_to_images_sync(
+    pdf_content: bytes, password: str | None = None
+) -> tuple[list[tuple[bytes, str]], str | None]:
     """Converte PDF para lista de imagens (uma por pagina) - SINCRONO
 
     Args:
@@ -64,10 +69,12 @@ def convert_pdf_to_images_sync(pdf_content: bytes, password: str | None = None) 
         for page_num in range(len(pdf_doc)):
             page = pdf_doc[page_num]
             # Renderizar pagina como imagem com boa resolucao
-            mat = fitz.Matrix(1.5, 1.5)  # 1.5x zoom - boa qualidade para OCR com menor uso de memória
+            mat = fitz.Matrix(
+                1.5, 1.5
+            )  # 1.5x zoom - boa qualidade para OCR com menor uso de memória
             pix = page.get_pixmap(matrix=mat)
             img_bytes = pix.tobytes("png")
-            images.append((img_bytes, 'image/png'))
+            images.append((img_bytes, "image/png"))
 
             # Liberar memória da página imediatamente após processá-la
             del pix
@@ -82,7 +89,9 @@ def convert_pdf_to_images_sync(pdf_content: bytes, password: str | None = None) 
         return [], f"Erro ao converter PDF: {e}"
 
 
-async def convert_pdf_to_images(pdf_content: bytes, password: str | None = None) -> tuple[list[tuple[bytes, str]], str | None]:
+async def convert_pdf_to_images(
+    pdf_content: bytes, password: str | None = None
+) -> tuple[list[tuple[bytes, str]], str | None]:
     """Converte PDF para lista de imagens (uma por pagina) - ASYNC wrapper
 
     Executa em thread separada para nao bloquear o event loop.

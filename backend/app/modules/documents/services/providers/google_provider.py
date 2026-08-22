@@ -1,4 +1,5 @@
 """Google Gemini provider para extracao de documentos"""
+
 import asyncio
 import base64
 import os
@@ -16,15 +17,21 @@ DEFAULT_RETRY_DELAY = 2.0
 class GoogleProvider(BaseProvider):
     """Provider Google Gemini para extracao de documentos"""
 
-    def __init__(self, model: str | None = None, prompt: str = "", response_schema=None, parse_response_fn=None):
-        super().__init__(model or settings.vision_model or 'gemini-2.0-flash')
+    def __init__(
+        self,
+        model: str | None = None,
+        prompt: str = "",
+        response_schema=None,
+        parse_response_fn=None,
+    ):
+        super().__init__(model or settings.vision_model or "gemini-2.0-flash")
         self.max_retries = DEFAULT_MAX_RETRIES
         self.retry_delay = DEFAULT_RETRY_DELAY
         self._client = None
         self.base_prompt = prompt  # Prompt base (geral)
         self.prompt = prompt  # Prompt atual (pode ser composto)
         self.response_schema = response_schema
-        self._parse_response = parse_response_fn or (lambda x: {'items': [], 'error': 'No parser'})
+        self._parse_response = parse_response_fn or (lambda x: {"items": [], "error": "No parser"})
 
     def _detect_bank(self, text: str) -> str | None:
         """Detecta o banco emissor da fatura a partir do texto.
@@ -35,17 +42,17 @@ class GoogleProvider(BaseProvider):
         text_lower = text.lower()
 
         bank_indicators = {
-            'itau': ['banco itau', 'itaú', 'itau unibanco', 'financeira itau cbd'],
-            'nubank': ['nubank', 'nu pagamentos'],
-            'bradesco': ['bradesco', 'banco bradesco'],
-            'santander': ['santander', 'banco santander'],
-            'inter': ['banco inter', 'inter'],
-            'c6': ['c6 bank', 'banco c6', 'c6bank'],
-            'picpay': ['picpay', 'pic pay'],
-            'neon': ['neon', 'banco neon'],
-            'next': ['next', 'banco next'],
-            'will': ['will bank', 'banco will'],
-            'pan': ['banco pan', 'bancopan'],
+            "itau": ["banco itau", "itaú", "itau unibanco", "financeira itau cbd"],
+            "nubank": ["nubank", "nu pagamentos"],
+            "bradesco": ["bradesco", "banco bradesco"],
+            "santander": ["santander", "banco santander"],
+            "inter": ["banco inter", "inter"],
+            "c6": ["c6 bank", "banco c6", "c6bank"],
+            "picpay": ["picpay", "pic pay"],
+            "neon": ["neon", "banco neon"],
+            "next": ["next", "banco next"],
+            "will": ["will bank", "banco will"],
+            "pan": ["banco pan", "bancopan"],
         }
 
         for bank_name, indicators in bank_indicators.items():
@@ -87,6 +94,7 @@ class GoogleProvider(BaseProvider):
         if self._client is None:
             try:
                 from google import genai
+
                 api_key = settings.google_api_key
                 if not api_key:
                     raise ValueError("GOOGLE_API_KEY nao configurada")
@@ -140,15 +148,17 @@ class GoogleProvider(BaseProvider):
             except Exception as e:
                 last_error = e
                 if self._is_retryable_error(e) and attempt < self.max_retries - 1:
-                    wait_time = self.retry_delay * (2 ** attempt)
+                    wait_time = self.retry_delay * (2**attempt)
                     await asyncio.sleep(wait_time)
                     continue
                 else:
                     raise
 
-        return {'items': [], 'error': f'Falha apos {self.max_retries} tentativas: {last_error}'}
+        return {"items": [], "error": f"Falha apos {self.max_retries} tentativas: {last_error}"}
 
-    async def extract_from_pdf(self, pdf_content: bytes, filename: str = "document.pdf", password: str | None = None) -> dict:
+    async def extract_from_pdf(
+        self, pdf_content: bytes, filename: str = "document.pdf", password: str | None = None
+    ) -> dict:
         """Extrai dados de um PDF via upload para o Gemini (non-blocking)"""
         try:
             from google.genai import types
@@ -164,6 +174,7 @@ class GoogleProvider(BaseProvider):
             # Quick bank detection to auto-select native mode for complex layouts
             try:
                 import fitz
+
                 doc = fitz.open(stream=pdf_content, filetype="pdf")
                 quick_text = ""
                 for i in range(min(2, len(doc))):
@@ -171,25 +182,29 @@ class GoogleProvider(BaseProvider):
                 doc.close()
                 quick_lower = quick_text.lower()
                 # Banks where native PDF mode produces better results (complex two-column layouts)
-                native_banks = ['banco itau', 'itaú', 'itau unibanco', 'financeira itau cbd']
+                native_banks = ["banco itau", "itaú", "itau unibanco", "financeira itau cbd"]
                 if any(ind in quick_lower for ind in native_banks):
                     use_native = True
-                    print("[GoogleProvider] Auto-detected Itaú layout — switching to native PDF mode")
+                    print(
+                        "[GoogleProvider] Auto-detected Itaú layout — switching to native PDF mode"
+                    )
             except Exception:
                 pass
 
-        print(f"[GoogleProvider] Using PDF {'native' if use_native else 'text'} mode, model={self.model}")
+        print(
+            f"[GoogleProvider] Using PDF {'native' if use_native else 'text'} mode, model={self.model}"
+        )
 
         temp_file = None
         try:
             # Helper function para ler arquivo (definida ANTES do uso)
             def _read_file_sync(path):
-                with open(path, 'rb') as f:
+                with open(path, "rb") as f:
                     return f.read()
 
             # Salvar PDF em arquivo temporario (em thread separada)
             def _write_temp():
-                with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as f:
+                with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as f:
                     f.write(pdf_content)
                     return f.name
 
@@ -201,6 +216,7 @@ class GoogleProvider(BaseProvider):
 
                 # Extract text only for bank detection (lightweight)
                 from ..pdf_text_extractor import PDFTextExtractor
+
                 pdf_bytes = await asyncio.to_thread(_read_file_sync, temp_file)
                 try:
                     ocr_text = PDFTextExtractor.extract_text_with_layout(pdf_bytes, password)
@@ -244,7 +260,7 @@ Extraia TODAS as transações do documento PDF anexado."""
                 print(f"[GoogleProvider] Text extracted with layout: {len(ocr_text)} chars")
 
                 # Log das primeiras linhas para debug
-                lines_preview = '\n'.join(ocr_text.split('\n')[:30])
+                lines_preview = "\n".join(ocr_text.split("\n")[:30])
                 print(f"[GoogleProvider] Text preview:\n{lines_preview}\n...")
 
                 # PASSO 2: Detectar banco e compor prompt
@@ -288,7 +304,9 @@ NÃO retorne apenas um array! Retorne um objeto completo."""
             last_error = None
             for attempt in range(self.max_retries):
                 try:
-                    print(f"[GoogleProvider] Calling Gemini API (attempt {attempt + 1}/{self.max_retries})...")
+                    print(
+                        f"[GoogleProvider] Calling Gemini API (attempt {attempt + 1}/{self.max_retries})..."
+                    )
                     # Executa em thread separada para nao bloquear o event loop
                     response = await asyncio.to_thread(
                         self._generate_content_sync, client, self.model, contents, config
@@ -300,16 +318,18 @@ NÃO retorne apenas um array! Retorne um objeto completo."""
 
                 except Exception as e:
                     last_error = e
-                    print(f"[GoogleProvider] API error (attempt {attempt + 1}): {type(e).__name__}: {e}")
+                    print(
+                        f"[GoogleProvider] API error (attempt {attempt + 1}): {type(e).__name__}: {e}"
+                    )
                     if self._is_retryable_error(e) and attempt < self.max_retries - 1:
-                        wait_time = self.retry_delay * (2 ** attempt)
+                        wait_time = self.retry_delay * (2**attempt)
                         print(f"[GoogleProvider] Retrying in {wait_time}s...")
                         await asyncio.sleep(wait_time)
                         continue
                     else:
                         raise
 
-            return {'items': [], 'error': f'Falha apos {self.max_retries} tentativas: {last_error}'}
+            return {"items": [], "error": f"Falha apos {self.max_retries} tentativas: {last_error}"}
 
         finally:
             if temp_file and os.path.exists(temp_file):
@@ -326,11 +346,14 @@ NÃO retorne apenas um array! Retorne um objeto completo."""
         client = self._get_client()
         print(f"[GoogleProvider] Using Google SDK, model={self.model}")
 
-        parts = [self.prompt + "\n\n ATENCAO: Este documento tem MULTIPLAS PAGINAS. Extraia TODAS as transacoes de TODAS as paginas!"]
+        parts = [
+            self.prompt
+            + "\n\n ATENCAO: Este documento tem MULTIPLAS PAGINAS. Extraia TODAS as transacoes de TODAS as paginas!"
+        ]
 
         for i, (img_content, img_mime) in enumerate(images):
             parts.append(types.Part.from_bytes(data=img_content, mime_type=img_mime))
-            parts.append(f'[Pagina {i+1} de {len(images)}]')
+            parts.append(f"[Pagina {i + 1} de {len(images)}]")
 
         config = types.GenerateContentConfig(
             temperature=0.1,
@@ -342,7 +365,9 @@ NÃO retorne apenas um array! Retorne um objeto completo."""
         last_error = None
         for attempt in range(self.max_retries):
             try:
-                print(f"[GoogleProvider] Calling Gemini API (attempt {attempt + 1}/{self.max_retries})...")
+                print(
+                    f"[GoogleProvider] Calling Gemini API (attempt {attempt + 1}/{self.max_retries})..."
+                )
                 # Executa em thread separada para nao bloquear o event loop
                 response = await asyncio.to_thread(
                     self._generate_content_sync, client, self.model, parts, config
@@ -354,16 +379,18 @@ NÃO retorne apenas um array! Retorne um objeto completo."""
 
             except Exception as e:
                 last_error = e
-                print(f"[GoogleProvider] API error (attempt {attempt + 1}): {type(e).__name__}: {e}")
+                print(
+                    f"[GoogleProvider] API error (attempt {attempt + 1}): {type(e).__name__}: {e}"
+                )
                 if self._is_retryable_error(e) and attempt < self.max_retries - 1:
-                    wait_time = self.retry_delay * (2 ** attempt)
+                    wait_time = self.retry_delay * (2**attempt)
                     print(f"[GoogleProvider] Retrying in {wait_time}s...")
                     await asyncio.sleep(wait_time)
                     continue
                 else:
                     raise
 
-        return {'items': [], 'error': f'Falha apos {self.max_retries} tentativas: {last_error}'}
+        return {"items": [], "error": f"Falha apos {self.max_retries} tentativas: {last_error}"}
 
     async def _call_httpx(self, image_content: bytes, mime_type: str) -> dict:
         """Fallback: Chama Google Gemini API via httpx"""
@@ -371,59 +398,61 @@ NÃO retorne apenas um array! Retorne um objeto completo."""
 
         api_key = settings.google_api_key
         if not api_key:
-            return {'items': [], 'error': 'GOOGLE_API_KEY nao configurada'}
+            return {"items": [], "error": "GOOGLE_API_KEY nao configurada"}
 
-        image_base64 = base64.b64encode(image_content).decode('utf-8')
+        image_base64 = base64.b64encode(image_content).decode("utf-8")
 
         last_error = None
         for attempt in range(self.max_retries):
             try:
                 async with httpx.AsyncClient(timeout=60.0) as client:
                     response = await client.post(
-                        f'https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent',
+                        f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent",
                         headers={
-                            'x-goog-api-key': api_key,
-                            'Content-Type': 'application/json',
+                            "x-goog-api-key": api_key,
+                            "Content-Type": "application/json",
                         },
                         json={
-                            'contents': [{
-                                'parts': [
-                                    {'text': self.prompt},
-                                    {
-                                        'inline_data': {
-                                            'mime_type': mime_type,
-                                            'data': image_base64,
-                                        }
-                                    }
-                                ]
-                            }],
-                            'generationConfig': {
-                                'temperature': 0.1,
-                                'maxOutputTokens': 16000,
-                            }
+                            "contents": [
+                                {
+                                    "parts": [
+                                        {"text": self.prompt},
+                                        {
+                                            "inline_data": {
+                                                "mime_type": mime_type,
+                                                "data": image_base64,
+                                            }
+                                        },
+                                    ]
+                                }
+                            ],
+                            "generationConfig": {
+                                "temperature": 0.1,
+                                "maxOutputTokens": 16000,
+                            },
                         },
                     )
 
                     if response.status_code != 200:
-                        error_msg = f'Google API error: {response.status_code}'
+                        error_msg = f"Google API error: {response.status_code}"
                         if response.status_code in [503, 429]:
                             raise Exception(error_msg)
-                        return {'items': [], 'error': error_msg}
+                        return {"items": [], "error": error_msg}
 
                     result = response.json()
-                    content = result['candidates'][0]['content']['parts'][0]['text']
+                    content = result["candidates"][0]["content"]["parts"][0]["text"]
                     return self._parse_response(content)
 
             except Exception as e:
                 last_error = e
                 if self._is_retryable_error(e) and attempt < self.max_retries - 1:
-                    wait_time = self.retry_delay * (2 ** attempt)
+                    wait_time = self.retry_delay * (2**attempt)
                     await asyncio.sleep(wait_time)
                     continue
-                elif 'httpx' not in str(type(e).__module__):
+                elif "httpx" not in str(type(e).__module__):
                     raise
 
-        return {'items': [], 'error': f'Falha apos {self.max_retries} tentativas: {last_error}'}
+        return {"items": [], "error": f"Falha apos {self.max_retries} tentativas: {last_error}"}
 
     async def _call_multi_page_httpx(self, images: list[tuple[bytes, str]]) -> dict:
         """Fallback: Chama Google Gemini API com multiplas paginas via httpx"""
@@ -431,59 +460,66 @@ NÃO retorne apenas um array! Retorne um objeto completo."""
 
         api_key = settings.google_api_key
         if not api_key:
-            return {'items': [], 'error': 'GOOGLE_API_KEY nao configurada'}
+            return {"items": [], "error": "GOOGLE_API_KEY nao configurada"}
 
-        parts = [{'text': self.prompt + "\n\n ATENCAO: Este documento tem MULTIPLAS PAGINAS. Extraia TODAS as transacoes de TODAS as paginas!"}]
+        parts = [
+            {
+                "text": self.prompt
+                + "\n\n ATENCAO: Este documento tem MULTIPLAS PAGINAS. Extraia TODAS as transacoes de TODAS as paginas!"
+            }
+        ]
 
         for i, (img_content, img_mime) in enumerate(images):
-            image_base64 = base64.b64encode(img_content).decode('utf-8')
-            parts.append({
-                'inline_data': {
-                    'mime_type': img_mime,
-                    'data': image_base64,
+            image_base64 = base64.b64encode(img_content).decode("utf-8")
+            parts.append(
+                {
+                    "inline_data": {
+                        "mime_type": img_mime,
+                        "data": image_base64,
+                    }
                 }
-            })
-            parts.append({'text': f'[Pagina {i+1} de {len(images)}]'})
+            )
+            parts.append({"text": f"[Pagina {i + 1} de {len(images)}]"})
 
         last_error = None
         for attempt in range(self.max_retries):
             try:
                 async with httpx.AsyncClient(timeout=120.0) as client:
                     response = await client.post(
-                        f'https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent',
+                        f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent",
                         headers={
-                            'x-goog-api-key': api_key,
-                            'Content-Type': 'application/json',
+                            "x-goog-api-key": api_key,
+                            "Content-Type": "application/json",
                         },
                         json={
-                            'contents': [{'parts': parts}],
-                            'generationConfig': {
-                                'temperature': 0.1,
-                                'maxOutputTokens': 32000,
-                            }
+                            "contents": [{"parts": parts}],
+                            "generationConfig": {
+                                "temperature": 0.1,
+                                "maxOutputTokens": 32000,
+                            },
                         },
                     )
 
                     if response.status_code != 200:
-                        error_msg = f'Google API error: {response.status_code}'
+                        error_msg = f"Google API error: {response.status_code}"
                         if response.status_code in [503, 429]:
                             raise Exception(error_msg)
-                        return {'items': [], 'error': error_msg}
+                        return {"items": [], "error": error_msg}
 
                     result = response.json()
-                    if not result.get('candidates'):
-                        return {'items': [], 'error': 'Google API retornou resposta vazia'}
+                    if not result.get("candidates"):
+                        return {"items": [], "error": "Google API retornou resposta vazia"}
 
-                    content = result['candidates'][0]['content']['parts'][0]['text']
+                    content = result["candidates"][0]["content"]["parts"][0]["text"]
                     return self._parse_response(content)
 
             except Exception as e:
                 last_error = e
                 if self._is_retryable_error(e) and attempt < self.max_retries - 1:
-                    wait_time = self.retry_delay * (2 ** attempt)
+                    wait_time = self.retry_delay * (2**attempt)
                     await asyncio.sleep(wait_time)
                     continue
-                elif 'httpx' not in str(type(e).__module__):
+                elif "httpx" not in str(type(e).__module__):
                     raise
 
-        return {'items': [], 'error': f'Falha apos {self.max_retries} tentativas: {last_error}'}
+        return {"items": [], "error": f"Falha apos {self.max_retries} tentativas: {last_error}"}

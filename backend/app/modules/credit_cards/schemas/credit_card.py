@@ -67,7 +67,9 @@ class CreditCardResponse(CreditCardBase):
     is_active: bool
     created_at: datetime
     updated_at: datetime
-    has_invoice_password: bool = False  # Indicates if invoice password is saved (does not return the password)
+    has_invoice_password: bool = (
+        False  # Indicates if invoice password is saved (does not return the password)
+    )
 
     # Account info
     account_name: str | None = None
@@ -81,6 +83,7 @@ class CreditCardResponse(CreditCardBase):
 
 class CreditCardListResponse(BaseModel):
     """Simplified response for listing"""
+
     id: int
     account_id: int
     name: str  # from account
@@ -110,6 +113,7 @@ class CreditCardListResponse(BaseModel):
 
 class InvoicePasswordRequest(BaseModel):
     """Request to save invoice password"""
+
     password: str
 
     class Config:

@@ -1,4 +1,5 @@
 """Rate limiting configuration using slowapi"""
+
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from slowapi import Limiter
@@ -31,6 +32,6 @@ def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
         status_code=429,
         content={
             "detail": "Muitas requisições. Tente novamente em alguns minutos.",
-            "retry_after": exc.detail.split("per")[0].strip() if exc.detail else "1 minute"
-        }
+            "retry_after": exc.detail.split("per")[0].strip() if exc.detail else "1 minute",
+        },
     )

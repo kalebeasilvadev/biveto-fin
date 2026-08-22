@@ -21,6 +21,7 @@ class InvoiceCreate(InvoiceBase):
 
 class InvoiceFromDocument(BaseModel):
     """Criar fatura a partir de documento PDF"""
+
     document_id: int
     credit_card_id: int
     reference_month: int = Field(ge=1, le=12)
@@ -36,6 +37,7 @@ class InvoiceUpdate(BaseModel):
 
 class InvoicePayment(BaseModel):
     """Registrar pagamento de fatura"""
+
     amount: float = Field(gt=0)
     payment_account_id: int
     payment_date: date_type | None = None
@@ -77,11 +79,13 @@ class InvoiceResponse(InvoiceBase):
 
 class InvoiceDetailResponse(InvoiceResponse):
     """Resposta detalhada com transacoes"""
+
     transactions: list["InvoiceTransactionResponse"] = []
 
 
 class InvoiceTransactionResponse(BaseModel):
     """Transacao resumida para listagem na fatura"""
+
     id: int
     date: date_type
     description: str | None
@@ -98,6 +102,7 @@ class InvoiceTransactionResponse(BaseModel):
 
 class InvoiceSummary(BaseModel):
     """Resumo da fatura atual para exibir no card do cartao"""
+
     invoice_id: int | None
     reference_month: int
     reference_year: int
@@ -113,12 +118,14 @@ class InvoiceSummary(BaseModel):
 
 class CardDetectionResult(BaseModel):
     """Resultado da deteccao de cartao a partir do documento"""
+
     detected_cards: list["DetectedCardInfo"]
     suggested_card_id: int | None = None
 
 
 class DetectedCardInfo(BaseModel):
     """Informacoes de um cartao detectado"""
+
     credit_card_id: int
     account_name: str
     last_four_digits: str | None

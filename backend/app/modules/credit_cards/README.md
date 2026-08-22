@@ -62,10 +62,14 @@ credit_cards/
 ## Uso
 ```python
 from app.modules.credit_cards import (
-    credit_cards_router, invoices_router,
+    credit_cards_router,
+    invoices_router,
     InvoiceService,
-    CreditCardCreate, CreditCardResponse,
-    InvoiceCreate, InvoiceResponse, InvoicePayment,
+    CreditCardCreate,
+    CreditCardResponse,
+    InvoiceCreate,
+    InvoiceResponse,
+    InvoicePayment,
 )
 ```
 
@@ -97,11 +101,11 @@ Para melhorar o matching, o sistema mapeia emissores para variantes conhecidas:
 
 ```python
 {
-    'bradescard': ['bradescard', 'bradesco', 'bradesco amazon', 'amazon bradesco'],
-    'itau': ['itau', 'itaucard'],
-    'nubank': ['nubank', 'nu'],
-    'santander': ['santander'],
-    'amazon': ['amazon', 'bradesco', 'bradescard'],
+    "bradescard": ["bradescard", "bradesco", "bradesco amazon", "amazon bradesco"],
+    "itau": ["itau", "itaucard"],
+    "nubank": ["nubank", "nu"],
+    "santander": ["santander"],
+    "amazon": ["amazon", "bradesco", "bradescard"],
     # ... outros
 }
 ```

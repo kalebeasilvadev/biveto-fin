@@ -55,8 +55,11 @@ income/
 ```python
 from app.modules.income import (
     router,
-    IncomeSourceBase, IncomeSourceCreate, IncomeSourceUpdate,
-    IncomeSourceResponse, IncomeSourceListResponse,
+    IncomeSourceBase,
+    IncomeSourceCreate,
+    IncomeSourceUpdate,
+    IncomeSourceResponse,
+    IncomeSourceListResponse,
     IncomeTransactionService,
 )
 ```

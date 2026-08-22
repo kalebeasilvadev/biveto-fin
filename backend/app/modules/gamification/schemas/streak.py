@@ -14,6 +14,7 @@ class StreakType(str, Enum):
 
 class StreakResponse(BaseModel):
     """Resposta de um streak"""
+
     streak_type: StreakType
     current_count: int
     longest_count: int
@@ -31,6 +32,7 @@ class StreakResponse(BaseModel):
 
 class StreakDayInfo(BaseModel):
     """Informação de um dia no calendário de streak"""
+
     date: str
     day_name: str  # S, T, Q, Q, S, S, D
     completed: bool
@@ -40,6 +42,7 @@ class StreakDayInfo(BaseModel):
 
 class StreakWeekView(BaseModel):
     """Visualização da semana para o widget"""
+
     days: list[StreakDayInfo]
     current_streak: int
     streak_type: StreakType

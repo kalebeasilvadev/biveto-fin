@@ -5,23 +5,24 @@ Revises: add_payment_transaction_ids
 Create Date: 2025-01-13
 
 """
-from alembic import op
+
 import sqlalchemy as sa
 
+from alembic import op
 
 # revision identifiers, used by Alembic.
-revision = 'add_payment_method'
-down_revision = 'add_payment_txn_ids'
+revision = "add_payment_method"
+down_revision = "add_payment_txn_ids"
 branch_labels = None
 depends_on = None
 
 
 def upgrade():
     # Add payment_method column to transactions
-    op.add_column('transactions', sa.Column('payment_method', sa.String(20), nullable=True))
+    op.add_column("transactions", sa.Column("payment_method", sa.String(20), nullable=True))
 
     # Create index for payment_method
-    op.create_index('ix_transactions_payment_method', 'transactions', ['payment_method'])
+    op.create_index("ix_transactions_payment_method", "transactions", ["payment_method"])
 
     # Backfill existing data:
     # - Transactions with credit_card_id get 'credit_card'
@@ -50,10 +51,12 @@ def upgrade():
     """)
 
     # Add payment_method column to recurring_transactions
-    op.add_column('recurring_transactions', sa.Column('payment_method', sa.String(20), nullable=True))
+    op.add_column(
+        "recurring_transactions", sa.Column("payment_method", sa.String(20), nullable=True)
+    )
 
 
 def downgrade():
-    op.drop_column('recurring_transactions', 'payment_method')
-    op.drop_index('ix_transactions_payment_method', 'transactions')
-    op.drop_column('transactions', 'payment_method')
+    op.drop_column("recurring_transactions", "payment_method")
+    op.drop_index("ix_transactions_payment_method", "transactions")
+    op.drop_column("transactions", "payment_method")

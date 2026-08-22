@@ -1,4 +1,5 @@
 """Endpoints de Orçamento (Budget)"""
+
 from datetime import date
 
 from fastapi import APIRouter, Query
@@ -102,8 +103,12 @@ async def copy_budget(
     """
     service = BudgetService(db)
     budget = await service.copy_budget(
-        current_user, target_year, target_month,
-        data.source_year, data.source_month, data.include_rollover
+        current_user,
+        target_year,
+        target_month,
+        data.source_year,
+        data.source_month,
+        data.include_rollover,
     )
     return await service.get_budget(current_user, budget.year, budget.month)
 

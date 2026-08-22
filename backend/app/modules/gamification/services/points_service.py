@@ -13,17 +13,11 @@ class PointsService:
 
     async def get_or_create_balance(self, user: User) -> UserPoints:
         """Obtém ou cria o saldo de pontos do usuário"""
-        result = await self.db.execute(
-            select(UserPoints).where(UserPoints.user_id == user.id)
-        )
+        result = await self.db.execute(select(UserPoints).where(UserPoints.user_id == user.id))
         points = result.scalar_one_or_none()
 
         if not points:
-            points = UserPoints(
-                user_id=user.id,
-                current_points=0,
-                lifetime_points=0
-            )
+            points = UserPoints(user_id=user.id, current_points=0, lifetime_points=0)
             self.db.add(points)
             await self.db.flush()
             await self.db.refresh(points)
@@ -32,9 +26,7 @@ class PointsService:
 
     async def get_balance(self, user: User) -> UserPoints | None:
         """Obtém o saldo de pontos do usuário"""
-        result = await self.db.execute(
-            select(UserPoints).where(UserPoints.user_id == user.id)
-        )
+        result = await self.db.execute(select(UserPoints).where(UserPoints.user_id == user.id))
         return result.scalar_one_or_none()
 
     async def add_points(
@@ -43,7 +35,7 @@ class PointsService:
         amount: int,
         reason: str,
         reference_type: str | None = None,
-        reference_id: str | None = None
+        reference_id: str | None = None,
     ) -> tuple[UserPoints, PointsTransaction]:
         """Adiciona pontos ao usuário"""
         points = await self.get_or_create_balance(user)
@@ -59,7 +51,7 @@ class PointsService:
             balance_after=points.current_points,
             reason=reason,
             reference_type=reference_type,
-            reference_id=reference_id
+            reference_id=reference_id,
         )
         self.db.add(transaction)
         await self.db.flush()
@@ -73,7 +65,7 @@ class PointsService:
         amount: int,
         reason: str,
         reference_type: str | None = None,
-        reference_id: str | None = None
+        reference_id: str | None = None,
     ) -> tuple[UserPoints, PointsTransaction] | None:
         """Gasta pontos do usuário (retorna None se saldo insuficiente)"""
         points = await self.get_or_create_balance(user)
@@ -91,7 +83,7 @@ class PointsService:
             balance_after=points.current_points,
             reason=reason,
             reference_type=reference_type,
-            reference_id=reference_id
+            reference_id=reference_id,
         )
         self.db.add(transaction)
         await self.db.flush()
@@ -100,10 +92,7 @@ class PointsService:
         return points, transaction
 
     async def get_history(
-        self,
-        user: User,
-        limit: int = 20,
-        offset: int = 0
+        self, user: User, limit: int = 20, offset: int = 0
     ) -> list[PointsTransaction]:
         """Obtém histórico de transações de pontos"""
         result = await self.db.execute(

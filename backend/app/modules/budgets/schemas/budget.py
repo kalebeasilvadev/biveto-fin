@@ -1,4 +1,5 @@
 """Schemas para Budget (Orcamento)"""
+
 from datetime import datetime
 from decimal import Decimal
 
@@ -51,6 +52,7 @@ class BudgetItemResponse(BudgetItemBase):
 
 class BudgetItemHistoryResponse(BaseModel):
     """Resposta de histórico de item de orçamento"""
+
     id: int
     budget_item_id: int
     transaction_id: int | None
@@ -108,6 +110,7 @@ class BudgetResponse(BudgetBase):
 
 class BudgetSummary(BaseModel):
     """Resumo do orçamento para dashboard"""
+
     year: int
     month: int
     total_planned: Decimal
@@ -124,6 +127,7 @@ class BudgetSummary(BaseModel):
 
 class BudgetCopyRequest(BaseModel):
     """Request para copiar orçamento de outro mês"""
+
     source_year: int
     source_month: int
     include_rollover: bool = True
@@ -131,6 +135,7 @@ class BudgetCopyRequest(BaseModel):
 
 class BudgetComparisonResponse(BaseModel):
     """Comparação entre orçamento planejado e realizado"""
+
     category_id: int
     category_name: str
     planned: Decimal
@@ -142,6 +147,7 @@ class BudgetComparisonResponse(BaseModel):
 
 class BudgetTransferRequest(BaseModel):
     """Request para transferir orçamento entre categorias (inspirado em Envelopes)"""
+
     from_category_id: int = Field(..., description="Categoria de origem")
     to_category_id: int = Field(..., description="Categoria de destino")
     amount: Decimal = Field(..., gt=0, description="Valor a transferir")
@@ -150,6 +156,7 @@ class BudgetTransferRequest(BaseModel):
 
 class BudgetTransferResponse(BaseModel):
     """Resposta de transferência entre categorias"""
+
     from_item: BudgetItemResponse
     to_item: BudgetItemResponse
     amount: Decimal

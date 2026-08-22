@@ -67,8 +67,13 @@ admin/
 from app.modules.admin import (
     router,
     AdminDashboard,
-    LicenseCreate, LicenseUpdate, LicenseResponse,
-    UserAdminCreate, UserAdminUpdate, UserAdminResponse, UserListResponse,
+    LicenseCreate,
+    LicenseUpdate,
+    LicenseResponse,
+    UserAdminCreate,
+    UserAdminUpdate,
+    UserAdminResponse,
+    UserListResponse,
     HouseholdMemberSummary,
 )
 ```

@@ -2,6 +2,7 @@
 Rotas para gerenciamento de familia/household.
 Permite ao owner convidar membros e gerenciar a familia.
 """
+
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
 
@@ -25,8 +26,7 @@ def require_license(user: User):
     """Verifica se o usuario tem licenca"""
     if not user.license_id:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Usuario nao possui licenca"
+            status_code=status.HTTP_403_FORBIDDEN, detail="Usuario nao possui licenca"
         )
 
 
@@ -34,13 +34,11 @@ def require_can_invite(user: User):
     """Verifica se o usuario pode convidar membros"""
     if not user.household_membership:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Usuario nao pertence a nenhuma familia"
+            status_code=status.HTTP_403_FORBIDDEN, detail="Usuario nao pertence a nenhuma familia"
         )
     if not user.household_membership.can_invite_members:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Sem permissao para convidar membros"
+            status_code=status.HTTP_403_FORBIDDEN, detail="Sem permissao para convidar membros"
         )
 
 
@@ -50,9 +48,7 @@ async def get_family_context(current_user: CurrentUser, db: DbSession):
     require_license(current_user)
 
     # Buscar licenca
-    license_result = await db.execute(
-        select(License).where(License.id == current_user.license_id)
-    )
+    license_result = await db.execute(select(License).where(License.id == current_user.license_id))
     license = license_result.scalar_one_or_none()
 
     if not license:
@@ -68,29 +64,29 @@ async def get_family_context(current_user: CurrentUser, db: DbSession):
     user_ids = [m.user_id for m in members if m.user_id]
     users_by_id = {}
     if user_ids:
-        users_result = await db.execute(
-            select(User).where(User.id.in_(user_ids))
-        )
+        users_result = await db.execute(select(User).where(User.id.in_(user_ids)))
         users_by_id = {u.id: u for u in users_result.scalars().all()}
 
     members_response = []
     for m in members:
         user = users_by_id.get(m.user_id)
-        members_response.append(HouseholdMemberResponse(
-            id=m.id,
-            license_id=m.license_id,
-            user_id=m.user_id,
-            user_name=user.name if user else None,
-            user_email=user.email if user else None,
-            role=m.role,
-            nickname=m.nickname,
-            joined_at=m.joined_at,
-            invited_by_id=m.invited_by_id,
-            can_create_transactions=m.can_create_transactions,
-            can_edit_shared=m.can_edit_shared,
-            can_invite_members=m.can_invite_members,
-            can_see_all=m.can_see_all,
-        ))
+        members_response.append(
+            HouseholdMemberResponse(
+                id=m.id,
+                license_id=m.license_id,
+                user_id=m.user_id,
+                user_name=user.name if user else None,
+                user_email=user.email if user else None,
+                role=m.role,
+                nickname=m.nickname,
+                joined_at=m.joined_at,
+                invited_by_id=m.invited_by_id,
+                can_create_transactions=m.can_create_transactions,
+                can_edit_shared=m.can_edit_shared,
+                can_invite_members=m.can_invite_members,
+                can_see_all=m.can_see_all,
+            )
+        )
 
     # Verificar se usuario eh owner
     is_owner = False
@@ -100,7 +96,7 @@ async def get_family_context(current_user: CurrentUser, db: DbSession):
         can_invite = current_user.household_membership.can_invite_members
 
     # Tipo da licenca
-    license_type = license.type.value if hasattr(license.type, 'value') else str(license.type)
+    license_type = license.type.value if hasattr(license.type, "value") else str(license.type)
 
     return FamilyContext(
         license_id=license.id,
@@ -130,29 +126,29 @@ async def list_members(current_user: CurrentUser, db: DbSession):
     user_ids = [m.user_id for m in members if m.user_id]
     users_by_id = {}
     if user_ids:
-        users_result = await db.execute(
-            select(User).where(User.id.in_(user_ids))
-        )
+        users_result = await db.execute(select(User).where(User.id.in_(user_ids)))
         users_by_id = {u.id: u for u in users_result.scalars().all()}
 
     response = []
     for m in members:
         user = users_by_id.get(m.user_id)
-        response.append(HouseholdMemberResponse(
-            id=m.id,
-            license_id=m.license_id,
-            user_id=m.user_id,
-            user_name=user.name if user else None,
-            user_email=user.email if user else None,
-            role=m.role,
-            nickname=m.nickname,
-            joined_at=m.joined_at,
-            invited_by_id=m.invited_by_id,
-            can_create_transactions=m.can_create_transactions,
-            can_edit_shared=m.can_edit_shared,
-            can_invite_members=m.can_invite_members,
-            can_see_all=m.can_see_all,
-        ))
+        response.append(
+            HouseholdMemberResponse(
+                id=m.id,
+                license_id=m.license_id,
+                user_id=m.user_id,
+                user_name=user.name if user else None,
+                user_email=user.email if user else None,
+                role=m.role,
+                nickname=m.nickname,
+                joined_at=m.joined_at,
+                invited_by_id=m.invited_by_id,
+                can_create_transactions=m.can_create_transactions,
+                can_edit_shared=m.can_edit_shared,
+                can_invite_members=m.can_invite_members,
+                can_see_all=m.can_see_all,
+            )
+        )
 
     return response
 
@@ -168,9 +164,7 @@ async def invite_member(
     require_can_invite(current_user)
 
     # Buscar licenca para verificar limite
-    license_result = await db.execute(
-        select(License).where(License.id == current_user.license_id)
-    )
+    license_result = await db.execute(select(License).where(License.id == current_user.license_id))
     license = license_result.scalar_one_or_none()
 
     if not license:
@@ -179,8 +173,7 @@ async def invite_member(
     # Verificar limite de usuarios
     if not license.can_add_members:
         raise HTTPException(
-            status_code=400,
-            detail=f"Limite de {license.max_users} membros atingido"
+            status_code=400, detail=f"Limite de {license.max_users} membros atingido"
         )
 
     # Verificar se email ja esta cadastrado no sistema
@@ -190,7 +183,7 @@ async def invite_member(
         existing_member = await db.scalar(
             select(HouseholdMember).where(
                 HouseholdMember.license_id == license.id,
-                HouseholdMember.user_id == existing_user.id
+                HouseholdMember.user_id == existing_user.id,
             )
         )
         if existing_member:
@@ -200,8 +193,7 @@ async def invite_member(
     # Verificar se ja existe convite pendente
     existing_invite = await db.scalar(
         select(Invitation).where(
-            Invitation.email == data.email,
-            Invitation.status == InvitationStatus.PENDING
+            Invitation.email == data.email, Invitation.status == InvitationStatus.PENDING
         )
     )
     if existing_invite:
@@ -229,7 +221,9 @@ async def invite_member(
         print(f"Aviso: Email nao enviado para {data.email}")
 
     # Status pode ser Enum ou string dependendo de como foi carregado
-    status_value = invitation.status.value if hasattr(invitation.status, 'value') else str(invitation.status)
+    status_value = (
+        invitation.status.value if hasattr(invitation.status, "value") else str(invitation.status)
+    )
 
     return FamilyInviteResponse(
         invitation_id=invitation.id,
@@ -245,23 +239,27 @@ async def list_family_invitations(current_user: CurrentUser, db: DbSession):
     require_license(current_user)
 
     invitations_result = await db.execute(
-        select(Invitation).where(
+        select(Invitation)
+        .where(
             Invitation.license_id == current_user.license_id,
-            Invitation.status == InvitationStatus.PENDING
-        ).order_by(Invitation.created_at.desc())
+            Invitation.status == InvitationStatus.PENDING,
+        )
+        .order_by(Invitation.created_at.desc())
     )
     invitations = invitations_result.scalars().all()
 
     response = []
     for inv in invitations:
-        status_value = inv.status.value if hasattr(inv.status, 'value') else str(inv.status)
-        response.append(FamilyInvitationResponse(
-            id=inv.id,
-            email=inv.email,
-            status=status_value,
-            created_at=inv.created_at,
-            expires_at=inv.expires_at,
-        ))
+        status_value = inv.status.value if hasattr(inv.status, "value") else str(inv.status)
+        response.append(
+            FamilyInvitationResponse(
+                id=inv.id,
+                email=inv.email,
+                status=status_value,
+                created_at=inv.created_at,
+                expires_at=inv.expires_at,
+            )
+        )
 
     return response
 
@@ -276,9 +274,7 @@ async def cancel_family_invitation(
     require_license(current_user)
     require_can_invite(current_user)
 
-    invitation_result = await db.execute(
-        select(Invitation).where(Invitation.id == invitation_id)
-    )
+    invitation_result = await db.execute(select(Invitation).where(Invitation.id == invitation_id))
     invitation = invitation_result.scalar_one_or_none()
 
     if not invitation:
@@ -305,9 +301,7 @@ async def resend_family_invitation(
     require_license(current_user)
     require_can_invite(current_user)
 
-    invitation_result = await db.execute(
-        select(Invitation).where(Invitation.id == invitation_id)
-    )
+    invitation_result = await db.execute(select(Invitation).where(Invitation.id == invitation_id))
     invitation = invitation_result.scalar_one_or_none()
 
     if not invitation:
@@ -345,20 +339,17 @@ async def remove_family_member(
     # Verificar se o usuario eh owner da familia
     if not current_user.household_membership:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Usuario nao pertence a nenhuma familia"
+            status_code=status.HTTP_403_FORBIDDEN, detail="Usuario nao pertence a nenhuma familia"
         )
 
     if current_user.household_membership.role != HouseholdRole.OWNER.value:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Apenas o proprietario pode remover membros"
+            detail="Apenas o proprietario pode remover membros",
         )
 
     # Buscar membro a ser removido
-    member_result = await db.execute(
-        select(HouseholdMember).where(HouseholdMember.id == member_id)
-    )
+    member_result = await db.execute(select(HouseholdMember).where(HouseholdMember.id == member_id))
     member = member_result.scalar_one_or_none()
 
     if not member:
@@ -377,9 +368,7 @@ async def remove_family_member(
         raise HTTPException(status_code=400, detail="Nao e possivel remover o proprietario")
 
     # Buscar usuario para limpar a licenca dele
-    user_result = await db.execute(
-        select(User).where(User.id == member.user_id)
-    )
+    user_result = await db.execute(select(User).where(User.id == member.user_id))
     user = user_result.scalar_one_or_none()
 
     if user:

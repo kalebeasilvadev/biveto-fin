@@ -2,6 +2,7 @@
 Schemas do modulo auth.
 Exporta os schemas de autenticacao, usuario e convites.
 """
+
 from app.modules.auth.schemas.auth import (
     LoginRequest,
     Token,

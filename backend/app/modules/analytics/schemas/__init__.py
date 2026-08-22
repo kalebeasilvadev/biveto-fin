@@ -1,4 +1,5 @@
 """Analytics schemas."""
+
 from app.modules.analytics.schemas.analytics import (
     AnalyticsSummary,
     CategorySummary,

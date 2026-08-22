@@ -60,9 +60,15 @@ debts/
 from app.modules.debts import (
     router,
     DebtService,
-    DebtCreate, DebtUpdate, DebtPaymentCreate,
-    DebtResponse, DebtDetailResponse, DebtPaymentResponse,
-    DebtSummary, SnowballPlan, AvalanchePlan,
+    DebtCreate,
+    DebtUpdate,
+    DebtPaymentCreate,
+    DebtResponse,
+    DebtDetailResponse,
+    DebtPaymentResponse,
+    DebtSummary,
+    SnowballPlan,
+    AvalanchePlan,
     PayoffStrategyComparison,
 )
 ```

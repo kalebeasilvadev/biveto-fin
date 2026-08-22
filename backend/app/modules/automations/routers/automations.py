@@ -80,8 +80,7 @@ async def get_automation(
     rule = await service.get(current_user, rule_id)
     if not rule:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Automation rule not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Automation rule not found"
         )
     return service._to_response(rule)
 
@@ -98,8 +97,7 @@ async def update_automation(
     rule = await service.update(current_user, rule_id, data)
     if not rule:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Automation rule not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Automation rule not found"
         )
     return service._to_response(rule)
 
@@ -115,8 +113,7 @@ async def delete_automation(
     deleted = await service.delete(current_user, rule_id)
     if not deleted:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Automation rule not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Automation rule not found"
         )
 
 
@@ -131,8 +128,7 @@ async def toggle_automation(
     rule = await service.toggle(current_user, rule_id)
     if not rule:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Automation rule not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Automation rule not found"
         )
     return service._to_response(rule)
 
@@ -148,10 +144,7 @@ async def test_automation(
     try:
         return await service.test_rule(current_user, rule_id=rule_id)
     except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 
 
 @router.post("/{rule_id}/execute", response_model=AutomationExecutionResponse)
@@ -165,8 +158,7 @@ async def execute_automation(
     rule = await service.get(current_user, rule_id)
     if not rule:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Automation rule not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Automation rule not found"
         )
 
     execution = await service.execute_rule(
@@ -190,8 +182,7 @@ async def get_rule_executions(
     rule = await service.get(current_user, rule_id)
     if not rule:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Automation rule not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Automation rule not found"
         )
 
     return await service.get_executions(

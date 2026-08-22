@@ -11,6 +11,7 @@ from ..core.database import Base
 
 class PointsProgram(str, Enum):
     """Common points programs in Brazil"""
+
     LIVELO = "livelo"
     ESFERA = "esfera"
     SMILES = "smiles"
@@ -27,13 +28,12 @@ class CreditCard(Base):
     Credit card details linked to an account of type CREDIT_CARD.
     Stores limit, points program, billing dates, etc.
     """
+
     __tablename__ = "credit_cards"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     account_id: Mapped[int] = mapped_column(
-        ForeignKey("accounts.id", ondelete="CASCADE"),
-        unique=True,
-        index=True
+        ForeignKey("accounts.id", ondelete="CASCADE"), unique=True, index=True
     )
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
 
@@ -49,10 +49,14 @@ class CreditCard(Base):
     points_program: Mapped[str | None] = mapped_column(String(50))  # PointsProgram enum
     points_program_name: Mapped[str | None] = mapped_column(String(100))  # Custom name if OTHER
     points_factor: Mapped[float] = mapped_column(Numeric(6, 2), default=1.0)  # Points per R$1 spent
-    points_factor_international: Mapped[float | None] = mapped_column(Numeric(6, 2))  # Points for international purchases
+    points_factor_international: Mapped[float | None] = mapped_column(
+        Numeric(6, 2)
+    )  # Points for international purchases
 
     # Card details
-    nickname: Mapped[str | None] = mapped_column(String(50))  # User-friendly nickname: "Roxinho", "Cartão do trabalho"
+    nickname: Mapped[str | None] = mapped_column(
+        String(50)
+    )  # User-friendly nickname: "Roxinho", "Cartão do trabalho"
     bank_id: Mapped[str | None] = mapped_column(String(50))  # Bank ID: 'nubank', 'itau', etc.
     card_brand: Mapped[str | None] = mapped_column(String(50))  # Visa, Mastercard, Elo, Amex, etc.
     card_variant: Mapped[str | None] = mapped_column(String(100))  # Platinum, Black, Infinite, etc.
@@ -60,11 +64,15 @@ class CreditCard(Base):
 
     # Annual fee
     annual_fee: Mapped[float | None] = mapped_column(Numeric(10, 2))
-    annual_fee_frequency: Mapped[str] = mapped_column(String(20), default="monthly")  # 'monthly' or 'yearly'
+    annual_fee_frequency: Mapped[str] = mapped_column(
+        String(20), default="monthly"
+    )  # 'monthly' or 'yearly'
     annual_fee_waived: Mapped[bool] = mapped_column(Boolean, default=False)
 
     # Additional benefits
-    benefits_notes: Mapped[str | None] = mapped_column(Text)  # Free text for benefits like lounge access, insurance, etc.
+    benefits_notes: Mapped[str | None] = mapped_column(
+        Text
+    )  # Free text for benefits like lounge access, insurance, etc.
 
     # Invoice PDF password (encrypted for automatic PDF unlock)
     # IMPORTANT: This password is ONLY for unlocking password-protected invoice PDF files
@@ -75,9 +83,7 @@ class CreditCard(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=utc_now, onupdate=utc_now
-    )
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, onupdate=utc_now)
 
     # Relationships
     account: Mapped["Account"] = relationship(back_populates="credit_card_details")
@@ -85,7 +91,7 @@ class CreditCard(Base):
     invoices: Mapped[list["CreditCardInvoice"]] = relationship(
         back_populates="credit_card",
         lazy="noload",
-        order_by="desc(CreditCardInvoice.reference_year), desc(CreditCardInvoice.reference_month)"
+        order_by="desc(CreditCardInvoice.reference_year), desc(CreditCardInvoice.reference_month)",
     )
 
 

@@ -1,4 +1,5 @@
 """Serviço de envio de emails via SMTP"""
+
 import smtplib
 import ssl
 from email.mime.multipart import MIMEMultipart
@@ -175,7 +176,9 @@ class EmailService:
 
         return server
 
-    def send_email(self, to_email: str, subject: str, html_content: str, text_content: str = None) -> bool:
+    def send_email(
+        self, to_email: str, subject: str, html_content: str, text_content: str = None
+    ) -> bool:
         """Envia email HTML com cabeçalhos para melhor entregabilidade"""
         if not self.user or not self.password:
             print("SMTP não configurado - email não enviado")

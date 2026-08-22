@@ -30,13 +30,15 @@ class DuplicateDetectionService:
 
     # Constantes para hard rules de detecção de duplicatas em SÉRIES
     MAX_AMOUNT_DIFFERENCE_BRL = 0.05  # R$ 0,05 (5 centavos) - diferença absoluta máxima
-    MIN_NAME_OVERLAP = 0.80           # 80% mínimo de palavras em comum
+    MIN_NAME_OVERLAP = 0.80  # 80% mínimo de palavras em comum
 
     # Constantes para detecção de duplicatas em TRANSAÇÕES INDIVIDUAIS
     MAX_TRANSACTION_AMOUNT_DIFF = 0.05  # R$ 0,05 diferença máxima entre valores
-    MIN_DESCRIPTION_SIMILARITY = 80.0    # 80% similaridade mínima na descrição (fuzzy)
-    MAX_DATE_DIFFERENCE_DAYS = 3         # 3 dias de diferença máxima entre datas (transações normais)
-    MAX_DATE_DIFFERENCE_DAYS_INSTALLMENTS = 45  # 45 dias para parcelas (permite matching entre meses)
+    MIN_DESCRIPTION_SIMILARITY = 80.0  # 80% similaridade mínima na descrição (fuzzy)
+    MAX_DATE_DIFFERENCE_DAYS = 3  # 3 dias de diferença máxima entre datas (transações normais)
+    MAX_DATE_DIFFERENCE_DAYS_INSTALLMENTS = (
+        45  # 45 dias para parcelas (permite matching entre meses)
+    )
 
     def __init__(self, db: AsyncSession):
         self.db = db
@@ -59,35 +61,33 @@ class DuplicateDetectionService:
             return ""
 
         # Remove acentos
-        description = unicodedata.normalize('NFD', description)
-        description = ''.join(c for c in description if unicodedata.category(c) != 'Mn')
+        description = unicodedata.normalize("NFD", description)
+        description = "".join(c for c in description if unicodedata.category(c) != "Mn")
 
         # Lowercase
         description = description.lower()
 
         # Remove padrões de parcela (do mais específico ao mais genérico)
         parcela_patterns = [
-            r'\s*-?\s*parcela\s+\d+\s*/\s*\d+',  # "- Parcela 3/12" ou "Parcela 3/12"
-            r'\s*\(parcela\s*\d+\s*de\s*\d+\)',  # "(Parcela 3 de 12)"
-            r'\s*parc\.?\s*\d+\s*/\s*\d+',       # "PARC.3/12" ou "PARC 3/12"
-            r'\s*\(\s*\d+\s*/\s*\d+\s*\)',       # "(3/12)"
-            r'\s*\d+\s*/\s*\d+\s*$',              # "3/12" no final
+            r"\s*-?\s*parcela\s+\d+\s*/\s*\d+",  # "- Parcela 3/12" ou "Parcela 3/12"
+            r"\s*\(parcela\s*\d+\s*de\s*\d+\)",  # "(Parcela 3 de 12)"
+            r"\s*parc\.?\s*\d+\s*/\s*\d+",  # "PARC.3/12" ou "PARC 3/12"
+            r"\s*\(\s*\d+\s*/\s*\d+\s*\)",  # "(3/12)"
+            r"\s*\d+\s*/\s*\d+\s*$",  # "3/12" no final
         ]
         for pattern in parcela_patterns:
-            description = re.sub(pattern, '', description, flags=re.IGNORECASE)
+            description = re.sub(pattern, "", description, flags=re.IGNORECASE)
 
         # Remove caracteres especiais, mantendo apenas letras, números e espaços
-        description = re.sub(r'[^\w\s]', ' ', description)
+        description = re.sub(r"[^\w\s]", " ", description)
 
         # Remove espaços duplicados
-        description = re.sub(r'\s+', ' ', description).strip()
+        description = re.sub(r"\s+", " ", description).strip()
 
         return description
 
     async def find_duplicate_groups(
-        self,
-        user: User,
-        min_similarity: float = 0.7
+        self, user: User, min_similarity: float = 0.7
     ) -> list[DuplicateGroup]:
         """
         Detecta grupos de séries similares.
@@ -101,12 +101,14 @@ class DuplicateDetectionService:
         """
         # Buscar todas séries ativas
         result = await self.db.execute(
-            select(InstallmentSeries).where(
+            select(InstallmentSeries)
+            .where(
                 and_(
                     InstallmentSeries.user_id == user.id,
                     InstallmentSeries.status == InstallmentSeriesStatus.ACTIVE,
                 )
-            ).order_by(InstallmentSeries.created_at.desc())
+            )
+            .order_by(InstallmentSeries.created_at.desc())
         )
         series_list = list(result.scalars().all())
 
@@ -121,7 +123,7 @@ class DuplicateDetectionService:
             if series_a.id in processed_ids:
                 continue
 
-            for series_b in series_list[i + 1:]:
+            for series_b in series_list[i + 1 :]:
                 if series_b.id in processed_ids:
                     continue
 
@@ -141,20 +143,21 @@ class DuplicateDetectionService:
 
                     # Sugerir série primária (mais antiga)
                     suggested_primary_id = (
-                        series_a.id if series_a.created_at < series_b.created_at
-                        else series_b.id
+                        series_a.id if series_a.created_at < series_b.created_at else series_b.id
                     )
 
-                    duplicate_groups.append(DuplicateGroup(
-                        series=[
-                            InstallmentSeriesResponse.model_validate(series_a),
-                            InstallmentSeriesResponse.model_validate(series_b),
-                        ],
-                        similarity_score=score,
-                        conflicts=conflicts,
-                        suggested_primary_id=suggested_primary_id,
-                        estimated_excess=estimated_excess,
-                    ))
+                    duplicate_groups.append(
+                        DuplicateGroup(
+                            series=[
+                                InstallmentSeriesResponse.model_validate(series_a),
+                                InstallmentSeriesResponse.model_validate(series_b),
+                            ],
+                            similarity_score=score,
+                            conflicts=conflicts,
+                            suggested_primary_id=suggested_primary_id,
+                            estimated_excess=estimated_excess,
+                        )
+                    )
 
                     # Marcar como processadas
                     processed_ids.add(series_a.id)
@@ -203,6 +206,7 @@ class DuplicateDetectionService:
         if reference_month and reference_year:
             # Buscar por fatura (transactions que cairiam nessa fatura)
             from datetime import date
+
             # Aproximação: transações do mês anterior ao fechamento
             start_date = date(reference_year, reference_month - 1 if reference_month > 1 else 12, 1)
             end_date = date(reference_year, reference_month, 28)  # Aproximado
@@ -231,7 +235,7 @@ class DuplicateDetectionService:
             if tx_a.id in processed_ids:
                 continue
 
-            for tx_b in transactions[i + 1:]:
+            for tx_b in transactions[i + 1 :]:
                 if tx_b.id in processed_ids:
                     continue
 
@@ -248,24 +252,24 @@ class DuplicateDetectionService:
                     # Sugerir ação
                     suggested_action = self._suggest_duplicate_action(tx_a, tx_b)
 
-                    duplicate_pairs.append(TransactionDuplicatePair(
-                        transaction_a_id=tx_a.id,
-                        transaction_a_description=tx_a.description,
-                        transaction_a_date=tx_a.date,
-                        transaction_a_amount=float(tx_a.amount),
-                        transaction_a_is_installment=tx_a.installment_series_id is not None,
-
-                        transaction_b_id=tx_b.id,
-                        transaction_b_description=tx_b.description,
-                        transaction_b_date=tx_b.date,
-                        transaction_b_amount=float(tx_b.amount),
-                        transaction_b_is_installment=tx_b.installment_series_id is not None,
-
-                        similarity_score=score,
-                        amount_difference=amount_diff,
-                        days_apart=days_apart,
-                        suggested_action=suggested_action,
-                    ))
+                    duplicate_pairs.append(
+                        TransactionDuplicatePair(
+                            transaction_a_id=tx_a.id,
+                            transaction_a_description=tx_a.description,
+                            transaction_a_date=tx_a.date,
+                            transaction_a_amount=float(tx_a.amount),
+                            transaction_a_is_installment=tx_a.installment_series_id is not None,
+                            transaction_b_id=tx_b.id,
+                            transaction_b_description=tx_b.description,
+                            transaction_b_date=tx_b.date,
+                            transaction_b_amount=float(tx_b.amount),
+                            transaction_b_is_installment=tx_b.installment_series_id is not None,
+                            similarity_score=score,
+                            amount_difference=amount_diff,
+                            days_apart=days_apart,
+                            suggested_action=suggested_action,
+                        )
+                    )
 
                     # Marcar como processadas
                     processed_ids.add(tx_a.id)
@@ -277,8 +281,7 @@ class DuplicateDetectionService:
 
         # Calcular excesso estimado
         estimated_excess = sum(
-            min(pair.transaction_a_amount, pair.transaction_b_amount)
-            for pair in duplicate_pairs
+            min(pair.transaction_a_amount, pair.transaction_b_amount) for pair in duplicate_pairs
         )
 
         return TransactionDuplicatesResponse(
@@ -316,11 +319,11 @@ class DuplicateDetectionService:
 
         # Usar tolerância maior para parcelas (permite matching entre meses diferentes)
         is_installment = (
-            (tx_a.installment_number is not None and tx_a.installment_total is not None) or
-            (tx_b.installment_number is not None and tx_b.installment_total is not None)
-        )
+            tx_a.installment_number is not None and tx_a.installment_total is not None
+        ) or (tx_b.installment_number is not None and tx_b.installment_total is not None)
         max_date_diff = (
-            self.MAX_DATE_DIFFERENCE_DAYS_INSTALLMENTS if is_installment
+            self.MAX_DATE_DIFFERENCE_DAYS_INSTALLMENTS
+            if is_installment
             else self.MAX_DATE_DIFFERENCE_DAYS
         )
 
@@ -336,10 +339,7 @@ class DuplicateDetectionService:
         normalized_desc_b = self._normalize_description(tx_b.description)
 
         # Usar fuzzy matching para comparar descrições normalizadas
-        description_similarity = fuzz.partial_ratio(
-            normalized_desc_a,
-            normalized_desc_b
-        )
+        description_similarity = fuzz.partial_ratio(normalized_desc_a, normalized_desc_b)
 
         if description_similarity < self.MIN_DESCRIPTION_SIMILARITY:
             return False, 0.0
@@ -399,9 +399,7 @@ class DuplicateDetectionService:
         return "review"
 
     def _calculate_similarity_score(
-        self,
-        series_a: InstallmentSeries,
-        series_b: InstallmentSeries
+        self, series_a: InstallmentSeries, series_b: InstallmentSeries
     ) -> float:
         """
         Calcula score de similaridade entre duas séries (0.0 a 1.0).
@@ -506,9 +504,7 @@ class DuplicateDetectionService:
         return score
 
     async def _find_conflicts(
-        self,
-        series_a: InstallmentSeries,
-        series_b: InstallmentSeries
+        self, series_a: InstallmentSeries, series_b: InstallmentSeries
     ) -> list[ConflictDetail]:
         """
         Encontra conflitos entre duas séries (parcelas duplicadas).
@@ -517,16 +513,12 @@ class DuplicateDetectionService:
         """
         # Buscar transações de ambas séries
         result_a = await self.db.execute(
-            select(Transaction).where(
-                Transaction.installment_series_id == series_a.id
-            )
+            select(Transaction).where(Transaction.installment_series_id == series_a.id)
         )
         transactions_a = {t.installment_number: t for t in result_a.scalars().all()}
 
         result_b = await self.db.execute(
-            select(Transaction).where(
-                Transaction.installment_series_id == series_b.id
-            )
+            select(Transaction).where(Transaction.installment_series_id == series_b.id)
         )
         transactions_b = {t.installment_number: t for t in result_b.scalars().all()}
 
@@ -538,14 +530,16 @@ class DuplicateDetectionService:
             tx_a = transactions_a[num]
             tx_b = transactions_b[num]
 
-            conflicts.append(ConflictDetail(
-                installment_number=num,
-                series_a_transaction_id=tx_a.id,
-                series_a_date=tx_a.date,
-                series_b_transaction_id=tx_b.id,
-                series_b_date=tx_b.date,
-                description=f"Parcela {num}/{series_a.installment_count} existe em ambas as séries"
-            ))
+            conflicts.append(
+                ConflictDetail(
+                    installment_number=num,
+                    series_a_transaction_id=tx_a.id,
+                    series_a_date=tx_a.date,
+                    series_b_transaction_id=tx_b.id,
+                    series_b_date=tx_b.date,
+                    description=f"Parcela {num}/{series_a.installment_count} existe em ambas as séries",
+                )
+            )
 
         return conflicts
 
@@ -555,7 +549,7 @@ class DuplicateDetectionService:
         source_id: int,
         target_id: int,
         conflict_resolution: str = "keep_oldest",
-        new_merchant_name: str | None = None
+        new_merchant_name: str | None = None,
     ) -> InstallmentSeries:
         """
         Mescla duas séries.
@@ -574,8 +568,7 @@ class DuplicateDetectionService:
 
         if not source or not target:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Série não encontrada"
+                status_code=status.HTTP_404_NOT_FOUND, detail="Série não encontrada"
             )
 
         # Verificar conflitos
@@ -583,9 +576,7 @@ class DuplicateDetectionService:
 
         # Buscar todas transações da source
         result = await self.db.execute(
-            select(Transaction).where(
-                Transaction.installment_series_id == source_id
-            )
+            select(Transaction).where(Transaction.installment_series_id == source_id)
         )
         source_transactions = list(result.scalars().all())
 
@@ -600,9 +591,12 @@ class DuplicateDetectionService:
                     if tx_a_date < tx_b_date:
                         # A é mais antiga, deletar B
                         tx_to_delete = next(
-                            (t for t in source_transactions
-                             if t.id == conflict.series_b_transaction_id),
-                            None
+                            (
+                                t
+                                for t in source_transactions
+                                if t.id == conflict.series_b_transaction_id
+                            ),
+                            None,
                         )
                     else:
                         # B é mais antiga, deletar A da target
@@ -628,9 +622,12 @@ class DuplicateDetectionService:
                     if tx_a_date > tx_b_date:
                         # A é mais recente, deletar B
                         tx_to_delete = next(
-                            (t for t in source_transactions
-                             if t.id == conflict.series_b_transaction_id),
-                            None
+                            (
+                                t
+                                for t in source_transactions
+                                if t.id == conflict.series_b_transaction_id
+                            ),
+                            None,
                         )
                     else:
                         # B é mais recente, deletar A da target
@@ -663,10 +660,7 @@ class DuplicateDetectionService:
         # Recalcular paid_count da target
         result_target = await self.db.execute(
             select(Transaction).where(
-                and_(
-                    Transaction.installment_series_id == target_id,
-                    Transaction.is_paid == True
-                )
+                and_(Transaction.installment_series_id == target_id, Transaction.is_paid == True)
             )
         )
         target.paid_count = len(list(result_target.scalars().all()))

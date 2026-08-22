@@ -96,7 +96,9 @@ class AlertEngine:
                         entity_id=invoice.id,
                         action_url=f"/invoices/{invoice.id}",
                         action_label="Ver fatura",
-                        priority=NotificationPriority.HIGH if days_until_due <= 3 else NotificationPriority.NORMAL,
+                        priority=NotificationPriority.HIGH
+                        if days_until_due <= 3
+                        else NotificationPriority.NORMAL,
                         icon="credit-card",
                         color="orange" if days_until_due > 1 else "red",
                     )
@@ -156,19 +158,25 @@ class AlertEngine:
         items = items_result.scalars().all()
 
         # Fetch ALL category spending in ONE query (instead of N queries)
-        category_ids = [item.category_id for item in items if item.limit_amount > 0 and item.category_id]
+        category_ids = [
+            item.category_id for item in items if item.limit_amount > 0 and item.category_id
+        ]
         spending_by_category: dict[int, Decimal] = {}
         if category_ids:
-            spending_query = select(
-                Transaction.category_id,
-                func.coalesce(func.sum(Transaction.amount), 0).label("spent"),
-            ).where(
-                Transaction.user_id == user.id,
-                Transaction.category_id.in_(category_ids),
-                Transaction.type == "expense",
-                func.extract("year", Transaction.date) == today.year,
-                func.extract("month", Transaction.date) == today.month,
-            ).group_by(Transaction.category_id)
+            spending_query = (
+                select(
+                    Transaction.category_id,
+                    func.coalesce(func.sum(Transaction.amount), 0).label("spent"),
+                )
+                .where(
+                    Transaction.user_id == user.id,
+                    Transaction.category_id.in_(category_ids),
+                    Transaction.type == "expense",
+                    func.extract("year", Transaction.date) == today.year,
+                    func.extract("month", Transaction.date) == today.month,
+                )
+                .group_by(Transaction.category_id)
+            )
             spending_result = await self.db.execute(spending_query)
             spending_by_category = {row.category_id: row.spent for row in spending_result.all()}
 
@@ -306,9 +314,24 @@ class AlertEngine:
 
             # Check milestones
             milestones = [
-                (100, NotificationType.GOAL_ACHIEVED, "Meta alcançada! 🎉", NotificationPriority.HIGH),
-                (75, NotificationType.GOAL_MILESTONE_75, "75% da meta!", NotificationPriority.NORMAL),
-                (50, NotificationType.GOAL_MILESTONE_50, "50% da meta!", NotificationPriority.NORMAL),
+                (
+                    100,
+                    NotificationType.GOAL_ACHIEVED,
+                    "Meta alcançada! 🎉",
+                    NotificationPriority.HIGH,
+                ),
+                (
+                    75,
+                    NotificationType.GOAL_MILESTONE_75,
+                    "75% da meta!",
+                    NotificationPriority.NORMAL,
+                ),
+                (
+                    50,
+                    NotificationType.GOAL_MILESTONE_50,
+                    "50% da meta!",
+                    NotificationPriority.NORMAL,
+                ),
                 (25, NotificationType.GOAL_MILESTONE_25, "25% da meta!", NotificationPriority.LOW),
             ]
 
@@ -367,7 +390,9 @@ class AlertEngine:
                         entity_id=account.id,
                         action_url="/accounts",
                         action_label="Ver contas",
-                        priority=NotificationPriority.NORMAL if account.balance >= 0 else NotificationPriority.HIGH,
+                        priority=NotificationPriority.NORMAL
+                        if account.balance >= 0
+                        else NotificationPriority.HIGH,
                         icon="alert-triangle",
                         color="orange" if account.balance >= 0 else "red",
                     )
@@ -453,9 +478,7 @@ class AlertEngine:
             ):
                 continue
 
-            scheduled_for = now + timedelta(
-                minutes=idx * self._START_OF_MONTH_STAGGER_MINUTES
-            )
+            scheduled_for = now + timedelta(minutes=idx * self._START_OF_MONTH_STAGGER_MINUTES)
 
             await self._create_missing_invoice_notification(
                 user_id=user.id,
@@ -599,18 +622,25 @@ class AlertEngine:
         result = await self.db.execute(query)
         for notification in result.scalars().all():
             data = notification.extra_data or {}
-            if (
-                data.get("ref_month") == reference_month
-                and data.get("ref_year") == reference_year
-            ):
+            if data.get("ref_month") == reference_month and data.get("ref_year") == reference_year:
                 return True
         return False
 
     @staticmethod
     def _month_name(month: int) -> str:
         names = [
-            "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-            "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
+            "Janeiro",
+            "Fevereiro",
+            "Março",
+            "Abril",
+            "Maio",
+            "Junho",
+            "Julho",
+            "Agosto",
+            "Setembro",
+            "Outubro",
+            "Novembro",
+            "Dezembro",
         ]
         return names[month - 1]
 

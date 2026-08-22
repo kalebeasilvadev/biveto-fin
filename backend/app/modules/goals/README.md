@@ -57,9 +57,15 @@ goals/
 from app.modules.goals import (
     router,
     GoalService,
-    GoalCreate, GoalUpdate, GoalContributionCreate,
-    GoalResponse, GoalDetailResponse, GoalContributionResponse,
-    GoalSummary, EmergencyFundCalculation, PNIFCalculation,
+    GoalCreate,
+    GoalUpdate,
+    GoalContributionCreate,
+    GoalResponse,
+    GoalDetailResponse,
+    GoalContributionResponse,
+    GoalSummary,
+    EmergencyFundCalculation,
+    PNIFCalculation,
 )
 ```
 

@@ -3,21 +3,21 @@
 Script para migrar transacoes antigas de mercado para a tabela grocery_purchases.
 Execute com: python scripts/backfill_grocery_purchases.py [--dry-run]
 """
+
 import asyncio
-import sys
 import os
-from datetime import date
+import sys
 
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from sqlalchemy import select, and_, func
+from sqlalchemy import and_, func, select
 from sqlalchemy.orm import selectinload
-from app.core.database import async_session_maker
-from app.models.transaction import Transaction
-from app.models.category import Category
-from app.models.grocery import GroceryPurchase, GroceryCategory, NecessityType
 
+from app.core.database import async_session_maker
+from app.models.category import Category
+from app.models.grocery import GroceryCategory, GroceryPurchase, NecessityType
+from app.models.transaction import Transaction
 
 # Categorias que indicam compras de mercado
 MARKET_CATEGORY_NAMES = [
@@ -69,7 +69,9 @@ async def backfill_grocery_purchases(dry_run: bool = True):
                 and_(
                     Transaction.category_id.in_(category_ids),
                     Transaction.type == "expense",
-                    ~Transaction.id.in_(existing_transaction_ids) if existing_transaction_ids else True,
+                    ~Transaction.id.in_(existing_transaction_ids)
+                    if existing_transaction_ids
+                    else True,
                 )
             )
             .order_by(Transaction.date.desc())
@@ -121,10 +123,10 @@ async def backfill_grocery_purchases(dry_run: bool = True):
 
         if not dry_run:
             await db.commit()
-            print(f"\n{'='*50}")
+            print(f"\n{'=' * 50}")
             print(f"Criados {created_count} registros de grocery_purchase!")
         else:
-            print(f"\n{'='*50}")
+            print(f"\n{'=' * 50}")
             print(f"[DRY-RUN] Seriam criados {len(transactions)} registros.")
             print("Execute sem --dry-run para criar os registros.")
 

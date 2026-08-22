@@ -46,7 +46,10 @@ accounts/
 ```python
 from app.modules.accounts import (
     router,
-    AccountBase, AccountCreate, AccountUpdate, AccountResponse,
+    AccountBase,
+    AccountCreate,
+    AccountUpdate,
+    AccountResponse,
 )
 ```
 

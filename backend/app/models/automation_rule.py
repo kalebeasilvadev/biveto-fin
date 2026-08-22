@@ -15,22 +15,25 @@ from ..core.database import Base
 
 class TriggerType(str, Enum):
     """Types of triggers that can activate an automation."""
-    SCHEDULE = "schedule"          # Run on a schedule (daily, weekly, monthly)
-    EVENT = "event"                # React to events (transaction created, invoice due, etc.)
-    THRESHOLD = "threshold"        # React to thresholds (balance below X, budget above Y%)
+
+    SCHEDULE = "schedule"  # Run on a schedule (daily, weekly, monthly)
+    EVENT = "event"  # React to events (transaction created, invoice due, etc.)
+    THRESHOLD = "threshold"  # React to thresholds (balance below X, budget above Y%)
 
 
 class ActionType(str, Enum):
     """Types of actions an automation can perform."""
-    TRANSFER = "transfer"          # Transfer between accounts
-    CATEGORIZE = "categorize"      # Auto-categorize transaction
-    NOTIFY = "notify"              # Send notification
-    TAG = "tag"                    # Add tag to transaction
-    GENERATE = "generate"          # Generate a transaction
+
+    TRANSFER = "transfer"  # Transfer between accounts
+    CATEGORIZE = "categorize"  # Auto-categorize transaction
+    NOTIFY = "notify"  # Send notification
+    TAG = "tag"  # Add tag to transaction
+    GENERATE = "generate"  # Generate a transaction
 
 
 class ScheduleFrequency(str, Enum):
     """Frequency options for scheduled automations."""
+
     DAILY = "daily"
     WEEKLY = "weekly"
     BIWEEKLY = "biweekly"
@@ -39,6 +42,7 @@ class ScheduleFrequency(str, Enum):
 
 class EventType(str, Enum):
     """Event types that can trigger automations."""
+
     TRANSACTION_CREATED = "transaction_created"
     TRANSACTION_UPDATED = "transaction_updated"
     INVOICE_CLOSED = "invoice_closed"
@@ -50,6 +54,7 @@ class EventType(str, Enum):
 
 class ThresholdType(str, Enum):
     """Threshold types for conditional automations."""
+
     BALANCE_BELOW = "balance_below"
     BALANCE_ABOVE = "balance_above"
     BUDGET_PERCENT_ABOVE = "budget_percent_above"
@@ -63,13 +68,11 @@ class AutomationRule(Base):
     Users can create rules that automatically perform actions
     based on triggers (schedule, events, thresholds).
     """
+
     __tablename__ = "automation_rules"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"),
-        index=True
-    )
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
 
     # Basic info
     name: Mapped[str] = mapped_column(String(100))
@@ -182,10 +185,7 @@ class AutomationRule(Base):
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(default=utc_now)
-    updated_at: Mapped[datetime] = mapped_column(
-        default=utc_now,
-        onupdate=utc_now
-    )
+    updated_at: Mapped[datetime] = mapped_column(default=utc_now, onupdate=utc_now)
 
     # Ownership
     ownership_type: Mapped[str] = mapped_column(String(20), default="user")
@@ -193,9 +193,7 @@ class AutomationRule(Base):
     # Relationships
     user = relationship("User", back_populates="automation_rules")
     executions = relationship(
-        "AutomationExecution",
-        back_populates="rule",
-        cascade="all, delete-orphan"
+        "AutomationExecution", back_populates="rule", cascade="all, delete-orphan"
     )
 
     __table_args__ = (
@@ -212,12 +210,12 @@ class AutomationExecution(Base):
     Execution history for automation rules.
     Tracks when rules run, their results, and any errors.
     """
+
     __tablename__ = "automation_executions"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     rule_id: Mapped[int] = mapped_column(
-        ForeignKey("automation_rules.id", ondelete="CASCADE"),
-        index=True
+        ForeignKey("automation_rules.id", ondelete="CASCADE"), index=True
     )
 
     # Execution details
@@ -257,9 +255,7 @@ class AutomationExecution(Base):
     # Relationships
     rule = relationship("AutomationRule", back_populates="executions")
 
-    __table_args__ = (
-        Index("ix_automation_executions_rule_date", "rule_id", "executed_at"),
-    )
+    __table_args__ = (Index("ix_automation_executions_rule_date", "rule_id", "executed_at"),)
 
     def __repr__(self) -> str:
         return f"<AutomationExecution {self.id}: {self.status}>"

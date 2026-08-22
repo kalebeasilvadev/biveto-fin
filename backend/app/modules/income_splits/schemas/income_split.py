@@ -7,6 +7,7 @@ from app.models.income_split_rule import SplitType
 
 class IncomeSplitRuleBase(BaseModel):
     """Base schema with common fields for income split rules"""
+
     name: str = Field(min_length=1, max_length=100)
     split_type: SplitType
     percentage: float | None = Field(None, ge=0, le=100)  # 0-100%
@@ -29,11 +30,13 @@ class IncomeSplitRuleBase(BaseModel):
 
 class IncomeSplitRuleCreate(IncomeSplitRuleBase):
     """Schema for creating a new income split rule"""
+
     pass
 
 
 class IncomeSplitRuleUpdate(BaseModel):
     """Schema for updating an existing income split rule (all fields optional)"""
+
     name: str | None = Field(None, min_length=1, max_length=100)
     split_type: SplitType | None = None
     percentage: float | None = Field(None, ge=0, le=100)
@@ -46,6 +49,7 @@ class IncomeSplitRuleUpdate(BaseModel):
 
 class IncomeSplitRuleResponse(BaseModel):
     """Schema for returning an income split rule"""
+
     id: int
     user_id: int
     name: str
@@ -66,6 +70,7 @@ class IncomeSplitRuleResponse(BaseModel):
 
 class IncomeSplitPreview(BaseModel):
     """Preview of what a split would generate for a given income amount"""
+
     rule_id: int
     rule_name: str
     split_type: str
@@ -77,6 +82,7 @@ class IncomeSplitPreview(BaseModel):
 
 class AppliedSplitResponse(BaseModel):
     """Response when splits are applied to an income transaction"""
+
     source_transaction_id: int
     generated_expenses: list[dict]  # List of created expense transactions
     total_split_amount: float

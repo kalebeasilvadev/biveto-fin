@@ -25,8 +25,7 @@ class StreakService:
         # Buscar streak existente
         result = await self.db.execute(
             select(UserStreak).where(
-                UserStreak.user_id == user.id,
-                UserStreak.streak_type == streak_type.value
+                UserStreak.user_id == user.id, UserStreak.streak_type == streak_type.value
             )
         )
         streak = result.scalar_one_or_none()
@@ -90,8 +89,7 @@ class StreakService:
         """Retorna dados do streak com informações adicionais"""
         result = await self.db.execute(
             select(UserStreak).where(
-                UserStreak.user_id == user.id,
-                UserStreak.streak_type == streak_type.value
+                UserStreak.user_id == user.id, UserStreak.streak_type == streak_type.value
             )
         )
         streak = result.scalar_one_or_none()
@@ -162,13 +160,15 @@ class StreakService:
                 streak_start = last_action - timedelta(days=current_count - 1)
                 completed = streak_start <= day <= last_action
 
-            days.append(StreakDayInfo(
-                date=day.isoformat(),
-                day_name=day_names[day.weekday()],
-                completed=completed,
-                is_today=day == today,
-                is_future=day > today,
-            ))
+            days.append(
+                StreakDayInfo(
+                    date=day.isoformat(),
+                    day_name=day_names[day.weekday()],
+                    completed=completed,
+                    is_today=day == today,
+                    is_future=day > today,
+                )
+            )
 
         return StreakWeekView(
             days=days,

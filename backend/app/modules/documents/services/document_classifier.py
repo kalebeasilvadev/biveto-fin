@@ -9,12 +9,14 @@ Design:
 - Custo adicional: ~$0.0001 por documento
 - Tempo adicional: 0.5-2s
 """
+
 import asyncio
 from enum import Enum
 
 
 class DocumentType(Enum):
     """Tipos de documentos financeiros suportados"""
+
     CUPOM_FISCAL = "cupom_fiscal"
     FATURA_CARTAO = "fatura_cartao"
     EXTRATO_BANCARIO = "extrato_bancario"
@@ -94,12 +96,7 @@ class DocumentClassifier:
             use_llm_fallback: Se True, usa LLM quando regras sao inconclusivas
         """
         self.use_llm_fallback = use_llm_fallback
-        self._stats = {
-            'total': 0,
-            'by_rules': 0,
-            'by_llm': 0,
-            'unknown': 0
-        }
+        self._stats = {"total": 0, "by_rules": 0, "by_llm": 0, "unknown": 0}
 
     async def classify(self, ocr_text: str, max_chars: int = 3000) -> DocumentType:
         """Classifica documento usando texto OCR
@@ -115,7 +112,7 @@ class DocumentClassifier:
         Returns:
             DocumentType enum
         """
-        self._stats['total'] += 1
+        self._stats["total"] += 1
 
         # Usar apenas inicio do documento (suficiente para classificacao)
         text_sample = ocr_text[:max_chars]
@@ -124,7 +121,7 @@ class DocumentClassifier:
         rule_based = self._classify_by_rules(text_sample)
 
         if rule_based != DocumentType.UNKNOWN:
-            self._stats['by_rules'] += 1
+            self._stats["by_rules"] += 1
             print(f"[Classifier] Classificado por regras: {rule_based.value}")
             print(f"[Classifier] Stats: {self._stats}")
             return rule_based
@@ -134,14 +131,14 @@ class DocumentClassifier:
             print("[Classifier] Regras inconclusivas, usando LLM...")
             llm_result = await self._classify_by_llm(text_sample)
             if llm_result != DocumentType.UNKNOWN:
-                self._stats['by_llm'] += 1
+                self._stats["by_llm"] += 1
             else:
-                self._stats['unknown'] += 1
+                self._stats["unknown"] += 1
             print(f"[Classifier] Classificado por LLM: {llm_result.value}")
             print(f"[Classifier] Stats: {self._stats}")
             return llm_result
 
-        self._stats['unknown'] += 1
+        self._stats["unknown"] += 1
         print("[Classifier] Nao foi possivel classificar (UNKNOWN)")
         print(f"[Classifier] Stats: {self._stats}")
         return DocumentType.UNKNOWN
@@ -163,12 +160,15 @@ class DocumentClassifier:
         # ===== DECISORES FORTES (classificacao imediata) =====
 
         # Cupom fiscal - indicadores exclusivos
-        if any(phrase in text_lower for phrase in [
-            "nfc-e",
-            "danfe nfc",
-            "cupom fiscal eletronico",
-            "nota fiscal consumidor eletron",
-        ]):
+        if any(
+            phrase in text_lower
+            for phrase in [
+                "nfc-e",
+                "danfe nfc",
+                "cupom fiscal eletronico",
+                "nota fiscal consumidor eletron",
+            ]
+        ):
             print("[Classifier] Decisor forte: NFC-e detectado")
             return DocumentType.CUPOM_FISCAL
 
@@ -176,18 +176,22 @@ class DocumentClassifier:
         if "chave de acesso" in text_lower and any(c.isdigit() for c in text):
             # Verificar se tem sequencia longa de digitos
             import re
-            digit_sequences = re.findall(r'\d+', text)
+
+            digit_sequences = re.findall(r"\d+", text)
             if any(len(seq) >= 40 for seq in digit_sequences):
                 print("[Classifier] Decisor forte: Chave de acesso detectada")
                 return DocumentType.CUPOM_FISCAL
 
         # Fatura - indicadores exclusivos
-        if any(phrase in text_lower for phrase in [
-            "limite de credito",
-            "limite total",
-            "limite disponivel",
-            "cartao final",
-        ]):
+        if any(
+            phrase in text_lower
+            for phrase in [
+                "limite de credito",
+                "limite total",
+                "limite disponivel",
+                "cartao final",
+            ]
+        ):
             print("[Classifier] Decisor forte: Limite de credito detectado")
             return DocumentType.FATURA_CARTAO
 
@@ -225,11 +229,17 @@ class DocumentClassifier:
             ("parcelamento", 7),
             ("encargos", 6),
             # Bancos/fintechs (peso medio - podem aparecer em cupons de co-branded)
-            ("nubank", 5), ("itau", 5), ("bradesco", 5),
-            ("santander", 5), ("inter", 5), ("banco do brasil", 5),
+            ("nubank", 5),
+            ("itau", 5),
+            ("bradesco", 5),
+            ("santander", 5),
+            ("inter", 5),
+            ("banco do brasil", 5),
             ("total a pagar", 4),
             ("bandeira", 3),
-            ("visa", 2), ("mastercard", 2), ("elo", 2),
+            ("visa", 2),
+            ("mastercard", 2),
+            ("elo", 2),
         ]
 
         # Indicadores de EXTRATO BANCARIO (peso total: 100)
@@ -263,7 +273,9 @@ class DocumentClassifier:
                 extrato_score += weight
                 print(f"[Classifier] Extrato: '{indicator}' (+{weight}) = {extrato_score}")
 
-        print(f"[Classifier] Score final: cupom={cupom_score}, fatura={fatura_score}, extrato={extrato_score}")
+        print(
+            f"[Classifier] Score final: cupom={cupom_score}, fatura={fatura_score}, extrato={extrato_score}"
+        )
 
         # ===== DECISAO COM MARGEM DE CONFIANCA =====
 
@@ -276,37 +288,60 @@ class DocumentClassifier:
             return DocumentType.UNKNOWN
 
         # Verificar se tem margem suficiente
-        if cupom_score == max_score and cupom_score >= fatura_score + MARGEM_CONFIANCA and cupom_score >= extrato_score + MARGEM_CONFIANCA:
+        if (
+            cupom_score == max_score
+            and cupom_score >= fatura_score + MARGEM_CONFIANCA
+            and cupom_score >= extrato_score + MARGEM_CONFIANCA
+        ):
             return DocumentType.CUPOM_FISCAL
 
-        if fatura_score == max_score and fatura_score >= cupom_score + MARGEM_CONFIANCA and fatura_score >= extrato_score + MARGEM_CONFIANCA:
+        if (
+            fatura_score == max_score
+            and fatura_score >= cupom_score + MARGEM_CONFIANCA
+            and fatura_score >= extrato_score + MARGEM_CONFIANCA
+        ):
             return DocumentType.FATURA_CARTAO
 
-        if extrato_score == max_score and extrato_score >= cupom_score + MARGEM_CONFIANCA and extrato_score >= fatura_score + MARGEM_CONFIANCA:
+        if (
+            extrato_score == max_score
+            and extrato_score >= cupom_score + MARGEM_CONFIANCA
+            and extrato_score >= fatura_score + MARGEM_CONFIANCA
+        ):
             return DocumentType.EXTRATO_BANCARIO
 
         # ===== ZONA CINZENTA: heuristica adicional =====
 
-        print(f"[Classifier] Zona cinzenta (diferenca < {MARGEM_CONFIANCA}), aplicando heuristica...")
+        print(
+            f"[Classifier] Zona cinzenta (diferenca < {MARGEM_CONFIANCA}), aplicando heuristica..."
+        )
 
         # Heuristica 1: Se tem lista de produtos com quantidade, e cupom
-        has_product_list = any(phrase in text_lower for phrase in [
-            "item codigo descricao",
-            "qtde un vl unit",
-            "qtd un vl unit",
-            "quantidade unid",
-        ])
+        has_product_list = any(
+            phrase in text_lower
+            for phrase in [
+                "item codigo descricao",
+                "qtde un vl unit",
+                "qtd un vl unit",
+                "quantidade unid",
+            ]
+        )
 
         if has_product_list:
             print("[Classifier] Heuristica: Lista de produtos detectada -> CUPOM")
             return DocumentType.CUPOM_FISCAL
 
         # Heuristica 2: Se tem parcelamento, e fatura
-        has_installments = any(phrase in text_lower for phrase in [
-            "parc.",
-            "parcela",
-            "/10", "/12", "/06", "/03",  # Formatos comuns: 01/10, 2/12
-        ])
+        has_installments = any(
+            phrase in text_lower
+            for phrase in [
+                "parc.",
+                "parcela",
+                "/10",
+                "/12",
+                "/06",
+                "/03",  # Formatos comuns: 01/10, 2/12
+            ]
+        )
 
         if has_installments and fatura_score > 0:
             print("[Classifier] Heuristica: Parcelamento detectado -> FATURA")
@@ -357,7 +392,7 @@ class DocumentClassifier:
                     config={
                         "temperature": 0.0,
                         "max_output_tokens": 20,  # Apenas 1 palavra
-                    }
+                    },
                 )
 
             response = await asyncio.to_thread(_call_gemini)

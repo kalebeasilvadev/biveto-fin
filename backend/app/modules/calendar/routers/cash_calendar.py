@@ -43,9 +43,7 @@ async def get_daily_calendar(
         end_date = start_date + timedelta(days=90)
 
     service = CashCalendarService(db)
-    return await service.get_cash_calendar(
-        current_user, start_date, end_date, include_details
-    )
+    return await service.get_cash_calendar(current_user, start_date, end_date, include_details)
 
 
 @router.get("/weekly/{year}/{week}", response_model=WeeklySummary)
@@ -61,6 +59,7 @@ async def get_weekly_summary(
     """
     if week < 1 or week > 53:
         from fastapi import HTTPException
+
         raise HTTPException(status_code=400, detail="Week must be between 1 and 53")
 
     service = CashCalendarService(db)
@@ -80,6 +79,7 @@ async def get_monthly_calendar(
     """
     if month < 1 or month > 12:
         from fastapi import HTTPException
+
         raise HTTPException(status_code=400, detail="Month must be between 1 and 12")
 
     start_date = date(year, month, 1)
@@ -89,9 +89,7 @@ async def get_monthly_calendar(
         end_date = date(year, month + 1, 1) - timedelta(days=1)
 
     service = CashCalendarService(db)
-    return await service.get_cash_calendar(
-        current_user, start_date, end_date, include_details
-    )
+    return await service.get_cash_calendar(current_user, start_date, end_date, include_details)
 
 
 @router.get("/running-balance", response_model=CashCalendarResponse)
@@ -137,12 +135,11 @@ async def get_projections(
     """
     if days_ahead < 1 or days_ahead > 365:
         from fastapi import HTTPException
+
         raise HTTPException(status_code=400, detail="days_ahead must be between 1 and 365")
 
     start_date = date.today()
     end_date = start_date + timedelta(days=days_ahead)
 
     service = CashCalendarService(db)
-    return await service.get_cash_calendar(
-        current_user, start_date, end_date, include_details
-    )
+    return await service.get_cash_calendar(current_user, start_date, end_date, include_details)

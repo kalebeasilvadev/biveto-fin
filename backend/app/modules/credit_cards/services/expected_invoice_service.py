@@ -219,8 +219,7 @@ class ExpectedInvoiceService:
         invoices = result.scalars().all()
 
         return {
-            (inv.credit_card_id, inv.reference_year, inv.reference_month): inv
-            for inv in invoices
+            (inv.credit_card_id, inv.reference_year, inv.reference_month): inv for inv in invoices
         }
 
     def _card_is_eligible_for_month(
@@ -254,14 +253,14 @@ class ExpectedInvoiceService:
         # 3. Ciclo alterado recentemente e estamos olhando o mes atual
         if card.updated_at:
             days_since_update = (today - card.updated_at.date()).days
-            is_current_month = (year == today.year and month == today.month)
+            is_current_month = year == today.year and month == today.month
             if is_current_month and days_since_update <= self.CYCLE_CHANGE_SUPPRESS_DAYS:
                 # Heuristica conservadora: nao podemos saber *qual* campo mudou
                 # sem historico, entao so suprimimos se a regra apertar.
                 # Na pratica: suprimir apenas se o fechamento ainda nao ocorreu
                 # OU se ocorreu ha menos de 3 dias (janela de ajuste).
                 dates = self._invoice_service.calculate_invoice_dates(card, month, year)
-                days_since_closing = (today - dates['closing_date']).days
+                days_since_closing = (today - dates["closing_date"]).days
                 if 0 <= days_since_closing <= 3:
                     return False
 
@@ -277,8 +276,8 @@ class ExpectedInvoiceService:
     ) -> ExpectedInvoiceDTO | None:
         """Monta o DTO com o estado derivado."""
         dates = self._invoice_service.calculate_invoice_dates(card, month, year)
-        closing_date = dates['closing_date']
-        due_date = dates['due_date']
+        closing_date = dates["closing_date"]
+        due_date = dates["due_date"]
 
         invoice = invoices_map.get((card.id, year, month))
         state = self._derive_state(invoice, closing_date, today)
@@ -345,7 +344,7 @@ class ExpectedInvoiceService:
 
         for year, month in candidates:
             dates = self._invoice_service.calculate_invoice_dates(card, month, year)
-            if dates['due_date'] == target_due_date:
+            if dates["due_date"] == target_due_date:
                 return (year, month)
 
         return None

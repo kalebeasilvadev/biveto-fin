@@ -99,7 +99,10 @@ A resposta inclui campos adicionais para transferencias:
 from app.modules.transactions import (
     transactions_router,
     TransactionService,
-    TransactionCreate, TransactionUpdate, TransactionConfirm, TransactionResponse,
+    TransactionCreate,
+    TransactionUpdate,
+    TransactionConfirm,
+    TransactionResponse,
 )
 ```
 

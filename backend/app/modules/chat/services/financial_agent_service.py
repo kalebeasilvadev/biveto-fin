@@ -3,6 +3,7 @@ Agente IA Financeiro - Assistente Inteligente de Financas Pessoais
 Suporta: Google Gemini (gratuito) e Mistral AI (melhor custo-beneficio)
 Com analise detalhada de gastos por categoria, estabelecimento, periodo, cartoes e receitas.
 """
+
 from __future__ import annotations
 
 import json
@@ -66,27 +67,46 @@ class FinancialAgentService:
 
     # Mapeamento de meses em portugues
     MONTHS_PT = {
-        "janeiro": 1, "fevereiro": 2, "marco": 3, "abril": 4,
-        "maio": 5, "junho": 6, "julho": 7, "agosto": 8, "setembro": 9,
-        "outubro": 10, "novembro": 11, "dezembro": 12,
-        "jan": 1, "fev": 2, "mar": 3, "abr": 4, "mai": 5, "jun": 6,
-        "jul": 7, "ago": 8, "set": 9, "out": 10, "nov": 11, "dez": 12
+        "janeiro": 1,
+        "fevereiro": 2,
+        "marco": 3,
+        "abril": 4,
+        "maio": 5,
+        "junho": 6,
+        "julho": 7,
+        "agosto": 8,
+        "setembro": 9,
+        "outubro": 10,
+        "novembro": 11,
+        "dezembro": 12,
+        "jan": 1,
+        "fev": 2,
+        "mar": 3,
+        "abr": 4,
+        "mai": 5,
+        "jun": 6,
+        "jul": 7,
+        "ago": 8,
+        "set": 9,
+        "out": 10,
+        "nov": 11,
+        "dez": 12,
     }
 
     # Domínios válidos para classificação
     VALID_DOMAINS = [
-        "cartoes",      # Cartões de crédito, faturas, limites, parcelas no cartão
-        "mercado",      # Compras de supermercado, produtos, preços, listas de compras
-        "dividas",      # Dívidas, empréstimos, financiamentos, juros, quitação
-        "orcamento",    # Orçamento mensal, limites por categoria, gastos vs planejado
-        "metas",        # Metas financeiras, objetivos, PNIF, fundo de emergência
+        "cartoes",  # Cartões de crédito, faturas, limites, parcelas no cartão
+        "mercado",  # Compras de supermercado, produtos, preços, listas de compras
+        "dividas",  # Dívidas, empréstimos, financiamentos, juros, quitação
+        "orcamento",  # Orçamento mensal, limites por categoria, gastos vs planejado
+        "metas",  # Metas financeiras, objetivos, PNIF, fundo de emergência
         "recorrentes",  # Assinaturas, Netflix, Spotify, contas fixas mensais
-        "fluxo",        # Fluxo de caixa, quando recebo, saldo futuro, projeções
-        "beneficios",   # VA, VR, VT, vale alimentação, vale refeição
-        "calendario",   # Calendário financeiro, projeções, vencimentos futuros
-        "revisao",      # Weekly review, análise semanal, transações sem categoria
-        "automacoes",   # Automações, regras automáticas, transferências programadas
-        "geral",        # Visão geral, resumo, saúde financeira
+        "fluxo",  # Fluxo de caixa, quando recebo, saldo futuro, projeções
+        "beneficios",  # VA, VR, VT, vale alimentação, vale refeição
+        "calendario",  # Calendário financeiro, projeções, vencimentos futuros
+        "revisao",  # Weekly review, análise semanal, transações sem categoria
+        "automacoes",  # Automações, regras automáticas, transferências programadas
+        "geral",  # Visão geral, resumo, saúde financeira
     ]
 
     def __init__(self, db: AsyncSession):
@@ -95,7 +115,9 @@ class FinancialAgentService:
 
     # ========== ROUTER/COORDENADOR: Classificação de Intent ==========
 
-    async def _classify_intent_with_llm(self, message: str, history: list[dict] | None = None) -> list[str]:
+    async def _classify_intent_with_llm(
+        self, message: str, history: list[dict] | None = None
+    ) -> list[str]:
         """Usa LLM para classificar domínios relevantes da pergunta do usuário
 
         Args:
@@ -148,7 +170,7 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
             # Parse da resposta - extrair apenas palavras válidas
             response_clean = response.lower().strip()
             # Remover caracteres especiais e extrair palavras
-            domains = [d.strip().strip('"\'.,') for d in response_clean.split(",")]
+            domains = [d.strip().strip("\"'.,") for d in response_clean.split(",")]
             domains = [d for d in domains if d in self.VALID_DOMAINS]
 
             return domains if domains else ["geral"]
@@ -162,11 +184,9 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
     def _classify_from_history(self, history: list[dict]) -> list[str]:
         """Extrai domínios do histórico quando a mensagem atual é muito curta"""
         # Concatenar últimas mensagens do histórico
-        recent_text = " ".join([
-            msg.get("content", "")
-            for msg in history[-4:]
-            if msg.get("role") == "user"
-        ])
+        recent_text = " ".join(
+            [msg.get("content", "") for msg in history[-4:] if msg.get("role") == "user"]
+        )
         return self._classify_intent_by_keywords(recent_text)
 
     async def _call_classification_llm(self, prompt: str) -> str:
@@ -181,8 +201,8 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
                 f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key={api_key}",
                 json={
                     "contents": [{"parts": [{"text": prompt}]}],
-                    "generationConfig": {"temperature": 0, "maxOutputTokens": 50}
-                }
+                    "generationConfig": {"temperature": 0, "maxOutputTokens": 50},
+                },
             )
             if response.status_code != 200:
                 raise ValueError(f"API error: {response.status_code}")
@@ -196,18 +216,141 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
 
         # Mapeamento de keywords para domínios
         keyword_map = {
-            "cartoes": ["cartao", "cartão", "fatura", "limite", "credito", "crédito", "bandeira", "visa", "master", "elo"],
-            "mercado": ["mercado", "supermercado", "compras", "produto", "lista de compras", "groceries", "feira", "hortifruti"],
-            "dividas": ["divida", "dívida", "emprestimo", "empréstimo", "financiamento", "juros", "quitacao", "quitação", "snowball", "avalanche"],
-            "orcamento": ["orcamento", "orçamento", "planejado", "estourei", "estourou", "limite de gasto", "budget"],
-            "metas": ["meta", "objetivo", "pnif", "fundo de emergencia", "emergência", "guardar", "economizar", "poupar"],
-            "recorrentes": ["assinatura", "netflix", "spotify", "recorrente", "mensal fixo", "streaming", "amazon prime", "icloud"],
-            "fluxo": ["fluxo", "quando recebo", "salario", "salário", "receita", "projecao", "projeção"],
-            "beneficios": ["va", "vr", "vt", "vale alimentacao", "vale alimentação", "vale refeicao", "vale refeição", "beneficio", "benefício", "alelo", "sodexo"],
-            "calendario": ["calendario", "calendário", "agenda", "vencimento", "proximo pagamento", "próximo pagamento", "quando vence"],
-            "revisao": ["review", "revisao", "revisão", "semana passada", "essa semana", "sem categoria", "categorizar", "o que mudou"],
-            "automacoes": ["automacao", "automação", "automatico", "automático", "regra", "robo", "robô", "transferencia programada", "transferência programada"],
-            "geral": ["resumo", "geral", "financas", "finanças", "como estou", "situacao", "situação", "saude financeira", "saúde financeira", "quanto gastei", "gastos do mes", "gastos do mês", "esse mes", "esse mês", "este mes", "este mês", "por categoria", "categoria"],
+            "cartoes": [
+                "cartao",
+                "cartão",
+                "fatura",
+                "limite",
+                "credito",
+                "crédito",
+                "bandeira",
+                "visa",
+                "master",
+                "elo",
+            ],
+            "mercado": [
+                "mercado",
+                "supermercado",
+                "compras",
+                "produto",
+                "lista de compras",
+                "groceries",
+                "feira",
+                "hortifruti",
+            ],
+            "dividas": [
+                "divida",
+                "dívida",
+                "emprestimo",
+                "empréstimo",
+                "financiamento",
+                "juros",
+                "quitacao",
+                "quitação",
+                "snowball",
+                "avalanche",
+            ],
+            "orcamento": [
+                "orcamento",
+                "orçamento",
+                "planejado",
+                "estourei",
+                "estourou",
+                "limite de gasto",
+                "budget",
+            ],
+            "metas": [
+                "meta",
+                "objetivo",
+                "pnif",
+                "fundo de emergencia",
+                "emergência",
+                "guardar",
+                "economizar",
+                "poupar",
+            ],
+            "recorrentes": [
+                "assinatura",
+                "netflix",
+                "spotify",
+                "recorrente",
+                "mensal fixo",
+                "streaming",
+                "amazon prime",
+                "icloud",
+            ],
+            "fluxo": [
+                "fluxo",
+                "quando recebo",
+                "salario",
+                "salário",
+                "receita",
+                "projecao",
+                "projeção",
+            ],
+            "beneficios": [
+                "va",
+                "vr",
+                "vt",
+                "vale alimentacao",
+                "vale alimentação",
+                "vale refeicao",
+                "vale refeição",
+                "beneficio",
+                "benefício",
+                "alelo",
+                "sodexo",
+            ],
+            "calendario": [
+                "calendario",
+                "calendário",
+                "agenda",
+                "vencimento",
+                "proximo pagamento",
+                "próximo pagamento",
+                "quando vence",
+            ],
+            "revisao": [
+                "review",
+                "revisao",
+                "revisão",
+                "semana passada",
+                "essa semana",
+                "sem categoria",
+                "categorizar",
+                "o que mudou",
+            ],
+            "automacoes": [
+                "automacao",
+                "automação",
+                "automatico",
+                "automático",
+                "regra",
+                "robo",
+                "robô",
+                "transferencia programada",
+                "transferência programada",
+            ],
+            "geral": [
+                "resumo",
+                "geral",
+                "financas",
+                "finanças",
+                "como estou",
+                "situacao",
+                "situação",
+                "saude financeira",
+                "saúde financeira",
+                "quanto gastei",
+                "gastos do mes",
+                "gastos do mês",
+                "esse mes",
+                "esse mês",
+                "este mes",
+                "este mês",
+                "por categoria",
+                "categoria",
+            ],
         }
 
         for domain, keywords in keyword_map.items():
@@ -219,7 +362,9 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
 
     # ========== ROTEAMENTO DE CONTEXTO POR DOMÍNIO ==========
 
-    async def _get_domain_context(self, user: User, domains: list[str], query_context: dict[str, Any]) -> dict[str, Any]:
+    async def _get_domain_context(
+        self, user: User, domains: list[str], query_context: dict[str, Any]
+    ) -> dict[str, Any]:
         """Busca apenas os dados relevantes para os domínios identificados"""
         context: dict[str, Any] = {}
 
@@ -244,13 +389,17 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
             )
 
         if "mercado" in domains:
-            context["mercado"] = await self._get_grocery_expert_context(user, period_start, period_end, household_user_ids)
+            context["mercado"] = await self._get_grocery_expert_context(
+                user, period_start, period_end, household_user_ids
+            )
 
         if "dividas" in domains:
             context["dividas"] = await self._get_debt_expert_context(user)
 
         if "orcamento" in domains:
-            context["orcamento"] = await self._get_budget_expert_context(user, period_start, period_end)
+            context["orcamento"] = await self._get_budget_expert_context(
+                user, period_start, period_end
+            )
 
         if "metas" in domains:
             context["metas"] = await self._get_goals_expert_context(user)
@@ -259,22 +408,30 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
             context["recorrentes"] = await self._get_recurring_expert_context(user)
 
         if "fluxo" in domains:
-            context["fluxo"] = await self._get_cashflow_expert_context(user, period_start, period_end, household_user_ids)
+            context["fluxo"] = await self._get_cashflow_expert_context(
+                user, period_start, period_end, household_user_ids
+            )
 
         if "beneficios" in domains:
             context["beneficios"] = await self._get_benefits_expert_context(user)
 
         if "calendario" in domains:
-            context["calendario"] = await self._get_calendar_expert_context(user, household_user_ids)
+            context["calendario"] = await self._get_calendar_expert_context(
+                user, household_user_ids
+            )
 
         if "revisao" in domains:
-            context["revisao"] = await self._get_review_expert_context(user, period_start, period_end)
+            context["revisao"] = await self._get_review_expert_context(
+                user, period_start, period_end
+            )
 
         if "automacoes" in domains:
             context["automacoes"] = await self._get_automations_expert_context(user)
 
         if "geral" in domains:
-            context["geral"] = await self._get_general_expert_context(user, period_start, period_end, household_user_ids)
+            context["geral"] = await self._get_general_expert_context(
+                user, period_start, period_end, household_user_ids
+            )
 
         return context
 
@@ -285,7 +442,7 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
         user: User,
         query_context: dict[str, Any] | None = None,
         period_start: date | None = None,
-        period_end: date | None = None
+        period_end: date | None = None,
     ) -> dict[str, Any]:
         """Contexto detalhado para o especialista de cartões com análise completa de faturas e parcelas
 
@@ -301,9 +458,18 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
 
         # Mapeamento de meses em português
         MESES_PT = {
-            1: "janeiro", 2: "fevereiro", 3: "março", 4: "abril",
-            5: "maio", 6: "junho", 7: "julho", 8: "agosto",
-            9: "setembro", 10: "outubro", 11: "novembro", 12: "dezembro"
+            1: "janeiro",
+            2: "fevereiro",
+            3: "março",
+            4: "abril",
+            5: "maio",
+            6: "junho",
+            7: "julho",
+            8: "agosto",
+            9: "setembro",
+            10: "outubro",
+            11: "novembro",
+            12: "dezembro",
         }
 
         # Variáveis para controle de filtro por período
@@ -318,10 +484,7 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
 
         # Buscar cartões ativos
         credit_cards_result = await self.db.execute(
-            select(CreditCard).where(
-                CreditCard.user_id == user.id,
-                CreditCard.is_active == True
-            )
+            select(CreditCard).where(CreditCard.user_id == user.id, CreditCard.is_active == True)
         )
         credit_cards_list = credit_cards_result.scalars().all()
 
@@ -329,7 +492,7 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
         installments_result = await self.db.execute(
             select(InstallmentSeries).where(
                 InstallmentSeries.user_id == user.id,
-                InstallmentSeries.status == InstallmentSeriesStatus.ACTIVE.value
+                InstallmentSeries.status == InstallmentSeriesStatus.ACTIVE.value,
             )
         )
         all_installments = installments_result.scalars().all()
@@ -353,11 +516,10 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
 
             # Buscar TODAS as faturas (não apenas abertas) para projeção
             invoices_result = await self.db.execute(
-                select(CreditCardInvoice).where(
-                    CreditCardInvoice.credit_card_id == card.id
-                ).order_by(
-                    CreditCardInvoice.reference_year.asc(),
-                    CreditCardInvoice.reference_month.asc()
+                select(CreditCardInvoice)
+                .where(CreditCardInvoice.credit_card_id == card.id)
+                .order_by(
+                    CreditCardInvoice.reference_year.asc(), CreditCardInvoice.reference_month.asc()
                 )
             )
             all_invoices = invoices_result.scalars().all()
@@ -367,13 +529,13 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
                 if spans_multiple_years:
                     # Filtrar apenas por mês (ex: "todas as faturas de janeiro")
                     filtered_invoices = [
-                        inv for inv in all_invoices
-                        if inv.reference_month == target_month
+                        inv for inv in all_invoices if inv.reference_month == target_month
                     ]
                 else:
                     # Filtrar por mês E ano específico (ex: "fatura de janeiro de 2026")
                     filtered_invoices = [
-                        inv for inv in all_invoices
+                        inv
+                        for inv in all_invoices
                         if inv.reference_month == target_month and inv.reference_year == target_year
                     ]
 
@@ -400,7 +562,7 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
                     "valor_pago": float(inv.paid_amount or 0),
                     "valor_restante": remaining,
                     "vencimento": inv.due_date.strftime("%d/%m/%Y") if inv.due_date else None,
-                    "vencida": inv.due_date < today if inv.due_date else False
+                    "vencida": inv.due_date < today if inv.due_date else False,
                 }
 
                 # Se um período específico foi solicitado, adicionar TODAS as faturas
@@ -415,8 +577,13 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
                     # Identificar fatura do mês atual e próximo
                     if inv.reference_month == mes_atual and inv.reference_year == ano_atual:
                         fatura_mes_atual = fatura_info
-                    elif (inv.reference_month == mes_atual + 1 and inv.reference_year == ano_atual) or \
-                         (inv.reference_month == 1 and mes_atual == 12 and inv.reference_year == ano_atual + 1):
+                    elif (
+                        inv.reference_month == mes_atual + 1 and inv.reference_year == ano_atual
+                    ) or (
+                        inv.reference_month == 1
+                        and mes_atual == 12
+                        and inv.reference_year == ano_atual + 1
+                    ):
                         fatura_proximo_mes = fatura_info
 
             # Calcular total de faturas abertas deste cartão
@@ -438,14 +605,16 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
                         parcelas_pagas = s.paid_count or 0
                         parcelas_total = s.installment_count or 0
 
-                        parcelas_do_cartao.append({
-                            "descricao": s.description,
-                            "valor_parcela": valor_parcela,
-                            "parcelas_pagas": parcelas_pagas,
-                            "parcelas_total": parcelas_total,
-                            "parcelas_restantes": restantes,
-                            "valor_total_restante": valor_total
-                        })
+                        parcelas_do_cartao.append(
+                            {
+                                "descricao": s.description,
+                                "valor_parcela": valor_parcela,
+                                "parcelas_pagas": parcelas_pagas,
+                                "parcelas_total": parcelas_total,
+                                "parcelas_restantes": restantes,
+                                "valor_total_restante": valor_total,
+                            }
+                        )
 
                         parcelas_mes_valor += valor_parcela
                         parcelas_total_valor += valor_total
@@ -458,8 +627,13 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
                                 # Meses desde a primeira parcela
                                 meses_offset = num_parcela - 1
                                 # Data desta parcela
-                                ano_parcela = s.first_installment_date.year + (s.first_installment_date.month + meses_offset - 1) // 12
-                                mes_parcela = (s.first_installment_date.month + meses_offset - 1) % 12 + 1
+                                ano_parcela = (
+                                    s.first_installment_date.year
+                                    + (s.first_installment_date.month + meses_offset - 1) // 12
+                                )
+                                mes_parcela = (
+                                    s.first_installment_date.month + meses_offset - 1
+                                ) % 12 + 1
 
                                 chave_mes = f"{mes_parcela:02d}/{ano_parcela}"
 
@@ -468,15 +642,17 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
                                         "mes": mes_parcela,
                                         "ano": ano_parcela,
                                         "valor_total": 0,
-                                        "itens": []
+                                        "itens": [],
                                     }
 
                                 projecao_por_mes[chave_mes]["valor_total"] += valor_parcela
-                                projecao_por_mes[chave_mes]["itens"].append({
-                                    "descricao": s.description,
-                                    "parcela": f"{num_parcela}/{parcelas_total}",
-                                    "valor": valor_parcela
-                                })
+                                projecao_por_mes[chave_mes]["itens"].append(
+                                    {
+                                        "descricao": s.description,
+                                        "parcela": f"{num_parcela}/{parcelas_total}",
+                                        "valor": valor_parcela,
+                                    }
+                                )
 
             total_parcelas_mensais += parcelas_mes_valor
             total_parcelas_restantes += parcelas_total_valor
@@ -489,7 +665,7 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
                 # Ex: "INSIDE GAMES 01/06" -> "INSIDE GAMES"
                 desc = p["descricao"] or "Outros"
                 # Remover padrões comuns de parcela no final
-                nome_base = re.sub(r'\s*\d+/\d+\s*$', '', desc).strip()
+                nome_base = re.sub(r"\s*\d+/\d+\s*$", "", desc).strip()
                 nome_base = nome_base.upper()
 
                 if nome_base not in parcelas_por_estabelecimento:
@@ -498,40 +674,50 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
                         "quantidade_compras": 0,
                         "impacto_mensal_total": 0,
                         "valor_total_restante": 0,
-                        "compras": []
+                        "compras": [],
                     }
 
                 parcelas_por_estabelecimento[nome_base]["quantidade_compras"] += 1
-                parcelas_por_estabelecimento[nome_base]["impacto_mensal_total"] += p["valor_parcela"]
-                parcelas_por_estabelecimento[nome_base]["valor_total_restante"] += p["valor_total_restante"]
-                parcelas_por_estabelecimento[nome_base]["compras"].append({
-                    "descricao": p["descricao"],
-                    "valor_parcela": p["valor_parcela"],
-                    "parcelas_pagas": p["parcelas_pagas"],
-                    "parcelas_total": p["parcelas_total"],
-                    "parcelas_restantes": p["parcelas_restantes"],
-                    "valor_restante": p["valor_total_restante"]
-                })
+                parcelas_por_estabelecimento[nome_base]["impacto_mensal_total"] += p[
+                    "valor_parcela"
+                ]
+                parcelas_por_estabelecimento[nome_base]["valor_total_restante"] += p[
+                    "valor_total_restante"
+                ]
+                parcelas_por_estabelecimento[nome_base]["compras"].append(
+                    {
+                        "descricao": p["descricao"],
+                        "valor_parcela": p["valor_parcela"],
+                        "parcelas_pagas": p["parcelas_pagas"],
+                        "parcelas_total": p["parcelas_total"],
+                        "parcelas_restantes": p["parcelas_restantes"],
+                        "valor_restante": p["valor_total_restante"],
+                    }
+                )
 
             # Converter para lista ordenada por impacto
             resumo_por_estabelecimento = sorted(
                 parcelas_por_estabelecimento.values(),
                 key=lambda x: x["valor_total_restante"],
-                reverse=True
+                reverse=True,
             )
 
             # Ordenar projeção por data (mais próximo primeiro)
             projecao_faturas_futuras = []
-            for chave in sorted(projecao_por_mes.keys(), key=lambda x: (int(x.split("/")[1]), int(x.split("/")[0]))):
+            for chave in sorted(
+                projecao_por_mes.keys(), key=lambda x: (int(x.split("/")[1]), int(x.split("/")[0]))
+            ):
                 dados = projecao_por_mes[chave]
-                projecao_faturas_futuras.append({
-                    "periodo": chave,
-                    "mes": dados["mes"],
-                    "ano": dados["ano"],
-                    "valor_total": round(dados["valor_total"], 2),
-                    "quantidade_itens": len(dados["itens"]),
-                    "itens": dados["itens"]
-                })
+                projecao_faturas_futuras.append(
+                    {
+                        "periodo": chave,
+                        "mes": dados["mes"],
+                        "ano": dados["ano"],
+                        "valor_total": round(dados["valor_total"], 2),
+                        "quantidade_itens": len(dados["itens"]),
+                        "itens": dados["itens"],
+                    }
+                )
 
             # IMPACTO MENSAL = soma das parcelas mensais (isso é o que vai compor as faturas futuras)
             # Nota: a fatura atual já contém as parcelas do mês, então o impacto futuro são as parcelas
@@ -545,44 +731,50 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
             limite = float(card.credit_limit) if card.credit_limit else 0
             utilizacao = round((saldo_faturas / limite) * 100, 1) if limite > 0 else 0
 
-            cartoes_info.append({
-                "nome": card_name,
-                "bandeira": card.card_brand,
-                "ultimos_digitos": card.last_four_digits,
-                "limite_total": limite,
-                "limite_disponivel": limite - saldo_faturas,
-                "utilizacao_limite_percentual": utilizacao,
-                "dia_fechamento": card.closing_day,
-                "dia_vencimento": card.due_day,
-                # Faturas existentes (já abertas no sistema)
-                "faturas_abertas": faturas_abertas,
-                "total_faturas_abertas": saldo_faturas,
-                "fatura_mes_atual": fatura_mes_atual,
-                "fatura_proximo_mes": fatura_proximo_mes,
-                # Faturas do período solicitado (inclui pagas) - para consultas históricas
-                "faturas_do_periodo": faturas_do_periodo if target_month else [],
-                # Parcelas ativas
-                "parcelas": parcelas_do_cartao,
-                "parcelas_por_mes": parcelas_mes_valor,
-                "total_parcelas_restantes": parcelas_total_valor,
-                "quantidade_parcelas_ativas": len(parcelas_do_cartao),
-                # NOVO: Resumo de parcelas agrupado por estabelecimento
-                # Facilita responder "quanto tenho de parcelas da X?"
-                "parcelas_por_estabelecimento": resumo_por_estabelecimento,
-                # PROJEÇÃO DE FATURAS FUTURAS - mês a mês com itens detalhados
-                "projecao_faturas_futuras": projecao_faturas_futuras,
-                # Impacto e estratégia
-                "impacto_mensal": impacto_mensal,
-                "valor_para_zerar_cartao": valor_para_zerar,
-                # Meses até zerar (se não pagar antecipado)
-                "meses_para_zerar": max([p["parcelas_restantes"] for p in parcelas_do_cartao]) if parcelas_do_cartao else 0
-            })
+            cartoes_info.append(
+                {
+                    "nome": card_name,
+                    "bandeira": card.card_brand,
+                    "ultimos_digitos": card.last_four_digits,
+                    "limite_total": limite,
+                    "limite_disponivel": limite - saldo_faturas,
+                    "utilizacao_limite_percentual": utilizacao,
+                    "dia_fechamento": card.closing_day,
+                    "dia_vencimento": card.due_day,
+                    # Faturas existentes (já abertas no sistema)
+                    "faturas_abertas": faturas_abertas,
+                    "total_faturas_abertas": saldo_faturas,
+                    "fatura_mes_atual": fatura_mes_atual,
+                    "fatura_proximo_mes": fatura_proximo_mes,
+                    # Faturas do período solicitado (inclui pagas) - para consultas históricas
+                    "faturas_do_periodo": faturas_do_periodo if target_month else [],
+                    # Parcelas ativas
+                    "parcelas": parcelas_do_cartao,
+                    "parcelas_por_mes": parcelas_mes_valor,
+                    "total_parcelas_restantes": parcelas_total_valor,
+                    "quantidade_parcelas_ativas": len(parcelas_do_cartao),
+                    # NOVO: Resumo de parcelas agrupado por estabelecimento
+                    # Facilita responder "quanto tenho de parcelas da X?"
+                    "parcelas_por_estabelecimento": resumo_por_estabelecimento,
+                    # PROJEÇÃO DE FATURAS FUTURAS - mês a mês com itens detalhados
+                    "projecao_faturas_futuras": projecao_faturas_futuras,
+                    # Impacto e estratégia
+                    "impacto_mensal": impacto_mensal,
+                    "valor_para_zerar_cartao": valor_para_zerar,
+                    # Meses até zerar (se não pagar antecipado)
+                    "meses_para_zerar": max([p["parcelas_restantes"] for p in parcelas_do_cartao])
+                    if parcelas_do_cartao
+                    else 0,
+                }
+            )
 
         # Ordenar por impacto mensal (maior primeiro)
         cartoes_info.sort(key=lambda c: c["impacto_mensal"], reverse=True)
 
         # Calcular estratégias de redução
-        estrategias_reducao = self._calcular_estrategias_reducao(cartoes_info, total_parcelas_mensais)
+        estrategias_reducao = self._calcular_estrategias_reducao(
+            cartoes_info, total_parcelas_mensais
+        )
 
         # Calcular estratégia dinâmica se usuário mencionou valor disponível
         estrategia_com_orcamento = None
@@ -601,7 +793,9 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
             "total_parcelas_restantes": total_parcelas_restantes,
             # Destaques
             "cartao_maior_impacto": cartoes_info[0] if cartoes_info else None,
-            "cartoes_com_limite_apertado": [c for c in cartoes_info if c["utilizacao_limite_percentual"] > 70],
+            "cartoes_com_limite_apertado": [
+                c for c in cartoes_info if c["utilizacao_limite_percentual"] > 70
+            ],
             # Estratégias para reduzir custo mensal
             "estrategias_reducao": estrategias_reducao,
             # Estratégia dinâmica com orçamento específico (se valor foi mencionado)
@@ -610,7 +804,7 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
             "resumo": {
                 "impacto_mensal_total": total_parcelas_mensais,
                 "valor_para_zerar_todos": total_parcelas_restantes,
-                "faturas_em_aberto": total_faturas_abertas
+                "faturas_em_aberto": total_faturas_abertas,
             },
             # Informação sobre filtro de período aplicado
             "periodo_filtrado": {
@@ -618,11 +812,13 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
                 "ano": target_year if not spans_multiple_years else None,
                 "todos_os_anos": spans_multiple_years,
                 "label": (
-                    f"Faturas de {MESES_PT[target_month]} (todos os anos)" if spans_multiple_years and target_month
-                    else f"Fatura de {MESES_PT[target_month]}/{target_year}" if target_month
+                    f"Faturas de {MESES_PT[target_month]} (todos os anos)"
+                    if spans_multiple_years and target_month
+                    else f"Fatura de {MESES_PT[target_month]}/{target_year}"
+                    if target_month
                     else "Todas as faturas"
-                )
-            }
+                ),
+            },
         }
 
     def _calcular_estrategias_reducao(self, cartoes: list[dict], total_mensal: float) -> dict:
@@ -647,22 +843,32 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
         estrategia_zerar = {
             "meta_mensal": 0,
             "valor_necessario": sum(c["valor_para_zerar_cartao"] for c in cartoes),
-            "cartoes_a_quitar": [{"nome": c["nome"], "valor": c["valor_para_zerar_cartao"], "impacto_eliminado": c["impacto_mensal"]} for c in cartoes if c["valor_para_zerar_cartao"] > 0],
-            "impacto_mensal_restante": 0
+            "cartoes_a_quitar": [
+                {
+                    "nome": c["nome"],
+                    "valor": c["valor_para_zerar_cartao"],
+                    "impacto_eliminado": c["impacto_mensal"],
+                }
+                for c in cartoes
+                if c["valor_para_zerar_cartao"] > 0
+            ],
+            "impacto_mensal_restante": 0,
         }
 
         return {
             "atual": {
                 "impacto_mensal": total_mensal,
-                "total_parcelas": sum(c["total_parcelas_restantes"] for c in cartoes)
+                "total_parcelas": sum(c["total_parcelas_restantes"] for c in cartoes),
             },
             "reduzir_para_metade": estrategia_50,
             "reduzir_para_3k": estrategia_3k,
             "reduzir_para_5k": estrategia_5k,
-            "zerar_tudo": estrategia_zerar
+            "zerar_tudo": estrategia_zerar,
         }
 
-    def _calcular_cartoes_para_meta(self, cartoes: list[dict], meta: float, total_atual: float) -> dict:
+    def _calcular_cartoes_para_meta(
+        self, cartoes: list[dict], meta: float, total_atual: float
+    ) -> dict:
         """Calcula quais cartões quitar para atingir uma meta de custo mensal"""
         if total_atual <= meta:
             return {
@@ -670,7 +876,7 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
                 "valor_necessario": 0,
                 "cartoes_a_quitar": [],
                 "impacto_mensal_restante": total_atual,
-                "ja_atingida": True
+                "ja_atingida": True,
             }
 
         impacto_restante = total_atual
@@ -681,25 +887,23 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
             if impacto_restante > meta and card["valor_para_zerar_cartao"] > 0:
                 impacto_restante -= card["impacto_mensal"]
                 valor_necessario += card["valor_para_zerar_cartao"]
-                cartoes_a_quitar.append({
-                    "nome": card["nome"],
-                    "valor": card["valor_para_zerar_cartao"],
-                    "impacto_eliminado": card["impacto_mensal"]
-                })
+                cartoes_a_quitar.append(
+                    {
+                        "nome": card["nome"],
+                        "valor": card["valor_para_zerar_cartao"],
+                        "impacto_eliminado": card["impacto_mensal"],
+                    }
+                )
 
         return {
             "meta_mensal": meta,
             "valor_necessario": round(valor_necessario, 2),
             "cartoes_a_quitar": cartoes_a_quitar,
             "impacto_mensal_restante": round(impacto_restante, 2),
-            "ja_atingida": False
+            "ja_atingida": False,
         }
 
-    def _calcular_estrategia_com_orcamento(
-        self,
-        cartoes: list[dict],
-        orcamento: float
-    ) -> dict:
+    def _calcular_estrategia_com_orcamento(self, cartoes: list[dict], orcamento: float) -> dict:
         """Calcula quais cartões quitar com orçamento específico do usuário.
 
         Baseado em literatura financeira:
@@ -715,10 +919,7 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
             Dicionário com ordenações por diferentes métodos e recomendações
         """
         if not cartoes or orcamento <= 0:
-            return {
-                "orcamento_disponivel": orcamento,
-                "erro": "Sem cartões ou orçamento inválido"
-            }
+            return {"orcamento_disponivel": orcamento, "erro": "Sem cartões ou orçamento inválido"}
 
         # Filtrar apenas cartões com parcelas a pagar
         cartoes_com_parcelas = [c for c in cartoes if c.get("valor_para_zerar_cartao", 0) > 0]
@@ -726,7 +927,7 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
         if not cartoes_com_parcelas:
             return {
                 "orcamento_disponivel": orcamento,
-                "mensagem": "Nenhum cartão tem parcelas ativas para antecipar"
+                "mensagem": "Nenhum cartão tem parcelas ativas para antecipar",
             }
 
         def calcular_alocacao(cartoes_ordenados: list[dict], orcamento_total: float) -> dict:
@@ -742,13 +943,15 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
 
                 if valor_restante >= valor_cartao and valor_cartao > 0:
                     # Quita o cartão inteiro
-                    cartoes_a_quitar.append({
-                        "nome": card["nome"],
-                        "valor_a_pagar": round(valor_cartao, 2),
-                        "impacto_eliminado": round(impacto, 2),
-                        "utilizacao_atual": card.get("utilizacao_limite_percentual", 0),
-                        "quita_completo": True
-                    })
+                    cartoes_a_quitar.append(
+                        {
+                            "nome": card["nome"],
+                            "valor_a_pagar": round(valor_cartao, 2),
+                            "impacto_eliminado": round(impacto, 2),
+                            "utilizacao_atual": card.get("utilizacao_limite_percentual", 0),
+                            "quita_completo": True,
+                        }
+                    )
                     valor_restante -= valor_cartao
                     economia_mensal += impacto
                 elif valor_restante > 0 and valor_cartao > 0:
@@ -756,14 +959,16 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
                     percentual_pago = (valor_restante / valor_cartao) * 100
                     # Estimar redução proporcional do impacto mensal
                     reducao_estimada = impacto * (valor_restante / valor_cartao)
-                    cartoes_parciais.append({
-                        "nome": card["nome"],
-                        "valor_total_cartao": round(valor_cartao, 2),
-                        "valor_possivel_pagar": round(valor_restante, 2),
-                        "percentual_quitado": round(percentual_pago, 1),
-                        "reducao_estimada_mensal": round(reducao_estimada, 2),
-                        "falta_para_quitar": round(valor_cartao - valor_restante, 2)
-                    })
+                    cartoes_parciais.append(
+                        {
+                            "nome": card["nome"],
+                            "valor_total_cartao": round(valor_cartao, 2),
+                            "valor_possivel_pagar": round(valor_restante, 2),
+                            "percentual_quitado": round(percentual_pago, 1),
+                            "reducao_estimada_mensal": round(reducao_estimada, 2),
+                            "falta_para_quitar": round(valor_cartao - valor_restante, 2),
+                        }
+                    )
                     # Não zerar valor_restante aqui para mostrar opções
 
             return {
@@ -772,21 +977,18 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
                 "valor_utilizado": round(orcamento_total - valor_restante, 2),
                 "valor_restante": round(valor_restante, 2),
                 "economia_mensal": round(economia_mensal, 2),
-                "quantidade_cartoes_quitados": len(cartoes_a_quitar)
+                "quantidade_cartoes_quitados": len(cartoes_a_quitar),
             }
 
         # 1. Ordenação AVALANCHE: maior impacto mensal primeiro (economia)
         cartoes_avalanche = sorted(
-            cartoes_com_parcelas,
-            key=lambda c: c.get("impacto_mensal", 0),
-            reverse=True
+            cartoes_com_parcelas, key=lambda c: c.get("impacto_mensal", 0), reverse=True
         )
         resultado_avalanche = calcular_alocacao(cartoes_avalanche, orcamento)
 
         # 2. Ordenação SNOWBALL: menor saldo primeiro (motivação)
         cartoes_snowball = sorted(
-            cartoes_com_parcelas,
-            key=lambda c: c.get("valor_para_zerar_cartao", float('inf'))
+            cartoes_com_parcelas, key=lambda c: c.get("valor_para_zerar_cartao", float("inf"))
         )
         resultado_snowball = calcular_alocacao(cartoes_snowball, orcamento)
 
@@ -794,7 +996,7 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
         cartoes_utilizacao = sorted(
             cartoes_com_parcelas,
             key=lambda c: c.get("utilizacao_limite_percentual", 0),
-            reverse=True
+            reverse=True,
         )
         resultado_utilizacao = calcular_alocacao(cartoes_utilizacao, orcamento)
 
@@ -803,45 +1005,55 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
         motivo_recomendacao = "Maximiza economia eliminando maior impacto mensal primeiro"
 
         # Se snowball quita mais cartões completos com mesmo orçamento
-        if (resultado_snowball["quantidade_cartoes_quitados"] >
-            resultado_avalanche["quantidade_cartoes_quitados"] and
-            resultado_snowball["economia_mensal"] >= resultado_avalanche["economia_mensal"] * 0.8):
+        if (
+            resultado_snowball["quantidade_cartoes_quitados"]
+            > resultado_avalanche["quantidade_cartoes_quitados"]
+            and resultado_snowball["economia_mensal"]
+            >= resultado_avalanche["economia_mensal"] * 0.8
+        ):
             recomendacao = "snowball"
             motivo_recomendacao = "Elimina mais cartões, mantendo boa economia - motivação extra"
 
         # Se tem cartões com utilização crítica (>80%)
-        cartoes_criticos = [c for c in cartoes_com_parcelas if c.get("utilizacao_limite_percentual", 0) > 80]
-        if cartoes_criticos and any(c["valor_para_zerar_cartao"] <= orcamento for c in cartoes_criticos):
+        cartoes_criticos = [
+            c for c in cartoes_com_parcelas if c.get("utilizacao_limite_percentual", 0) > 80
+        ]
+        if cartoes_criticos and any(
+            c["valor_para_zerar_cartao"] <= orcamento for c in cartoes_criticos
+        ):
             recomendacao = "utilizacao"
-            motivo_recomendacao = "Prioriza liberar limite de cartões críticos (>80% usado) - melhora score"
+            motivo_recomendacao = (
+                "Prioriza liberar limite de cartões críticos (>80% usado) - melhora score"
+            )
 
         # Total necessário para quitar todos
-        total_para_zerar_todos = sum(c.get("valor_para_zerar_cartao", 0) for c in cartoes_com_parcelas)
+        total_para_zerar_todos = sum(
+            c.get("valor_para_zerar_cartao", 0) for c in cartoes_com_parcelas
+        )
 
         return {
             "orcamento_disponivel": orcamento,
             "total_para_zerar_todos": round(total_para_zerar_todos, 2),
             "orcamento_suficiente_para_todos": orcamento >= total_para_zerar_todos,
-
             # Resultados por método
             "ordenacao_avalanche": resultado_avalanche,
             "ordenacao_snowball": resultado_snowball,
             "ordenacao_por_utilizacao": resultado_utilizacao,
-
             # Recomendação
             "metodo_recomendado": recomendacao,
             "motivo_recomendacao": motivo_recomendacao,
-
             # Observações sobre antecipação no Brasil
             "observacoes_antecipacao": {
                 "desconto_disponivel": "Nubank e Itaú oferecem ~9% a.a. de desconto para antecipação",
                 "quando_antecipar": "Vale antecipar se: há desconto oferecido OU precisa liberar limite",
                 "quando_nao_antecipar": "Se não há desconto e não precisa de limite, pode ser melhor investir o dinheiro",
-                "juros_rotativo_medio": "Evite rotativo a todo custo (~423% a.a. no Brasil)"
-            }
+                "juros_rotativo_medio": "Evite rotativo a todo custo (~423% a.a. no Brasil)",
+            },
         }
 
-    async def _get_grocery_expert_context(self, user: User, period_start: date, period_end: date, household_user_ids: list[int]) -> dict[str, Any]:
+    async def _get_grocery_expert_context(
+        self, user: User, period_start: date, period_end: date, household_user_ids: list[int]
+    ) -> dict[str, Any]:
         """Contexto detalhado para o especialista de mercado/compras"""
         # Buscar compras de mercado do período
         if household_user_ids:
@@ -849,15 +1061,21 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
                 GroceryPurchase.purchase_date >= period_start,
                 GroceryPurchase.purchase_date <= period_end,
                 or_(
-                    and_(GroceryPurchase.user_id == user.id, GroceryPurchase.ownership_type == "personal"),
-                    and_(GroceryPurchase.user_id.in_(household_user_ids), GroceryPurchase.ownership_type == "household")
-                )
+                    and_(
+                        GroceryPurchase.user_id == user.id,
+                        GroceryPurchase.ownership_type == "personal",
+                    ),
+                    and_(
+                        GroceryPurchase.user_id.in_(household_user_ids),
+                        GroceryPurchase.ownership_type == "household",
+                    ),
+                ),
             )
         else:
             purchases_query = select(GroceryPurchase).where(
                 GroceryPurchase.user_id == user.id,
                 GroceryPurchase.purchase_date >= period_start,
-                GroceryPurchase.purchase_date <= period_end
+                GroceryPurchase.purchase_date <= period_end,
             )
 
         purchases_result = await self.db.execute(purchases_query)
@@ -885,7 +1103,9 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
         # Gastos por estabelecimento
         gastos_por_estabelecimento: dict[str, dict] = defaultdict(lambda: {"total": 0, "itens": 0})
         for p in purchases:
-            merchant_name = merchants.get(p.merchant_id, "Desconhecido") if p.merchant_id else "Desconhecido"
+            merchant_name = (
+                merchants.get(p.merchant_id, "Desconhecido") if p.merchant_id else "Desconhecido"
+            )
             gastos_por_estabelecimento[merchant_name]["total"] += float(p.total_price)
             gastos_por_estabelecimento[merchant_name]["itens"] += 1
 
@@ -900,12 +1120,16 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
         if user.license_id:
             lists_query = select(ShoppingList).where(
                 ShoppingList.license_id == user.license_id,
-                ShoppingList.status.in_([ShoppingListStatus.DRAFT.value, ShoppingListStatus.ACTIVE.value])
+                ShoppingList.status.in_(
+                    [ShoppingListStatus.DRAFT.value, ShoppingListStatus.ACTIVE.value]
+                ),
             )
         else:
             lists_query = select(ShoppingList).where(
                 ShoppingList.user_id == user.id,
-                ShoppingList.status.in_([ShoppingListStatus.DRAFT.value, ShoppingListStatus.ACTIVE.value])
+                ShoppingList.status.in_(
+                    [ShoppingListStatus.DRAFT.value, ShoppingListStatus.ACTIVE.value]
+                ),
             )
 
         lists_result = await self.db.execute(lists_query)
@@ -918,13 +1142,17 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
                 select(ShoppingListItem).where(ShoppingListItem.list_id == lst.id)
             )
             items = items_result.scalars().all()
-            listas_ativas.append({
-                "nome": lst.name,
-                "status": lst.status,
-                "total_itens": len(items),
-                "itens_marcados": sum(1 for i in items if i.is_checked),
-                "valor_estimado": sum(float(i.estimated_price or 0) * float(i.quantity) for i in items)
-            })
+            listas_ativas.append(
+                {
+                    "nome": lst.name,
+                    "status": lst.status,
+                    "total_itens": len(items),
+                    "itens_marcados": sum(1 for i in items if i.is_checked),
+                    "valor_estimado": sum(
+                        float(i.estimated_price or 0) * float(i.quantity) for i in items
+                    ),
+                }
+            )
 
         # Calcular média por compra
         compras_unicas = len(set((p.purchase_date, p.merchant_id) for p in purchases))
@@ -935,19 +1163,24 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
             "total_itens_comprados": total_itens,
             "quantidade_compras": compras_unicas,
             "media_por_compra": round(media_por_compra, 2),
-            "gastos_por_categoria": dict(sorted(gastos_por_categoria.items(), key=lambda x: x[1], reverse=True)),
-            "gastos_por_estabelecimento": dict(sorted(gastos_por_estabelecimento.items(), key=lambda x: x[1]["total"], reverse=True)[:5]),
+            "gastos_por_categoria": dict(
+                sorted(gastos_por_categoria.items(), key=lambda x: x[1], reverse=True)
+            ),
+            "gastos_por_estabelecimento": dict(
+                sorted(
+                    gastos_por_estabelecimento.items(), key=lambda x: x[1]["total"], reverse=True
+                )[:5]
+            ),
             "produtos_mais_comprados": [{"produto": p[0], "vezes": p[1]} for p in produtos_top],
-            "listas_de_compras_ativas": listas_ativas
+            "listas_de_compras_ativas": listas_ativas,
         }
 
     async def _get_debt_expert_context(self, user: User) -> dict[str, Any]:
         """Contexto detalhado para o especialista de dívidas"""
         result = await self.db.execute(
-            select(Debt).where(
-                Debt.user_id == user.id,
-                Debt.status == DebtStatus.ACTIVE.value
-            ).order_by(Debt.current_balance.asc())
+            select(Debt)
+            .where(Debt.user_id == user.id, Debt.status == DebtStatus.ACTIVE.value)
+            .order_by(Debt.current_balance.asc())
         )
         debts = result.scalars().all()
 
@@ -957,9 +1190,10 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
         # Buscar pagamentos recentes
         debt_ids = [d.id for d in debts]
         payments_result = await self.db.execute(
-            select(DebtPayment).where(
-                DebtPayment.debt_id.in_(debt_ids)
-            ).order_by(DebtPayment.payment_date.desc()).limit(10)
+            select(DebtPayment)
+            .where(DebtPayment.debt_id.in_(debt_ids))
+            .order_by(DebtPayment.payment_date.desc())
+            .limit(10)
         )
         recent_payments = payments_result.scalars().all()
 
@@ -974,15 +1208,20 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
 
         dividas_info = []
         for d in debts:
-            dividas_info.append({
-                "nome": d.name,
-                "tipo": d.type,
-                "saldo_atual": float(d.current_balance),
-                "taxa_juros": float(d.interest_rate),
-                "tipo_juros": d.interest_type,
-                "pagamento_minimo": float(d.minimum_payment),
-                "juros_mensal_estimado": float(d.current_balance) * (float(d.interest_rate) / 100) if d.interest_type == "monthly" else 0
-            })
+            dividas_info.append(
+                {
+                    "nome": d.name,
+                    "tipo": d.type,
+                    "saldo_atual": float(d.current_balance),
+                    "taxa_juros": float(d.interest_rate),
+                    "tipo_juros": d.interest_type,
+                    "pagamento_minimo": float(d.minimum_payment),
+                    "juros_mensal_estimado": float(d.current_balance)
+                    * (float(d.interest_rate) / 100)
+                    if d.interest_type == "monthly"
+                    else 0,
+                }
+            )
 
         # Ordenar para estratégias
         dividas_por_saldo = sorted(dividas_info, key=lambda x: x["saldo_atual"])
@@ -1002,30 +1241,32 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
             "estrategia_snowball": {
                 "ordem": [d["nome"] for d in dividas_por_saldo],
                 "primeira_divida": dividas_por_saldo[0] if dividas_por_saldo else None,
-                "descricao": "Quitar a menor dívida primeiro para ganhar motivação"
+                "descricao": "Quitar a menor dívida primeiro para ganhar motivação",
             },
             "estrategia_avalanche": {
                 "ordem": [d["nome"] for d in dividas_por_juros],
                 "primeira_divida": dividas_por_juros[0] if dividas_por_juros else None,
-                "descricao": "Quitar a de maior juros primeiro para economizar dinheiro"
+                "descricao": "Quitar a de maior juros primeiro para economizar dinheiro",
             },
-            "recomendacao": "avalanche" if dividas_por_juros and dividas_por_juros[0]["taxa_juros"] > 5 else "snowball",
+            "recomendacao": "avalanche"
+            if dividas_por_juros and dividas_por_juros[0]["taxa_juros"] > 5
+            else "snowball",
             "pagamentos_recentes": [
                 {"valor": float(p.amount), "data": p.payment_date.strftime("%d/%m/%Y")}
                 for p in recent_payments[:5]
-            ]
+            ],
         }
 
-    async def _get_budget_expert_context(self, user: User, period_start: date, period_end: date) -> dict[str, Any]:
+    async def _get_budget_expert_context(
+        self, user: User, period_start: date, period_end: date
+    ) -> dict[str, Any]:
         """Contexto detalhado para o especialista de orçamento"""
         today = date.today()
 
         # Buscar orçamento do mês
         budget_result = await self.db.execute(
             select(Budget).where(
-                Budget.user_id == user.id,
-                Budget.year == today.year,
-                Budget.month == today.month
+                Budget.user_id == user.id, Budget.year == today.year, Budget.month == today.month
             )
         )
         budget = budget_result.scalar_one_or_none()
@@ -1034,17 +1275,16 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
             # Mesmo sem orçamento, buscar gastos reais do mês
             start_date = date(today.year, today.month, 1)
             result = await self.db.execute(
-                select(
-                    Transaction.category_id,
-                    func.sum(Transaction.amount).label('total')
-                ).where(
+                select(Transaction.category_id, func.sum(Transaction.amount).label("total"))
+                .where(
                     Transaction.user_id == user.id,
                     Transaction.type == TransactionType.EXPENSE.value,
                     Transaction.date >= start_date,
                     Transaction.date <= today,
                     Transaction.linked_transaction_id.is_(None),
-                    Transaction.receipt_id.is_(None)
-                ).group_by(Transaction.category_id)
+                    Transaction.receipt_id.is_(None),
+                )
+                .group_by(Transaction.category_id)
             )
             gastos_raw = {row.category_id: float(row.total) for row in result.all()}
 
@@ -1053,7 +1293,9 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
             categories: dict[int | None, str] = {}
             if category_ids:
                 cat_result = await self.db.execute(
-                    select(Category).where(Category.id.in_([c for c in category_ids if c is not None]))
+                    select(Category).where(
+                        Category.id.in_([c for c in category_ids if c is not None])
+                    )
                 )
                 categories = {c.id: c.name for c in cat_result.scalars().all()}
 
@@ -1067,7 +1309,7 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
                 "tem_orcamento": False,
                 "gastos_por_categoria": gastos_por_categoria,
                 "total_gasto": sum(gastos_raw.values()),
-                "mensagem": "Sem orçamento definido, mas aqui estão seus gastos do mês"
+                "mensagem": "Sem orçamento definido, mas aqui estão seus gastos do mês",
             }
 
         # Buscar itens do orçamento
@@ -1088,17 +1330,16 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
         # Buscar gastos reais do mês - excluindo transferências e receipts
         start_date = date(today.year, today.month, 1)
         result = await self.db.execute(
-            select(
-                Transaction.category_id,
-                func.sum(Transaction.amount).label('total')
-            ).where(
+            select(Transaction.category_id, func.sum(Transaction.amount).label("total"))
+            .where(
                 Transaction.user_id == user.id,
                 Transaction.type == TransactionType.EXPENSE.value,
                 Transaction.date >= start_date,
                 Transaction.date <= today,
                 Transaction.linked_transaction_id.is_(None),
-                Transaction.receipt_id.is_(None)
-            ).group_by(Transaction.category_id)
+                Transaction.receipt_id.is_(None),
+            )
+            .group_by(Transaction.category_id)
         )
         gastos_por_categoria = {row.category_id: float(row.total) for row in result.all()}
 
@@ -1124,7 +1365,7 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
                 "planejado": planejado,
                 "gasto": gasto,
                 "restante": restante,
-                "percentual_usado": percentual
+                "percentual_usado": percentual,
             }
             orcamento_items.append(item_info)
 
@@ -1143,7 +1384,11 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
                 score = 100 - (percentual_total - 80)
 
         # Calcular orçamento diário restante
-        dias_restantes = (date(today.year, today.month + 1 if today.month < 12 else 1, 1) - timedelta(days=1) - today).days
+        dias_restantes = (
+            date(today.year, today.month + 1 if today.month < 12 else 1, 1)
+            - timedelta(days=1)
+            - today
+        ).days
         orcamento_diario_restante = (total_planejado - total_gasto) / max(1, dias_restantes)
 
         return {
@@ -1152,21 +1397,20 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
             "total_planejado": total_planejado,
             "total_gasto": total_gasto,
             "total_restante": total_planejado - total_gasto,
-            "percentual_usado": round((total_gasto / total_planejado * 100), 1) if total_planejado > 0 else 0,
+            "percentual_usado": round((total_gasto / total_planejado * 100), 1)
+            if total_planejado > 0
+            else 0,
             "dias_restantes_no_mes": dias_restantes,
             "orcamento_diario_restante": round(orcamento_diario_restante, 2),
             "itens_orcamento": orcamento_items,
             "categorias_em_alerta": categorias_alerta,
-            "categorias_estouradas": categorias_estouradas
+            "categorias_estouradas": categorias_estouradas,
         }
 
     async def _get_goals_expert_context(self, user: User) -> dict[str, Any]:
         """Contexto detalhado para o especialista de metas"""
         goals_result = await self.db.execute(
-            select(Goal).where(
-                Goal.user_id == user.id,
-                Goal.status == "active"
-            )
+            select(Goal).where(Goal.user_id == user.id, Goal.status == "active")
         )
         goals = goals_result.scalars().all()
 
@@ -1175,7 +1419,11 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
         total_atual = 0
 
         for g in goals:
-            progresso = round(float(g.current_amount / g.target_amount * 100), 1) if g.target_amount > 0 else 0
+            progresso = (
+                round(float(g.current_amount / g.target_amount * 100), 1)
+                if g.target_amount > 0
+                else 0
+            )
             falta = float(g.target_amount - g.current_amount)
             total_alvo += float(g.target_amount)
             total_atual += float(g.current_amount)
@@ -1185,28 +1433,33 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
             meses_restantes = None
             if g.target_date:
                 today = date.today()
-                meses_restantes = max(1, (g.target_date.year - today.year) * 12 + (g.target_date.month - today.month))
+                meses_restantes = max(
+                    1, (g.target_date.year - today.year) * 12 + (g.target_date.month - today.month)
+                )
                 contribuicao_mensal = round(falta / meses_restantes, 2) if falta > 0 else 0
 
-            metas_info.append({
-                "nome": g.name,
-                "valor_alvo": float(g.target_amount),
-                "valor_atual": float(g.current_amount),
-                "progresso_percentual": progresso,
-                "falta": falta,
-                "prazo": g.target_date.strftime("%d/%m/%Y") if g.target_date else None,
-                "meses_restantes": meses_restantes,
-                "contribuicao_mensal_necessaria": contribuicao_mensal
-            })
+            metas_info.append(
+                {
+                    "nome": g.name,
+                    "valor_alvo": float(g.target_amount),
+                    "valor_atual": float(g.current_amount),
+                    "progresso_percentual": progresso,
+                    "falta": falta,
+                    "prazo": g.target_date.strftime("%d/%m/%Y") if g.target_date else None,
+                    "meses_restantes": meses_restantes,
+                    "contribuicao_mensal_necessaria": contribuicao_mensal,
+                }
+            )
 
         # Buscar contribuições recentes
         goal_ids = [g.id for g in goals]
         contributions = []
         if goal_ids:
             contrib_result = await self.db.execute(
-                select(GoalContribution).where(
-                    GoalContribution.goal_id.in_(goal_ids)
-                ).order_by(GoalContribution.contribution_date.desc()).limit(5)
+                select(GoalContribution)
+                .where(GoalContribution.goal_id.in_(goal_ids))
+                .order_by(GoalContribution.contribution_date.desc())
+                .limit(5)
             )
             contributions = [
                 {"valor": float(c.amount), "data": c.contribution_date.strftime("%d/%m/%Y")}
@@ -1219,17 +1472,19 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
             "total_alvo_todas_metas": total_alvo,
             "total_atual_todas_metas": total_atual,
             "progresso_geral": round((total_atual / total_alvo * 100), 1) if total_alvo > 0 else 0,
-            "contribuicoes_recentes": contributions
+            "contribuicoes_recentes": contributions,
         }
 
     async def _get_recurring_expert_context(self, user: User) -> dict[str, Any]:
         """Contexto detalhado para o especialista de recorrentes/assinaturas"""
         result = await self.db.execute(
-            select(RecurringTransaction).where(
+            select(RecurringTransaction)
+            .where(
                 RecurringTransaction.user_id == user.id,
                 RecurringTransaction.status == RecurringStatus.ACTIVE.value,
-                RecurringTransaction.type == "expense"
-            ).order_by(RecurringTransaction.amount.desc())
+                RecurringTransaction.type == "expense",
+            )
+            .order_by(RecurringTransaction.amount.desc())
         )
         recurring_list = result.scalars().all()
 
@@ -1269,7 +1524,7 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
                 "daily": "diário",
                 "weekly": "semanal",
                 "monthly": "mensal",
-                "yearly": "anual"
+                "yearly": "anual",
             }.get(r.frequency, r.frequency)
 
             # Calcular valor mensal equivalente
@@ -1291,16 +1546,20 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
                     tipo_servico = tipo
                     break
 
-            recorrentes.append({
-                "nome": r.name,
-                "valor": float(r.amount),
-                "valor_mensal_equivalente": round(valor_mensal, 2),
-                "frequencia": freq_display,
-                "categoria": categories.get(r.category_id, "Sem categoria"),
-                "tipo_servico": tipo_servico,
-                "proximo_vencimento": r.next_due_date.strftime("%d/%m/%Y") if r.next_due_date else None,
-                "dia_do_mes": r.day_of_month
-            })
+            recorrentes.append(
+                {
+                    "nome": r.name,
+                    "valor": float(r.amount),
+                    "valor_mensal_equivalente": round(valor_mensal, 2),
+                    "frequencia": freq_display,
+                    "categoria": categories.get(r.category_id, "Sem categoria"),
+                    "tipo_servico": tipo_servico,
+                    "proximo_vencimento": r.next_due_date.strftime("%d/%m/%Y")
+                    if r.next_due_date
+                    else None,
+                    "dia_do_mes": r.day_of_month,
+                }
+            )
 
         # Agrupar por tipo de serviço
         por_tipo: dict[str, float] = defaultdict(float)
@@ -1314,18 +1573,27 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
             "total_mensal": round(total_mensal + total_anual / 12, 2),
             "total_anual_projetado": round((total_mensal * 12) + total_anual, 2),
             "gastos_por_tipo": dict(sorted(por_tipo.items(), key=lambda x: x[1], reverse=True)),
-            "possivel_economia": round(sum(r["valor_mensal_equivalente"] for r in recorrentes if r["tipo_servico"] == "Streaming") * 0.3, 2)  # Estimativa: 30% streaming pode ser cortado
+            "possivel_economia": round(
+                sum(
+                    r["valor_mensal_equivalente"]
+                    for r in recorrentes
+                    if r["tipo_servico"] == "Streaming"
+                )
+                * 0.3,
+                2,
+            ),  # Estimativa: 30% streaming pode ser cortado
         }
 
-    async def _get_cashflow_expert_context(self, user: User, period_start: date, period_end: date, household_user_ids: list[int]) -> dict[str, Any]:
+    async def _get_cashflow_expert_context(
+        self, user: User, period_start: date, period_end: date, household_user_ids: list[int]
+    ) -> dict[str, Any]:
         """Contexto detalhado para o especialista de fluxo de caixa"""
         today = date.today()
 
         # Buscar fontes de receita
         income_sources_result = await self.db.execute(
             select(IncomeSource).where(
-                IncomeSource.user_id == user.id,
-                IncomeSource.is_active == True
+                IncomeSource.user_id == user.id, IncomeSource.is_active == True
             )
         )
         income_sources = income_sources_result.scalars().all()
@@ -1335,7 +1603,10 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
             accounts_query = select(Account).where(
                 or_(
                     and_(Account.user_id == user.id, Account.ownership_type == "personal"),
-                    and_(Account.user_id.in_(household_user_ids), Account.ownership_type == "household")
+                    and_(
+                        Account.user_id.in_(household_user_ids),
+                        Account.ownership_type == "household",
+                    ),
                 )
             )
         else:
@@ -1352,14 +1623,17 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
                 Transaction.date <= period_end,
                 or_(
                     and_(Transaction.user_id == user.id, Transaction.ownership_type == "personal"),
-                    and_(Transaction.user_id.in_(household_user_ids), Transaction.ownership_type == "household")
-                )
+                    and_(
+                        Transaction.user_id.in_(household_user_ids),
+                        Transaction.ownership_type == "household",
+                    ),
+                ),
             )
         else:
             tx_query = select(Transaction).where(
                 Transaction.user_id == user.id,
                 Transaction.date >= period_start,
-                Transaction.date <= period_end
+                Transaction.date <= period_end,
             )
 
         tx_result = await self.db.execute(tx_query)
@@ -1367,14 +1641,14 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
 
         # Excluir apenas transferências do cálculo
         receitas_periodo = sum(
-            float(t.amount) for t in transactions
-            if t.type == TransactionType.INCOME.value
-            and not t.linked_transaction_id
+            float(t.amount)
+            for t in transactions
+            if t.type == TransactionType.INCOME.value and not t.linked_transaction_id
         )
         despesas_periodo = sum(
-            float(t.amount) for t in transactions
-            if t.type == TransactionType.EXPENSE.value
-            and not t.linked_transaction_id
+            float(t.amount)
+            for t in transactions
+            if t.type == TransactionType.EXPENSE.value and not t.linked_transaction_id
         )
 
         # Calcular próximas receitas esperadas
@@ -1388,30 +1662,33 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
                         prox_pagamento = date(
                             today.year + (1 if today.month == 12 else 0),
                             1 if today.month == 12 else today.month + 1,
-                            min(source.payment_day, 28)
+                            min(source.payment_day, 28),
                         )
-                    proximas_receitas.append({
-                        "fonte": source.name,
-                        "valor_esperado": float(source.expected_amount),
-                        "data_prevista": prox_pagamento.strftime("%d/%m/%Y"),
-                        "dias_para_receber": (prox_pagamento - today).days
-                    })
+                    proximas_receitas.append(
+                        {
+                            "fonte": source.name,
+                            "valor_esperado": float(source.expected_amount),
+                            "data_prevista": prox_pagamento.strftime("%d/%m/%Y"),
+                            "dias_para_receber": (prox_pagamento - today).days,
+                        }
+                    )
 
         # Projeção de saldo para os próximos 30 dias
-        receita_mensal_esperada = sum(float(s.expected_amount) for s in income_sources if s.expected_amount)
+        receita_mensal_esperada = sum(
+            float(s.expected_amount) for s in income_sources if s.expected_amount
+        )
 
         # Buscar despesas recorrentes para projeção
         recurring_result = await self.db.execute(
             select(RecurringTransaction).where(
                 RecurringTransaction.user_id == user.id,
                 RecurringTransaction.status == RecurringStatus.ACTIVE.value,
-                RecurringTransaction.type == "expense"
+                RecurringTransaction.type == "expense",
             )
         )
         recurring_expenses = recurring_result.scalars().all()
         despesas_recorrentes_mes = sum(
-            float(r.amount) for r in recurring_expenses
-            if r.frequency == "monthly"
+            float(r.amount) for r in recurring_expenses if r.frequency == "monthly"
         )
 
         saldo_projetado_30_dias = saldo_atual + receita_mensal_esperada - despesas_recorrentes_mes
@@ -1426,16 +1703,13 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
             "despesas_recorrentes_mes": despesas_recorrentes_mes,
             "proximas_receitas": sorted(proximas_receitas, key=lambda x: x["dias_para_receber"]),
             "saldo_projetado_30_dias": round(saldo_projetado_30_dias, 2),
-            "fluxo_positivo": receitas_periodo > despesas_periodo
+            "fluxo_positivo": receitas_periodo > despesas_periodo,
         }
 
     async def _get_benefits_expert_context(self, user: User) -> dict[str, Any]:
         """Contexto detalhado para o especialista de benefícios"""
         result = await self.db.execute(
-            select(BenefitCard).where(
-                BenefitCard.user_id == user.id,
-                BenefitCard.is_active == True
-            )
+            select(BenefitCard).where(BenefitCard.user_id == user.id, BenefitCard.is_active == True)
         )
         benefit_cards = result.scalars().all()
 
@@ -1443,9 +1717,7 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
         account_ids = [b.account_id for b in benefit_cards]
         accounts: dict[int, Account] = {}
         if account_ids:
-            acc_result = await self.db.execute(
-                select(Account).where(Account.id.in_(account_ids))
-            )
+            acc_result = await self.db.execute(select(Account).where(Account.id.in_(account_ids)))
             accounts = {a.id: a for a in acc_result.scalars().all()}
 
         beneficios = []
@@ -1470,35 +1742,45 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
                     prox_recarga_date = date(
                         today.year + (1 if today.month == 12 else 0),
                         1 if today.month == 12 else today.month + 1,
-                        min(b.recharge_day, 28)
+                        min(b.recharge_day, 28),
                     )
                 prox_recarga = prox_recarga_date.strftime("%d/%m/%Y")
                 dias_para_recarga = (prox_recarga_date - today).days
 
             # Calcular média de uso diário (estimativa)
-            dias_desde_recarga = today.day if b.recharge_day and today.day > b.recharge_day else today.day + 30 - (b.recharge_day or 1)
-            uso_diario_estimado = (recarga - saldo) / max(1, dias_desde_recarga) if recarga > 0 else 0
+            dias_desde_recarga = (
+                today.day
+                if b.recharge_day and today.day > b.recharge_day
+                else today.day + 30 - (b.recharge_day or 1)
+            )
+            uso_diario_estimado = (
+                (recarga - saldo) / max(1, dias_desde_recarga) if recarga > 0 else 0
+            )
 
-            beneficios.append({
-                "tipo": b.card_type_display,
-                "operadora": b.provider_display,
-                "ultimos_digitos": b.last_four_digits,
-                "saldo_atual": saldo,
-                "recarga_esperada": recarga,
-                "dia_recarga": b.recharge_day,
-                "proxima_recarga": prox_recarga,
-                "dias_para_recarga": dias_para_recarga,
-                "uso_diario_estimado": round(uso_diario_estimado, 2)
-            })
+            beneficios.append(
+                {
+                    "tipo": b.card_type_display,
+                    "operadora": b.provider_display,
+                    "ultimos_digitos": b.last_four_digits,
+                    "saldo_atual": saldo,
+                    "recarga_esperada": recarga,
+                    "dia_recarga": b.recharge_day,
+                    "proxima_recarga": prox_recarga,
+                    "dias_para_recarga": dias_para_recarga,
+                    "uso_diario_estimado": round(uso_diario_estimado, 2),
+                }
+            )
 
         return {
             "beneficios": beneficios,
             "quantidade": len(beneficios),
             "total_saldo_beneficios": total_saldo,
-            "total_recarga_mensal": total_recarga_mensal
+            "total_recarga_mensal": total_recarga_mensal,
         }
 
-    async def _get_general_expert_context(self, user: User, period_start: date, period_end: date, household_user_ids: list[int]) -> dict[str, Any]:
+    async def _get_general_expert_context(
+        self, user: User, period_start: date, period_end: date, household_user_ids: list[int]
+    ) -> dict[str, Any]:
         """Contexto geral/resumo para visão ampla das finanças"""
         # Usar o método existente de contexto completo, mas resumido
         query_context = {"period": {"start": period_start, "end": period_end}}
@@ -1516,25 +1798,29 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
             "total_dividas": full_context.get("total_dividas", 0),
             "quantidade_metas": len(full_context.get("metas", [])),
             "quantidade_cartoes": len(full_context.get("cartoes_credito", [])),
-            "contas": full_context.get("contas", [])
+            "contas": full_context.get("contas", []),
         }
 
-    async def _get_calendar_expert_context(self, user: User, household_user_ids: list[int]) -> dict[str, Any]:
+    async def _get_calendar_expert_context(
+        self, user: User, household_user_ids: list[int]
+    ) -> dict[str, Any]:
         """Contexto detalhado para o especialista de calendário financeiro"""
         today = date.today()
         end_date = today + timedelta(days=30)  # Próximos 30 dias
 
         # Buscar faturas de cartão com vencimento próximo
         invoices_result = await self.db.execute(
-            select(CreditCardInvoice).where(
+            select(CreditCardInvoice)
+            .where(
                 CreditCardInvoice.user_id == user.id,
                 CreditCardInvoice.due_date >= today,
                 CreditCardInvoice.due_date <= end_date,
                 or_(
                     CreditCardInvoice.status == InvoiceStatus.OPEN.value,
-                    CreditCardInvoice.status == InvoiceStatus.CLOSED.value
-                )
-            ).order_by(CreditCardInvoice.due_date)
+                    CreditCardInvoice.status == InvoiceStatus.CLOSED.value,
+                ),
+            )
+            .order_by(CreditCardInvoice.due_date)
         )
         invoices = invoices_result.scalars().all()
 
@@ -1543,51 +1829,56 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
         card_names: dict[int, str] = {}
         if card_ids:
             cards_result = await self.db.execute(
-                select(CreditCard, Account).join(Account, CreditCard.account_id == Account.id).where(
-                    CreditCard.id.in_(card_ids)
-                )
+                select(CreditCard, Account)
+                .join(Account, CreditCard.account_id == Account.id)
+                .where(CreditCard.id.in_(card_ids))
             )
             for card, account in cards_result.all():
                 card_names[card.id] = account.name
 
         faturas_proximas = []
         for inv in invoices:
-            faturas_proximas.append({
-                "cartao": card_names.get(inv.credit_card_id, "Cartão"),
-                "periodo": inv.period_display,
-                "valor": float(inv.remaining_amount),
-                "vencimento": inv.due_date.strftime("%d/%m/%Y"),
-                "dias_para_vencer": (inv.due_date - today).days,
-                "status": inv.status
-            })
+            faturas_proximas.append(
+                {
+                    "cartao": card_names.get(inv.credit_card_id, "Cartão"),
+                    "periodo": inv.period_display,
+                    "valor": float(inv.remaining_amount),
+                    "vencimento": inv.due_date.strftime("%d/%m/%Y"),
+                    "dias_para_vencer": (inv.due_date - today).days,
+                    "status": inv.status,
+                }
+            )
 
         # Buscar despesas recorrentes com próximo vencimento
         recurring_result = await self.db.execute(
-            select(RecurringTransaction).where(
+            select(RecurringTransaction)
+            .where(
                 RecurringTransaction.user_id == user.id,
                 RecurringTransaction.status == RecurringStatus.ACTIVE.value,
                 RecurringTransaction.type == "expense",
                 RecurringTransaction.next_due_date >= today,
-                RecurringTransaction.next_due_date <= end_date
-            ).order_by(RecurringTransaction.next_due_date)
+                RecurringTransaction.next_due_date <= end_date,
+            )
+            .order_by(RecurringTransaction.next_due_date)
         )
         recurrings = recurring_result.scalars().all()
 
         despesas_proximas = []
         for r in recurrings:
-            despesas_proximas.append({
-                "nome": r.name,
-                "valor": float(r.amount),
-                "vencimento": r.next_due_date.strftime("%d/%m/%Y") if r.next_due_date else None,
-                "dias_para_vencer": (r.next_due_date - today).days if r.next_due_date else None,
-                "frequencia": r.frequency
-            })
+            despesas_proximas.append(
+                {
+                    "nome": r.name,
+                    "valor": float(r.amount),
+                    "vencimento": r.next_due_date.strftime("%d/%m/%Y") if r.next_due_date else None,
+                    "dias_para_vencer": (r.next_due_date - today).days if r.next_due_date else None,
+                    "frequencia": r.frequency,
+                }
+            )
 
         # Buscar receitas esperadas (fontes de renda)
         income_result = await self.db.execute(
             select(IncomeSource).where(
-                IncomeSource.user_id == user.id,
-                IncomeSource.is_active == True
+                IncomeSource.user_id == user.id, IncomeSource.is_active == True
             )
         )
         income_sources = income_result.scalars().all()
@@ -1600,22 +1891,24 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
                     prox_pagamento = date(
                         today.year + (1 if today.month == 12 else 0),
                         1 if today.month == 12 else today.month + 1,
-                        min(source.payment_day, 28)
+                        min(source.payment_day, 28),
                     )
                 if prox_pagamento <= end_date:
-                    receitas_proximas.append({
-                        "fonte": source.name,
-                        "valor": float(source.expected_amount),
-                        "data_prevista": prox_pagamento.strftime("%d/%m/%Y"),
-                        "dias_para_receber": (prox_pagamento - today).days
-                    })
+                    receitas_proximas.append(
+                        {
+                            "fonte": source.name,
+                            "valor": float(source.expected_amount),
+                            "data_prevista": prox_pagamento.strftime("%d/%m/%Y"),
+                            "dias_para_receber": (prox_pagamento - today).days,
+                        }
+                    )
 
         # Buscar pagamentos de dívidas
         debts_result = await self.db.execute(
             select(Debt).where(
                 Debt.user_id == user.id,
                 Debt.status == DebtStatus.ACTIVE.value,
-                Debt.due_day.isnot(None)
+                Debt.due_day.isnot(None),
             )
         )
         debts = debts_result.scalars().all()
@@ -1628,35 +1921,69 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
                     prox_pagamento = date(
                         today.year + (1 if today.month == 12 else 0),
                         1 if today.month == 12 else today.month + 1,
-                        min(debt.due_day, 28)
+                        min(debt.due_day, 28),
                     )
                 if prox_pagamento <= end_date:
-                    dividas_proximas.append({
-                        "nome": debt.name,
-                        "valor": float(debt.minimum_payment),
-                        "vencimento": prox_pagamento.strftime("%d/%m/%Y"),
-                        "dias_para_vencer": (prox_pagamento - today).days
-                    })
+                    dividas_proximas.append(
+                        {
+                            "nome": debt.name,
+                            "valor": float(debt.minimum_payment),
+                            "vencimento": prox_pagamento.strftime("%d/%m/%Y"),
+                            "dias_para_vencer": (prox_pagamento - today).days,
+                        }
+                    )
 
         # Calcular totais
         total_a_pagar = (
-            sum(f["valor"] for f in faturas_proximas) +
-            sum(d["valor"] for d in despesas_proximas) +
-            sum(d["valor"] for d in dividas_proximas)
+            sum(f["valor"] for f in faturas_proximas)
+            + sum(d["valor"] for d in despesas_proximas)
+            + sum(d["valor"] for d in dividas_proximas)
         )
         total_a_receber = sum(r["valor"] for r in receitas_proximas)
 
         # Ordenar todos os eventos por data
         todos_eventos = []
         for f in faturas_proximas:
-            todos_eventos.append({"tipo": "fatura", "data": f["vencimento"], "dias": f["dias_para_vencer"], "valor": f["valor"], "descricao": f"Fatura {f['cartao']}"})
+            todos_eventos.append(
+                {
+                    "tipo": "fatura",
+                    "data": f["vencimento"],
+                    "dias": f["dias_para_vencer"],
+                    "valor": f["valor"],
+                    "descricao": f"Fatura {f['cartao']}",
+                }
+            )
         for d in despesas_proximas:
             if d["vencimento"]:
-                todos_eventos.append({"tipo": "despesa", "data": d["vencimento"], "dias": d["dias_para_vencer"], "valor": d["valor"], "descricao": d["nome"]})
+                todos_eventos.append(
+                    {
+                        "tipo": "despesa",
+                        "data": d["vencimento"],
+                        "dias": d["dias_para_vencer"],
+                        "valor": d["valor"],
+                        "descricao": d["nome"],
+                    }
+                )
         for r in receitas_proximas:
-            todos_eventos.append({"tipo": "receita", "data": r["data_prevista"], "dias": r["dias_para_receber"], "valor": r["valor"], "descricao": r["fonte"]})
+            todos_eventos.append(
+                {
+                    "tipo": "receita",
+                    "data": r["data_prevista"],
+                    "dias": r["dias_para_receber"],
+                    "valor": r["valor"],
+                    "descricao": r["fonte"],
+                }
+            )
         for d in dividas_proximas:
-            todos_eventos.append({"tipo": "divida", "data": d["vencimento"], "dias": d["dias_para_vencer"], "valor": d["valor"], "descricao": d["nome"]})
+            todos_eventos.append(
+                {
+                    "tipo": "divida",
+                    "data": d["vencimento"],
+                    "dias": d["dias_para_vencer"],
+                    "valor": d["valor"],
+                    "descricao": d["nome"],
+                }
+            )
 
         todos_eventos.sort(key=lambda x: x["dias"])
 
@@ -1668,10 +1995,12 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
             "todos_eventos_ordenados": todos_eventos[:15],  # Top 15 mais próximos
             "total_a_pagar_30_dias": total_a_pagar,
             "total_a_receber_30_dias": total_a_receber,
-            "saldo_projetado": total_a_receber - total_a_pagar
+            "saldo_projetado": total_a_receber - total_a_pagar,
         }
 
-    async def _get_review_expert_context(self, user: User, period_start: date, period_end: date) -> dict[str, Any]:
+    async def _get_review_expert_context(
+        self, user: User, period_start: date, period_end: date
+    ) -> dict[str, Any]:
         """Contexto detalhado para o especialista de review semanal"""
         today = date.today()
 
@@ -1688,31 +2017,34 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
             select(Transaction).where(
                 Transaction.user_id == user.id,
                 Transaction.date >= week_start,
-                Transaction.date <= min(week_end, today)
+                Transaction.date <= min(week_end, today),
             )
         )
         week_transactions = result.scalars().all()
 
         # Calcular totais da semana - excluindo apenas transferências
         receitas_semana = sum(
-            float(t.amount) for t in week_transactions
-            if t.type == TransactionType.INCOME.value
-            and not t.linked_transaction_id
+            float(t.amount)
+            for t in week_transactions
+            if t.type == TransactionType.INCOME.value and not t.linked_transaction_id
         )
         despesas_semana = sum(
-            float(t.amount) for t in week_transactions
-            if t.type == TransactionType.EXPENSE.value
-            and not t.linked_transaction_id
+            float(t.amount)
+            for t in week_transactions
+            if t.type == TransactionType.EXPENSE.value and not t.linked_transaction_id
         )
 
         # Buscar transações sem categoria
         uncategorized_result = await self.db.execute(
-            select(Transaction).where(
+            select(Transaction)
+            .where(
                 Transaction.user_id == user.id,
                 Transaction.date >= week_start,
                 Transaction.date <= today,
-                Transaction.category_id == None
-            ).order_by(Transaction.date.desc()).limit(20)
+                Transaction.category_id == None,
+            )
+            .order_by(Transaction.date.desc())
+            .limit(20)
         )
         uncategorized = uncategorized_result.scalars().all()
 
@@ -1721,7 +2053,7 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
                 "descricao": t.description or "Sem descrição",
                 "valor": float(t.amount),
                 "data": t.date.strftime("%d/%m/%Y"),
-                "tipo": t.type
+                "tipo": t.type,
             }
             for t in uncategorized
         ]
@@ -1734,24 +2066,30 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
             select(Transaction).where(
                 Transaction.user_id == user.id,
                 Transaction.date >= prev_week_start,
-                Transaction.date <= prev_week_end
+                Transaction.date <= prev_week_end,
             )
         )
         prev_transactions = prev_result.scalars().all()
 
         despesas_semana_anterior = sum(
-            float(t.amount) for t in prev_transactions
-            if t.type == TransactionType.EXPENSE.value
-            and not t.linked_transaction_id
+            float(t.amount)
+            for t in prev_transactions
+            if t.type == TransactionType.EXPENSE.value and not t.linked_transaction_id
         )
 
         # Calcular variação
         variacao_despesas = None
         if despesas_semana_anterior > 0:
-            variacao_despesas = round(((despesas_semana - despesas_semana_anterior) / despesas_semana_anterior) * 100, 1)
+            variacao_despesas = round(
+                ((despesas_semana - despesas_semana_anterior) / despesas_semana_anterior) * 100, 1
+            )
 
         # Buscar top categorias da semana
-        category_ids = [t.category_id for t in week_transactions if t.category_id and t.type == TransactionType.EXPENSE.value]
+        category_ids = [
+            t.category_id
+            for t in week_transactions
+            if t.category_id and t.type == TransactionType.EXPENSE.value
+        ]
         categories: dict[int | None, str] = {}
         if category_ids:
             cat_result = await self.db.execute(
@@ -1768,17 +2106,23 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
         top_categorias = sorted(
             [{"categoria": k, "valor": v} for k, v in gastos_por_categoria.items()],
             key=lambda x: x["valor"],
-            reverse=True
+            reverse=True,
         )[:5]
 
         # Gerar dicas baseadas nos dados
         dicas = []
         if variacao_despesas and variacao_despesas > 20:
-            dicas.append(f"Seus gastos aumentaram {variacao_despesas}% em relação à semana passada.")
+            dicas.append(
+                f"Seus gastos aumentaram {variacao_despesas}% em relação à semana passada."
+            )
         if len(transacoes_sem_categoria) > 5:
-            dicas.append(f"Você tem {len(transacoes_sem_categoria)} transações sem categoria. Categorize-as para melhor controle.")
+            dicas.append(
+                f"Você tem {len(transacoes_sem_categoria)} transações sem categoria. Categorize-as para melhor controle."
+            )
         if receitas_semana > despesas_semana:
-            dicas.append(f"Semana positiva! Você tem R$ {receitas_semana - despesas_semana:.2f} de saldo.")
+            dicas.append(
+                f"Semana positiva! Você tem R$ {receitas_semana - despesas_semana:.2f} de saldo."
+            )
 
         return {
             "semana_numero": week_number,
@@ -1789,21 +2133,23 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
             "saldo_semana": receitas_semana - despesas_semana,
             "despesas_semana_anterior": despesas_semana_anterior,
             "variacao_despesas_percentual": variacao_despesas,
-            "media_diaria_gastos": round(despesas_semana / max(1, (min(week_end, today) - week_start).days + 1), 2),
+            "media_diaria_gastos": round(
+                despesas_semana / max(1, (min(week_end, today) - week_start).days + 1), 2
+            ),
             "transacoes_sem_categoria": transacoes_sem_categoria,
             "quantidade_sem_categoria": len(transacoes_sem_categoria),
             "top_categorias_semana": top_categorias,
             "dicas": dicas,
-            "total_transacoes_semana": len(week_transactions)
+            "total_transacoes_semana": len(week_transactions),
         }
 
     async def _get_automations_expert_context(self, user: User) -> dict[str, Any]:
         """Contexto detalhado para o especialista de automações"""
         # Buscar regras de automação ativas
         rules_result = await self.db.execute(
-            select(AutomationRule).where(
-                AutomationRule.user_id == user.id
-            ).order_by(AutomationRule.priority.desc())
+            select(AutomationRule)
+            .where(AutomationRule.user_id == user.id)
+            .order_by(AutomationRule.priority.desc())
         )
         rules = rules_result.scalars().all()
 
@@ -1820,10 +2166,12 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
                 "configuracao_gatilho": rule.trigger_config,
                 "configuracao_acao": rule.action_config,
                 "ativa": rule.is_active,
-                "ultima_execucao": rule.last_executed_at.strftime("%d/%m/%Y %H:%M") if rule.last_executed_at else None,
+                "ultima_execucao": rule.last_executed_at.strftime("%d/%m/%Y %H:%M")
+                if rule.last_executed_at
+                else None,
                 "total_execucoes": rule.execution_count,
                 "falhas_consecutivas": rule.consecutive_failures,
-                "ultimo_erro": rule.last_error
+                "ultimo_erro": rule.last_error,
             }
 
             if not rule.is_active:
@@ -1838,9 +2186,10 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
         executions = []
         if rule_ids:
             exec_result = await self.db.execute(
-                select(AutomationExecution).where(
-                    AutomationExecution.rule_id.in_(rule_ids)
-                ).order_by(AutomationExecution.executed_at.desc()).limit(10)
+                select(AutomationExecution)
+                .where(AutomationExecution.rule_id.in_(rule_ids))
+                .order_by(AutomationExecution.executed_at.desc())
+                .limit(10)
             )
             executions_list = exec_result.scalars().all()
 
@@ -1854,7 +2203,7 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
                     "status": e.status,
                     "motivo": e.trigger_reason,
                     "resultado": e.result_data,
-                    "erro": e.error_message
+                    "erro": e.error_message,
                 }
                 for e in executions_list
             ]
@@ -1878,7 +2227,7 @@ Exemplos: "cartoes,fluxo" ou "geral" ou "mercado" ou "cartoes,geral"."""
             "ultimas_execucoes": executions,
             "tipos_gatilho": dict(tipos_gatilho),
             "tipos_acao": dict(tipos_acao),
-            "tem_automacoes": len(rules) > 0
+            "tem_automacoes": len(rules) > 0,
         }
 
     # ========== PROMPTS ESPECIALIZADOS POR DOMÍNIO ==========
@@ -2049,7 +2398,6 @@ DIFERENÇA IMPORTANTE:
 - total_parcelas_restantes = tudo que ainda vai cair nas faturas futuras
 - impacto_mensal = quanto cai por mês de parcelas (recorrente)
 - valor_para_zerar_cartao = pagar antecipado para eliminar o impacto mensal""",
-
             "mercado": """## ESPECIALISTA EM MERCADO/COMPRAS 🛒
 
 DADOS DISPONÍVEIS EM context["mercado"]:
@@ -2066,7 +2414,6 @@ COMO RESPONDER:
 2. "onde compro mais?" → Use gastos_por_estabelecimento
 3. "quais produtos mais compro?" → Use produtos_mais_comprados
 4. "tenho lista de compras?" → Use listas_de_compras_ativas""",
-
             "dividas": """## ESPECIALISTA EM DÍVIDAS 💰
 
 DADOS DISPONÍVEIS EM context["dividas"]:
@@ -2082,7 +2429,6 @@ COMO RESPONDER:
 2. "quanto pago de juros?" → Use juros_mensal_estimado
 3. "quando quito minhas dívidas?" → Use meses_para_quitar_estimado
 4. Sempre mencione economia potencial com avalanche se juros > 5%""",
-
             "orcamento": """## ESPECIALISTA EM ORÇAMENTO 📊
 
 DADOS DISPONÍVEIS EM context["orcamento"]:
@@ -2099,7 +2445,6 @@ COMO RESPONDER:
 2. "estourei alguma categoria?" → Use categorias_estouradas
 3. "quanto posso gastar?" → Use orcamento_diario_restante
 4. Alerte sobre categorias em alerta proativamente""",
-
             "metas": """## ESPECIALISTA EM METAS 🎯
 
 DADOS DISPONÍVEIS EM context["metas"]:
@@ -2113,7 +2458,6 @@ COMO RESPONDER:
 2. "quanto preciso guardar?" → Use contribuicao_mensal_necessaria
 3. "quando atinjo a meta?" → Use meses_restantes
 4. Celebre progressos e encoraje contribuições""",
-
             "recorrentes": """## ESPECIALISTA EM ASSINATURAS/RECORRENTES 🔄
 
 DADOS DISPONÍVEIS EM context["recorrentes"]:
@@ -2128,7 +2472,6 @@ COMO RESPONDER:
 2. "quanto gasto com recorrentes?" → Use total_mensal
 3. "o que posso cortar?" → Use possivel_economia e sugira streaming duplicado
 4. Identifique serviços parecidos (streaming duplicado, etc.)""",
-
             "fluxo": """## ESPECIALISTA EM FLUXO DE CAIXA 📅
 
 DADOS DISPONÍVEIS EM context["fluxo"]:
@@ -2144,7 +2487,6 @@ COMO RESPONDER:
 2. "vou ter dinheiro?" → Compare saldo_atual com compromissos
 3. "como está meu fluxo?" → Use fluxo_positivo e saldo_projetado
 4. Alerte se saldo projetado ficar negativo""",
-
             "beneficios": """## ESPECIALISTA EM BENEFÍCIOS 🎫
 
 DADOS DISPONÍVEIS EM context["beneficios"]:
@@ -2158,7 +2500,6 @@ COMO RESPONDER:
 2. "quando recarrega?" → Use proxima_recarga e dias_para_recarga
 3. "está durando?" → Compare uso_diario_estimado com dias restantes
 4. Alerte se saldo estiver acabando antes da recarga""",
-
             "calendario": """## ESPECIALISTA EM CALENDÁRIO FINANCEIRO 📆
 
 DADOS DISPONÍVEIS EM context["calendario"]:
@@ -2177,7 +2518,6 @@ COMO RESPONDER:
 3. "quando recebo?" → Use receitas_esperadas
 4. "vou conseguir pagar tudo?" → Compare total_a_pagar com saldo + receitas
 5. Alerte se saldo_projetado for negativo""",
-
             "revisao": """## ESPECIALISTA EM REVIEW SEMANAL 📊
 
 DADOS DISPONÍVEIS EM context["revisao"]:
@@ -2196,7 +2536,6 @@ COMO RESPONDER:
 3. "onde mais gastei?" → Use top_categorias_semana
 4. Sempre mencione as dicas geradas
 5. Se houver muitas transações sem categoria, incentive categorizar""",
-
             "automacoes": """## ESPECIALISTA EM AUTOMAÇÕES 🤖
 
 DADOS DISPONÍVEIS EM context["automacoes"]:
@@ -2213,7 +2552,6 @@ COMO RESPONDER:
 3. "o que foi executado?" → Use ultimas_execucoes
 4. Explique o que cada automação faz de forma simples
 5. Se houver erros, sugira verificar a configuração""",
-
             "geral": """## ESPECIALISTA EM VISÃO GERAL 📋
 
 DADOS DISPONÍVEIS EM context["geral"]:
@@ -2228,7 +2566,7 @@ COMO RESPONDER:
 1. "como estão minhas finanças?" → Resumo com saldo, saúde, tendência
 2. "me dá um resumo" → Principais números do mês
 3. Sempre mencione se há alertas importantes (dívidas, cartões, orçamento)
-4. Ofereça aprofundar em áreas específicas"""
+4. Ofereça aprofundar em áreas específicas""",
         }
 
         # Combinar prompts dos domínios identificados
@@ -2239,13 +2577,14 @@ COMO RESPONDER:
 
         return combined_prompt
 
-    async def _get_or_create_conversation(self, user: User, conversation_id: str | None) -> tuple[str, ChatConversation]:
+    async def _get_or_create_conversation(
+        self, user: User, conversation_id: str | None
+    ) -> tuple[str, ChatConversation]:
         """Busca ou cria uma conversa no banco de dados"""
         if conversation_id:
             result = await self.db.execute(
                 select(ChatConversation).where(
-                    ChatConversation.id == conversation_id,
-                    ChatConversation.user_id == user.id
+                    ChatConversation.id == conversation_id, ChatConversation.user_id == user.id
                 )
             )
             conversation = result.scalar_one_or_none()
@@ -2254,10 +2593,7 @@ COMO RESPONDER:
 
         # Criar nova conversa
         new_id = str(uuid.uuid4())
-        conversation = ChatConversation(
-            id=new_id,
-            user_id=user.id
-        )
+        conversation = ChatConversation(id=new_id, user_id=user.id)
         self.db.add(conversation)
         await self.db.flush()
         return new_id, conversation
@@ -2278,17 +2614,14 @@ COMO RESPONDER:
         """Salva mensagem e remove antigas se > limite"""
         # Criar mensagem
         message = ChatMessage(
-            conversation_id=conversation_id,
-            role=MessageRole(role),
-            content=content
+            conversation_id=conversation_id, role=MessageRole(role), content=content
         )
         self.db.add(message)
         await self.db.flush()
 
         # Contar mensagens
         count_result = await self.db.execute(
-            select(func.count(ChatMessage.id))
-            .where(ChatMessage.conversation_id == conversation_id)
+            select(func.count(ChatMessage.id)).where(ChatMessage.conversation_id == conversation_id)
         )
         count = count_result.scalar()
 
@@ -2303,15 +2636,17 @@ COMO RESPONDER:
             )
             old_ids = [row[0] for row in oldest.fetchall()]
             if old_ids:
-                await self.db.execute(
-                    delete(ChatMessage).where(ChatMessage.id.in_(old_ids))
-                )
+                await self.db.execute(delete(ChatMessage).where(ChatMessage.id.in_(old_ids)))
 
-    async def chat(self, user: User, message: str, conversation_id: str | None = None) -> ChatResponse:
+    async def chat(
+        self, user: User, message: str, conversation_id: str | None = None
+    ) -> ChatResponse:
         """Processa mensagem do usuario e retorna resposta do agente usando arquitetura multi-agente"""
 
         # Buscar ou criar conversa no banco
-        conversation_id, conversation = await self._get_or_create_conversation(user, conversation_id)
+        conversation_id, conversation = await self._get_or_create_conversation(
+            user, conversation_id
+        )
 
         # Buscar histórico do banco ANTES de classificar (para contexto)
         history = await self._get_conversation_history(conversation_id)
@@ -2332,10 +2667,7 @@ COMO RESPONDER:
         system_prompt = self._build_expert_system_prompt(context, domains, message)
 
         # Adicionar mensagem do usuário ao histórico (em memória para chamar LLM)
-        history.append({
-            "role": "user",
-            "content": message
-        })
+        history.append({"role": "user", "content": message})
 
         # Chamar LLM
         response_text = await self._call_llm(system_prompt, history)
@@ -2352,17 +2684,25 @@ COMO RESPONDER:
         await self.db.commit()
 
         # Gerar sugestoes de follow-up (usar contexto geral para sugestões)
-        full_context = await self._get_comprehensive_context(user, query_context) if "geral" not in domains else context.get("geral", {})
-        suggestions = self._generate_smart_suggestions(message, full_context if isinstance(full_context, dict) else context)
+        full_context = (
+            await self._get_comprehensive_context(user, query_context)
+            if "geral" not in domains
+            else context.get("geral", {})
+        )
+        suggestions = self._generate_smart_suggestions(
+            message, full_context if isinstance(full_context, dict) else context
+        )
 
         return ChatResponse(
             message=response_text,
             conversation_id=conversation_id,
             suggestions=suggestions,
-            data_used=data_used
+            data_used=data_used,
         )
 
-    def _build_expert_system_prompt(self, context: dict, domains: list[str], user_message: str) -> str:
+    def _build_expert_system_prompt(
+        self, context: dict, domains: list[str], user_message: str
+    ) -> str:
         """Constrói prompt do sistema com instruções especializadas para os domínios identificados"""
         context_json = json.dumps(context, cls=DecimalEncoder, ensure_ascii=False)
 
@@ -2439,13 +2779,38 @@ PONTOS IMPORTANTES:
 
         # Mapeamento de números por extenso
         extenso_map = {
-            "um": 1, "uma": 1, "dois": 2, "duas": 2, "tres": 3, "três": 3,
-            "quatro": 4, "cinco": 5, "seis": 6, "sete": 7, "oito": 8,
-            "nove": 9, "dez": 10, "onze": 11, "doze": 12, "treze": 13,
-            "quatorze": 14, "catorze": 14, "quinze": 15, "dezesseis": 16,
-            "dezessete": 17, "dezoito": 18, "dezenove": 19, "vinte": 20,
-            "trinta": 30, "quarenta": 40, "cinquenta": 50, "sessenta": 60,
-            "setenta": 70, "oitenta": 80, "noventa": 90, "cem": 100
+            "um": 1,
+            "uma": 1,
+            "dois": 2,
+            "duas": 2,
+            "tres": 3,
+            "três": 3,
+            "quatro": 4,
+            "cinco": 5,
+            "seis": 6,
+            "sete": 7,
+            "oito": 8,
+            "nove": 9,
+            "dez": 10,
+            "onze": 11,
+            "doze": 12,
+            "treze": 13,
+            "quatorze": 14,
+            "catorze": 14,
+            "quinze": 15,
+            "dezesseis": 16,
+            "dezessete": 17,
+            "dezoito": 18,
+            "dezenove": 19,
+            "vinte": 20,
+            "trinta": 30,
+            "quarenta": 40,
+            "cinquenta": 50,
+            "sessenta": 60,
+            "setenta": 70,
+            "oitenta": 80,
+            "noventa": 90,
+            "cem": 100,
         }
 
         def normalize_number(value_str: str) -> float | None:
@@ -2497,27 +2862,30 @@ PONTOS IMPORTANTES:
         # Padrões ordenados por especificidade (mais específico primeiro)
         patterns = [
             # R$ 20.000,00 ou R$ 20000 ou R$20k
-            (r'R\$\s*([\d.,]+k?)', lambda m: normalize_number(m.group(1))),
-
+            (r"R\$\s*([\d.,]+k?)", lambda m: normalize_number(m.group(1))),
             # 20k ou 20K
-            (r'\b(\d+(?:[.,]\d+)?)\s*[kK]\b', lambda m: normalize_number(m.group(1) + "k")),
-
+            (r"\b(\d+(?:[.,]\d+)?)\s*[kK]\b", lambda m: normalize_number(m.group(1) + "k")),
             # 20 mil, 20.5 mil
-            (r'\b(\d+(?:[.,]\d+)?)\s*mil\b', lambda m: normalize_number(m.group(1)) * 1000 if normalize_number(m.group(1)) else None),
-
+            (
+                r"\b(\d+(?:[.,]\d+)?)\s*mil\b",
+                lambda m: (
+                    normalize_number(m.group(1)) * 1000 if normalize_number(m.group(1)) else None
+                ),
+            ),
             # vinte mil, trinta mil, etc
-            (r'\b(' + '|'.join(extenso_map.keys()) + r')\s+mil\b',
-             lambda m: extenso_map.get(m.group(1), 0) * 1000),
-
+            (
+                r"\b(" + "|".join(extenso_map.keys()) + r")\s+mil\b",
+                lambda m: extenso_map.get(m.group(1), 0) * 1000,
+            ),
             # 20000 reais, 20.000 reais
-            (r'\b([\d.,]+)\s*reais\b', lambda m: normalize_number(m.group(1))),
-
+            (r"\b([\d.,]+)\s*reais\b", lambda m: normalize_number(m.group(1))),
             # tenho/com/usar seguido de valor
-            (r'(?:tenho|com|usar|usando|aplico|aplicar|invisto|investir|pago|pagar|quito|quitar)\s*([\d.,]+k?)',
-             lambda m: normalize_number(m.group(1))),
-
+            (
+                r"(?:tenho|com|usar|usando|aplico|aplicar|invisto|investir|pago|pagar|quito|quitar)\s*([\d.,]+k?)",
+                lambda m: normalize_number(m.group(1)),
+            ),
             # Número grande isolado (>1000) que provavelmente é valor
-            (r'\b(\d{4,}(?:[.,]\d+)?)\b', lambda m: normalize_number(m.group(1))),
+            (r"\b(\d{4,}(?:[.,]\d+)?)\b", lambda m: normalize_number(m.group(1))),
         ]
 
         for pattern, extractor in patterns:
@@ -2553,37 +2921,46 @@ PONTOS IMPORTANTES:
                 query["period"] = {
                     "start": date(year, month_num, 1),
                     "end": (date(year, month_num, 1) + relativedelta(months=1)) - timedelta(days=1),
-                    "label": f"{month_name.capitalize()}/{year}"
+                    "label": f"{month_name.capitalize()}/{year}",
                 }
                 break
 
         # Detectar periodos relativos
         if not query["period"]:
-            if "esse mes" in message_lower or "este mes" in message_lower or "mes atual" in message_lower:
+            if (
+                "esse mes" in message_lower
+                or "este mes" in message_lower
+                or "mes atual" in message_lower
+            ):
                 query["period"] = {
                     "start": date(today.year, today.month, 1),
                     "end": today,
-                    "label": "Mes atual"
+                    "label": "Mes atual",
                 }
             elif "mes passado" in message_lower or "ultimo mes" in message_lower:
                 last_month = today - relativedelta(months=1)
                 query["period"] = {
                     "start": date(last_month.year, last_month.month, 1),
-                    "end": (date(last_month.year, last_month.month, 1) + relativedelta(months=1)) - timedelta(days=1),
-                    "label": "Mes passado"
+                    "end": (date(last_month.year, last_month.month, 1) + relativedelta(months=1))
+                    - timedelta(days=1),
+                    "label": "Mes passado",
                 }
             elif "ultimos 3 meses" in message_lower:
                 start = today - relativedelta(months=3)
                 query["period"] = {
                     "start": date(start.year, start.month, 1),
                     "end": today,
-                    "label": "Ultimos 3 meses"
+                    "label": "Ultimos 3 meses",
                 }
-            elif "esse ano" in message_lower or "este ano" in message_lower or "ano atual" in message_lower:
+            elif (
+                "esse ano" in message_lower
+                or "este ano" in message_lower
+                or "ano atual" in message_lower
+            ):
                 query["period"] = {
                     "start": date(today.year, 1, 1),
                     "end": today,
-                    "label": f"Ano {today.year}"
+                    "label": f"Ano {today.year}",
                 }
 
         # Se nao detectou periodo, usar mes atual como padrao
@@ -2591,21 +2968,50 @@ PONTOS IMPORTANTES:
             query["period"] = {
                 "start": date(today.year, today.month, 1),
                 "end": today,
-                "label": "Mes atual"
+                "label": "Mes atual",
             }
 
         # Detectar categorias mencionadas
         category_keywords = [
-            "alimentacao", "comida", "restaurante", "mercado", "supermercado",
-            "transporte", "uber", "gasolina", "combustivel",
-            "lazer", "entretenimento", "netflix", "streaming",
-            "saude", "farmacia", "medico", "hospital",
-            "educacao", "escola", "curso", "faculdade",
-            "moradia", "aluguel", "condominio", "luz", "agua", "gas",
-            "roupas", "vestuario", "shopping",
-            "carne", "acougue", "proteina",
-            "ifood", "delivery", "rappi",
-            "assinatura", "spotify", "amazon"
+            "alimentacao",
+            "comida",
+            "restaurante",
+            "mercado",
+            "supermercado",
+            "transporte",
+            "uber",
+            "gasolina",
+            "combustivel",
+            "lazer",
+            "entretenimento",
+            "netflix",
+            "streaming",
+            "saude",
+            "farmacia",
+            "medico",
+            "hospital",
+            "educacao",
+            "escola",
+            "curso",
+            "faculdade",
+            "moradia",
+            "aluguel",
+            "condominio",
+            "luz",
+            "agua",
+            "gas",
+            "roupas",
+            "vestuario",
+            "shopping",
+            "carne",
+            "acougue",
+            "proteina",
+            "ifood",
+            "delivery",
+            "rappi",
+            "assinatura",
+            "spotify",
+            "amazon",
         ]
 
         for keyword in category_keywords:
@@ -2623,7 +3029,9 @@ PONTOS IMPORTANTES:
 
         return query
 
-    async def _get_comprehensive_context(self, user: User, query_context: dict[str, Any]) -> dict[str, Any]:
+    async def _get_comprehensive_context(
+        self, user: User, query_context: dict[str, Any]
+    ) -> dict[str, Any]:
         """Busca contexto financeiro completo e detalhado"""
         context: dict[str, Any] = {}
         today = date.today()
@@ -2638,7 +3046,9 @@ PONTOS IMPORTANTES:
         categories_result = await self.db.execute(
             select(Category).where(Category.user_id == user.id)
         )
-        categories: dict[int | None, str] = {c.id: c.name for c in categories_result.scalars().all()}
+        categories: dict[int | None, str] = {
+            c.id: c.name for c in categories_result.scalars().all()
+        }
         context["categorias_disponiveis"] = list(categories.values())
 
         # 2. Resumo de contas
@@ -2646,7 +3056,10 @@ PONTOS IMPORTANTES:
             accounts_query = select(Account).where(
                 or_(
                     and_(Account.user_id == user.id, Account.ownership_type == "personal"),
-                    and_(Account.user_id.in_(household_user_ids), Account.ownership_type == "household")
+                    and_(
+                        Account.user_id.in_(household_user_ids),
+                        Account.ownership_type == "household",
+                    ),
                 )
             )
         else:
@@ -2655,8 +3068,7 @@ PONTOS IMPORTANTES:
         accounts = await self.db.execute(accounts_query)
         accounts_list = accounts.scalars().all()
         context["contas"] = [
-            {"nome": a.name, "tipo": a.type, "saldo": float(a.balance)}
-            for a in accounts_list
+            {"nome": a.name, "tipo": a.type, "saldo": float(a.balance)} for a in accounts_list
         ]
         context["saldo_total"] = sum(float(a.balance) for a in accounts_list)
 
@@ -2667,14 +3079,17 @@ PONTOS IMPORTANTES:
                 Transaction.date <= period_end,
                 or_(
                     and_(Transaction.user_id == user.id, Transaction.ownership_type == "personal"),
-                    and_(Transaction.user_id.in_(household_user_ids), Transaction.ownership_type == "household")
-                )
+                    and_(
+                        Transaction.user_id.in_(household_user_ids),
+                        Transaction.ownership_type == "household",
+                    ),
+                ),
             )
         else:
             tx_query = select(Transaction).where(
                 Transaction.user_id == user.id,
                 Transaction.date >= period_start,
-                Transaction.date <= period_end
+                Transaction.date <= period_end,
             )
 
         transactions = await self.db.execute(tx_query)
@@ -2694,14 +3109,14 @@ PONTOS IMPORTANTES:
         # Nota: transações com receipt_id SÃO despesas legítimas (itens de cupom fiscal)
         # e NÃO devem ser excluídas - o Receipt é apenas um agrupador, não uma transação
         receitas = sum(
-            float(t.amount) for t in txs
-            if t.type == TransactionType.INCOME.value
-            and not t.linked_transaction_id
+            float(t.amount)
+            for t in txs
+            if t.type == TransactionType.INCOME.value and not t.linked_transaction_id
         )
         despesas = sum(
-            float(t.amount) for t in txs
-            if t.type == TransactionType.EXPENSE.value
-            and not t.linked_transaction_id
+            float(t.amount)
+            for t in txs
+            if t.type == TransactionType.EXPENSE.value and not t.linked_transaction_id
         )
 
         context["periodo_analise"] = {
@@ -2715,23 +3130,29 @@ PONTOS IMPORTANTES:
             "despesas": despesas,
             "saldo": receitas - despesas,
             "total_transacoes": len(txs),
-            "media_diaria_gastos": round(despesas / max(1, (period_end - period_start).days + 1), 2)
+            "media_diaria_gastos": round(
+                despesas / max(1, (period_end - period_start).days + 1), 2
+            ),
         }
 
         # 4. Gastos por categoria (DETALHADO) - excluindo apenas transferências
-        gastos_por_categoria: dict[str, Any] = defaultdict(lambda: {"total": 0, "count": 0, "transacoes": []})
+        gastos_por_categoria: dict[str, Any] = defaultdict(
+            lambda: {"total": 0, "count": 0, "transacoes": []}
+        )
         for t in txs:
             if t.type == TransactionType.EXPENSE.value and not t.linked_transaction_id:
                 cat_name = categories.get(t.category_id, "Sem categoria")
                 merchant_name = merchants.get(t.merchant_id, t.description or "Nao identificado")
                 gastos_por_categoria[cat_name]["total"] += float(t.amount)
                 gastos_por_categoria[cat_name]["count"] += 1
-                gastos_por_categoria[cat_name]["transacoes"].append({
-                    "valor": float(t.amount),
-                    "data": t.date.strftime("%d/%m"),
-                    "estabelecimento": merchant_name,
-                    "descricao": t.description
-                })
+                gastos_por_categoria[cat_name]["transacoes"].append(
+                    {
+                        "valor": float(t.amount),
+                        "data": t.date.strftime("%d/%m"),
+                        "estabelecimento": merchant_name,
+                        "descricao": t.description,
+                    }
+                )
 
         # Ordenar por valor
         context["gastos_por_categoria"] = dict(
@@ -2739,7 +3160,9 @@ PONTOS IMPORTANTES:
         )
 
         # 5. Gastos por estabelecimento - excluindo apenas transferências
-        gastos_por_estabelecimento: dict[str, Any] = defaultdict(lambda: {"total": 0, "count": 0, "categoria": None})
+        gastos_por_estabelecimento: dict[str, Any] = defaultdict(
+            lambda: {"total": 0, "count": 0, "categoria": None}
+        )
         for t in txs:
             if t.type == TransactionType.EXPENSE.value and not t.linked_transaction_id:
                 merchant_name = merchants.get(t.merchant_id, t.description or "Outros")
@@ -2749,7 +3172,9 @@ PONTOS IMPORTANTES:
                 gastos_por_estabelecimento[merchant_name]["categoria"] = cat_name
 
         context["gastos_por_estabelecimento"] = dict(
-            sorted(gastos_por_estabelecimento.items(), key=lambda x: x[1]["total"], reverse=True)[:15]
+            sorted(gastos_por_estabelecimento.items(), key=lambda x: x[1]["total"], reverse=True)[
+                :15
+            ]
         )
 
         # 6. Receitas por categoria - excluindo apenas transferências
@@ -2764,27 +3189,26 @@ PONTOS IMPORTANTES:
 
         # 7. Top 10 maiores gastos do periodo - excluindo apenas transferências
         despesas_list = [
-            t for t in txs
-            if t.type == TransactionType.EXPENSE.value
-            and not t.linked_transaction_id
+            t
+            for t in txs
+            if t.type == TransactionType.EXPENSE.value and not t.linked_transaction_id
         ]
         despesas_list.sort(key=lambda x: float(x.amount), reverse=True)
         context["maiores_gastos"] = [
             {
                 "valor": float(t.amount),
                 "data": t.date.strftime("%d/%m/%Y"),
-                "estabelecimento": merchants.get(t.merchant_id, t.description or "Nao identificado"),
-                "categoria": categories.get(t.category_id, "Sem categoria")
+                "estabelecimento": merchants.get(
+                    t.merchant_id, t.description or "Nao identificado"
+                ),
+                "categoria": categories.get(t.category_id, "Sem categoria"),
             }
             for t in despesas_list[:10]
         ]
 
         # 8. Dividas ativas
         debts = await self.db.execute(
-            select(Debt).where(
-                Debt.user_id == user.id,
-                Debt.status == DebtStatus.ACTIVE.value
-            )
+            select(Debt).where(Debt.user_id == user.id, Debt.status == DebtStatus.ACTIVE.value)
         )
         debts_list = debts.scalars().all()
         context["dividas"] = [
@@ -2793,7 +3217,7 @@ PONTOS IMPORTANTES:
                 "saldo": float(d.current_balance),
                 "taxa_juros": float(d.interest_rate) * 100,
                 "pagamento_minimo": float(d.minimum_payment),
-                "tipo": d.type
+                "tipo": d.type,
             }
             for d in debts_list
         ]
@@ -2801,10 +3225,7 @@ PONTOS IMPORTANTES:
 
         # 9. Metas financeiras
         goals = await self.db.execute(
-            select(Goal).where(
-                Goal.user_id == user.id,
-                Goal.status == "active"
-            )
+            select(Goal).where(Goal.user_id == user.id, Goal.status == "active")
         )
         goals_list = goals.scalars().all()
         context["metas"] = [
@@ -2812,9 +3233,11 @@ PONTOS IMPORTANTES:
                 "nome": g.name,
                 "valor_alvo": float(g.target_amount),
                 "valor_atual": float(g.current_amount),
-                "progresso": round(float(g.current_amount / g.target_amount * 100), 1) if g.target_amount > 0 else 0,
+                "progresso": round(float(g.current_amount / g.target_amount * 100), 1)
+                if g.target_amount > 0
+                else 0,
                 "prazo": g.target_date.strftime("%d/%m/%Y") if g.target_date else None,
-                "falta": float(g.target_amount - g.current_amount)
+                "falta": float(g.target_amount - g.current_amount),
             }
             for g in goals_list
         ]
@@ -2822,9 +3245,7 @@ PONTOS IMPORTANTES:
         # 10. Orcamento do mes
         budget_result = await self.db.execute(
             select(Budget).where(
-                Budget.user_id == user.id,
-                Budget.year == today.year,
-                Budget.month == today.month
+                Budget.user_id == user.id, Budget.year == today.year, Budget.month == today.month
             )
         )
         budget = budget_result.scalar_one_or_none()
@@ -2839,13 +3260,17 @@ PONTOS IMPORTANTES:
             for b in budget_items:
                 cat_name = categories.get(b.category_id, "Categoria")
                 gasto_atual = gastos_por_categoria.get(cat_name, {}).get("total", 0)
-                orcamento_items.append({
-                    "categoria": cat_name,
-                    "planejado": float(b.planned_amount),
-                    "gasto": gasto_atual,
-                    "restante": float(b.planned_amount) - gasto_atual,
-                    "percentual_usado": round(gasto_atual / float(b.planned_amount) * 100, 1) if b.planned_amount > 0 else 0
-                })
+                orcamento_items.append(
+                    {
+                        "categoria": cat_name,
+                        "planejado": float(b.planned_amount),
+                        "gasto": gasto_atual,
+                        "restante": float(b.planned_amount) - gasto_atual,
+                        "percentual_usado": round(gasto_atual / float(b.planned_amount) * 100, 1)
+                        if b.planned_amount > 0
+                        else 0,
+                    }
+                )
             context["orcamento"] = orcamento_items
         else:
             context["orcamento"] = []
@@ -2853,7 +3278,9 @@ PONTOS IMPORTANTES:
         # 11. Comparacao com mes anterior (se relevante)
         last_month = today - relativedelta(months=1)
         last_month_start = date(last_month.year, last_month.month, 1)
-        last_month_end = (date(last_month.year, last_month.month, 1) + relativedelta(months=1)) - timedelta(days=1)
+        last_month_end = (
+            date(last_month.year, last_month.month, 1) + relativedelta(months=1)
+        ) - timedelta(days=1)
 
         if household_user_ids:
             last_month_query = select(Transaction).where(
@@ -2861,35 +3288,47 @@ PONTOS IMPORTANTES:
                 Transaction.date <= last_month_end,
                 or_(
                     and_(Transaction.user_id == user.id, Transaction.ownership_type == "personal"),
-                    and_(Transaction.user_id.in_(household_user_ids), Transaction.ownership_type == "household")
-                )
+                    and_(
+                        Transaction.user_id.in_(household_user_ids),
+                        Transaction.ownership_type == "household",
+                    ),
+                ),
             )
         else:
             last_month_query = select(Transaction).where(
                 Transaction.user_id == user.id,
                 Transaction.date >= last_month_start,
-                Transaction.date <= last_month_end
+                Transaction.date <= last_month_end,
             )
 
         last_txs = await self.db.execute(last_month_query)
         last_txs_list = last_txs.scalars().all()
 
-        last_despesas = sum(float(t.amount) for t in last_txs_list if t.type == TransactionType.EXPENSE.value)
-        last_receitas = sum(float(t.amount) for t in last_txs_list if t.type == TransactionType.INCOME.value)
+        last_despesas = sum(
+            float(t.amount) for t in last_txs_list if t.type == TransactionType.EXPENSE.value
+        )
+        last_receitas = sum(
+            float(t.amount) for t in last_txs_list if t.type == TransactionType.INCOME.value
+        )
 
         context["comparacao_mes_anterior"] = {
             "despesas_mes_anterior": last_despesas,
             "receitas_mes_anterior": last_receitas,
-            "variacao_despesas": round(((despesas - last_despesas) / max(1, last_despesas)) * 100, 1) if last_despesas > 0 else 0,
-            "variacao_receitas": round(((receitas - last_receitas) / max(1, last_receitas)) * 100, 1) if last_receitas > 0 else 0,
+            "variacao_despesas": round(
+                ((despesas - last_despesas) / max(1, last_despesas)) * 100, 1
+            )
+            if last_despesas > 0
+            else 0,
+            "variacao_receitas": round(
+                ((receitas - last_receitas) / max(1, last_receitas)) * 100, 1
+            )
+            if last_receitas > 0
+            else 0,
         }
 
         # 12. Cartoes de credito e faturas
         credit_cards_result = await self.db.execute(
-            select(CreditCard).where(
-                CreditCard.user_id == user.id,
-                CreditCard.is_active == True
-            )
+            select(CreditCard).where(CreditCard.user_id == user.id, CreditCard.is_active == True)
         )
         credit_cards_list = credit_cards_result.scalars().all()
 
@@ -2897,17 +3336,19 @@ PONTOS IMPORTANTES:
         for card in credit_cards_list:
             # Buscar faturas abertas (OPEN) e proximas a vencer (CLOSED)
             invoices_result = await self.db.execute(
-                select(CreditCardInvoice).where(
+                select(CreditCardInvoice)
+                .where(
                     CreditCardInvoice.credit_card_id == card.id,
                     or_(
                         CreditCardInvoice.status == InvoiceStatus.OPEN.value,
                         CreditCardInvoice.status == InvoiceStatus.CLOSED.value,
                         CreditCardInvoice.status == InvoiceStatus.PARTIAL.value,
-                        CreditCardInvoice.status == InvoiceStatus.OVERDUE.value
-                    )
-                ).order_by(
+                        CreditCardInvoice.status == InvoiceStatus.OVERDUE.value,
+                    ),
+                )
+                .order_by(
                     CreditCardInvoice.reference_year.desc(),
-                    CreditCardInvoice.reference_month.desc()
+                    CreditCardInvoice.reference_month.desc(),
                 )
             )
             invoices_list = invoices_result.scalars().all()
@@ -2927,41 +3368,44 @@ PONTOS IMPORTANTES:
 
             faturas_info = []
             for inv in invoices_list[:3]:  # Mostrar até 3 faturas mais recentes
-                faturas_info.append({
-                    "periodo": inv.period_display,
-                    "mes": inv.reference_month,
-                    "ano": inv.reference_year,
-                    "status": inv.status,
-                    "valor_total": float(inv.total_amount),
-                    "valor_pago": float(inv.paid_amount),
-                    "valor_restante": float(inv.remaining_amount),
-                    "vencimento": inv.due_date.strftime("%d/%m/%Y"),
-                    "fechamento": inv.closing_date.strftime("%d/%m/%Y"),
-                    "vencida": inv.is_overdue
-                })
+                faturas_info.append(
+                    {
+                        "periodo": inv.period_display,
+                        "mes": inv.reference_month,
+                        "ano": inv.reference_year,
+                        "status": inv.status,
+                        "valor_total": float(inv.total_amount),
+                        "valor_pago": float(inv.paid_amount),
+                        "valor_restante": float(inv.remaining_amount),
+                        "vencimento": inv.due_date.strftime("%d/%m/%Y"),
+                        "fechamento": inv.closing_date.strftime("%d/%m/%Y"),
+                        "vencida": inv.is_overdue,
+                    }
+                )
 
-            cartoes_info.append({
-                "nome": account.name if account else "Cartao",
-                "bandeira": card.card_brand,
-                "variante": card.card_variant,
-                "ultimos_digitos": card.last_four_digits,
-                "limite_total": float(card.credit_limit),
-                "saldo_em_aberto": saldo_em_aberto,
-                "limite_disponivel": float(card.credit_limit) - saldo_em_aberto,
-                "dia_fechamento": card.closing_day,
-                "dia_vencimento": card.due_day,
-                "anuidade": float(card.annual_fee) if card.annual_fee else 0,
-                "anuidade_isenta": card.annual_fee_waived,
-                "faturas": faturas_info
-            })
+            cartoes_info.append(
+                {
+                    "nome": account.name if account else "Cartao",
+                    "bandeira": card.card_brand,
+                    "variante": card.card_variant,
+                    "ultimos_digitos": card.last_four_digits,
+                    "limite_total": float(card.credit_limit),
+                    "saldo_em_aberto": saldo_em_aberto,
+                    "limite_disponivel": float(card.credit_limit) - saldo_em_aberto,
+                    "dia_fechamento": card.closing_day,
+                    "dia_vencimento": card.due_day,
+                    "anuidade": float(card.annual_fee) if card.annual_fee else 0,
+                    "anuidade_isenta": card.annual_fee_waived,
+                    "faturas": faturas_info,
+                }
+            )
 
         context["cartoes_credito"] = cartoes_info
 
         # 13. Fontes de receita planejadas
         income_sources_result = await self.db.execute(
             select(IncomeSource).where(
-                IncomeSource.user_id == user.id,
-                IncomeSource.is_active == True
+                IncomeSource.user_id == user.id, IncomeSource.is_active == True
             )
         )
         income_sources_list = income_sources_result.scalars().all()
@@ -2996,7 +3440,7 @@ PONTOS IMPORTANTES:
                 "numero_dia_util": source.business_day_number,
                 "conta_destino": source_account.name if source_account else None,
                 "categoria": source_category.name if source_category else None,
-                "tributavel": source.is_taxable
+                "tributavel": source.is_taxable,
             }
 
             # Adicionar info de beneficio se aplicavel
@@ -3032,10 +3476,12 @@ PONTOS IMPORTANTES:
     async def _get_installment_series(self, user: User) -> list[dict]:
         """Busca parcelas ativas com projecao"""
         result = await self.db.execute(
-            select(InstallmentSeries).where(
+            select(InstallmentSeries)
+            .where(
                 InstallmentSeries.user_id == user.id,
-                InstallmentSeries.status == InstallmentSeriesStatus.ACTIVE.value
-            ).order_by(InstallmentSeries.installment_amount.desc())
+                InstallmentSeries.status == InstallmentSeriesStatus.ACTIVE.value,
+            )
+            .order_by(InstallmentSeries.installment_amount.desc())
         )
         series_list = result.scalars().all()
 
@@ -3046,28 +3492,32 @@ PONTOS IMPORTANTES:
             remaining = s.installment_count - s.paid_count
             end_date = today + relativedelta(months=remaining)
 
-            parcelas.append({
-                "descricao": s.description,
-                "estabelecimento": s.merchant_name,
-                "valor_parcela": float(s.installment_amount),
-                "valor_total": float(s.total_amount),
-                "parcelas_totais": s.installment_count,
-                "parcelas_pagas": s.paid_count,
-                "parcelas_restantes": remaining,
-                "valor_restante": float(s.installment_amount * remaining),
-                "termino_previsto": end_date.strftime("%m/%Y")
-            })
+            parcelas.append(
+                {
+                    "descricao": s.description,
+                    "estabelecimento": s.merchant_name,
+                    "valor_parcela": float(s.installment_amount),
+                    "valor_total": float(s.total_amount),
+                    "parcelas_totais": s.installment_count,
+                    "parcelas_pagas": s.paid_count,
+                    "parcelas_restantes": remaining,
+                    "valor_restante": float(s.installment_amount * remaining),
+                    "termino_previsto": end_date.strftime("%m/%Y"),
+                }
+            )
 
         return parcelas
 
     async def _get_recurring_transactions(self, user: User) -> list[dict]:
         """Busca despesas recorrentes/assinaturas ativas"""
         result = await self.db.execute(
-            select(RecurringTransaction).where(
+            select(RecurringTransaction)
+            .where(
                 RecurringTransaction.user_id == user.id,
                 RecurringTransaction.status == RecurringStatus.ACTIVE.value,
-                RecurringTransaction.type == "expense"
-            ).order_by(RecurringTransaction.amount.desc())
+                RecurringTransaction.type == "expense",
+            )
+            .order_by(RecurringTransaction.amount.desc())
         )
         recurring_list = result.scalars().all()
 
@@ -3086,17 +3536,21 @@ PONTOS IMPORTANTES:
                 "daily": "diario",
                 "weekly": "semanal",
                 "monthly": "mensal",
-                "yearly": "anual"
+                "yearly": "anual",
             }.get(r.frequency, r.frequency)
 
-            recorrentes.append({
-                "nome": r.name,
-                "valor": float(r.amount),
-                "frequencia": freq_display,
-                "categoria": categories.get(r.category_id, "Sem categoria"),
-                "proximo_vencimento": r.next_due_date.strftime("%d/%m/%Y") if r.next_due_date else None,
-                "dia_do_mes": r.day_of_month
-            })
+            recorrentes.append(
+                {
+                    "nome": r.name,
+                    "valor": float(r.amount),
+                    "frequencia": freq_display,
+                    "categoria": categories.get(r.category_id, "Sem categoria"),
+                    "proximo_vencimento": r.next_due_date.strftime("%d/%m/%Y")
+                    if r.next_due_date
+                    else None,
+                    "dia_do_mes": r.day_of_month,
+                }
+            )
 
         return recorrentes
 
@@ -3111,8 +3565,7 @@ PONTOS IMPORTANTES:
         # Soma de recorrentes mensais
         recorrentes = context.get("recorrentes", [])
         total_recorrentes_mes = sum(
-            r.get("valor", 0) for r in recorrentes
-            if r.get("frequencia") == "mensal"
+            r.get("valor", 0) for r in recorrentes if r.get("frequencia") == "mensal"
         )
 
         for i in range(1, 4):
@@ -3124,24 +3577,23 @@ PONTOS IMPORTANTES:
                 if p.get("parcelas_restantes", 0) > i:
                     parcelas_ativas_mes += p.get("valor_parcela", 0)
 
-            projecao.append({
-                "mes": mes_futuro.strftime("%B/%Y"),
-                "mes_numero": mes_futuro.month,
-                "ano": mes_futuro.year,
-                "parcelas_previstas": parcelas_ativas_mes,
-                "recorrentes_previstas": total_recorrentes_mes,
-                "total_projetado": parcelas_ativas_mes + total_recorrentes_mes
-            })
+            projecao.append(
+                {
+                    "mes": mes_futuro.strftime("%B/%Y"),
+                    "mes_numero": mes_futuro.month,
+                    "ano": mes_futuro.year,
+                    "parcelas_previstas": parcelas_ativas_mes,
+                    "recorrentes_previstas": total_recorrentes_mes,
+                    "total_projetado": parcelas_ativas_mes + total_recorrentes_mes,
+                }
+            )
 
         return projecao
 
     async def _get_benefit_cards(self, user: User) -> list[dict]:
         """Busca cartoes de beneficio VA/VR/VT"""
         result = await self.db.execute(
-            select(BenefitCard).where(
-                BenefitCard.user_id == user.id,
-                BenefitCard.is_active == True
-            )
+            select(BenefitCard).where(BenefitCard.user_id == user.id, BenefitCard.is_active == True)
         )
         benefit_cards = result.scalars().all()
 
@@ -3149,22 +3601,24 @@ PONTOS IMPORTANTES:
         account_ids = [b.account_id for b in benefit_cards]
         accounts: dict[int, Account] = {}
         if account_ids:
-            acc_result = await self.db.execute(
-                select(Account).where(Account.id.in_(account_ids))
-            )
+            acc_result = await self.db.execute(select(Account).where(Account.id.in_(account_ids)))
             accounts = {a.id: a for a in acc_result.scalars().all()}
 
         beneficios = []
         for b in benefit_cards:
             account = accounts.get(b.account_id)
-            beneficios.append({
-                "tipo": b.card_type_display,
-                "operadora": b.provider_display,
-                "ultimos_digitos": b.last_four_digits,
-                "saldo_atual": float(account.balance) if account else 0,
-                "recarga_esperada": float(b.expected_monthly_recharge) if b.expected_monthly_recharge else None,
-                "dia_recarga": b.recharge_day
-            })
+            beneficios.append(
+                {
+                    "tipo": b.card_type_display,
+                    "operadora": b.provider_display,
+                    "ultimos_digitos": b.last_four_digits,
+                    "saldo_atual": float(account.balance) if account else 0,
+                    "recarga_esperada": float(b.expected_monthly_recharge)
+                    if b.expected_monthly_recharge
+                    else None,
+                    "dia_recarga": b.recharge_day,
+                }
+            )
 
         return beneficios
 
@@ -3175,9 +3629,7 @@ PONTOS IMPORTANTES:
         # Buscar orcamento do mes
         budget_result = await self.db.execute(
             select(Budget).where(
-                Budget.user_id == user.id,
-                Budget.year == today.year,
-                Budget.month == today.month
+                Budget.user_id == user.id, Budget.year == today.year, Budget.month == today.month
             )
         )
         budget = budget_result.scalar_one_or_none()
@@ -3186,7 +3638,7 @@ PONTOS IMPORTANTES:
             return {
                 "tem_orcamento": False,
                 "score": None,
-                "mensagem": "Sem orcamento definido para este mes"
+                "mensagem": "Sem orcamento definido para este mes",
             }
 
         # Buscar itens do orcamento
@@ -3207,15 +3659,14 @@ PONTOS IMPORTANTES:
         # Buscar gastos reais do mes
         start_date = date(today.year, today.month, 1)
         result = await self.db.execute(
-            select(
-                Transaction.category_id,
-                func.sum(Transaction.amount).label('total')
-            ).where(
+            select(Transaction.category_id, func.sum(Transaction.amount).label("total"))
+            .where(
                 Transaction.user_id == user.id,
                 Transaction.type == TransactionType.EXPENSE.value,
                 Transaction.date >= start_date,
-                Transaction.date <= today
-            ).group_by(Transaction.category_id)
+                Transaction.date <= today,
+            )
+            .group_by(Transaction.category_id)
         )
         gastos_por_categoria = {row.category_id: float(row.total) for row in result.all()}
 
@@ -3234,12 +3685,14 @@ PONTOS IMPORTANTES:
                 percentual = (gasto / planejado) * 100
                 if percentual >= 80:
                     cat_name = categories.get(item.category_id, "Categoria")
-                    categorias_alerta.append({
-                        "categoria": cat_name,
-                        "planejado": planejado,
-                        "gasto": gasto,
-                        "percentual": round(percentual, 1)
-                    })
+                    categorias_alerta.append(
+                        {
+                            "categoria": cat_name,
+                            "planejado": planejado,
+                            "gasto": gasto,
+                            "percentual": round(percentual, 1),
+                        }
+                    )
 
         # Calcular score (0-100)
         score = 100.0
@@ -3255,17 +3708,18 @@ PONTOS IMPORTANTES:
             "score": round(score, 1),
             "total_planejado": total_planejado,
             "total_gasto": total_gasto,
-            "percentual_usado": round((total_gasto / total_planejado * 100), 1) if total_planejado > 0 else 0,
-            "categorias_alerta": categorias_alerta[:5]  # Top 5 em alerta
+            "percentual_usado": round((total_gasto / total_planejado * 100), 1)
+            if total_planejado > 0
+            else 0,
+            "categorias_alerta": categorias_alerta[:5],  # Top 5 em alerta
         }
 
     async def _get_debt_strategy(self, user: User) -> dict:
         """Calcula estrategia de quitacao de dividas (snowball vs avalanche)"""
         result = await self.db.execute(
-            select(Debt).where(
-                Debt.user_id == user.id,
-                Debt.status == DebtStatus.ACTIVE.value
-            ).order_by(Debt.current_balance.asc())
+            select(Debt)
+            .where(Debt.user_id == user.id, Debt.status == DebtStatus.ACTIVE.value)
+            .order_by(Debt.current_balance.asc())
         )
         debts = result.scalars().all()
 
@@ -3299,15 +3753,15 @@ PONTOS IMPORTANTES:
             "estrategia_snowball": {
                 "primeira_divida": menor_saldo.name,
                 "saldo": float(menor_saldo.current_balance),
-                "descricao": "Quitar a menor divida primeiro para ganhar motivacao"
+                "descricao": "Quitar a menor divida primeiro para ganhar motivacao",
             },
             "estrategia_avalanche": {
                 "primeira_divida": maior_juros.name,
                 "taxa_juros": float(maior_juros.interest_rate),
-                "descricao": "Quitar a de maior juros primeiro para economizar dinheiro"
+                "descricao": "Quitar a de maior juros primeiro para economizar dinheiro",
             },
             "meses_para_quitar": meses_estimados,
-            "recomendacao": "avalanche" if float(maior_juros.interest_rate) > 5 else "snowball"
+            "recomendacao": "avalanche" if float(maior_juros.interest_rate) > 5 else "snowball",
         }
 
     def _build_enhanced_system_prompt(self, context: dict, user_message: str) -> str:
@@ -3379,21 +3833,21 @@ PONTOS IMPORTANTES:
             return "Configure GOOGLE_API_KEY no arquivo .env para usar o assistente."
 
         contents = []
-        contents.append({
-            "role": "user",
-            "parts": [{"text": system_prompt}]
-        })
-        contents.append({
-            "role": "model",
-            "parts": [{"text": "Entendido! Sou o Fin e vou analisar os dados financeiros fornecidos para dar respostas precisas e personalizadas."}]
-        })
+        contents.append({"role": "user", "parts": [{"text": system_prompt}]})
+        contents.append(
+            {
+                "role": "model",
+                "parts": [
+                    {
+                        "text": "Entendido! Sou o Fin e vou analisar os dados financeiros fornecidos para dar respostas precisas e personalizadas."
+                    }
+                ],
+            }
+        )
 
         for msg in messages:
             role = "user" if msg["role"] == "user" else "model"
-            contents.append({
-                "role": role,
-                "parts": [{"text": msg["content"]}]
-            })
+            contents.append({"role": role, "parts": [{"text": msg["content"]}]})
 
         model = "gemini-2.0-flash"
 
@@ -3405,7 +3859,7 @@ PONTOS IMPORTANTES:
                     "generationConfig": {
                         "temperature": 0.4,
                         "maxOutputTokens": 2500,  # Aumentado para respostas detalhadas
-                    }
+                    },
                 },
             )
 
@@ -3423,10 +3877,7 @@ PONTOS IMPORTANTES:
 
         mistral_messages = [{"role": "system", "content": system_prompt}]
         for msg in messages:
-            mistral_messages.append({
-                "role": msg["role"],
-                "content": msg["content"]
-            })
+            mistral_messages.append({"role": msg["role"], "content": msg["content"]})
 
         async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.post(
@@ -3457,7 +3908,11 @@ PONTOS IMPORTANTES:
         # Se falou de gastos, sugerir detalhamento
         if "gast" in message_lower:
             if context.get("gastos_por_categoria"):
-                top_cat = list(context["gastos_por_categoria"].keys())[0] if context["gastos_por_categoria"] else None
+                top_cat = (
+                    list(context["gastos_por_categoria"].keys())[0]
+                    if context["gastos_por_categoria"]
+                    else None
+                )
                 if top_cat:
                     suggestions.append(f"Detalhe meus gastos com {top_cat}")
 
@@ -3466,8 +3921,7 @@ PONTOS IMPORTANTES:
             cartoes = context["cartoes_credito"]
             # Verificar se tem faturas vencidas
             has_overdue = any(
-                fatura.get("vencida") for cartao in cartoes
-                for fatura in cartao.get("faturas", [])
+                fatura.get("vencida") for cartao in cartoes for fatura in cartao.get("faturas", [])
             )
             if has_overdue and "venc" not in message_lower:
                 suggestions.append("Quais faturas estao vencidas?")
@@ -3475,13 +3929,19 @@ PONTOS IMPORTANTES:
             # Verificar limite baixo (menos de 30% disponível)
             for cartao in cartoes:
                 if cartao.get("limite_total", 0) > 0:
-                    percentual_usado = (cartao.get("saldo_em_aberto", 0) / cartao["limite_total"]) * 100
+                    percentual_usado = (
+                        cartao.get("saldo_em_aberto", 0) / cartao["limite_total"]
+                    ) * 100
                     if percentual_usado > 70 and "limite" not in message_lower:
                         suggestions.append("Qual meu limite disponivel nos cartoes?")
                         break
 
         # Se tem receitas configuradas, sugerir analise
-        if context.get("fontes_receita") and "receita" not in message_lower and "salario" not in message_lower:
+        if (
+            context.get("fontes_receita")
+            and "receita" not in message_lower
+            and "salario" not in message_lower
+        ):
             suggestions.append("Quando recebo minhas proximas receitas?")
 
         # Se tem dividas, sugerir estrategia
@@ -3529,9 +3989,7 @@ PONTOS IMPORTANTES:
             return []
 
         result = await self.db.execute(
-            select(HouseholdMember.user_id).where(
-                HouseholdMember.license_id == user.license_id
-            )
+            select(HouseholdMember.user_id).where(HouseholdMember.license_id == user.license_id)
         )
         return list(result.scalars().all())
 

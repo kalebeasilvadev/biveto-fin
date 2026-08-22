@@ -24,11 +24,14 @@ class RecurringStatus(str, Enum):
 
 class RecurringTransaction(Base):
     """Template de transação recorrente (aluguel, Netflix, etc.)"""
+
     __tablename__ = "recurring_transactions"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
-    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id", ondelete="CASCADE"), index=True)
+    account_id: Mapped[int] = mapped_column(
+        ForeignKey("accounts.id", ondelete="CASCADE"), index=True
+    )
     category_id: Mapped[int | None] = mapped_column(ForeignKey("categories.id"), index=True)
 
     # Dados da transação
@@ -51,21 +54,20 @@ class RecurringTransaction(Base):
     status: Mapped[str] = mapped_column(String(20), default="active")  # RecurringStatus
     last_generated_date: Mapped[date | None] = mapped_column(Date)  # Última data gerada
     next_due_date: Mapped[date | None] = mapped_column(Date, index=True)  # Próxima data
-    ownership_type: Mapped[str] = mapped_column(String(20), default="personal")  # personal, household
+    ownership_type: Mapped[str] = mapped_column(
+        String(20), default="personal"
+    )  # personal, household
 
     # Metadados
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=utc_now, onupdate=utc_now
-    )
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, onupdate=utc_now)
 
     # Relationships
     user: Mapped["User"] = relationship(back_populates="recurring_transactions")
     account: Mapped["Account"] = relationship()
     category: Mapped["Category | None"] = relationship()
     generated_transactions: Mapped[list["Transaction"]] = relationship(
-        back_populates="recurring_source",
-        foreign_keys="Transaction.recurring_id"
+        back_populates="recurring_source", foreign_keys="Transaction.recurring_id"
     )
 
 

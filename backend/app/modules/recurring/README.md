@@ -64,9 +64,13 @@ recurring/
 from app.modules.recurring import (
     router,
     RecurringTransactionService,
-    RecurringCreate, RecurringUpdate,
-    RecurringResponse, RecurringSummary,
-    RecurrenceFrequency, RecurringStatus, TransactionType,
+    RecurringCreate,
+    RecurringUpdate,
+    RecurringResponse,
+    RecurringSummary,
+    RecurrenceFrequency,
+    RecurringStatus,
+    TransactionType,
 )
 ```
 

@@ -29,6 +29,7 @@ class GroceryPurchaseCreate(GroceryPurchaseBase):
 
 class GroceryPurchaseBulkItem(BaseModel):
     """Single item for bulk purchase creation"""
+
     product_name: str = Field(min_length=1, max_length=200)
     quantity: float = Field(default=1, gt=0)
     unit: str = Field(default="un", max_length=10)
@@ -40,6 +41,7 @@ class GroceryPurchaseBulkItem(BaseModel):
 
 class GroceryPurchaseBulkCreate(BaseModel):
     """Create multiple purchase items at once (from a single receipt)"""
+
     items: list[GroceryPurchaseBulkItem] = Field(min_length=1, max_length=200)
     transaction_id: int | None = None
     document_id: int | None = None
@@ -81,6 +83,7 @@ class GroceryPurchaseResponse(GroceryPurchaseBase):
 
 class CategorySummary(BaseModel):
     """Summary for a single category"""
+
     category: str
     category_display: str
     total: float
@@ -90,6 +93,7 @@ class CategorySummary(BaseModel):
 
 class NecessitySummary(BaseModel):
     """Summary by necessity type"""
+
     necessity_type: str
     necessity_type_display: str
     total: float
@@ -99,6 +103,7 @@ class NecessitySummary(BaseModel):
 
 class GroceryPurchaseSummary(BaseModel):
     """Monthly summary of grocery purchases"""
+
     month: int
     year: int
     total: float
@@ -111,6 +116,7 @@ class GroceryPurchaseSummary(BaseModel):
 
 class MonthData(BaseModel):
     """Data for a single month"""
+
     total: float
     essential: float
     non_essential: float
@@ -120,6 +126,7 @@ class MonthData(BaseModel):
 
 class ComparisonItem(BaseModel):
     """Item that changed between months"""
+
     product_name: str
     current_quantity: float
     previous_quantity: float
@@ -128,6 +135,7 @@ class ComparisonItem(BaseModel):
 
 class GroceryPurchaseComparison(BaseModel):
     """Comparison between two months"""
+
     current_month: MonthData
     previous_month: MonthData
     comparison: dict  # Contains diffs and analysis
@@ -138,18 +146,17 @@ class GroceryPurchaseComparison(BaseModel):
 
 class BackfillRequest(BaseModel):
     """Request to backfill grocery purchases from existing transactions"""
-    dry_run: bool = Field(
-        default=True,
-        description="Se True, apenas simula sem criar registros"
-    )
+
+    dry_run: bool = Field(default=True, description="Se True, apenas simula sem criar registros")
     category_names: list[str] | None = Field(
         default=None,
-        description="Nomes das categorias a considerar (ex: Supermercado, alimentação)"
+        description="Nomes das categorias a considerar (ex: Supermercado, alimentação)",
     )
 
 
 class BackfillTransactionDetail(BaseModel):
     """Detail of a transaction being backfilled"""
+
     transaction_id: int
     description: str | None
     amount: float
@@ -159,6 +166,7 @@ class BackfillTransactionDetail(BaseModel):
 
 class BackfillResponse(BaseModel):
     """Response from backfill operation"""
+
     transactions_found: int
     already_have_purchases: int
     to_create: int

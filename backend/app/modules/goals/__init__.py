@@ -1,4 +1,5 @@
 """Goals module - Financial goals management"""
+
 from app.modules.goals.routers.goals import router
 from app.modules.goals.schemas.goal import (
     EmergencyFundCalculation,

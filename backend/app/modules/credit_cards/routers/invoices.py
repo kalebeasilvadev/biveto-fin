@@ -101,10 +101,7 @@ async def list_invoices(
 
     # Subquery para contar transacoes
     tx_count_subq = (
-        select(
-            Transaction.invoice_id,
-            func.count(Transaction.id).label('tx_count')
-        )
+        select(Transaction.invoice_id, func.count(Transaction.id).label("tx_count"))
         .where(Transaction.user_id == current_user.id)
         .group_by(Transaction.invoice_id)
         .subquery()
@@ -114,9 +111,9 @@ async def list_invoices(
     query = (
         select(
             CreditCardInvoice,
-            CardAccount.name.label('credit_card_name'),
-            PaymentAccount.name.label('payment_account_name'),
-            func.coalesce(tx_count_subq.c.tx_count, 0).label('transaction_count'),
+            CardAccount.name.label("credit_card_name"),
+            PaymentAccount.name.label("payment_account_name"),
+            func.coalesce(tx_count_subq.c.tx_count, 0).label("transaction_count"),
         )
         .join(CreditCard, CreditCard.id == CreditCardInvoice.credit_card_id)
         .join(CardAccount, CardAccount.id == CreditCard.account_id)
@@ -132,8 +129,14 @@ async def list_invoices(
         # See personal invoices + household invoices from family
         query = query.where(
             or_(
-                and_(CreditCardInvoice.user_id == current_user.id, CardAccount.ownership_type == "personal"),
-                and_(CreditCardInvoice.user_id.in_(household_user_ids), CardAccount.ownership_type == "household")
+                and_(
+                    CreditCardInvoice.user_id == current_user.id,
+                    CardAccount.ownership_type == "personal",
+                ),
+                and_(
+                    CreditCardInvoice.user_id.in_(household_user_ids),
+                    CardAccount.ownership_type == "household",
+                ),
             )
         )
     else:
@@ -151,10 +154,14 @@ async def list_invoices(
         query = query.where(CreditCardInvoice.reference_month == month)
 
     # Ordenar e paginar
-    query = query.order_by(
-        CreditCardInvoice.reference_year.desc(),
-        CreditCardInvoice.reference_month.desc(),
-    ).limit(limit).offset(offset)
+    query = (
+        query.order_by(
+            CreditCardInvoice.reference_year.desc(),
+            CreditCardInvoice.reference_month.desc(),
+        )
+        .limit(limit)
+        .offset(offset)
+    )
 
     result = await db.execute(query)
     rows = result.all()
@@ -163,18 +170,21 @@ async def list_invoices(
     responses = []
     for row in rows:
         invoice = row[0]
-        responses.append(build_invoice_response(
-            invoice,
-            credit_card_name=row.credit_card_name,
-            payment_account_name=row.payment_account_name,
-            transaction_count=row.transaction_count,
-        ))
+        responses.append(
+            build_invoice_response(
+                invoice,
+                credit_card_name=row.credit_card_name,
+                payment_account_name=row.payment_account_name,
+                transaction_count=row.transaction_count,
+            )
+        )
 
     return responses
 
 
 class ExpectedInvoiceItem(BaseModel):
     """Item retornado pelo endpoint /overview - pode ser materializado ou fantasma."""
+
     credit_card_id: int
     credit_card_name: str
     reference_month: int
@@ -194,6 +204,7 @@ class ExpectedInvoiceItem(BaseModel):
 
 class InvoiceOverviewResponse(BaseModel):
     """Resposta do endpoint overview: lista unificada + resumo."""
+
     reference_month: int
     reference_year: int
     items: list[ExpectedInvoiceItem]
@@ -275,8 +286,8 @@ async def get_invoice(
     invoice_query = (
         select(
             CreditCardInvoice,
-            CardAccount.name.label('credit_card_name'),
-            PaymentAccount.name.label('payment_account_name'),
+            CardAccount.name.label("credit_card_name"),
+            PaymentAccount.name.label("payment_account_name"),
         )
         .join(CreditCard, CreditCard.id == CreditCardInvoice.credit_card_id)
         .join(CardAccount, CardAccount.id == CreditCard.account_id)
@@ -292,8 +303,14 @@ async def get_invoice(
         # See personal invoices + household invoices from family
         invoice_query = invoice_query.where(
             or_(
-                and_(CreditCardInvoice.user_id == current_user.id, CardAccount.ownership_type == "personal"),
-                and_(CreditCardInvoice.user_id.in_(household_user_ids), CardAccount.ownership_type == "household")
+                and_(
+                    CreditCardInvoice.user_id == current_user.id,
+                    CardAccount.ownership_type == "personal",
+                ),
+                and_(
+                    CreditCardInvoice.user_id.in_(household_user_ids),
+                    CardAccount.ownership_type == "household",
+                ),
             )
         )
     else:
@@ -317,8 +334,8 @@ async def get_invoice(
     tx_query = (
         select(
             Transaction,
-            Merchant.name.label('merchant_name'),
-            Category.name.label('category_name'),
+            Merchant.name.label("merchant_name"),
+            Category.name.label("category_name"),
         )
         .outerjoin(Merchant, Merchant.id == Transaction.merchant_id)
         .outerjoin(Category, Category.id == Transaction.category_id)
@@ -335,20 +352,22 @@ async def get_invoice(
         # Aplicar sinal correto: income/creditos sao negativos na fatura
         # (pagamentos, estornos, cashback reduzem o valor a pagar)
         amount = float(t.amount)
-        if t.type == 'income':
+        if t.type == "income":
             amount = -amount
 
-        transaction_responses.append(InvoiceTransactionResponse(
-            id=t.id,
-            date=t.date,
-            description=t.description,
-            merchant_name=tx_row.merchant_name,
-            category_name=tx_row.category_name,
-            amount=amount,
-            installment_number=t.installment_number,
-            installment_total=t.installment_total,
-            is_paid=t.is_paid,
-        ))
+        transaction_responses.append(
+            InvoiceTransactionResponse(
+                id=t.id,
+                date=t.date,
+                description=t.description,
+                merchant_name=tx_row.merchant_name,
+                category_name=tx_row.category_name,
+                amount=amount,
+                installment_number=t.installment_number,
+                installment_total=t.installment_total,
+                is_paid=t.is_paid,
+            )
+        )
 
     return InvoiceDetailResponse(
         id=invoice.id,
@@ -565,8 +584,7 @@ async def delete_invoice(
     current_user: CurrentUser,
     db: DbSession,
     delete_transactions: bool = Query(
-        False,
-        description="Se True, deleta as transacoes vinculadas. Se False, apenas desvincula."
+        False, description="Se True, deleta as transacoes vinculadas. Se False, apenas desvincula."
     ),
 ):
     """
@@ -587,9 +605,9 @@ async def delete_invoice(
 
     if delete_transactions:
         parts = [f"{result['transactions_deleted']} transacoes deletadas"]
-        if result['series_deleted'] > 0:
+        if result["series_deleted"] > 0:
             parts.append(f"{result['series_deleted']} series de parcelas removidas")
-        if result['invoices_deleted'] > 1:
+        if result["invoices_deleted"] > 1:
             parts.append(f"{result['invoices_deleted']} faturas removidas (incluindo vazias)")
         message = f"Fatura excluida. {', '.join(parts)}."
     else:
@@ -597,9 +615,9 @@ async def delete_invoice(
 
     return DeleteInvoiceResponse(
         message=message,
-        transactions_deleted=result['transactions_deleted'],
-        invoices_deleted=result['invoices_deleted'],
-        series_deleted=result['series_deleted'],
+        transactions_deleted=result["transactions_deleted"],
+        invoices_deleted=result["invoices_deleted"],
+        series_deleted=result["series_deleted"],
     )
 
 
@@ -646,9 +664,7 @@ async def pay_invoice(
     )
     credit_card_name = card_result.scalar_one_or_none()
 
-    pay_result = await db.execute(
-        select(Account.name).where(Account.id == data.payment_account_id)
-    )
+    pay_result = await db.execute(select(Account.name).where(Account.id == data.payment_account_id))
     payment_account_name = pay_result.scalar_one_or_none()
 
     return build_invoice_response(
@@ -702,10 +718,7 @@ async def list_card_invoices(
     # Buscar contagem de transacoes para todas as faturas de uma vez
     invoice_ids = [inv.id for inv in invoices]
     count_result = await db.execute(
-        select(
-            Transaction.invoice_id,
-            func.count(Transaction.id).label('count')
-        )
+        select(Transaction.invoice_id, func.count(Transaction.id).label("count"))
         .where(Transaction.invoice_id.in_(invoice_ids))
         .group_by(Transaction.invoice_id)
     )
@@ -713,11 +726,13 @@ async def list_card_invoices(
 
     responses = []
     for invoice in invoices:
-        responses.append(build_invoice_response(
-            invoice,
-            credit_card_name=credit_card_name,
-            transaction_count=tx_counts.get(invoice.id, 0),
-        ))
+        responses.append(
+            build_invoice_response(
+                invoice,
+                credit_card_name=credit_card_name,
+                transaction_count=tx_counts.get(invoice.id, 0),
+            )
+        )
 
     return responses
 
@@ -754,23 +769,21 @@ async def get_card_current_invoice(
     if not invoice:
         return InvoiceSummary(
             invoice_id=None,
-            reference_month=period['reference_month'],
-            reference_year=period['reference_year'],
+            reference_month=period["reference_month"],
+            reference_year=period["reference_year"],
             period_display=f"{['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'][period['reference_month'] - 1]}/{period['reference_year']}",
             total_amount=0,
             paid_amount=0,
             remaining_amount=0,
             status=InvoiceStatus.OPEN.value,
-            due_date=period['due_date'],
-            days_until_due=(period['due_date'] - today).days,
+            due_date=period["due_date"],
+            days_until_due=(period["due_date"] - today).days,
             transaction_count=0,
         )
 
     # Contar transacoes
     count_result = await db.execute(
-        select(func.count(Transaction.id)).where(
-            Transaction.invoice_id == invoice.id
-        )
+        select(func.count(Transaction.id)).where(Transaction.invoice_id == invoice.id)
     )
     transaction_count = count_result.scalar() or 0
 
@@ -813,12 +826,14 @@ async def detect_card_from_document(
 
     detected_cards = []
     for card in cards:
-        detected_cards.append(DetectedCardInfo(
-            credit_card_id=card.id,
-            account_name=account_names.get(card.account_id, "Cartao"),
-            last_four_digits=card.last_four_digits,
-            match_score=1,  # Simplificado
-        ))
+        detected_cards.append(
+            DetectedCardInfo(
+                credit_card_id=card.id,
+                account_name=account_names.get(card.account_id, "Cartao"),
+                last_four_digits=card.last_four_digits,
+                match_score=1,  # Simplificado
+            )
+        )
 
     return CardDetectionResult(
         detected_cards=detected_cards,
@@ -828,6 +843,7 @@ async def detect_card_from_document(
 
 class CreateCardFromInvoiceRequest(BaseModel):
     """Dados para criar um cartao a partir de uma fatura"""
+
     card_issuer: str  # "itau", "nubank", etc.
     card_last_digits: str | None = None  # "8849"
     card_name: str | None = None  # "Itau Visa Platinum"
@@ -860,29 +876,31 @@ class ProjectFutureResponse(BaseModel):
 
 # Mapeamento de cores por banco
 BANK_COLORS = {
-    'itau': '#EC7000',  # Laranja Itau
-    'nubank': '#820AD1',  # Roxo Nubank
-    'inter': '#FF7A00',  # Laranja Inter
-    'santander': '#EC0000',  # Vermelho Santander
-    'bradesco': '#CC092F',  # Vermelho Bradesco
-    'bb': '#FFCC00',  # Amarelo BB
-    'caixa': '#005CA9',  # Azul Caixa
-    'c6': '#1A1A1A',  # Preto C6
-    'xp': '#FFD100',  # Amarelo XP
-    'btg': '#000000',  # Preto BTG
-    'original': '#00A857',  # Verde Original
-    'next': '#00E676',  # Verde Next
-    'neon': '#00D4AA',  # Verde Neon
-    'pagbank': '#00AB4E',  # Verde PagBank
-    'picpay': '#21C25E',  # Verde PicPay
-    'mercadopago': '#00B1EA',  # Azul MercadoPago
-    'digio': '#0052FF',  # Azul Digio
-    'ame': '#FF007A',  # Rosa Ame
-    'default': '#6366F1',  # Indigo (padrao)
+    "itau": "#EC7000",  # Laranja Itau
+    "nubank": "#820AD1",  # Roxo Nubank
+    "inter": "#FF7A00",  # Laranja Inter
+    "santander": "#EC0000",  # Vermelho Santander
+    "bradesco": "#CC092F",  # Vermelho Bradesco
+    "bb": "#FFCC00",  # Amarelo BB
+    "caixa": "#005CA9",  # Azul Caixa
+    "c6": "#1A1A1A",  # Preto C6
+    "xp": "#FFD100",  # Amarelo XP
+    "btg": "#000000",  # Preto BTG
+    "original": "#00A857",  # Verde Original
+    "next": "#00E676",  # Verde Next
+    "neon": "#00D4AA",  # Verde Neon
+    "pagbank": "#00AB4E",  # Verde PagBank
+    "picpay": "#21C25E",  # Verde PicPay
+    "mercadopago": "#00B1EA",  # Azul MercadoPago
+    "digio": "#0052FF",  # Azul Digio
+    "ame": "#FF007A",  # Rosa Ame
+    "default": "#6366F1",  # Indigo (padrao)
 }
 
 
-@router.post("/create-card-from-invoice", response_model=CreateCardFromInvoiceResponse, status_code=201)
+@router.post(
+    "/create-card-from-invoice", response_model=CreateCardFromInvoiceResponse, status_code=201
+)
 async def create_card_from_invoice(
     data: CreateCardFromInvoiceRequest,
     current_user: CurrentUser,
@@ -898,23 +916,23 @@ async def create_card_from_invoice(
 
     # Gerar nome do cartao se nao fornecido
     issuer_names = {
-        'itau': 'Itau',
-        'nubank': 'Nubank',
-        'inter': 'Inter',
-        'santander': 'Santander',
-        'bradesco': 'Bradesco',
-        'bb': 'Banco do Brasil',
-        'caixa': 'Caixa',
-        'c6': 'C6 Bank',
-        'xp': 'XP',
-        'btg': 'BTG Pactual',
-        'original': 'Original',
-        'next': 'Next',
-        'neon': 'Neon',
-        'pagbank': 'PagBank',
-        'picpay': 'PicPay',
-        'mercadopago': 'Mercado Pago',
-        'digio': 'Digio',
+        "itau": "Itau",
+        "nubank": "Nubank",
+        "inter": "Inter",
+        "santander": "Santander",
+        "bradesco": "Bradesco",
+        "bb": "Banco do Brasil",
+        "caixa": "Caixa",
+        "c6": "C6 Bank",
+        "xp": "XP",
+        "btg": "BTG Pactual",
+        "original": "Original",
+        "next": "Next",
+        "neon": "Neon",
+        "pagbank": "PagBank",
+        "picpay": "PicPay",
+        "mercadopago": "Mercado Pago",
+        "digio": "Digio",
     }
 
     issuer_display = issuer_names.get(data.card_issuer.lower(), data.card_issuer.title())
@@ -927,7 +945,7 @@ async def create_card_from_invoice(
         account_name = f"{issuer_display} Cartao"
 
     # Usar cor do banco ou cor fornecida
-    color = data.color or BANK_COLORS.get(data.card_issuer.lower(), BANK_COLORS['default'])
+    color = data.color or BANK_COLORS.get(data.card_issuer.lower(), BANK_COLORS["default"])
     icon = data.icon or "credit-card"
 
     # Criar conta
@@ -935,7 +953,7 @@ async def create_card_from_invoice(
         user_id=current_user.id,
         name=account_name,
         type=AccountType.CREDIT_CARD.value,
-        balance=Decimal('0'),
+        balance=Decimal("0"),
         currency="BRL",
         color=color,
         icon=icon,
@@ -1001,9 +1019,7 @@ async def project_future_transactions(
 
     # Contar faturas antes
     inv_result = await db.execute(
-        select(CreditCardInvoice.id).where(
-            CreditCardInvoice.credit_card_id == data.credit_card_id
-        )
+        select(CreditCardInvoice.id).where(CreditCardInvoice.credit_card_id == data.credit_card_id)
     )
     invoices_before = set(inv_result.scalars().all())
 
@@ -1049,9 +1065,7 @@ async def project_future_transactions(
 
     # Contar faturas depois
     inv_result = await db.execute(
-        select(CreditCardInvoice.id).where(
-            CreditCardInvoice.credit_card_id == data.credit_card_id
-        )
+        select(CreditCardInvoice.id).where(CreditCardInvoice.credit_card_id == data.credit_card_id)
     )
     invoices_after = set(inv_result.scalars().all())
 
@@ -1066,6 +1080,7 @@ async def project_future_transactions(
 
 class ReprocessOrphanResponse(BaseModel):
     """Resposta do reprocessamento de transações órfãs"""
+
     message: str
     found: int
     processed: int
@@ -1080,7 +1095,7 @@ async def reprocess_orphan_transactions(
     db: DbSession,
     credit_card_id: int | None = Query(
         None,
-        description="ID do cartão específico para reprocessar. Se não informado, processa todos os cartões."
+        description="ID do cartão específico para reprocessar. Se não informado, processa todos os cartões.",
     ),
 ):
     """
@@ -1118,6 +1133,7 @@ async def reprocess_orphan_transactions(
 
 class DuplicateSeriesPair(BaseModel):
     """Par de séries potencialmente duplicadas"""
+
     series_a_id: int
     series_b_id: int
     series_a_name: str
@@ -1127,6 +1143,7 @@ class DuplicateSeriesPair(BaseModel):
 
 class InvoiceDuplicateWarning(BaseModel):
     """Alerta de duplicatas em uma fatura"""
+
     has_duplicates: bool
     estimated_excess: float = 0.0
     affected_series_pairs: list[DuplicateSeriesPair] = []
@@ -1164,10 +1181,7 @@ async def get_invoice_duplicate_warnings(
     invoice = invoice_result.scalar_one_or_none()
 
     if not invoice:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Fatura não encontrada"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fatura não encontrada")
 
     # Buscar todas as transações parceladas desta fatura
     transactions_result = await db.execute(
@@ -1195,8 +1209,7 @@ async def get_invoice_duplicate_warnings(
     # Detectar duplicatas entre essas séries
     detection_service = DuplicateDetectionService(db)
     all_duplicates = await detection_service.find_duplicate_groups(
-        user=current_user,
-        min_similarity=0.7
+        user=current_user, min_similarity=0.7
     )
 
     # Filtrar apenas duplicatas que afetam esta fatura
@@ -1229,13 +1242,15 @@ async def get_invoice_duplicate_warnings(
 
             # Só adicionar o par se realmente houver conflitos nesta fatura
             if conflicts_in_invoice:
-                affected_pairs.append(DuplicateSeriesPair(
-                    series_a_id=group.series[0].id,
-                    series_b_id=group.series[1].id,
-                    series_a_name=group.series[0].merchant_name,
-                    series_b_name=group.series[1].merchant_name,
-                    similarity_score=group.similarity_score,
-                ))
+                affected_pairs.append(
+                    DuplicateSeriesPair(
+                        series_a_id=group.series[0].id,
+                        series_b_id=group.series[1].id,
+                        series_a_name=group.series[0].merchant_name,
+                        series_b_name=group.series[1].merchant_name,
+                        similarity_score=group.similarity_score,
+                    )
+                )
 
     return InvoiceDuplicateWarning(
         has_duplicates=len(affected_pairs) > 0,

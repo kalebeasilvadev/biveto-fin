@@ -34,9 +34,7 @@ class ReceiptService:
 
     # ==================== CRUD ====================
 
-    async def confirm_receipt(
-        self, user: User, data: ReceiptConfirmRequest
-    ) -> ReceiptResponse:
+    async def confirm_receipt(self, user: User, data: ReceiptConfirmRequest) -> ReceiptResponse:
         """
         Confirma um receipt a partir dos dados extraídos do documento.
         Cria o Receipt, os ReceiptPayments e as Transactions vinculadas.
@@ -57,10 +55,7 @@ class ReceiptService:
             select(Receipt).where(Receipt.document_id == data.document_id)
         )
         if existing_result.scalar_one_or_none():
-            raise HTTPException(
-                status_code=400,
-                detail="Já existe um receipt para este documento"
-            )
+            raise HTTPException(status_code=400, detail="Já existe um receipt para este documento")
 
         # 3. Validar accounts pertencem ao usuário
         account_ids = [p.account_id for p in data.payments]
@@ -75,7 +70,7 @@ class ReceiptService:
             if account_id not in valid_accounts:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Conta {account_id} não encontrada ou não pertence ao usuário"
+                    detail=f"Conta {account_id} não encontrada ou não pertence ao usuário",
                 )
 
         # 4. Validar benefit cards (se fornecidos)
@@ -91,8 +86,7 @@ class ReceiptService:
             for card_id in benefit_card_ids:
                 if card_id not in valid_cards:
                     raise HTTPException(
-                        status_code=400,
-                        detail=f"Cartão de benefício {card_id} não encontrado"
+                        status_code=400, detail=f"Cartão de benefício {card_id} não encontrado"
                     )
 
         # 4.1. Validar credit cards (para pagamentos parcelados)
@@ -110,7 +104,7 @@ class ReceiptService:
                 if cc_id not in valid_credit_cards:
                     raise HTTPException(
                         status_code=400,
-                        detail=f"Cartão de crédito {cc_id} não encontrado ou não pertence ao usuário"
+                        detail=f"Cartão de crédito {cc_id} não encontrado ou não pertence ao usuário",
                     )
 
         # 5. Criar o Receipt
@@ -144,7 +138,9 @@ class ReceiptService:
                 sequence=idx,
                 original_label=payment_data.original_label,
                 is_installment=payment_data.is_installment,
-                installment_count=payment_data.installment_count if payment_data.is_installment else None,
+                installment_count=payment_data.installment_count
+                if payment_data.is_installment
+                else None,
                 credit_card_id=payment_data.credit_card_id if payment_data.is_installment else None,
             )
             self.db.add(payment)
@@ -179,10 +175,10 @@ class ReceiptService:
                 first_invoice = await invoice_service.get_or_create_invoice(
                     user=user,
                     credit_card=credit_card,
-                    reference_month=period['reference_month'],
-                    reference_year=period['reference_year'],
-                    closing_date=period['closing_date'],
-                    due_date=period['due_date'],
+                    reference_month=period["reference_month"],
+                    reference_year=period["reference_year"],
+                    closing_date=period["closing_date"],
+                    due_date=period["due_date"],
                 )
 
                 # Criar transação da primeira parcela
@@ -205,8 +201,8 @@ class ReceiptService:
                     user=user,
                     series=series,
                     from_installment=1,
-                    current_invoice_month=period['reference_month'],
-                    current_invoice_year=period['reference_year'],
+                    current_invoice_month=period["reference_month"],
+                    current_invoice_year=period["reference_year"],
                 )
 
                 # Atualizar total da fatura da primeira parcela
@@ -219,18 +215,13 @@ class ReceiptService:
 
                 # MONITOR: Verificar se resultará em saldo negativo (ALERTA, não bloqueia)
                 check_result = BalanceMonitor.check_negative_balance(
-                    account,
-                    payment_data.amount,
-                    f"pagamento de recibo #{receipt.id}"
+                    account, payment_data.amount, f"pagamento de recibo #{receipt.id}"
                 )
 
                 if check_result["will_be_negative"]:
                     # LOG: Registrar evento para auditoria
                     BalanceMonitor.log_negative_balance_event(
-                        account,
-                        payment_data.amount,
-                        f"receipt_payment #{payment.id}",
-                        user.id
+                        account, payment_data.amount, f"receipt_payment #{payment.id}", user.id
                     )
                     print(check_result["alert_message"])
 
@@ -308,17 +299,13 @@ class ReceiptService:
         for receipt in receipts:
             # Contagem de itens
             items_result = await self.db.execute(
-                select(func.count(Transaction.id)).where(
-                    Transaction.receipt_id == receipt.id
-                )
+                select(func.count(Transaction.id)).where(Transaction.receipt_id == receipt.id)
             )
             items_count = items_result.scalar() or 0
 
             # Contagem de pagamentos
             payments_result = await self.db.execute(
-                select(func.count(ReceiptPayment.id)).where(
-                    ReceiptPayment.receipt_id == receipt.id
-                )
+                select(func.count(ReceiptPayment.id)).where(ReceiptPayment.receipt_id == receipt.id)
             )
             payments_count = payments_result.scalar() or 0
 
@@ -357,9 +344,7 @@ class ReceiptService:
 
         # Contagem de itens
         items_result = await self.db.execute(
-            select(func.count(Transaction.id)).where(
-                Transaction.receipt_id == receipt.id
-            )
+            select(func.count(Transaction.id)).where(Transaction.receipt_id == receipt.id)
         )
         items_count = items_result.scalar() or 0
 
@@ -408,9 +393,7 @@ class ReceiptService:
             payments=payments_response,
         )
 
-    async def get_receipt_items(
-        self, user: User, receipt_id: int
-    ) -> list[dict]:
+    async def get_receipt_items(self, user: User, receipt_id: int) -> list[dict]:
         """Retorna as transações (itens) de um receipt"""
         # Verificar se o receipt existe e pertence ao usuário
         receipt_result = await self.db.execute(
@@ -424,9 +407,7 @@ class ReceiptService:
 
         # Buscar transações
         result = await self.db.execute(
-            select(Transaction)
-            .where(Transaction.receipt_id == receipt_id)
-            .order_by(Transaction.id)
+            select(Transaction).where(Transaction.receipt_id == receipt_id).order_by(Transaction.id)
         )
         transactions = result.scalars().all()
 
@@ -478,16 +459,12 @@ class ReceiptService:
             raise HTTPException(status_code=404, detail="Receipt não encontrado")
 
         # Desvincular transações (não deletar)
-        await self.db.execute(
-            select(Transaction)
-            .where(Transaction.receipt_id == receipt_id)
-        )
+        await self.db.execute(select(Transaction).where(Transaction.receipt_id == receipt_id))
         # Atualizar transações para remover vínculo
         from sqlalchemy import update
+
         await self.db.execute(
-            update(Transaction)
-            .where(Transaction.receipt_id == receipt_id)
-            .values(receipt_id=None)
+            update(Transaction).where(Transaction.receipt_id == receipt_id).values(receipt_id=None)
         )
 
         # Marcar como cancelado

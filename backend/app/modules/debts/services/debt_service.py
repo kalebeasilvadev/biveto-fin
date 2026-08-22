@@ -2,6 +2,7 @@
 Serviço de Gestão de Dívidas (Debt)
 Implementa metodologias Dave Ramsey (Snowball/Avalanche) e Gustavo Cerbasi
 """
+
 from datetime import date
 from decimal import Decimal
 
@@ -41,19 +42,16 @@ class DebtService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def list_debts(self, user: User, status_filter: DebtStatus | None = None) -> list[DebtResponse]:
+    async def list_debts(
+        self, user: User, status_filter: DebtStatus | None = None
+    ) -> list[DebtResponse]:
         """Lista dívidas do usuário (personal + household da família)"""
         household_user_ids = await get_household_user_ids(self.db, user)
         member = await get_household_member(self.db, user)
 
         query = select(Debt).where(
             build_ownership_filter(
-                Debt,
-                Debt.user_id,
-                Debt.ownership_type,
-                user.id,
-                household_user_ids,
-                member
+                Debt, Debt.user_id, Debt.ownership_type, user.id, household_user_ids, member
             )
         )
 
@@ -69,10 +67,7 @@ class DebtService:
     async def get_debt(self, user: User, debt_id: int) -> DebtDetailResponse | None:
         """Retorna dívida com detalhes e projeção"""
         result = await self.db.execute(
-            select(Debt).where(
-                Debt.id == debt_id,
-                Debt.user_id == user.id
-            )
+            select(Debt).where(Debt.id == debt_id, Debt.user_id == user.id)
         )
         debt = result.scalar_one_or_none()
 
@@ -90,16 +85,15 @@ class DebtService:
                 payment_date=p.payment_date,
                 notes=p.notes,
                 transaction_id=p.transaction_id,
-                created_at=p.created_at
-            ) for p in debt.payments
+                created_at=p.created_at,
+            )
+            for p in debt.payments
         ]
 
         projection = self._calculate_payoff_projection(debt)
 
         return DebtDetailResponse(
-            **response.model_dump(),
-            payments=payments,
-            payoff_projection=projection
+            **response.model_dump(), payments=payments, payoff_projection=projection
         )
 
     async def create_debt(self, user: User, data: DebtCreate) -> Debt:
@@ -123,7 +117,7 @@ class DebtService:
             priority=data.priority,
             account_id=data.account_id,
             installment_series_id=data.installment_series_id,
-            ownership_type=data.ownership_type.value
+            ownership_type=data.ownership_type.value,
         )
 
         # Calcular data prevista de quitação
@@ -140,26 +134,17 @@ class DebtService:
     async def update_debt(self, user: User, debt_id: int, data: DebtUpdate) -> Debt:
         """Atualiza dívida"""
         result = await self.db.execute(
-            select(Debt).where(
-                Debt.id == debt_id,
-                Debt.user_id == user.id
-            )
+            select(Debt).where(Debt.id == debt_id, Debt.user_id == user.id)
         )
         debt = result.scalar_one_or_none()
 
         if not debt:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Dívida não encontrada"
+                status_code=status.HTTP_404_NOT_FOUND, detail="Dívida não encontrada"
             )
 
         # Validar permissão para editar
-        await validate_edit_permission(
-            self.db,
-            user,
-            debt.user_id,
-            debt.ownership_type
-        )
+        await validate_edit_permission(self.db, user, debt.user_id, debt.ownership_type)
 
         for field, value in data.model_dump(exclude_unset=True).items():
             if field == "status" and value:
@@ -181,43 +166,30 @@ class DebtService:
     async def delete_debt(self, user: User, debt_id: int) -> None:
         """Remove dívida"""
         result = await self.db.execute(
-            select(Debt).where(
-                Debt.id == debt_id,
-                Debt.user_id == user.id
-            )
+            select(Debt).where(Debt.id == debt_id, Debt.user_id == user.id)
         )
         debt = result.scalar_one_or_none()
 
         if not debt:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Dívida não encontrada"
+                status_code=status.HTTP_404_NOT_FOUND, detail="Dívida não encontrada"
             )
 
         # Validar permissão para deletar
-        await validate_delete_permission(
-            self.db,
-            user,
-            debt.user_id,
-            debt.ownership_type
-        )
+        await validate_delete_permission(self.db, user, debt.user_id, debt.ownership_type)
 
         await self.db.delete(debt)
 
     async def add_payment(self, user: User, debt_id: int, data: DebtPaymentCreate) -> DebtPayment:
         """Registra pagamento de dívida"""
         result = await self.db.execute(
-            select(Debt).where(
-                Debt.id == debt_id,
-                Debt.user_id == user.id
-            )
+            select(Debt).where(Debt.id == debt_id, Debt.user_id == user.id)
         )
         debt = result.scalar_one_or_none()
 
         if not debt:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Dívida não encontrada"
+                status_code=status.HTTP_404_NOT_FOUND, detail="Dívida não encontrada"
             )
 
         # Calcular divisão entre principal e juros se não informado
@@ -241,7 +213,7 @@ class DebtService:
             interest_amount=interest,
             payment_date=data.payment_date,
             notes=data.notes,
-            transaction_id=data.transaction_id
+            transaction_id=data.transaction_id,
         )
         self.db.add(payment)
 
@@ -259,9 +231,7 @@ class DebtService:
 
     async def get_summary(self, user: User) -> DebtSummary:
         """Retorna resumo de todas as dívidas"""
-        result = await self.db.execute(
-            select(Debt).where(Debt.user_id == user.id)
-        )
+        result = await self.db.execute(select(Debt).where(Debt.user_id == user.id))
         debts = result.scalars().all()
 
         active = [d for d in debts if d.status == DebtStatus.ACTIVE.value]
@@ -280,7 +250,7 @@ class DebtService:
                 name=highest.name,
                 balance=highest.current_balance,
                 interest_rate=highest.interest_rate,
-                monthly_interest=highest.monthly_interest_amount
+                monthly_interest=highest.monthly_interest_amount,
             )
 
         # Encontrar dívida com menor saldo
@@ -292,7 +262,7 @@ class DebtService:
                 name=smallest.name,
                 balance=smallest.current_balance,
                 interest_rate=smallest.interest_rate,
-                monthly_interest=smallest.monthly_interest_amount
+                monthly_interest=smallest.monthly_interest_amount,
             )
 
         # Estimar data livre de dívidas (método avalanche simplificado)
@@ -311,7 +281,7 @@ class DebtService:
             total_interest_monthly=total_interest,
             highest_interest_debt=highest_interest,
             smallest_balance_debt=smallest_balance,
-            debt_free_date=debt_free_date
+            debt_free_date=debt_free_date,
         )
 
     async def get_snowball_plan(self, user: User, monthly_payment: Decimal) -> SnowballPlan:
@@ -323,17 +293,14 @@ class DebtService:
         member = await get_household_member(self.db, user)
 
         result = await self.db.execute(
-            select(Debt).where(
+            select(Debt)
+            .where(
                 Debt.status == DebtStatus.ACTIVE.value,
                 build_ownership_filter(
-                    Debt,
-                    Debt.user_id,
-                    Debt.ownership_type,
-                    user.id,
-                    household_user_ids,
-                    member
-                )
-            ).order_by(Debt.current_balance.asc())
+                    Debt, Debt.user_id, Debt.ownership_type, user.id, household_user_ids, member
+                ),
+            )
+            .order_by(Debt.current_balance.asc())
         )
         debts = list(result.scalars().all())
 
@@ -348,23 +315,22 @@ class DebtService:
         member = await get_household_member(self.db, user)
 
         result = await self.db.execute(
-            select(Debt).where(
+            select(Debt)
+            .where(
                 Debt.status == DebtStatus.ACTIVE.value,
                 build_ownership_filter(
-                    Debt,
-                    Debt.user_id,
-                    Debt.ownership_type,
-                    user.id,
-                    household_user_ids,
-                    member
-                )
-            ).order_by(Debt.interest_rate.desc())
+                    Debt, Debt.user_id, Debt.ownership_type, user.id, household_user_ids, member
+                ),
+            )
+            .order_by(Debt.interest_rate.desc())
         )
         debts = list(result.scalars().all())
 
         return self._simulate_payoff(debts, monthly_payment, "avalanche")
 
-    async def compare_strategies(self, user: User, monthly_payment: Decimal) -> PayoffStrategyComparison:
+    async def compare_strategies(
+        self, user: User, monthly_payment: Decimal
+    ) -> PayoffStrategyComparison:
         """Compara estratégias Snowball e Avalanche"""
         snowball = await self.get_snowball_plan(user, monthly_payment)
         avalanche = await self.get_avalanche_plan(user, monthly_payment)
@@ -389,12 +355,12 @@ class DebtService:
                 total_months=avalanche.total_months,
                 total_interest=avalanche.total_interest,
                 debt_free_date=avalanche.debt_free_date,
-                interest_saved_vs_snowball=interest_diff
+                interest_saved_vs_snowball=interest_diff,
             ),
             recommendation=recommendation,
             recommendation_reason=reason,
             months_difference=months_diff,
-            interest_difference=interest_diff
+            interest_difference=interest_diff,
         )
 
     def _build_debt_response(self, debt: Debt) -> DebtResponse:
@@ -437,10 +403,12 @@ class DebtService:
             total_paid=total_paid,
             progress_percentage=progress,
             monthly_interest_amount=monthly_interest,
-            next_payment_date=next_payment_date
+            next_payment_date=next_payment_date,
         )
 
-    def _calculate_payoff_projection(self, debt: Debt, extra_payment: Decimal = Decimal(0)) -> DebtPayoffProjection | None:
+    def _calculate_payoff_projection(
+        self, debt: Debt, extra_payment: Decimal = Decimal(0)
+    ) -> DebtPayoffProjection | None:
         """Calcula projeção de quitação da dívida"""
         if debt.current_balance <= 0:
             return None
@@ -450,7 +418,7 @@ class DebtService:
                 months_to_payoff=0,
                 total_interest_if_minimum=Decimal(0),
                 total_paid_if_minimum=debt.current_balance,
-                payoff_date_if_minimum=date.today()
+                payoff_date_if_minimum=date.today(),
             )
 
         # Simular pagamento mínimo
@@ -476,7 +444,7 @@ class DebtService:
             months_to_payoff=months,
             total_interest_if_minimum=total_interest,
             total_paid_if_minimum=total_paid,
-            payoff_date_if_minimum=payoff_date
+            payoff_date_if_minimum=payoff_date,
         )
 
         # Calcular com pagamento extra se fornecido
@@ -501,7 +469,9 @@ class DebtService:
 
         return result
 
-    def _simulate_payoff(self, debts: list[Debt], monthly_payment: Decimal, strategy: str) -> SnowballPlan:
+    def _simulate_payoff(
+        self, debts: list[Debt], monthly_payment: Decimal, strategy: str
+    ) -> SnowballPlan:
         """Simula plano de quitação para lista ordenada de dívidas"""
         if not debts:
             return SnowballPlan(
@@ -510,7 +480,7 @@ class DebtService:
                 debts_order=[],
                 total_months=0,
                 total_interest=Decimal(0),
-                debt_free_date=date.today()
+                debt_free_date=date.today(),
             )
 
         # Inicializar saldos
@@ -567,17 +537,21 @@ class DebtService:
                 if debt_months > 360:  # Safety limit
                     break
 
-            steps.append(SnowballDebtStep(
-                debt_id=debt.id,
-                debt_name=debt.name,
-                starting_balance=starting_balance,
-                interest_rate=debt.interest_rate,
-                monthly_payment=monthly_payment - other_minimums if order == 1 else monthly_payment,
-                months_to_payoff=debt_months,
-                payoff_date=date.today() + relativedelta(months=total_months),
-                total_interest_paid=debt_interest,
-                order=order
-            ))
+            steps.append(
+                SnowballDebtStep(
+                    debt_id=debt.id,
+                    debt_name=debt.name,
+                    starting_balance=starting_balance,
+                    interest_rate=debt.interest_rate,
+                    monthly_payment=monthly_payment - other_minimums
+                    if order == 1
+                    else monthly_payment,
+                    months_to_payoff=debt_months,
+                    payoff_date=date.today() + relativedelta(months=total_months),
+                    total_interest_paid=debt_interest,
+                    order=order,
+                )
+            )
 
         return SnowballPlan(
             strategy=strategy,
@@ -585,7 +559,7 @@ class DebtService:
             debts_order=steps,
             total_months=total_months,
             total_interest=total_interest,
-            debt_free_date=date.today() + relativedelta(months=total_months)
+            debt_free_date=date.today() + relativedelta(months=total_months),
         )
 
     def _get_monthly_rate(self, debt: Debt) -> Decimal:

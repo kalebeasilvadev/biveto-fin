@@ -2,6 +2,7 @@
 Modelo de Gestão de Dívidas (Debt)
 Baseado nas metodologias Dave Ramsey (Snowball/Avalanche) e Gustavo Cerbasi
 """
+
 from datetime import date, datetime
 from decimal import Decimal
 from enum import Enum
@@ -16,6 +17,7 @@ from ..core.database import Base
 
 class DebtType(str, Enum):
     """Tipo de dívida"""
+
     CREDIT_CARD = "credit_card"
     PERSONAL_LOAN = "personal_loan"
     CAR_LOAN = "car_loan"
@@ -28,6 +30,7 @@ class DebtType(str, Enum):
 
 class DebtStatus(str, Enum):
     """Status da dívida"""
+
     ACTIVE = "active"
     PAID_OFF = "paid_off"
     NEGOTIATING = "negotiating"
@@ -36,7 +39,8 @@ class DebtStatus(str, Enum):
 
 class PayoffStrategy(str, Enum):
     """Estratégia de quitação (Dave Ramsey)"""
-    SNOWBALL = "snowball"    # Menor saldo primeiro (motivacional)
+
+    SNOWBALL = "snowball"  # Menor saldo primeiro (motivacional)
     AVALANCHE = "avalanche"  # Maior juros primeiro (matemático)
 
 
@@ -45,6 +49,7 @@ class Debt(Base):
     Dívida do usuário.
     Permite rastrear dívidas e planejar quitação.
     """
+
     __tablename__ = "debts"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -62,7 +67,9 @@ class Debt(Base):
     minimum_payment: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)  # Pagamento mínimo
 
     # Juros
-    interest_rate: Mapped[Decimal] = mapped_column(Numeric(6, 4), default=0)  # Taxa de juros mensal (%)
+    interest_rate: Mapped[Decimal] = mapped_column(
+        Numeric(6, 4), default=0
+    )  # Taxa de juros mensal (%)
     interest_type: Mapped[str] = mapped_column(String(20), default="monthly")  # monthly, yearly
 
     # Datas
@@ -74,7 +81,9 @@ class Debt(Base):
     # Status
     status: Mapped[str] = mapped_column(String(20), default=DebtStatus.ACTIVE.value)
     priority: Mapped[int] = mapped_column(Integer, default=0)  # Ordem de prioridade
-    ownership_type: Mapped[str] = mapped_column(String(20), default="personal")  # personal, household
+    ownership_type: Mapped[str] = mapped_column(
+        String(20), default="personal"
+    )  # personal, household
 
     # Vinculação opcional
     account_id: Mapped[int | None] = mapped_column(ForeignKey("accounts.id", ondelete="SET NULL"))
@@ -90,9 +99,7 @@ class Debt(Base):
     account: Mapped["Account | None"] = relationship()
     installment_series: Mapped["InstallmentSeries | None"] = relationship()
     payments: Mapped[list["DebtPayment"]] = relationship(
-        back_populates="debt",
-        cascade="all, delete-orphan",
-        lazy="noload"
+        back_populates="debt", cascade="all, delete-orphan", lazy="noload"
     )
 
     @property
@@ -123,19 +130,24 @@ class DebtPayment(Base):
     Pagamento de dívida.
     Registra cada pagamento feito para a dívida.
     """
+
     __tablename__ = "debt_payments"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     debt_id: Mapped[int] = mapped_column(ForeignKey("debts.id", ondelete="CASCADE"), index=True)
 
     amount: Mapped[Decimal] = mapped_column(Numeric(12, 2))
-    principal_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)  # Parte do principal
+    principal_amount: Mapped[Decimal] = mapped_column(
+        Numeric(12, 2), default=0
+    )  # Parte do principal
     interest_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)  # Parte dos juros
     payment_date: Mapped[date] = mapped_column(Date, default=date.today)
     notes: Mapped[str | None] = mapped_column(String(200))
 
     # Vinculação opcional a transação
-    transaction_id: Mapped[int | None] = mapped_column(ForeignKey("transactions.id", ondelete="SET NULL"))
+    transaction_id: Mapped[int | None] = mapped_column(
+        ForeignKey("transactions.id", ondelete="SET NULL")
+    )
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 

@@ -60,14 +60,10 @@ class CashCalendarService:
         current_balance = await self._get_current_balance(user)
 
         # Get confirmed transactions
-        confirmed_by_date = await self._get_confirmed_transactions(
-            user, start_date, end_date
-        )
+        confirmed_by_date = await self._get_confirmed_transactions(user, start_date, end_date)
 
         # Get projections
-        projections_by_date = await self._get_projections(
-            user, start_date, end_date
-        )
+        projections_by_date = await self._get_projections(user, start_date, end_date)
 
         # Build daily entries
         daily_entries = []
@@ -106,14 +102,16 @@ class CashCalendarService:
             # Track major expenses
             for proj in projections:
                 if not proj.is_income and proj.amount >= 500:
-                    major_expenses.append(MajorExpense(
-                        date=current,
-                        description=proj.description,
-                        amount=proj.amount,
-                        type=proj.projection_type,
-                        entity_id=proj.entity_id,
-                        days_until=(current - today).days
-                    ))
+                    major_expenses.append(
+                        MajorExpense(
+                            date=current,
+                            description=proj.description,
+                            amount=proj.amount,
+                            type=proj.projection_type,
+                            entity_id=proj.entity_id,
+                            days_until=(current - today).days,
+                        )
+                    )
 
             # Build daily entry
             entry = DailyEntry(
@@ -145,16 +143,18 @@ class CashCalendarService:
             if closing_balance < 0:
                 shortfall_dates.append(current)
 
-            running_balance.append(RunningBalanceEntry(
-                date=current,
-                opening_balance=opening_balance,
-                income=day_income,
-                expense=day_expense,
-                net=day_net,
-                closing_balance=closing_balance,
-                is_projected=not is_past,
-                is_negative=closing_balance < 0,
-            ))
+            running_balance.append(
+                RunningBalanceEntry(
+                    date=current,
+                    opening_balance=opening_balance,
+                    income=day_income,
+                    expense=day_expense,
+                    net=day_net,
+                    closing_balance=closing_balance,
+                    is_projected=not is_past,
+                    is_negative=closing_balance < 0,
+                )
+            )
 
             balance = closing_balance
             current += timedelta(days=1)
@@ -206,12 +206,14 @@ class CashCalendarService:
         category_expenses = {}
         for t in transactions:
             if t.type == "expense" and t.category_name:
-                category_expenses[t.category_name] = category_expenses.get(t.category_name, 0) + t.amount
+                category_expenses[t.category_name] = (
+                    category_expenses.get(t.category_name, 0) + t.amount
+                )
 
         top_categories = sorted(
             [{"name": k, "amount": v} for k, v in category_expenses.items()],
             key=lambda x: x["amount"],
-            reverse=True
+            reverse=True,
         )[:5]
 
         # Compare with previous week
@@ -220,7 +222,9 @@ class CashCalendarService:
         if compare_previous:
             prev_start = start_date - timedelta(weeks=1)
             prev_end = end_date - timedelta(weeks=1)
-            prev_transactions = await self._get_confirmed_transactions_flat(user, prev_start, prev_end)
+            prev_transactions = await self._get_confirmed_transactions_flat(
+                user, prev_start, prev_end
+            )
 
             prev_income = sum(t.amount for t in prev_transactions if t.type == "income")
             prev_expense = sum(t.amount for t in prev_transactions if t.type == "expense")
@@ -256,19 +260,20 @@ class CashCalendarService:
         result = await self.db.execute(query)
         return result.scalar() or Decimal(0)
 
-    async def _get_net_change(
-        self, user: User, start_date: date, end_date: date
-    ) -> float:
+    async def _get_net_change(self, user: User, start_date: date, end_date: date) -> float:
         """Get net change in balance for a period."""
         household_ids = await get_household_user_ids(self.db, user)
 
         query = select(
-            func.coalesce(func.sum(
-                func.case(
-                    (Transaction.type == "income", Transaction.amount),
-                    else_=-Transaction.amount
-                )
-            ), 0)
+            func.coalesce(
+                func.sum(
+                    func.case(
+                        (Transaction.type == "income", Transaction.amount),
+                        else_=-Transaction.amount,
+                    )
+                ),
+                0,
+            )
         ).where(
             Transaction.user_id.in_(household_ids),
             Transaction.date >= start_date,
@@ -338,9 +343,7 @@ class CashCalendarService:
         projections = {}
 
         # Get recurring transaction projections
-        recurring_projs = await self._project_recurring_transactions(
-            user, proj_start, end_date
-        )
+        recurring_projs = await self._project_recurring_transactions(user, proj_start, end_date)
         for d, items in recurring_projs.items():
             if d not in projections:
                 projections[d] = []
@@ -391,9 +394,13 @@ class CashCalendarService:
         for r in recurrings:
             # Generate future dates for this recurring
             dates = self._generate_future_dates(
-                r.frequency, r.next_due_date, r.end_date,
-                r.day_of_month, r.day_of_week,
-                start_date, end_date
+                r.frequency,
+                r.next_due_date,
+                r.end_date,
+                r.day_of_month,
+                r.day_of_week,
+                start_date,
+                end_date,
             )
 
             for d in dates:
@@ -426,7 +433,9 @@ class CashCalendarService:
             .options(selectinload(CreditCardInvoice.credit_card))
             .where(
                 CreditCardInvoice.user_id.in_(household_ids),
-                CreditCardInvoice.status.in_([InvoiceStatus.OPEN.value, InvoiceStatus.CLOSED.value]),
+                CreditCardInvoice.status.in_(
+                    [InvoiceStatus.OPEN.value, InvoiceStatus.CLOSED.value]
+                ),
                 CreditCardInvoice.due_date >= start_date,
                 CreditCardInvoice.due_date <= end_date,
             )

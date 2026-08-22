@@ -28,9 +28,7 @@ async def get_household_user_ids(db, user) -> list[int]:
         return []
 
     result = await db.execute(
-        select(HouseholdMember.user_id).where(
-            HouseholdMember.license_id == user.license_id
-        )
+        select(HouseholdMember.user_id).where(HouseholdMember.license_id == user.license_id)
     )
     return list(result.scalars().all())
 
@@ -47,13 +45,12 @@ async def list_credit_cards(current_user: CurrentUser, db: DbSession):
             .where(
                 or_(
                     and_(
-                        CreditCard.user_id == current_user.id,
-                        Account.ownership_type == "personal"
+                        CreditCard.user_id == current_user.id, Account.ownership_type == "personal"
                     ),
                     and_(
                         CreditCard.user_id.in_(household_user_ids),
-                        Account.ownership_type == "household"
-                    )
+                        Account.ownership_type == "household",
+                    ),
                 )
             )
         )
@@ -78,13 +75,12 @@ async def list_credit_cards(current_user: CurrentUser, db: DbSession):
             select(
                 CreditCardInvoice.credit_card_id,
                 func.coalesce(
-                    func.sum(CreditCardInvoice.total_amount - CreditCardInvoice.paid_amount),
-                    0
-                ).label('total_used')
+                    func.sum(CreditCardInvoice.total_amount - CreditCardInvoice.paid_amount), 0
+                ).label("total_used"),
             )
             .where(
                 CreditCardInvoice.credit_card_id.in_(card_ids),
-                CreditCardInvoice.status != InvoiceStatus.PAID.value
+                CreditCardInvoice.status != InvoiceStatus.PAID.value,
             )
             .group_by(CreditCardInvoice.credit_card_id)
         )
@@ -182,7 +178,9 @@ async def create_credit_card(
         points_program=credit_card.points_program,
         points_program_name=credit_card.points_program_name,
         points_factor=float(credit_card.points_factor),
-        points_factor_international=float(credit_card.points_factor_international) if credit_card.points_factor_international else None,
+        points_factor_international=float(credit_card.points_factor_international)
+        if credit_card.points_factor_international
+        else None,
         nickname=credit_card.nickname,
         bank_id=credit_card.bank_id,
         card_brand=credit_card.card_brand,
@@ -233,7 +231,9 @@ async def get_credit_card(
         points_program=card.points_program,
         points_program_name=card.points_program_name,
         points_factor=float(card.points_factor),
-        points_factor_international=float(card.points_factor_international) if card.points_factor_international else None,
+        points_factor_international=float(card.points_factor_international)
+        if card.points_factor_international
+        else None,
         nickname=card.nickname,
         bank_id=card.bank_id,
         card_brand=card.card_brand,
@@ -277,11 +277,24 @@ async def update_credit_card(
 
     # Update card fields
     card_fields = [
-        "credit_limit", "closing_day", "due_day", "has_points",
-        "points_program", "points_program_name", "points_factor",
-        "points_factor_international", "nickname", "bank_id", "card_brand", "card_variant",
-        "last_four_digits", "annual_fee", "annual_fee_frequency",
-        "annual_fee_waived", "benefits_notes", "is_active"
+        "credit_limit",
+        "closing_day",
+        "due_day",
+        "has_points",
+        "points_program",
+        "points_program_name",
+        "points_factor",
+        "points_factor_international",
+        "nickname",
+        "bank_id",
+        "card_brand",
+        "card_variant",
+        "last_four_digits",
+        "annual_fee",
+        "annual_fee_frequency",
+        "annual_fee_waived",
+        "benefits_notes",
+        "is_active",
     ]
     account_fields = ["name", "color", "icon"]
 
@@ -313,7 +326,9 @@ async def update_credit_card(
         points_program=card.points_program,
         points_program_name=card.points_program_name,
         points_factor=float(card.points_factor),
-        points_factor_international=float(card.points_factor_international) if card.points_factor_international else None,
+        points_factor_international=float(card.points_factor_international)
+        if card.points_factor_international
+        else None,
         nickname=card.nickname,
         bank_id=card.bank_id,
         card_brand=card.card_brand,
@@ -352,9 +367,7 @@ async def delete_credit_card(
 
     # Deleting the card will cascade delete the account due to ondelete="CASCADE"
     # Actually, account has the cascade, so we need to delete account first
-    account_result = await db.execute(
-        select(Account).where(Account.id == card.account_id)
-    )
+    account_result = await db.execute(select(Account).where(Account.id == card.account_id))
     account = account_result.scalar_one_or_none()
 
     if account:
@@ -367,6 +380,7 @@ async def delete_credit_card(
 
 class ProjectRecurringResponse(BaseModel):
     """Resposta da projecao de recorrentes"""
+
     message: str
     transactions_created: int
     months_projected: int
@@ -413,6 +427,7 @@ async def project_recurring_transactions(
 
 class RecalculateInvoicesResponse(BaseModel):
     """Resposta do recalculo de faturas"""
+
     message: str
     transactions_linked: int
     invoices_created: int
@@ -474,10 +489,10 @@ async def recalculate_card_invoices(
         invoice = await service.get_or_create_invoice(
             user=current_user,
             credit_card=card,
-            reference_month=period['reference_month'],
-            reference_year=period['reference_year'],
-            closing_date=period['closing_date'],
-            due_date=period['due_date'],
+            reference_month=period["reference_month"],
+            reference_year=period["reference_year"],
+            closing_date=period["closing_date"],
+            due_date=period["due_date"],
         )
 
         if invoice.total_amount == 0 and invoice.id not in affected_invoices:
@@ -515,10 +530,10 @@ async def recalculate_card_invoices(
             invoice = await service.get_or_create_invoice(
                 user=current_user,
                 credit_card=card,
-                reference_month=period['reference_month'],
-                reference_year=period['reference_year'],
-                closing_date=period['closing_date'],
-                due_date=period['due_date'],
+                reference_month=period["reference_month"],
+                reference_year=period["reference_year"],
+                closing_date=period["closing_date"],
+                due_date=period["due_date"],
             )
             transaction.invoice_id = invoice.id
             affected_invoices.add(invoice.id)
@@ -529,9 +544,10 @@ async def recalculate_card_invoices(
         period = service.calculate_invoice_period(card, transaction.date)
 
         # Verificar se está na fatura errada
-        if (current_invoice.reference_month != period['reference_month'] or
-            current_invoice.reference_year != period['reference_year']):
-
+        if (
+            current_invoice.reference_month != period["reference_month"]
+            or current_invoice.reference_year != period["reference_year"]
+        ):
             # Marcar fatura antiga como afetada
             affected_invoices.add(current_invoice.id)
 
@@ -539,10 +555,10 @@ async def recalculate_card_invoices(
             correct_invoice = await service.get_or_create_invoice(
                 user=current_user,
                 credit_card=card,
-                reference_month=period['reference_month'],
-                reference_year=period['reference_year'],
-                closing_date=period['closing_date'],
-                due_date=period['due_date'],
+                reference_month=period["reference_month"],
+                reference_year=period["reference_year"],
+                closing_date=period["closing_date"],
+                due_date=period["due_date"],
             )
 
             if correct_invoice.total_amount == 0 and correct_invoice.id not in affected_invoices:
@@ -601,18 +617,12 @@ async def save_invoice_password(
 
     # Fetch card and verify ownership
     result = await db.execute(
-        select(CreditCard).where(
-            CreditCard.id == card_id,
-            CreditCard.user_id == current_user.id
-        )
+        select(CreditCard).where(CreditCard.id == card_id, CreditCard.user_id == current_user.id)
     )
     card = result.scalar_one_or_none()
 
     if not card:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Cartão não encontrado"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cartão não encontrado")
 
     # Encrypt and save password
     card.invoice_password_encrypted = encrypt_password(request.password)
@@ -635,18 +645,12 @@ async def delete_invoice_password(
     """
     # Fetch card and verify ownership
     result = await db.execute(
-        select(CreditCard).where(
-            CreditCard.id == card_id,
-            CreditCard.user_id == current_user.id
-        )
+        select(CreditCard).where(CreditCard.id == card_id, CreditCard.user_id == current_user.id)
     )
     card = result.scalar_one_or_none()
 
     if not card:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Cartão não encontrado"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cartão não encontrado")
 
     # Remove password
     card.invoice_password_encrypted = None

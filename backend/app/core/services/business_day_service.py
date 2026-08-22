@@ -2,6 +2,7 @@
 Serviço para cálculo de dias úteis no Brasil.
 Considera feriados nacionais fixos e móveis.
 """
+
 from datetime import date, timedelta
 
 
@@ -14,14 +15,14 @@ def get_brazilian_holidays(year: int) -> list[date]:
 
     # Feriados fixos
     fixed_holidays = [
-        (1, 1),   # Ano Novo
+        (1, 1),  # Ano Novo
         (4, 21),  # Tiradentes
-        (5, 1),   # Dia do Trabalho
-        (9, 7),   # Independência
-        (10, 12), # Nossa Senhora Aparecida
+        (5, 1),  # Dia do Trabalho
+        (9, 7),  # Independência
+        (10, 12),  # Nossa Senhora Aparecida
         (11, 2),  # Finados
-        (11, 15), # Proclamação da República
-        (12, 25), # Natal
+        (11, 15),  # Proclamação da República
+        (12, 25),  # Natal
     ]
 
     for month, day in fixed_holidays:
@@ -137,7 +138,7 @@ def get_payment_date_for_income(
     month: int,
     payment_day: int | None = None,
     use_business_day: bool = False,
-    business_day_number: int | None = None
+    business_day_number: int | None = None,
 ) -> date:
     """
     Calcula a data de pagamento para uma fonte de receita.
@@ -157,6 +158,7 @@ def get_payment_date_for_income(
     elif payment_day:
         # Ajustar para o último dia do mês se necessário
         from calendar import monthrange
+
         last_day = monthrange(year, month)[1]
         day = min(payment_day, last_day)
         return date(year, month, day)
@@ -169,7 +171,7 @@ def get_next_payment_date(
     payment_day: int | None = None,
     use_business_day: bool = False,
     business_day_number: int | None = None,
-    reference_date: date | None = None
+    reference_date: date | None = None,
 ) -> date:
     """
     Calcula a próxima data de pagamento a partir de uma data de referência.
@@ -192,18 +194,14 @@ def get_next_payment_date(
         reference_date.month,
         payment_day,
         use_business_day,
-        business_day_number
+        business_day_number,
     )
 
     # Se a data já passou, calcular para o próximo mês
     if payment_date <= reference_date:
         if reference_date.month == 12:
             payment_date = get_payment_date_for_income(
-                reference_date.year + 1,
-                1,
-                payment_day,
-                use_business_day,
-                business_day_number
+                reference_date.year + 1, 1, payment_day, use_business_day, business_day_number
             )
         else:
             payment_date = get_payment_date_for_income(
@@ -211,7 +209,7 @@ def get_next_payment_date(
                 reference_date.month + 1,
                 payment_day,
                 use_business_day,
-                business_day_number
+                business_day_number,
             )
 
     return payment_date

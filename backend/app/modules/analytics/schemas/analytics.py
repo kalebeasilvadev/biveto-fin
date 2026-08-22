@@ -51,6 +51,7 @@ class AnalyticsSummary(BaseModel):
 
 class PaymentMethodSummary(BaseModel):
     """Resumo de gastos por metodo de pagamento"""
+
     payment_method: str | None
     payment_method_display: str
     total: float
@@ -61,6 +62,7 @@ class PaymentMethodSummary(BaseModel):
 
 class PaymentMethodReport(BaseModel):
     """Relatorio completo de gastos por metodo de pagamento"""
+
     period_start: date_type
     period_end: date_type
     total_expenses: float

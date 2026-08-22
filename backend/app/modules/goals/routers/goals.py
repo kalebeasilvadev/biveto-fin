@@ -1,4 +1,5 @@
 """Endpoints de Metas Financeiras (Goals)"""
+
 from fastapi import APIRouter, HTTPException, Query, status
 
 from app.core.deps import CurrentUser, DbSession
@@ -86,7 +87,9 @@ async def calculate_emergency_fund(
 async def calculate_pnif(
     current_user: CurrentUser,
     db: DbSession,
-    expected_return: float = Query(0.08, ge=0.01, le=0.30, description="Taxa de retorno anual esperada"),
+    expected_return: float = Query(
+        0.08, ge=0.01, le=0.30, description="Taxa de retorno anual esperada"
+    ),
 ):
     """
     Calcula PNIF - Patrimônio Necessário para Independência Financeira.
@@ -111,10 +114,7 @@ async def get_goal(
     service = GoalService(db)
     goal = await service.get_goal(current_user, goal_id)
     if not goal:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Meta não encontrada"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Meta não encontrada")
     return goal
 
 

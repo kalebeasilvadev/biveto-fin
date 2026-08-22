@@ -308,18 +308,19 @@ async def create_from_suggestion(
     )
     if existing.scalar_one_or_none():
         raise HTTPException(
-            status_code=400,
-            detail=f"Recorrência '{data.name}' já existe com mesmo valor"
+            status_code=400, detail=f"Recorrência '{data.name}' já existe com mesmo valor"
         )
 
     # Resolver category_id se category_name foi fornecido
     category_id = data.category_id
     if not category_id and data.category_name:
         result = await db.execute(
-            select(Category).where(
+            select(Category)
+            .where(
                 Category.user_id == current_user.id,
                 Category.name.ilike(f"%{data.category_name}%"),
-            ).limit(1)
+            )
+            .limit(1)
         )
         category = result.scalar_one_or_none()
         if category:
@@ -409,13 +410,15 @@ async def batch_create_from_suggestion(
                 )
             )
             if existing.scalar_one_or_none():
-                results.append(BatchRecurringItemResult(
-                    index=index,
-                    success=False,
-                    recurring_name=item.name,
-                    error=f"Recorrência '{item.name}' já existe com mesmo valor",
-                    is_duplicate=True,
-                ))
+                results.append(
+                    BatchRecurringItemResult(
+                        index=index,
+                        success=False,
+                        recurring_name=item.name,
+                        error=f"Recorrência '{item.name}' já existe com mesmo valor",
+                        is_duplicate=True,
+                    )
+                )
                 duplicate_count += 1
                 continue
 
@@ -423,10 +426,12 @@ async def batch_create_from_suggestion(
             category_id = item.category_id
             if not category_id and item.category_name:
                 result = await db.execute(
-                    select(Category).where(
+                    select(Category)
+                    .where(
                         Category.user_id == current_user.id,
                         Category.name.ilike(f"%{item.category_name}%"),
-                    ).limit(1)
+                    )
+                    .limit(1)
                 )
                 category = result.scalar_one_or_none()
                 if category:
@@ -450,30 +455,36 @@ async def batch_create_from_suggestion(
 
             recurring = await service.create(current_user, create_data)
 
-            results.append(BatchRecurringItemResult(
-                index=index,
-                success=True,
-                recurring_id=recurring.id,
-                recurring_name=recurring.name,
-            ))
+            results.append(
+                BatchRecurringItemResult(
+                    index=index,
+                    success=True,
+                    recurring_id=recurring.id,
+                    recurring_name=recurring.name,
+                )
+            )
             success_count += 1
 
         except ValueError as e:
-            results.append(BatchRecurringItemResult(
-                index=index,
-                success=False,
-                recurring_name=item.name,
-                error=str(e),
-            ))
+            results.append(
+                BatchRecurringItemResult(
+                    index=index,
+                    success=False,
+                    recurring_name=item.name,
+                    error=str(e),
+                )
+            )
             error_count += 1
 
         except Exception as e:
-            results.append(BatchRecurringItemResult(
-                index=index,
-                success=False,
-                recurring_name=item.name,
-                error=str(e),
-            ))
+            results.append(
+                BatchRecurringItemResult(
+                    index=index,
+                    success=False,
+                    recurring_name=item.name,
+                    error=str(e),
+                )
+            )
             error_count += 1
 
     return BatchRecurringResponse(

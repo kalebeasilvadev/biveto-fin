@@ -10,6 +10,7 @@ from pydantic import BaseModel
 
 class ProjectionType(str, Enum):
     """Type of projected transaction."""
+
     RECURRING = "recurring"
     INVOICE = "invoice"
     DEBT = "debt"
@@ -18,6 +19,7 @@ class ProjectionType(str, Enum):
 
 class TransactionSummary(BaseModel):
     """Summary of a confirmed transaction."""
+
     id: int
     description: str
     amount: float
@@ -33,6 +35,7 @@ class TransactionSummary(BaseModel):
 
 class ProjectionItem(BaseModel):
     """A projected future transaction."""
+
     projection_type: ProjectionType
     description: str
     amount: float
@@ -51,6 +54,7 @@ class ProjectionItem(BaseModel):
 
 class DailyEntry(BaseModel):
     """Cash flow data for a single day."""
+
     date: date
     is_past: bool
     is_today: bool
@@ -78,6 +82,7 @@ class DailyEntry(BaseModel):
 
 class RunningBalanceEntry(BaseModel):
     """Running balance for a day."""
+
     date: date
     opening_balance: float
     income: float
@@ -90,6 +95,7 @@ class RunningBalanceEntry(BaseModel):
 
 class MajorExpense(BaseModel):
     """A major upcoming expense."""
+
     date: date
     description: str
     amount: float
@@ -100,6 +106,7 @@ class MajorExpense(BaseModel):
 
 class WeeklySummary(BaseModel):
     """Summary for a week."""
+
     year: int
     week: int
     start_date: date
@@ -119,6 +126,7 @@ class WeeklySummary(BaseModel):
 
 class CashCalendarResponse(BaseModel):
     """Response for cash calendar queries."""
+
     start_date: date
     end_date: date
 

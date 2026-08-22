@@ -2,6 +2,7 @@
 Modelo de Metas Financeiras (Goals)
 Baseado nas metodologias YNAB, Cerbasi (PNIF) e Thiago Nigro
 """
+
 from datetime import date, datetime
 from decimal import Decimal
 from enum import Enum
@@ -16,17 +17,19 @@ from ..core.database import Base
 
 class GoalType(str, Enum):
     """Tipo de meta financeira"""
-    SAVINGS = "savings"           # Economia para algo específico
+
+    SAVINGS = "savings"  # Economia para algo específico
     EMERGENCY_FUND = "emergency"  # Fundo de emergência (Ramsey Baby Step 3)
-    DEBT_FREE = "debt_free"       # Quitar dívidas
-    INVESTMENT = "investment"     # Meta de investimento
-    RETIREMENT = "retirement"     # Aposentadoria / PNIF
-    PURCHASE = "purchase"         # Compra específica
-    CUSTOM = "custom"             # Meta personalizada
+    DEBT_FREE = "debt_free"  # Quitar dívidas
+    INVESTMENT = "investment"  # Meta de investimento
+    RETIREMENT = "retirement"  # Aposentadoria / PNIF
+    PURCHASE = "purchase"  # Compra específica
+    CUSTOM = "custom"  # Meta personalizada
 
 
 class GoalStatus(str, Enum):
     """Status da meta"""
+
     ACTIVE = "active"
     PAUSED = "paused"
     COMPLETED = "completed"
@@ -38,6 +41,7 @@ class Goal(Base):
     Meta financeira do usuário.
     Permite definir objetivos com prazo e acompanhar progresso.
     """
+
     __tablename__ = "goals"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -61,13 +65,17 @@ class Goal(Base):
     completed_date: Mapped[date | None] = mapped_column(Date)  # Data de conclusão
 
     # Configurações
-    monthly_contribution: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))  # Contribuição mensal sugerida
+    monthly_contribution: Mapped[Decimal | None] = mapped_column(
+        Numeric(12, 2)
+    )  # Contribuição mensal sugerida
     auto_calculate_contribution: Mapped[bool] = mapped_column(Boolean, default=True)
     priority: Mapped[int] = mapped_column(Integer, default=0)  # Ordem de prioridade
 
     # Status
     status: Mapped[str] = mapped_column(String(20), default=GoalStatus.ACTIVE.value)
-    ownership_type: Mapped[str] = mapped_column(String(20), default="personal")  # personal, household
+    ownership_type: Mapped[str] = mapped_column(
+        String(20), default="personal"
+    )  # personal, household
 
     # Vinculação opcional a conta específica
     account_id: Mapped[int | None] = mapped_column(ForeignKey("accounts.id", ondelete="SET NULL"))
@@ -79,9 +87,7 @@ class Goal(Base):
     user: Mapped["User"] = relationship(back_populates="goals")
     account: Mapped["Account | None"] = relationship()
     contributions: Mapped[list["GoalContribution"]] = relationship(
-        back_populates="goal",
-        cascade="all, delete-orphan",
-        lazy="noload"
+        back_populates="goal", cascade="all, delete-orphan", lazy="noload"
     )
 
     @property
@@ -102,6 +108,7 @@ class GoalContribution(Base):
     Contribuição para uma meta.
     Registra cada depósito/aporte feito para a meta.
     """
+
     __tablename__ = "goal_contributions"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -112,7 +119,9 @@ class GoalContribution(Base):
     notes: Mapped[str | None] = mapped_column(String(200))
 
     # Vinculação opcional a transação
-    transaction_id: Mapped[int | None] = mapped_column(ForeignKey("transactions.id", ondelete="SET NULL"))
+    transaction_id: Mapped[int | None] = mapped_column(
+        ForeignKey("transactions.id", ondelete="SET NULL")
+    )
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 

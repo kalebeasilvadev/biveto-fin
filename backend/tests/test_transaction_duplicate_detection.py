@@ -1,11 +1,13 @@
 """Testes para detecção de duplicatas em transações individuais"""
-import pytest
-from decimal import Decimal
-from datetime import datetime, date, UTC
-from unittest.mock import Mock, AsyncMock
 
-from app.modules.installments.services.duplicate_detection_service import DuplicateDetectionService
+from datetime import UTC, date, datetime
+from decimal import Decimal
+from unittest.mock import AsyncMock, Mock
+
+import pytest
+
 from app.models.transaction import Transaction
+from app.modules.installments.services.duplicate_detection_service import DuplicateDetectionService
 
 
 @pytest.fixture
@@ -217,9 +219,7 @@ class TestRealWorldScenarios:
             installment_series_id=None,
         )
 
-        is_duplicate, score = service._check_transaction_duplicate(
-            tx_installment, tx_standalone
-        )
+        is_duplicate, score = service._check_transaction_duplicate(tx_installment, tx_standalone)
 
         assert is_duplicate is True, "Deveria detectar como duplicata"
         assert score >= 0.80, f"Score deveria ser alto, foi {score:.2%}"
@@ -334,5 +334,5 @@ class TestEdgeCases:
         assert score == 0.0
 
 
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

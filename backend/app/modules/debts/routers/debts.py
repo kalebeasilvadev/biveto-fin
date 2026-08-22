@@ -1,4 +1,5 @@
 """Endpoints de Gestão de Dívidas (Debts)"""
+
 from decimal import Decimal
 
 from fastapi import APIRouter, HTTPException, Query, status
@@ -72,7 +73,9 @@ async def get_debts_summary(
 async def get_snowball_plan(
     current_user: CurrentUser,
     db: DbSession,
-    monthly_payment: Decimal = Query(..., gt=0, description="Valor total disponível para pagar dívidas por mês"),
+    monthly_payment: Decimal = Query(
+        ..., gt=0, description="Valor total disponível para pagar dívidas por mês"
+    ),
 ):
     """
     Gera plano de quitação pelo método Snowball (Dave Ramsey).
@@ -91,7 +94,9 @@ async def get_snowball_plan(
 async def get_avalanche_plan(
     current_user: CurrentUser,
     db: DbSession,
-    monthly_payment: Decimal = Query(..., gt=0, description="Valor total disponível para pagar dívidas por mês"),
+    monthly_payment: Decimal = Query(
+        ..., gt=0, description="Valor total disponível para pagar dívidas por mês"
+    ),
 ):
     """
     Gera plano de quitação pelo método Avalanche.
@@ -109,7 +114,9 @@ async def get_avalanche_plan(
 async def compare_payoff_strategies(
     current_user: CurrentUser,
     db: DbSession,
-    monthly_payment: Decimal = Query(..., gt=0, description="Valor total disponível para pagar dívidas por mês"),
+    monthly_payment: Decimal = Query(
+        ..., gt=0, description="Valor total disponível para pagar dívidas por mês"
+    ),
 ):
     """
     Compara estratégias Snowball e Avalanche.
@@ -133,10 +140,7 @@ async def get_debt(
     service = DebtService(db)
     debt = await service.get_debt(current_user, debt_id)
     if not debt:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Dívida não encontrada"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dívida não encontrada")
     return debt
 
 

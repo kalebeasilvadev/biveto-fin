@@ -10,6 +10,7 @@ from ..core.database import Base
 
 class UserMerchantRule(Base):
     """Regras personalizadas do usuário para categorização por merchant"""
+
     __tablename__ = "user_merchant_rules"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -20,9 +21,7 @@ class UserMerchantRule(Base):
     confidence: Mapped[float] = mapped_column(Float, default=1.0)  # baseado em uso
     usage_count: Mapped[int] = mapped_column(default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=utc_now, onupdate=utc_now
-    )
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, onupdate=utc_now)
 
     # Relationships
     user: Mapped["User"] = relationship(back_populates="merchant_rules")

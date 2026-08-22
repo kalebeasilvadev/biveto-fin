@@ -1,6 +1,7 @@
 """
 Rotas de autenticacao: login, refresh, convites e reset de senha.
 """
+
 from fastapi import APIRouter, Body, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
@@ -58,6 +59,7 @@ async def refresh_token(db: DbSession, refresh_token: str = Body(..., embed=True
 
 # ========== Invitation Registration ==========
 
+
 @router.get("/invite/{token}", response_model=InviteValidation)
 async def validate_invitation(token: str, db: DbSession):
     """Valida um token de convite"""
@@ -75,14 +77,18 @@ async def validate_invitation(token: str, db: DbSession):
         raise HTTPException(status_code=400, detail="Convite expirado")
 
     if invitation.status != InvitationStatus.PENDING:
-        status_str = invitation.status.value if hasattr(invitation.status, 'value') else str(invitation.status)
+        status_str = (
+            invitation.status.value
+            if hasattr(invitation.status, "value")
+            else str(invitation.status)
+        )
         raise HTTPException(status_code=400, detail=f"Convite {status_str}")
 
     # license.type pode ser string ou Enum dependendo de como foi salvo
     license_type = None
     if invitation.license:
         lt = invitation.license.type
-        license_type = lt.value if hasattr(lt, 'value') else str(lt)
+        license_type = lt.value if hasattr(lt, "value") else str(lt)
 
     return InviteValidation(
         email=invitation.email,
@@ -93,7 +99,9 @@ async def validate_invitation(token: str, db: DbSession):
 
 @router.post("/invite/{token}", response_model=Token)
 @limiter.limit("3/minute")
-async def register_via_invitation(request: Request, token: str, data: InviteRegister, db: DbSession):
+async def register_via_invitation(
+    request: Request, token: str, data: InviteRegister, db: DbSession
+):
     """Registra usuario via convite e cria HouseholdMember"""
     result = await db.execute(select(Invitation).where(Invitation.token == token))
     invitation = result.scalar_one_or_none()
@@ -109,7 +117,11 @@ async def register_via_invitation(request: Request, token: str, data: InviteRegi
         raise HTTPException(status_code=400, detail="Convite expirado")
 
     if invitation.status != InvitationStatus.PENDING:
-        status_str = invitation.status.value if hasattr(invitation.status, 'value') else str(invitation.status)
+        status_str = (
+            invitation.status.value
+            if hasattr(invitation.status, "value")
+            else str(invitation.status)
+        )
         raise HTTPException(status_code=400, detail=f"Convite {status_str}")
 
     # Verificar se email ja existe
@@ -140,8 +152,9 @@ async def register_via_invitation(request: Request, token: str, data: InviteRegi
     if invitation.license_id:
         # Verificar se eh o primeiro membro da licenca
         existing_members = await db.scalar(
-            select(func.count(HouseholdMember.id))
-            .where(HouseholdMember.license_id == invitation.license_id)
+            select(func.count(HouseholdMember.id)).where(
+                HouseholdMember.license_id == invitation.license_id
+            )
         )
 
         is_first_member = (existing_members or 0) == 0
@@ -179,6 +192,7 @@ async def register_via_invitation(request: Request, token: str, data: InviteRegi
 
 # ========== Password Reset ==========
 
+
 class ResetPasswordValidation(BaseModel):
     email: str
     is_valid: bool
@@ -198,7 +212,7 @@ async def validate_reset_token(token: str, db: DbSession):
         raise HTTPException(status_code=404, detail="Token inválido ou expirado")
 
     # Verificar expiração do token (se o campo existir)
-    if hasattr(user, 'reset_token_expires') and user.reset_token_expires:
+    if hasattr(user, "reset_token_expires") and user.reset_token_expires:
         if utc_now() > user.reset_token_expires:
             # Limpar token expirado
             user.reset_token = None
@@ -220,7 +234,7 @@ async def reset_password(request: Request, token: str, data: ResetPasswordReques
         raise HTTPException(status_code=404, detail="Token inválido ou expirado")
 
     # Verificar expiração do token (se o campo existir)
-    if hasattr(user, 'reset_token_expires') and user.reset_token_expires:
+    if hasattr(user, "reset_token_expires") and user.reset_token_expires:
         if utc_now() > user.reset_token_expires:
             # Limpar token expirado
             user.reset_token = None
@@ -238,7 +252,7 @@ async def reset_password(request: Request, token: str, data: ResetPasswordReques
     # Atualizar senha e limpar token
     user.hashed_password = get_password_hash(data.password)
     user.reset_token = None
-    if hasattr(user, 'reset_token_expires'):
+    if hasattr(user, "reset_token_expires"):
         user.reset_token_expires = None
 
     await db.commit()

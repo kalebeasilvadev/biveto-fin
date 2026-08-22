@@ -25,11 +25,7 @@ class InvoiceService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    def calculate_invoice_period(
-        self,
-        credit_card: CreditCard,
-        reference_date: date
-    ) -> dict:
+    def calculate_invoice_period(self, credit_card: CreditCard, reference_date: date) -> dict:
         """
         Calcula o periodo da fatura baseado no closing_day do cartao.
 
@@ -60,10 +56,10 @@ class InvoiceService:
         dates = self.calculate_invoice_dates(credit_card, ref_month, ref_year)
 
         return {
-            'reference_month': ref_month,
-            'reference_year': ref_year,
-            'closing_date': dates['closing_date'],
-            'due_date': dates['due_date'],
+            "reference_month": ref_month,
+            "reference_year": ref_year,
+            "closing_date": dates["closing_date"],
+            "due_date": dates["due_date"],
         }
 
     def calculate_invoice_dates(
@@ -106,8 +102,8 @@ class InvoiceService:
                 due_date = date(reference_year, reference_month, 28)
 
         return {
-            'closing_date': closing_date,
-            'due_date': due_date,
+            "closing_date": closing_date,
+            "due_date": due_date,
         }
 
     async def get_or_create_invoice(
@@ -140,8 +136,8 @@ class InvoiceService:
         if not closing_date or not due_date:
             ref_date = date(reference_year, reference_month, 1)
             period = self.calculate_invoice_period(credit_card, ref_date)
-            closing_date = period['closing_date']
-            due_date = period['due_date']
+            closing_date = period["closing_date"]
+            due_date = period["due_date"]
 
         # Criar nova fatura
         invoice = CreditCardInvoice(
@@ -151,8 +147,8 @@ class InvoiceService:
             reference_year=reference_year,
             closing_date=closing_date,
             due_date=due_date,
-            total_amount=Decimal('0'),
-            paid_amount=Decimal('0'),
+            total_amount=Decimal("0"),
+            paid_amount=Decimal("0"),
             status=InvoiceStatus.OPEN.value,
         )
 
@@ -164,24 +160,22 @@ class InvoiceService:
 
     # Padroes de descricao que indicam pagamento de fatura (NAO devem ser somados no total)
     PAYMENT_DESCRIPTION_PATTERNS = [
-        'pagamento em ',      # Nubank: "Pagamento em 08 DEZ"
-        'pagamento de fatura',
-        'pagamento banco',    # "Pagamento Banco CSP", "Pagamento Banco do Brasil"
-        'pag fatura',
-        'pgto fatura',
-        'pgto cobranca',
-        'pagamento efetuado',
-        'pgto debito automatico',
-        'pagamento recebido',
-        'credito pagamento',
-        'pagto boleto',       # PAN: "Pagto Boleto Recebido"
-        'pagamento boleto',
+        "pagamento em ",  # Nubank: "Pagamento em 08 DEZ"
+        "pagamento de fatura",
+        "pagamento banco",  # "Pagamento Banco CSP", "Pagamento Banco do Brasil"
+        "pag fatura",
+        "pgto fatura",
+        "pgto cobranca",
+        "pagamento efetuado",
+        "pgto debito automatico",
+        "pagamento recebido",
+        "credito pagamento",
+        "pagto boleto",  # PAN: "Pagto Boleto Recebido"
+        "pagamento boleto",
     ]
 
     async def update_invoice_total(
-        self,
-        invoice: CreditCardInvoice,
-        force_recalculate: bool = False
+        self, invoice: CreditCardInvoice, force_recalculate: bool = False
     ) -> None:
         """
         Recalcula o total da fatura baseado nas transacoes vinculadas.
@@ -217,28 +211,25 @@ class InvoiceService:
         # Buscar todas as transacoes da fatura
         result = await self.db.execute(
             select(Transaction).where(
-                and_(
-                    Transaction.invoice_id == invoice.id,
-                    Transaction.amount > 0
-                )
+                and_(Transaction.invoice_id == invoice.id, Transaction.amount > 0)
             )
         )
         transactions = result.scalars().all()
 
-        total_expenses = Decimal('0')
-        total_credits = Decimal('0')
+        total_expenses = Decimal("0")
+        total_credits = Decimal("0")
 
         for tx in transactions:
-            desc_lower = (tx.description or '').lower()
+            desc_lower = (tx.description or "").lower()
             is_payment = any(pattern in desc_lower for pattern in self.PAYMENT_DESCRIPTION_PATTERNS)
 
-            if tx.type == 'expense':
+            if tx.type == "expense":
                 # Ignorar pagamentos de fatura salvos incorretamente como expense
                 if is_payment:
                     continue
                 total_expenses += Decimal(str(tx.amount))
 
-            elif tx.type == 'income':
+            elif tx.type == "income":
                 # Ignorar pagamentos de fatura (esses nao devem afetar o total)
                 if is_payment:
                     continue
@@ -265,9 +256,7 @@ class InvoiceService:
                 raise ValueError("Deve fornecer invoice ou credit_card")
 
             # Obter usuario
-            result = await self.db.execute(
-                select(User).where(User.id == transaction.user_id)
-            )
+            result = await self.db.execute(select(User).where(User.id == transaction.user_id))
             user = result.scalar_one()
 
             # Calcular periodo
@@ -277,10 +266,10 @@ class InvoiceService:
             invoice = await self.get_or_create_invoice(
                 user=user,
                 credit_card=credit_card,
-                reference_month=period['reference_month'],
-                reference_year=period['reference_year'],
-                closing_date=period['closing_date'],
-                due_date=period['due_date'],
+                reference_month=period["reference_month"],
+                reference_year=period["reference_year"],
+                closing_date=period["closing_date"],
+                due_date=period["due_date"],
             )
 
         # Vincular transacao
@@ -367,9 +356,7 @@ class InvoiceService:
         )
         credit_card = result.scalar_one()
 
-        result = await self.db.execute(
-            select(Account).where(Account.id == credit_card.account_id)
-        )
+        result = await self.db.execute(select(Account).where(Account.id == credit_card.account_id))
         card_account = result.scalar_one()
 
         # Determinar metodo de pagamento (default: bank_transfer)
@@ -393,7 +380,7 @@ class InvoiceService:
         await self.db.refresh(payment_transaction)
 
         # Atualizar fatura
-        invoice.paid_amount = (invoice.paid_amount or Decimal('0')) + amount
+        invoice.paid_amount = (invoice.paid_amount or Decimal("0")) + amount
         invoice.paid_at = utc_now()
         invoice.payment_account_id = payment_account_id
         invoice.payment_transaction_id = payment_transaction.id
@@ -428,12 +415,12 @@ class InvoiceService:
 
         Retorna lista de cartoes que podem corresponder.
         """
-        card_issuer = document_data.get('card_issuer', '').lower().strip()
-        card_last_digits = document_data.get('card_last_digits', '').strip()
-        card_name = document_data.get('card_name', '').lower().strip()
-        card_bank = document_data.get('card_bank', '').lower().strip()
-        card_brand = document_data.get('card_brand', '').lower().strip()
-        card_partner = document_data.get('card_partner', '').lower().strip()
+        card_issuer = document_data.get("card_issuer", "").lower().strip()
+        card_last_digits = document_data.get("card_last_digits", "").strip()
+        card_name = document_data.get("card_name", "").lower().strip()
+        card_bank = document_data.get("card_bank", "").lower().strip()
+        card_brand = document_data.get("card_brand", "").lower().strip()
+        card_partner = document_data.get("card_partner", "").lower().strip()
 
         # Buscar cartoes do usuario
         result = await self.db.execute(
@@ -451,9 +438,7 @@ class InvoiceService:
 
         # Buscar todas as contas de uma vez
         account_ids = [card.account_id for card in cards]
-        acc_result = await self.db.execute(
-            select(Account).where(Account.id.in_(account_ids))
-        )
+        acc_result = await self.db.execute(select(Account).where(Account.id.in_(account_ids)))
         accounts_by_id = {acc.id: acc for acc in acc_result.scalars().all()}
 
         matches = []
@@ -520,11 +505,12 @@ class InvoiceService:
     def _normalize_string(self, s: str) -> str:
         """Normaliza string para comparação: remove acentos, underscores, etc."""
         import unicodedata
+
         # Remove acentos
-        s = unicodedata.normalize('NFD', s)
-        s = ''.join(c for c in s if unicodedata.category(c) != 'Mn')
+        s = unicodedata.normalize("NFD", s)
+        s = "".join(c for c in s if unicodedata.category(c) != "Mn")
         # Lowercase e substitui separadores por espaço
-        s = s.lower().replace('_', ' ').replace('-', ' ').strip()
+        s = s.lower().replace("_", " ").replace("-", " ").strip()
         return s
 
     def _fuzzy_match(self, str1: str, str2: str) -> bool:
@@ -550,32 +536,32 @@ class InvoiceService:
     def _get_issuer_variants(self, issuer: str) -> list[str]:
         """Retorna variantes do nome do emissor para matching"""
         variants_map = {
-            'itau': ['itau', 'itaucard'],
-            'nubank': ['nubank', 'nu'],
-            'inter': ['inter', 'banco inter'],
-            'santander': ['santander'],
-            'bradesco': ['bradesco', 'bradescard'],
-            'bradescard': ['bradescard', 'bradesco', 'bradesco amazon', 'amazon bradesco'],
-            'bb': ['banco do brasil', 'bb'],
-            'caixa': ['caixa', 'cef'],
-            'c6': ['c6', 'c6 bank'],
-            'xp': ['xp'],
-            'btg': ['btg'],
-            'original': ['original'],
-            'next': ['next'],
-            'neon': ['neon'],
-            'pagbank': ['pagbank', 'pagseguro'],
-            'picpay': ['picpay'],
-            'mercadopago': ['mercado pago', 'mercadopago'],
-            'amazon': ['amazon', 'bradesco amazon', 'amazon bradesco'],
-            'carrefour': ['carrefour'],
-            'riachuelo': ['riachuelo'],
-            'renner': ['renner'],
-            'magalu': ['magalu', 'magazine luiza'],
-            'casas bahia': ['casas bahia'],
-            'ponto': ['ponto', 'ponto frio'],
-            'marisa': ['marisa'],
-            'digio': ['digio'],
+            "itau": ["itau", "itaucard"],
+            "nubank": ["nubank", "nu"],
+            "inter": ["inter", "banco inter"],
+            "santander": ["santander"],
+            "bradesco": ["bradesco", "bradescard"],
+            "bradescard": ["bradescard", "bradesco", "bradesco amazon", "amazon bradesco"],
+            "bb": ["banco do brasil", "bb"],
+            "caixa": ["caixa", "cef"],
+            "c6": ["c6", "c6 bank"],
+            "xp": ["xp"],
+            "btg": ["btg"],
+            "original": ["original"],
+            "next": ["next"],
+            "neon": ["neon"],
+            "pagbank": ["pagbank", "pagseguro"],
+            "picpay": ["picpay"],
+            "mercadopago": ["mercado pago", "mercadopago"],
+            "amazon": ["amazon", "bradesco amazon", "amazon bradesco"],
+            "carrefour": ["carrefour"],
+            "riachuelo": ["riachuelo"],
+            "renner": ["renner"],
+            "magalu": ["magalu", "magazine luiza"],
+            "casas bahia": ["casas bahia"],
+            "ponto": ["ponto", "ponto frio"],
+            "marisa": ["marisa"],
+            "digio": ["digio"],
         }
 
         # Buscar variantes conhecidas
@@ -618,10 +604,12 @@ class InvoiceService:
         result = await self.db.execute(
             select(CreditCardInvoice).where(
                 and_(
-                    CreditCardInvoice.status.in_([
-                        InvoiceStatus.CLOSED.value,
-                        InvoiceStatus.PARTIAL.value,
-                    ]),
+                    CreditCardInvoice.status.in_(
+                        [
+                            InvoiceStatus.CLOSED.value,
+                            InvoiceStatus.PARTIAL.value,
+                        ]
+                    ),
                     CreditCardInvoice.due_date < today,
                 )
             )
@@ -663,9 +651,7 @@ class InvoiceService:
         offset: int = 0,
     ) -> list[CreditCardInvoice]:
         """Lista faturas do usuario com filtros"""
-        query = select(CreditCardInvoice).where(
-            CreditCardInvoice.user_id == user.id
-        )
+        query = select(CreditCardInvoice).where(CreditCardInvoice.user_id == user.id)
 
         if credit_card_id:
             query = query.where(CreditCardInvoice.credit_card_id == credit_card_id)
@@ -679,10 +665,14 @@ class InvoiceService:
         if month:
             query = query.where(CreditCardInvoice.reference_month == month)
 
-        query = query.order_by(
-            CreditCardInvoice.reference_year.desc(),
-            CreditCardInvoice.reference_month.desc(),
-        ).limit(limit).offset(offset)
+        query = (
+            query.order_by(
+                CreditCardInvoice.reference_year.desc(),
+                CreditCardInvoice.reference_month.desc(),
+            )
+            .limit(limit)
+            .offset(offset)
+        )
 
         result = await self.db.execute(query)
         return list(result.scalars().all())
@@ -693,9 +683,9 @@ class InvoiceService:
     ) -> list[Transaction]:
         """Obtem todas as transacoes de uma fatura"""
         result = await self.db.execute(
-            select(Transaction).where(
-                Transaction.invoice_id == invoice.id
-            ).order_by(Transaction.date.desc())
+            select(Transaction)
+            .where(Transaction.invoice_id == invoice.id)
+            .order_by(Transaction.date.desc())
         )
         return list(result.scalars().all())
 
@@ -713,8 +703,8 @@ class InvoiceService:
                 and_(
                     CreditCardInvoice.user_id == user.id,
                     CreditCardInvoice.credit_card_id == credit_card.id,
-                    CreditCardInvoice.reference_month == period['reference_month'],
-                    CreditCardInvoice.reference_year == period['reference_year'],
+                    CreditCardInvoice.reference_month == period["reference_month"],
+                    CreditCardInvoice.reference_year == period["reference_year"],
                 )
             )
         )
@@ -816,7 +806,7 @@ class InvoiceService:
 
                 # Contar transacoes restantes de todas as faturas de uma vez
                 count_result = await self.db.execute(
-                    select(Transaction.invoice_id, func.count(Transaction.id).label('count'))
+                    select(Transaction.invoice_id, func.count(Transaction.id).label("count"))
                     .where(Transaction.invoice_id.in_(affected_invoice_ids))
                     .group_by(Transaction.invoice_id)
                 )
@@ -888,10 +878,10 @@ class InvoiceService:
             document_id=document.id,
             reference_month=reference_month,
             reference_year=reference_year,
-            closing_date=period['closing_date'],
-            due_date=period['due_date'],
-            total_amount=total_amount or Decimal('0'),
-            paid_amount=Decimal('0'),
+            closing_date=period["closing_date"],
+            due_date=period["due_date"],
+            total_amount=total_amount or Decimal("0"),
+            paid_amount=Decimal("0"),
             status=InvoiceStatus.OPEN.value,
         )
 
@@ -906,6 +896,7 @@ class InvoiceService:
             from app.modules.notifications.services.notification_service import (
                 NotificationService,
             )
+
             await NotificationService(self.db).resolve_pending_for_invoice(
                 user_id=user.id,
                 credit_card_id=credit_card.id,
@@ -971,14 +962,10 @@ class InvoiceService:
                         projected_date = date(
                             projected_date.year,
                             projected_date.month,
-                            min(recurring.day_of_month, 28)
+                            min(recurring.day_of_month, 28),
                         )
                     except ValueError:
-                        projected_date = date(
-                            projected_date.year,
-                            projected_date.month,
-                            28
-                        )
+                        projected_date = date(projected_date.year, projected_date.month, 28)
 
                 # Verificar se ja existe transacao para esta data e recorrente
                 existing_result = await self.db.execute(
@@ -1000,10 +987,10 @@ class InvoiceService:
                 invoice = await self.get_or_create_invoice(
                     user=user,
                     credit_card=credit_card,
-                    reference_month=period['reference_month'],
-                    reference_year=period['reference_year'],
-                    closing_date=period['closing_date'],
-                    due_date=period['due_date'],
+                    reference_month=period["reference_month"],
+                    reference_year=period["reference_year"],
+                    closing_date=period["closing_date"],
+                    due_date=period["due_date"],
                 )
 
                 # Criar transacao projetada
@@ -1084,14 +1071,18 @@ class InvoiceService:
         # Para cada cartão, buscar account_id associado
         for credit_card in credit_cards:
             # Buscar transações órfãs: estão na conta do cartão mas sem credit_card_id
-            orphan_query = select(Transaction).where(
-                and_(
-                    Transaction.user_id == user.id,
-                    Transaction.account_id == credit_card.account_id,
-                    Transaction.credit_card_id.is_(None),
-                    Transaction.type == TransactionType.EXPENSE.value,
+            orphan_query = (
+                select(Transaction)
+                .where(
+                    and_(
+                        Transaction.user_id == user.id,
+                        Transaction.account_id == credit_card.account_id,
+                        Transaction.credit_card_id.is_(None),
+                        Transaction.type == TransactionType.EXPENSE.value,
+                    )
                 )
-            ).order_by(Transaction.date)
+                .order_by(Transaction.date)
+            )
 
             orphan_result = await self.db.execute(orphan_query)
             orphan_transactions = orphan_result.scalars().all()
@@ -1107,10 +1098,10 @@ class InvoiceService:
                     invoice = await self.get_or_create_invoice(
                         user=user,
                         credit_card=credit_card,
-                        reference_month=period['reference_month'],
-                        reference_year=period['reference_year'],
-                        closing_date=period['closing_date'],
-                        due_date=period['due_date'],
+                        reference_month=period["reference_month"],
+                        reference_year=period["reference_year"],
+                        closing_date=period["closing_date"],
+                        due_date=period["due_date"],
                     )
 
                     # Atualizar a transação
@@ -1123,20 +1114,24 @@ class InvoiceService:
 
                     result["processed"] += 1
                     result["invoices_updated"].add(invoice.id)
-                    result["transactions"].append({
-                        "id": tx.id,
-                        "description": tx.description,
-                        "amount": float(tx.amount),
-                        "date": tx.date.isoformat(),
-                        "invoice_id": invoice.id,
-                        "invoice_ref": f"{period['reference_month']:02d}/{period['reference_year']}",
-                    })
+                    result["transactions"].append(
+                        {
+                            "id": tx.id,
+                            "description": tx.description,
+                            "amount": float(tx.amount),
+                            "date": tx.date.isoformat(),
+                            "invoice_id": invoice.id,
+                            "invoice_ref": f"{period['reference_month']:02d}/{period['reference_year']}",
+                        }
+                    )
 
                 except Exception as e:
-                    result["errors"].append({
-                        "transaction_id": tx.id,
-                        "error": str(e),
-                    })
+                    result["errors"].append(
+                        {
+                            "transaction_id": tx.id,
+                            "error": str(e),
+                        }
+                    )
 
         await self.db.flush()
 

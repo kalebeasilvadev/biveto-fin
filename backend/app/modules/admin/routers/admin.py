@@ -36,11 +36,12 @@ def require_admin(user: User):
     if not user.is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Acesso negado. Apenas administradores podem acessar."
+            detail="Acesso negado. Apenas administradores podem acessar.",
         )
 
 
 # ========== Dashboard ==========
+
 
 @router.get("/dashboard", response_model=AdminDashboard)
 async def get_dashboard(current_user: CurrentUser, db: DbSession):
@@ -49,12 +50,8 @@ async def get_dashboard(current_user: CurrentUser, db: DbSession):
 
     # Count users
     total_users = await db.scalar(select(func.count(User.id)))
-    active_users = await db.scalar(
-        select(func.count(User.id)).where(User.is_active == True)
-    )
-    admin_users = await db.scalar(
-        select(func.count(User.id)).where(User.is_admin == True)
-    )
+    active_users = await db.scalar(select(func.count(User.id)).where(User.is_active == True))
+    admin_users = await db.scalar(select(func.count(User.id)).where(User.is_admin == True))
 
     # Count licenses
     total_licenses = await db.scalar(select(func.count(License.id)))
@@ -77,6 +74,7 @@ async def get_dashboard(current_user: CurrentUser, db: DbSession):
 
 # ========== Licenses ==========
 
+
 @router.get("/licenses", response_model=list[LicenseResponse])
 async def list_licenses(current_user: CurrentUser, db: DbSession):
     """Lista todas as licencas"""
@@ -92,7 +90,7 @@ async def list_licenses(current_user: CurrentUser, db: DbSession):
 
     # Batch: contar usuarios por licenca
     user_counts_result = await db.execute(
-        select(User.license_id, func.count(User.id).label('count'))
+        select(User.license_id, func.count(User.id).label("count"))
         .where(User.license_id.in_(license_ids))
         .group_by(User.license_id)
     )
@@ -108,9 +106,7 @@ async def list_licenses(current_user: CurrentUser, db: DbSession):
     member_user_ids = [m.user_id for m in all_members if m.user_id]
     users_by_id = {}
     if member_user_ids:
-        users_result = await db.execute(
-            select(User).where(User.id.in_(member_user_ids))
-        )
+        users_result = await db.execute(select(User).where(User.id.in_(member_user_ids)))
         users_by_id = {u.id: u for u in users_result.scalars().all()}
 
     # Agrupar membros por licenca
@@ -122,9 +118,7 @@ async def list_licenses(current_user: CurrentUser, db: DbSession):
     owner_ids = [lic.owner_user_id for lic in licenses if lic.owner_user_id]
     owners_by_id = {}
     if owner_ids:
-        owners_result = await db.execute(
-            select(User).where(User.id.in_(owner_ids))
-        )
+        owners_result = await db.execute(select(User).where(User.id.in_(owner_ids)))
         owners_by_id = {u.id: u for u in owners_result.scalars().all()}
 
     response = []
@@ -133,14 +127,16 @@ async def list_licenses(current_user: CurrentUser, db: DbSession):
         members_summary = []
         for m in members:
             user = users_by_id.get(m.user_id)
-            members_summary.append(HouseholdMemberSummary(
-                id=m.id,
-                user_id=m.user_id,
-                user_name=user.name if user else None,
-                user_email=user.email if user else None,
-                role=m.role,
-                joined_at=m.joined_at,
-            ))
+            members_summary.append(
+                HouseholdMemberSummary(
+                    id=m.id,
+                    user_id=m.user_id,
+                    user_name=user.name if user else None,
+                    user_email=user.email if user else None,
+                    role=m.role,
+                    joined_at=m.joined_at,
+                )
+            )
 
         # Nome do owner
         owner_name = None
@@ -194,9 +190,11 @@ async def create_license(
     existing_user = await db.scalar(select(User).where(User.email == data.owner_email))
     if existing_user:
         # Get current license info
-        current_license = await db.scalar(
-            select(License).where(License.id == existing_user.license_id)
-        ) if existing_user.license_id else None
+        current_license = (
+            await db.scalar(select(License).where(License.id == existing_user.license_id))
+            if existing_user.license_id
+            else None
+        )
 
         # If force_transfer flag is set, proceed with transfer
         if data.force_transfer:
@@ -204,14 +202,10 @@ async def create_license(
             if existing_user.license_id:
                 # Remove household membership
                 await db.execute(
-                    select(HouseholdMember).where(
-                        HouseholdMember.user_id == existing_user.id
-                    )
+                    select(HouseholdMember).where(HouseholdMember.user_id == existing_user.id)
                 )
                 existing_membership = await db.scalar(
-                    select(HouseholdMember).where(
-                        HouseholdMember.user_id == existing_user.id
-                    )
+                    select(HouseholdMember).where(HouseholdMember.user_id == existing_user.id)
                 )
                 if existing_membership:
                     await db.delete(existing_membership)
@@ -231,23 +225,21 @@ async def create_license(
                         "user_name": existing_user.name,
                         "current_license_id": current_license.id if current_license else None,
                         "current_license_code": current_license.code if current_license else None,
-                        "current_license_owner_email": current_license.owner_email if current_license else None,
-                    }
-                }
+                        "current_license_owner_email": current_license.owner_email
+                        if current_license
+                        else None,
+                    },
+                },
             )
 
     # Verificar se ja existe convite pendente para este email
     existing_invite = await db.scalar(
         select(Invitation).where(
-            Invitation.email == data.owner_email,
-            Invitation.status == InvitationStatus.PENDING
+            Invitation.email == data.owner_email, Invitation.status == InvitationStatus.PENDING
         )
     )
     if existing_invite and not data.force_transfer:
-        raise HTTPException(
-            status_code=400,
-            detail="Ja existe um convite pendente para este email"
-        )
+        raise HTTPException(status_code=400, detail="Ja existe um convite pendente para este email")
 
     # Cancel any existing pending invites for this email if force_transfer
     if data.force_transfer and existing_invite:
@@ -325,14 +317,16 @@ async def create_license(
             owner_user_id=existing_user.id,
             owner_name=existing_user.name,
             member_count=1,
-            members=[HouseholdMemberSummary(
-                id=membership.id,
-                user_id=existing_user.id,
-                user_name=existing_user.name,
-                user_email=existing_user.email,
-                role=membership.role,
-                joined_at=membership.joined_at,
-            )],
+            members=[
+                HouseholdMemberSummary(
+                    id=membership.id,
+                    user_id=existing_user.id,
+                    user_name=existing_user.name,
+                    user_email=existing_user.email,
+                    role=membership.role,
+                    joined_at=membership.joined_at,
+                )
+            ],
         )
 
     # Criar convite automatico para o owner (new user case)
@@ -409,9 +403,7 @@ async def update_license(
     await db.commit()
     await db.refresh(license)
 
-    user_count = await db.scalar(
-        select(func.count(User.id)).where(User.license_id == license.id)
-    )
+    user_count = await db.scalar(select(func.count(User.id)).where(User.license_id == license.id))
 
     # Buscar membros
     members_result = await db.execute(
@@ -426,22 +418,22 @@ async def update_license(
 
     users_by_id = {}
     if user_ids_to_fetch:
-        users_result = await db.execute(
-            select(User).where(User.id.in_(user_ids_to_fetch))
-        )
+        users_result = await db.execute(select(User).where(User.id.in_(user_ids_to_fetch)))
         users_by_id = {u.id: u for u in users_result.scalars().all()}
 
     members_summary = []
     for m in members:
         user = users_by_id.get(m.user_id)
-        members_summary.append(HouseholdMemberSummary(
-            id=m.id,
-            user_id=m.user_id,
-            user_name=user.name if user else None,
-            user_email=user.email if user else None,
-            role=m.role,
-            joined_at=m.joined_at,
-        ))
+        members_summary.append(
+            HouseholdMemberSummary(
+                id=m.id,
+                user_id=m.user_id,
+                user_name=user.name if user else None,
+                user_email=user.email if user else None,
+                role=m.role,
+                joined_at=m.joined_at,
+            )
+        )
 
     owner_name = None
     if license.owner_user_id:
@@ -494,19 +486,14 @@ async def delete_license(
         raise HTTPException(status_code=404, detail="Licenca nao encontrada")
 
     # Check if license has users
-    user_count = await db.scalar(
-        select(func.count(User.id)).where(User.license_id == license.id)
-    )
+    user_count = await db.scalar(select(func.count(User.id)).where(User.license_id == license.id))
     if user_count > 0:
         raise HTTPException(
-            status_code=400,
-            detail=f"Nao e possivel deletar. {user_count} usuario(s) vinculado(s)."
+            status_code=400, detail=f"Nao e possivel deletar. {user_count} usuario(s) vinculado(s)."
         )
 
     # Delete related invitations first
-    await db.execute(
-        delete(Invitation).where(Invitation.license_id == license.id)
-    )
+    await db.execute(delete(Invitation).where(Invitation.license_id == license.id))
 
     await db.delete(license)
     await db.commit()
@@ -539,7 +526,7 @@ async def resend_license_invitation(
     invitation = await db.scalar(
         select(Invitation).where(
             Invitation.license_id == license_id,
-            Invitation.status.in_([InvitationStatus.PENDING, InvitationStatus.EXPIRED])
+            Invitation.status.in_([InvitationStatus.PENDING, InvitationStatus.EXPIRED]),
         )
     )
 
@@ -573,11 +560,12 @@ async def resend_license_invitation(
 
     return {
         "message": "Convite reenviado com sucesso",
-        "expires_at": invitation.expires_at.isoformat()
+        "expires_at": invitation.expires_at.isoformat(),
     }
 
 
 # ========== Users ==========
+
 
 @router.get("/users", response_model=list[UserListResponse])
 async def list_users(current_user: CurrentUser, db: DbSession):
@@ -607,9 +595,7 @@ async def create_user(
     # Validate license if provided
     license = None
     if data.license_id:
-        license = await db.scalar(
-            select(License).where(License.id == data.license_id)
-        )
+        license = await db.scalar(select(License).where(License.id == data.license_id))
         if not license:
             raise HTTPException(status_code=400, detail="Licenca nao encontrada")
 
@@ -638,8 +624,7 @@ async def create_user(
     # No password - create invitation and send email
     existing_invite = await db.scalar(
         select(Invitation).where(
-            Invitation.email == data.email,
-            Invitation.status == InvitationStatus.PENDING
+            Invitation.email == data.email, Invitation.status == InvitationStatus.PENDING
         )
     )
     if existing_invite:
@@ -799,14 +784,13 @@ async def send_password_reset(
 
 # ========== Invitations ==========
 
+
 @router.get("/invitations", response_model=list[InvitationListResponse])
 async def list_invitations(current_user: CurrentUser, db: DbSession):
     """Lista todos os convites"""
     require_admin(current_user)
 
-    result = await db.execute(
-        select(Invitation).order_by(Invitation.created_at.desc())
-    )
+    result = await db.execute(select(Invitation).order_by(Invitation.created_at.desc()))
     invitations = result.scalars().all()
 
     if not invitations:
@@ -816,39 +800,39 @@ async def list_invitations(current_user: CurrentUser, db: DbSession):
     license_ids = [inv.license_id for inv in invitations if inv.license_id]
     licenses_by_id = {}
     if license_ids:
-        lic_result = await db.execute(
-            select(License).where(License.id.in_(license_ids))
-        )
+        lic_result = await db.execute(select(License).where(License.id.in_(license_ids)))
         licenses_by_id = {lic.id: lic for lic in lic_result.scalars().all()}
 
     # Batch: buscar usuarios que convidaram
     invited_by_ids = [inv.invited_by_id for inv in invitations if inv.invited_by_id]
     users_by_id = {}
     if invited_by_ids:
-        users_result = await db.execute(
-            select(User).where(User.id.in_(invited_by_ids))
-        )
+        users_result = await db.execute(select(User).where(User.id.in_(invited_by_ids)))
         users_by_id = {u.id: u for u in users_result.scalars().all()}
 
     response = []
     for inv in invitations:
         license = licenses_by_id.get(inv.license_id)
         invited_by = users_by_id.get(inv.invited_by_id)
-        response.append(InvitationListResponse(
-            id=inv.id,
-            email=inv.email,
-            status=inv.status,
-            license_id=inv.license_id,
-            license_code=license.code if license else None,
-            invited_by_name=invited_by.name if invited_by else "Desconhecido",
-            expires_at=inv.expires_at,
-            created_at=inv.created_at,
-        ))
+        response.append(
+            InvitationListResponse(
+                id=inv.id,
+                email=inv.email,
+                status=inv.status,
+                license_id=inv.license_id,
+                license_code=license.code if license else None,
+                invited_by_name=invited_by.name if invited_by else "Desconhecido",
+                expires_at=inv.expires_at,
+                created_at=inv.created_at,
+            )
+        )
 
     return response
 
 
-@router.post("/invitations", response_model=InvitationListResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/invitations", response_model=InvitationListResponse, status_code=status.HTTP_201_CREATED
+)
 async def create_invitation(
     data: InvitationCreate,
     current_user: CurrentUser,
@@ -865,8 +849,7 @@ async def create_invitation(
     # Verificar se ja existe convite pendente
     existing_invite = await db.scalar(
         select(Invitation).where(
-            Invitation.email == data.email,
-            Invitation.status == InvitationStatus.PENDING
+            Invitation.email == data.email, Invitation.status == InvitationStatus.PENDING
         )
     )
     if existing_invite:
@@ -957,7 +940,7 @@ async def resend_invitation(
 
     return {
         "message": "Email reenviado e expiracao resetada",
-        "expires_at": invitation.expires_at.isoformat()
+        "expires_at": invitation.expires_at.isoformat(),
     }
 
 

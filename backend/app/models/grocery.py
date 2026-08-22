@@ -11,37 +11,40 @@ from ..core.database import Base
 
 class GroceryCategory(str, Enum):
     """Categorias de produtos de mercado"""
+
     # Alimentos
     FRUITS_VEGETABLES = "fruits_vegetables"  # Frutas e Verduras
-    MEAT_FISH = "meat_fish"                  # Carnes e Peixes
-    DAIRY = "dairy"                          # Laticínios
-    BAKERY = "bakery"                        # Padaria
-    BEVERAGES = "beverages"                  # Bebidas
-    SNACKS = "snacks"                        # Lanches/Salgadinhos
-    FROZEN = "frozen"                        # Congelados
-    CANNED = "canned"                        # Enlatados
-    GRAINS_PASTA = "grains_pasta"            # Grãos e Massas
-    GRAINS = "grains"                        # Grãos (arroz, feijão)
-    CONDIMENTS = "condiments"                # Temperos
+    MEAT_FISH = "meat_fish"  # Carnes e Peixes
+    DAIRY = "dairy"  # Laticínios
+    BAKERY = "bakery"  # Padaria
+    BEVERAGES = "beverages"  # Bebidas
+    SNACKS = "snacks"  # Lanches/Salgadinhos
+    FROZEN = "frozen"  # Congelados
+    CANNED = "canned"  # Enlatados
+    GRAINS_PASTA = "grains_pasta"  # Grãos e Massas
+    GRAINS = "grains"  # Grãos (arroz, feijão)
+    CONDIMENTS = "condiments"  # Temperos
 
     # Não-Alimentos
-    CLEANING = "cleaning"                    # Limpeza
-    HYGIENE = "hygiene"                      # Higiene Pessoal
-    PERSONAL_CARE = "personal_care"          # Cuidados Pessoais
-    BABY = "baby"                            # Bebê
-    PET = "pet"                              # Pet
-    HOUSEHOLD = "household"                  # Utilidades
-    OTHER = "other"                          # Outros
+    CLEANING = "cleaning"  # Limpeza
+    HYGIENE = "hygiene"  # Higiene Pessoal
+    PERSONAL_CARE = "personal_care"  # Cuidados Pessoais
+    BABY = "baby"  # Bebê
+    PET = "pet"  # Pet
+    HOUSEHOLD = "household"  # Utilidades
+    OTHER = "other"  # Outros
 
 
 class NecessityType(str, Enum):
     """Tipo de necessidade do produto"""
-    ESSENTIAL = "essential"          # Necessidades básicas
+
+    ESSENTIAL = "essential"  # Necessidades básicas
     NON_ESSENTIAL = "non_essential"  # Supérfluos (doces, refrigerantes, etc.)
 
 
 class ShoppingListStatus(str, Enum):
     """Status da lista de compras"""
+
     DRAFT = "draft"
     ACTIVE = "active"
     COMPLETED = "completed"
@@ -50,6 +53,7 @@ class ShoppingListStatus(str, Enum):
 
 class ShoppingListSource(str, Enum):
     """Origem da lista de compras"""
+
     MANUAL = "manual"
     AI_GENERATED = "ai_generated"
     HISTORY = "history"
@@ -85,6 +89,7 @@ NECESSITY_TYPE_DISPLAY = {
 
 class GroceryProduct(Base):
     """Catálogo de produtos de mercado"""
+
     __tablename__ = "grocery_products"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -122,12 +127,11 @@ class GroceryProduct(Base):
 
 class GroceryPurchase(Base):
     """Itens comprados (vinculados às transações)"""
+
     __tablename__ = "grocery_purchases"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), index=True
-    )
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     transaction_id: Mapped[int | None] = mapped_column(
         ForeignKey("transactions.id", ondelete="SET NULL"), index=True
     )
@@ -157,14 +161,18 @@ class GroceryPurchase(Base):
 
     # Metadata
     purchase_date: Mapped[date] = mapped_column(Date, index=True)
-    ownership_type: Mapped[str] = mapped_column(String(20), default="personal")  # personal/household
+    ownership_type: Mapped[str] = mapped_column(
+        String(20), default="personal"
+    )  # personal/household
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
     # Relationships
     user: Mapped["User"] = relationship(lazy="noload")
     transaction: Mapped["Transaction | None"] = relationship(lazy="noload")
     document: Mapped["Document | None"] = relationship(lazy="noload")
-    receipt: Mapped["Receipt | None"] = relationship(back_populates="grocery_purchase", lazy="noload")
+    receipt: Mapped["Receipt | None"] = relationship(
+        back_populates="grocery_purchase", lazy="noload"
+    )
     product: Mapped["GroceryProduct | None"] = relationship(
         back_populates="purchases", lazy="noload"
     )
@@ -185,6 +193,7 @@ class GroceryPurchase(Base):
 
 class GroceryPriceHistory(Base):
     """Histórico de preços dos produtos"""
+
     __tablename__ = "grocery_price_history"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -200,9 +209,7 @@ class GroceryPriceHistory(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
     # Relationships
-    product: Mapped["GroceryProduct"] = relationship(
-        back_populates="price_history", lazy="noload"
-    )
+    product: Mapped["GroceryProduct"] = relationship(back_populates="price_history", lazy="noload")
     merchant: Mapped["Merchant | None"] = relationship(lazy="noload")
 
     @property
@@ -212,12 +219,11 @@ class GroceryPriceHistory(Base):
 
 class ShoppingList(Base):
     """Listas de compras (compartilhadas no household)"""
+
     __tablename__ = "shopping_lists"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), index=True
-    )
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     license_id: Mapped[int | None] = mapped_column(
         ForeignKey("licenses.id", ondelete="CASCADE"), index=True
     )  # Compartilhada com household via license
@@ -227,9 +233,7 @@ class ShoppingList(Base):
     ownership_type: Mapped[str] = mapped_column(String(20), default="household")  # sempre household
     notes: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=utc_now, onupdate=utc_now
-    )
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, onupdate=utc_now)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime)
 
     # Relationships
@@ -260,8 +264,7 @@ class ShoppingList(Base):
         if not self.items:
             return 0
         return sum(
-            float(item.estimated_price or 0) * float(item.quantity or 1)
-            for item in self.items
+            float(item.estimated_price or 0) * float(item.quantity or 1) for item in self.items
         )
 
     @property
@@ -271,6 +274,7 @@ class ShoppingList(Base):
 
 class ShoppingListItem(Base):
     """Itens da lista de compras"""
+
     __tablename__ = "shopping_list_items"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -292,9 +296,7 @@ class ShoppingListItem(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
     # Relationships
-    shopping_list: Mapped["ShoppingList"] = relationship(
-        back_populates="items", lazy="noload"
-    )
+    shopping_list: Mapped["ShoppingList"] = relationship(back_populates="items", lazy="noload")
     product: Mapped["GroceryProduct | None"] = relationship(
         back_populates="shopping_list_items", lazy="noload"
     )

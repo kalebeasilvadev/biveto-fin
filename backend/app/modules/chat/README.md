@@ -39,8 +39,11 @@ chat/
 ```python
 from app.modules.chat import (
     router,
-    ChatMessage, ChatRequest, ChatResponse,
-    ConversationSummary, MessageRole,
+    ChatMessage,
+    ChatRequest,
+    ChatResponse,
+    ConversationSummary,
+    MessageRole,
     FinancialAgentService,
 )
 ```

@@ -1,4 +1,5 @@
 """Mistral provider para extracao de documentos via OCR especializado"""
+
 import asyncio
 import io
 from pathlib import Path
@@ -71,9 +72,9 @@ def compress_image_sync(image_bytes: bytes, max_size_mb: float = MAX_IMAGE_SIZE_
         img = Image.open(io.BytesIO(image_bytes))
 
         # Converter para RGB se necessario
-        if img.mode in ('RGBA', 'P'):
+        if img.mode in ("RGBA", "P"):
             old_img = img
-            img = img.convert('RGB')
+            img = img.convert("RGB")
             old_img.close()
 
         # Usar um unico buffer reutilizado
@@ -83,10 +84,12 @@ def compress_image_sync(image_bytes: bytes, max_size_mb: float = MAX_IMAGE_SIZE_
         for quality in range(85, 25, -10):
             buffer.seek(0)
             buffer.truncate()
-            img.save(buffer, format='JPEG', quality=quality, optimize=True)
+            img.save(buffer, format="JPEG", quality=quality, optimize=True)
             if buffer.tell() <= max_size:
                 result = buffer.getvalue()
-                print(f"[MistralProvider] Imagem comprimida: {len(image_bytes)} -> {len(result)} bytes (quality={quality})")
+                print(
+                    f"[MistralProvider] Imagem comprimida: {len(image_bytes)} -> {len(result)} bytes (quality={quality})"
+                )
                 return result
 
         # Se ainda muito grande, redimensionar
@@ -96,11 +99,13 @@ def compress_image_sync(image_bytes: bytes, max_size_mb: float = MAX_IMAGE_SIZE_
             resized = img.resize(new_size, Image.Resampling.LANCZOS)
             buffer.seek(0)
             buffer.truncate()
-            resized.save(buffer, format='JPEG', quality=70, optimize=True)
+            resized.save(buffer, format="JPEG", quality=70, optimize=True)
             resized.close()  # Fechar imagem redimensionada imediatamente
             if buffer.tell() <= max_size:
                 result = buffer.getvalue()
-                print(f"[MistralProvider] Imagem redimensionada e comprimida: {len(image_bytes)} -> {len(result)} bytes (scale={scale})")
+                print(
+                    f"[MistralProvider] Imagem redimensionada e comprimida: {len(image_bytes)} -> {len(result)} bytes (scale={scale})"
+                )
                 return result
 
         # Retornar ultima tentativa mesmo se ainda grande
@@ -125,12 +130,18 @@ def compress_image_sync(image_bytes: bytes, max_size_mb: float = MAX_IMAGE_SIZE_
 class MistralProvider(BaseProvider):
     """Provider Mistral para extracao via OCR especializado + LLM"""
 
-    def __init__(self, model: str | None = None, prompt: str = "", parse_response_fn=None, use_classifier: bool = True):
+    def __init__(
+        self,
+        model: str | None = None,
+        prompt: str = "",
+        parse_response_fn=None,
+        use_classifier: bool = True,
+    ):
         super().__init__(model or settings.mistral_llm_model)
         self.max_retries = DEFAULT_MAX_RETRIES
         self.retry_delay = DEFAULT_RETRY_DELAY
         self.prompt = prompt
-        self._parse_response = parse_response_fn or (lambda x: {'items': [], 'error': 'No parser'})
+        self._parse_response = parse_response_fn or (lambda x: {"items": [], "error": "No parser"})
         self.classifier = DocumentClassifier() if use_classifier else None
         print(f"[MistralProvider] Initialized with classifier={use_classifier}")
 
@@ -141,7 +152,7 @@ class MistralProvider(BaseProvider):
                 "file_name": filename,
                 "content": pdf_content,
             },
-            purpose="ocr"
+            purpose="ocr",
         )
 
     def _ocr_sync(self, client, file_id: str):
@@ -152,22 +163,17 @@ class MistralProvider(BaseProvider):
                 "type": "file",
                 "file_id": file_id,
             },
-            include_image_base64=False
+            include_image_base64=False,
         )
 
     def _chat_sync(self, client, full_prompt: str):
         """Chat sincrono com LLM"""
         return client.chat.complete(
             model=settings.mistral_llm_model,
-            messages=[
-                {
-                    "role": "user",
-                    "content": full_prompt
-                }
-            ],
+            messages=[{"role": "user", "content": full_prompt}],
             response_format={"type": "json_object"},
             temperature=0.0,
-            max_tokens=32000  # Aumentado para cupons grandes com muitos itens
+            max_tokens=32000,  # Aumentado para cupons grandes com muitos itens
         )
 
     async def _get_prompt(self, ocr_text: str = "") -> tuple[str, str]:
@@ -215,7 +221,9 @@ class MistralProvider(BaseProvider):
             print(f"[MistralProvider] Prompt base carregado: {prompt_path.name}")
         else:
             # Fallback: prompt generico
-            print(f"[MistralProvider] AVISO: Prompt {prompt_path} nao encontrado, usando self.prompt")
+            print(
+                f"[MistralProvider] AVISO: Prompt {prompt_path} nao encontrado, usando self.prompt"
+            )
             prompt_text = self.prompt
 
         # Se for fatura de cartão, tentar carregar prompt específico do banco
@@ -229,7 +237,9 @@ class MistralProvider(BaseProvider):
                     prompt_text = f"{prompt_text}\n\n{bank_prompt}"
                     print(f"[MistralProvider] Prompt específico do banco '{bank_name}' adicionado")
                 else:
-                    print(f"[MistralProvider] Banco '{bank_name}' detectado mas sem prompt específico")
+                    print(
+                        f"[MistralProvider] Banco '{bank_name}' detectado mas sem prompt específico"
+                    )
 
         return prompt_text, doc_type
 
@@ -244,23 +254,25 @@ class MistralProvider(BaseProvider):
 
         # Mapeamento de indicadores para nomes de bancos
         bank_indicators = {
-            'itau': ['banco itau', 'itaú', 'itau unibanco', 'financeira itau cbd'],
-            'nubank': ['nubank', 'nu pagamentos'],
-            'bradesco': ['bradesco', 'banco bradesco'],
-            'santander': ['santander', 'banco santander'],
-            'inter': ['banco inter', 'inter'],
-            'c6': ['c6 bank', 'banco c6', 'c6bank'],
-            'picpay': ['picpay', 'pic pay'],
-            'neon': ['neon', 'banco neon'],
-            'next': ['next', 'banco next'],
-            'will': ['will bank', 'banco will'],
-            'pan': ['banco pan', 'bancopan'],
+            "itau": ["banco itau", "itaú", "itau unibanco", "financeira itau cbd"],
+            "nubank": ["nubank", "nu pagamentos"],
+            "bradesco": ["bradesco", "banco bradesco"],
+            "santander": ["santander", "banco santander"],
+            "inter": ["banco inter", "inter"],
+            "c6": ["c6 bank", "banco c6", "c6bank"],
+            "picpay": ["picpay", "pic pay"],
+            "neon": ["neon", "banco neon"],
+            "next": ["next", "banco next"],
+            "will": ["will bank", "banco will"],
+            "pan": ["banco pan", "bancopan"],
         }
 
         for bank_name, indicators in bank_indicators.items():
             for indicator in indicators:
                 if indicator in text_lower:
-                    print(f"[MistralProvider] Banco detectado: {bank_name} (indicador: '{indicator}')")
+                    print(
+                        f"[MistralProvider] Banco detectado: {bank_name} (indicador: '{indicator}')"
+                    )
                     return bank_name
 
         return None
@@ -312,7 +324,9 @@ class MistralProvider(BaseProvider):
 
         return "cupom_fiscal" if cupom_score > fatura_score else "fatura_cartao"
 
-    async def extract_from_image(self, image_content: bytes, mime_type: str, password: str | None = None) -> dict:
+    async def extract_from_image(
+        self, image_content: bytes, mime_type: str, password: str | None = None
+    ) -> dict:
         """Converte imagem para PDF e processa via OCR
 
         Args:
@@ -344,7 +358,9 @@ class MistralProvider(BaseProvider):
 
         from PIL import Image
 
-        def _split_long_image(img: Image.Image, max_ratio: float = 3.0) -> tuple[list[Image.Image], bool]:
+        def _split_long_image(
+            img: Image.Image, max_ratio: float = 3.0
+        ) -> tuple[list[Image.Image], bool]:
             """
             Divide uma imagem muito longa em seções verticais menores.
             Retorna (sections, was_split) para saber se deve fechar a imagem original.
@@ -365,12 +381,16 @@ class MistralProvider(BaseProvider):
 
             for i in range(num_sections):
                 top = max(0, i * section_height - (overlap if i > 0 else 0))
-                bottom = min(height, (i + 1) * section_height + (overlap if i < num_sections - 1 else 0))
+                bottom = min(
+                    height, (i + 1) * section_height + (overlap if i < num_sections - 1 else 0)
+                )
 
                 section = img.crop((0, top, width, bottom))
                 sections.append(section)
 
-            print(f"[MistralProvider] Imagem longa detectada (ratio={ratio:.1f}), dividida em {len(sections)} seções")
+            print(
+                f"[MistralProvider] Imagem longa detectada (ratio={ratio:.1f}), dividida em {len(sections)} seções"
+            )
             return sections, True
 
         def _convert():
@@ -383,9 +403,9 @@ class MistralProvider(BaseProvider):
                     img_content = compress_image_sync(img_content)
 
                     img = Image.open(io.BytesIO(img_content))
-                    if img.mode in ('RGBA', 'P'):
+                    if img.mode in ("RGBA", "P"):
                         old_img = img
-                        img = img.convert('RGB')
+                        img = img.convert("RGB")
                         old_img.close()
 
                     # Dividir se for muito longa
@@ -409,9 +429,11 @@ class MistralProvider(BaseProvider):
             output = io.BytesIO()
             try:
                 if len(pdf_images) == 1:
-                    pdf_images[0].save(output, format='PDF')
+                    pdf_images[0].save(output, format="PDF")
                 else:
-                    pdf_images[0].save(output, format='PDF', save_all=True, append_images=pdf_images[1:])
+                    pdf_images[0].save(
+                        output, format="PDF", save_all=True, append_images=pdf_images[1:]
+                    )
                 result = output.getvalue()
             finally:
                 # Fechar todas as imagens do PDF
@@ -427,7 +449,9 @@ class MistralProvider(BaseProvider):
 
         return await asyncio.to_thread(_convert)
 
-    async def _split_long_pdf(self, pdf_content: bytes, max_ratio: float = 3.0, password: str | None = None) -> bytes:
+    async def _split_long_pdf(
+        self, pdf_content: bytes, max_ratio: float = 3.0, password: str | None = None
+    ) -> bytes:
         """
         Detecta e divide PDFs com páginas muito longas.
         Otimizado para memoria: processa pagina por pagina e libera recursos imediatamente.
@@ -498,7 +522,9 @@ class MistralProvider(BaseProvider):
                 doc.close()
                 return None  # Force fallback to convert_pdf_to_images
 
-            print(f"[MistralProvider] PDF com página longa detectado, processando {len(doc)} página(s)...")
+            print(
+                f"[MistralProvider] PDF com página longa detectado, processando {len(doc)} página(s)..."
+            )
 
             # Segunda passagem: processar pagina por pagina
             final_images = []
@@ -528,13 +554,18 @@ class MistralProvider(BaseProvider):
 
                         for i in range(num_sections):
                             top = max(0, i * section_height - (overlap if i > 0 else 0))
-                            bottom = min(height, (i + 1) * section_height + (overlap if i < num_sections - 1 else 0))
+                            bottom = min(
+                                height,
+                                (i + 1) * section_height + (overlap if i < num_sections - 1 else 0),
+                            )
                             section = img.crop((0, top, width, bottom))
                             final_images.append(section)
 
                         # Fechar imagem original apos dividir (as sections sao novas)
                         img.close()
-                        print(f"[MistralProvider] Página {page_num + 1} dividida em {num_sections} seções")
+                        print(
+                            f"[MistralProvider] Página {page_num + 1} dividida em {num_sections} seções"
+                        )
 
                     # GC periodico
                     if (page_num + 1) % 3 == 0:
@@ -545,9 +576,11 @@ class MistralProvider(BaseProvider):
                 # Reconverter para PDF
                 output = io.BytesIO()
                 if len(final_images) == 1:
-                    final_images[0].save(output, format='PDF')
+                    final_images[0].save(output, format="PDF")
                 else:
-                    final_images[0].save(output, format='PDF', save_all=True, append_images=final_images[1:])
+                    final_images[0].save(
+                        output, format="PDF", save_all=True, append_images=final_images[1:]
+                    )
 
                 result = output.getvalue()
                 print(f"[MistralProvider] PDF recriado com {len(final_images)} páginas")
@@ -586,7 +619,9 @@ class MistralProvider(BaseProvider):
             base += f"\n{bank_prompt}"
         return base
 
-    def _ocr_with_annotation_sync(self, client, file_id: str, annotation_format, annotation_prompt: str):
+    def _ocr_with_annotation_sync(
+        self, client, file_id: str, annotation_format, annotation_prompt: str
+    ):
         """OCR com document_annotation - extrai texto + dados estruturados em uma chamada."""
         return client.ocr.process(
             model=settings.mistral_ocr_model,
@@ -599,7 +634,9 @@ class MistralProvider(BaseProvider):
             document_annotation_prompt=annotation_prompt,
         )
 
-    async def _try_annotation_extraction(self, client, uploaded_file, bank_prompt: str = "") -> tuple[dict | None, str]:
+    async def _try_annotation_extraction(
+        self, client, uploaded_file, bank_prompt: str = ""
+    ) -> tuple[dict | None, str]:
         """
         Try extracting with document_annotation (single API call).
         Returns (result, ocr_text) or (None, ocr_text) if annotation failed.
@@ -608,6 +645,7 @@ class MistralProvider(BaseProvider):
 
         try:
             from mistralai.extra import response_format_from_pydantic_model
+
             annotation_format = response_format_from_pydantic_model(AnnotationExtracao)
         except (ImportError, Exception) as e:
             print(f"[MistralProvider] Cannot create annotation format: {e}")
@@ -619,8 +657,11 @@ class MistralProvider(BaseProvider):
 
         try:
             ocr_response = await asyncio.to_thread(
-                self._ocr_with_annotation_sync, client, uploaded_file.id,
-                annotation_format, annotation_prompt
+                self._ocr_with_annotation_sync,
+                client,
+                uploaded_file.id,
+                annotation_format,
+                annotation_prompt,
             )
         except Exception as e:
             print(f"[MistralProvider] document_annotation call failed: {type(e).__name__}: {e}")
@@ -628,20 +669,24 @@ class MistralProvider(BaseProvider):
 
         # Extract OCR text (always available)
         ocr_text = ""
-        if hasattr(ocr_response, 'pages'):
+        if hasattr(ocr_response, "pages"):
             for page in ocr_response.pages:
-                if hasattr(page, 'markdown'):
+                if hasattr(page, "markdown"):
                     ocr_text += page.markdown + "\n\n"
 
         # Check for annotation result
-        annotation_json = getattr(ocr_response, 'document_annotation', None)
+        annotation_json = getattr(ocr_response, "document_annotation", None)
         # Handle UNSET sentinel from Mistral SDK
-        if annotation_json is None or (hasattr(annotation_json, '__class__') and 'UNSET' in str(type(annotation_json))):
+        if annotation_json is None or (
+            hasattr(annotation_json, "__class__") and "UNSET" in str(type(annotation_json))
+        ):
             print("[MistralProvider] document_annotation returned no structured data")
             return None, ocr_text
 
         if not isinstance(annotation_json, str) or not annotation_json.strip():
-            print(f"[MistralProvider] document_annotation empty or invalid type: {type(annotation_json)}")
+            print(
+                f"[MistralProvider] document_annotation empty or invalid type: {type(annotation_json)}"
+            )
             return None, ocr_text
 
         print(f"[MistralProvider] document_annotation returned {len(annotation_json)} chars")
@@ -650,35 +695,44 @@ class MistralProvider(BaseProvider):
         # Parse through existing parser (handles normalization, validation, etc.)
         result = self._parse_response(annotation_json)
 
-        if not result.get('items'):
+        if not result.get("items"):
             print("[MistralProvider] document_annotation parsed but no items found")
             return None, ocr_text
 
         # Validate sum
-        card_info = result.get('card_info') or {}
-        total_amount = card_info.get('total_amount')
+        card_info = result.get("card_info") or {}
+        total_amount = card_info.get("total_amount")
         items_sum = sum(
-            item.get('amount', 0) for item in result['items']
-            if item.get('amount', 0) > 0
+            item.get("amount", 0) for item in result["items"] if item.get("amount", 0) > 0
         )
 
         if total_amount and abs(total_amount - items_sum) <= 100:
-            print(f"[MistralProvider] ✅ document_annotation SUCCESS: {len(result['items'])} items, "
-                  f"sum={items_sum:.2f}, total={total_amount:.2f}, diff={abs(total_amount - items_sum):.2f}")
-            result['_ocr_text'] = ocr_text
-            result['_ocr_text_preview'] = ocr_text[:500] + "..." if len(ocr_text) > 500 else ocr_text
+            print(
+                f"[MistralProvider] ✅ document_annotation SUCCESS: {len(result['items'])} items, "
+                f"sum={items_sum:.2f}, total={total_amount:.2f}, diff={abs(total_amount - items_sum):.2f}"
+            )
+            result["_ocr_text"] = ocr_text
+            result["_ocr_text_preview"] = (
+                ocr_text[:500] + "..." if len(ocr_text) > 500 else ocr_text
+            )
             return result, ocr_text
         else:
             diff = abs(total_amount - items_sum) if total_amount else 0
-            print(f"[MistralProvider] ⚠️ document_annotation sum mismatch: "
-                  f"sum={items_sum:.2f}, total={total_amount}, diff={diff:.2f} (>R$100) — falling back to LLM")
+            print(
+                f"[MistralProvider] ⚠️ document_annotation sum mismatch: "
+                f"sum={items_sum:.2f}, total={total_amount}, diff={diff:.2f} (>R$100) — falling back to LLM"
+            )
             # Return annotation result as candidate (might still be better than LLM)
-            result['_ocr_text'] = ocr_text
-            result['_ocr_text_preview'] = ocr_text[:500] + "..." if len(ocr_text) > 500 else ocr_text
-            result['_annotation_candidate'] = True
+            result["_ocr_text"] = ocr_text
+            result["_ocr_text_preview"] = (
+                ocr_text[:500] + "..." if len(ocr_text) > 500 else ocr_text
+            )
+            result["_annotation_candidate"] = True
             return result, ocr_text
 
-    async def extract_from_pdf(self, pdf_content: bytes, filename: str = "document.pdf", password: str | None = None) -> dict:
+    async def extract_from_pdf(
+        self, pdf_content: bytes, filename: str = "document.pdf", password: str | None = None
+    ) -> dict:
         """
         Extrai dados de um PDF usando Mistral OCR.
 
@@ -706,7 +760,7 @@ class MistralProvider(BaseProvider):
         try:
             client = await get_mistral_client()
         except (ValueError, ImportError) as e:
-            return {'items': [], 'card_info': None, 'document_type': None, 'error': str(e)}
+            return {"items": [], "card_info": None, "document_type": None, "error": str(e)}
 
         try:
             # Step 1: Upload PDF (single upload, reused for annotation and fallback)
@@ -724,28 +778,35 @@ class MistralProvider(BaseProvider):
 
             # If annotation returned no OCR text, do a separate OCR call (reuse file_id)
             if not ocr_text.strip():
-                print("[MistralProvider] Annotation didn't return OCR text, doing separate OCR (reusing file_id)...")
-                ocr_response = await asyncio.to_thread(
-                    self._ocr_sync, client, uploaded_file.id
+                print(
+                    "[MistralProvider] Annotation didn't return OCR text, doing separate OCR (reusing file_id)..."
                 )
-                if hasattr(ocr_response, 'pages'):
+                ocr_response = await asyncio.to_thread(self._ocr_sync, client, uploaded_file.id)
+                if hasattr(ocr_response, "pages"):
                     for page in ocr_response.pages:
-                        if hasattr(page, 'markdown'):
+                        if hasattr(page, "markdown"):
                             ocr_text += page.markdown + "\n\n"
 
             print(f"[MistralProvider] OCR extraiu {len(ocr_text)} caracteres")
             print(f"[MistralProvider] OCR texto preview: {ocr_text[:500]}")
 
             if not ocr_text.strip():
-                return {'items': [], 'card_info': None, 'document_type': None, 'error': 'OCR nao extraiu texto do PDF'}
+                return {
+                    "items": [],
+                    "card_info": None,
+                    "document_type": None,
+                    "error": "OCR nao extraiu texto do PDF",
+                }
 
             # If annotation succeeded with good sum match, return it directly
-            if annotation_result and not annotation_result.get('_annotation_candidate'):
+            if annotation_result and not annotation_result.get("_annotation_candidate"):
                 print("[MistralProvider] Using document_annotation result (perfect match)")
                 return annotation_result
 
             # Step 3: Fallback to OCR text + LLM chat
-            print(f"[MistralProvider] Passo 3: Estruturando com LLM {settings.mistral_llm_model}...")
+            print(
+                f"[MistralProvider] Passo 3: Estruturando com LLM {settings.mistral_llm_model}..."
+            )
 
             prompt, detected_doc_type = await self._get_prompt(ocr_text)
             full_prompt = f"{prompt}\n\n## Texto extraido do PDF pelo OCR:\n\n{ocr_text}"
@@ -755,18 +816,18 @@ class MistralProvider(BaseProvider):
             last_error = None
             for attempt in range(self.max_retries):
                 try:
-                    chat_response = await asyncio.to_thread(
-                        self._chat_sync, client, full_prompt
-                    )
+                    chat_response = await asyncio.to_thread(self._chat_sync, client, full_prompt)
 
                     response_text = chat_response.choices[0].message.content
                     print(f"[MistralProvider] LLM retornou {len(response_text)} caracteres")
 
                     llm_result = self._parse_response(response_text)
 
-                    if llm_result.get('items'):
-                        llm_result['_ocr_text'] = ocr_text
-                        llm_result['_ocr_text_preview'] = ocr_text[:500] + "..." if len(ocr_text) > 500 else ocr_text
+                    if llm_result.get("items"):
+                        llm_result["_ocr_text"] = ocr_text
+                        llm_result["_ocr_text_preview"] = (
+                            ocr_text[:500] + "..." if len(ocr_text) > 500 else ocr_text
+                        )
 
                         # Retry with feedback if sum mismatch
                         llm_result = await self._retry_if_sum_mismatch(
@@ -774,9 +835,9 @@ class MistralProvider(BaseProvider):
                         )
 
                     # Compare annotation vs LLM result — pick the one with better sum match
-                    if annotation_result and annotation_result.get('_annotation_candidate'):
+                    if annotation_result and annotation_result.get("_annotation_candidate"):
                         best = self._pick_best_result(annotation_result, llm_result)
-                        best.pop('_annotation_candidate', None)
+                        best.pop("_annotation_candidate", None)
                         return best
 
                     return llm_result
@@ -784,49 +845,62 @@ class MistralProvider(BaseProvider):
                 except Exception as e:
                     last_error = e
                     if self._is_retryable_error(e) and attempt < self.max_retries - 1:
-                        wait_time = self.retry_delay * (2 ** attempt)
+                        wait_time = self.retry_delay * (2**attempt)
                         print(f"[MistralProvider] Erro retryable, aguardando {wait_time}s...")
                         await asyncio.sleep(wait_time)
                         continue
                     else:
                         # LLM failed — use annotation as fallback if available
-                        if annotation_result and annotation_result.get('items'):
-                            print(f"[MistralProvider] LLM failed ({type(e).__name__}), using annotation fallback ({len(annotation_result['items'])} items)")
-                            annotation_result.pop('_annotation_candidate', None)
+                        if annotation_result and annotation_result.get("items"):
+                            print(
+                                f"[MistralProvider] LLM failed ({type(e).__name__}), using annotation fallback ({len(annotation_result['items'])} items)"
+                            )
+                            annotation_result.pop("_annotation_candidate", None)
                             return annotation_result
                         raise
 
             # If LLM loop exhausted but annotation had a candidate, use it
-            if annotation_result and annotation_result.get('items'):
-                print(f"[MistralProvider] LLM exhausted retries, using annotation fallback ({len(annotation_result['items'])} items)")
-                annotation_result.pop('_annotation_candidate', None)
+            if annotation_result and annotation_result.get("items"):
+                print(
+                    f"[MistralProvider] LLM exhausted retries, using annotation fallback ({len(annotation_result['items'])} items)"
+                )
+                annotation_result.pop("_annotation_candidate", None)
                 return annotation_result
 
-            return {'items': [], 'error': f'Falha apos {self.max_retries} tentativas: {last_error}'}
+            return {"items": [], "error": f"Falha apos {self.max_retries} tentativas: {last_error}"}
 
         except Exception as e:
             print(f"[MistralProvider] Erro: {type(e).__name__}: {str(e)}")
             import traceback
+
             traceback.print_exc()
-            return {'items': [], 'card_info': None, 'document_type': None, 'error': f'Mistral error: {str(e)}'}
+            return {
+                "items": [],
+                "card_info": None,
+                "document_type": None,
+                "error": f"Mistral error: {str(e)}",
+            }
 
     def _pick_best_result(self, result_a: dict, result_b: dict) -> dict:
         """Pick the result with the best sum match to total_amount."""
+
         def _score(result):
-            if not result or not result.get('items'):
-                return float('inf')
-            card_info = result.get('card_info') or {}
-            total = card_info.get('total_amount')
+            if not result or not result.get("items"):
+                return float("inf")
+            card_info = result.get("card_info") or {}
+            total = card_info.get("total_amount")
             if not total:
-                return float('inf')
-            items_sum = sum(i.get('amount', 0) for i in result['items'] if i.get('amount', 0) > 0)
+                return float("inf")
+            items_sum = sum(i.get("amount", 0) for i in result["items"] if i.get("amount", 0) > 0)
             return abs(total - items_sum)
 
         score_a = _score(result_a)
         score_b = _score(result_b)
 
         if score_a <= score_b:
-            print(f"[MistralProvider] Picked result A (annotation): diff={score_a:.2f} vs {score_b:.2f}")
+            print(
+                f"[MistralProvider] Picked result A (annotation): diff={score_a:.2f} vs {score_b:.2f}"
+            )
             return result_a
         else:
             print(f"[MistralProvider] Picked result B (LLM): diff={score_b:.2f} vs {score_a:.2f}")
@@ -837,17 +911,17 @@ class MistralProvider(BaseProvider):
         import re
 
         # Extract all monetary amounts from OCR text (format: 123,45 or 1.234,56)
-        amount_pattern = re.compile(r'(\d{1,3}(?:\.\d{3})*,\d{2})')
+        amount_pattern = re.compile(r"(\d{1,3}(?:\.\d{3})*,\d{2})")
         ocr_amounts = []
         for match in amount_pattern.finditer(ocr_text):
             raw = match.group(1)
             # Convert Brazilian format to float
-            value = float(raw.replace('.', '').replace(',', '.'))
+            value = float(raw.replace(".", "").replace(",", "."))
             if 5 <= value <= 10000:  # Reasonable transaction range
                 ocr_amounts.append(value)
 
         # Get all extracted amounts
-        extracted_amounts = [item.get('amount', 0) for item in extracted_items]
+        extracted_amounts = [item.get("amount", 0) for item in extracted_items]
 
         # Find amounts in OCR that don't match any extracted amount (with tolerance)
         missing = []
@@ -876,9 +950,9 @@ class MistralProvider(BaseProvider):
         results = []
         for amt in unique_missing[:10]:  # Limit to top 10
             # Search for this amount in OCR text to get context
-            amt_str_comma = f"{amt:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+            amt_str_comma = f"{amt:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
             # Also try without thousand separator
-            amt_str_simple = f"{amt:.2f}".replace('.', ',')
+            amt_str_simple = f"{amt:.2f}".replace(".", ",")
 
             context = ""
             for pattern_str in [amt_str_comma, amt_str_simple]:
@@ -886,11 +960,11 @@ class MistralProvider(BaseProvider):
                 if idx >= 0:
                     start = max(0, idx - 40)
                     end = min(len(ocr_text), idx + len(pattern_str) + 5)
-                    context = ocr_text[start:end].replace('\n', ' ').strip()
+                    context = ocr_text[start:end].replace("\n", " ").strip()
                     break
 
             if context:
-                results.append(f"  - R$ {amt:.2f} → contexto OCR: \"{context}\"")
+                results.append(f'  - R$ {amt:.2f} → contexto OCR: "{context}"')
             else:
                 results.append(f"  - R$ {amt:.2f}")
 
@@ -900,26 +974,31 @@ class MistralProvider(BaseProvider):
         self, result: dict, client, full_prompt: str, ocr_text: str
     ) -> dict:
         """Retry LLM extraction once if sum of items diverges from total_amount by > R$50."""
-        card_info = result.get('card_info') or {}
-        total_amount = card_info.get('total_amount')
-        if not total_amount or not result.get('items'):
+        card_info = result.get("card_info") or {}
+        total_amount = card_info.get("total_amount")
+        if not total_amount or not result.get("items"):
             return result
 
         items_sum = sum(
-            item.get('amount', 0) for item in result['items']
-            if item.get('amount', 0) > 0
+            item.get("amount", 0) for item in result["items"] if item.get("amount", 0) > 0
         )
         diff = total_amount - items_sum
 
         if abs(diff) <= 50:
             return result
 
-        print(f"[MistralProvider] Sum mismatch: items_sum={items_sum:.2f}, total={total_amount:.2f}, faltam={diff:.2f}")
+        print(
+            f"[MistralProvider] Sum mismatch: items_sum={items_sum:.2f}, total={total_amount:.2f}, faltam={diff:.2f}"
+        )
         print("[MistralProvider] Retrying with feedback...")
 
         # Identify specific missing amounts from OCR text
-        missing_amounts_info = self._find_missing_amounts_in_ocr(ocr_text, result['items'])
-        missing_details = "\n".join(missing_amounts_info) if missing_amounts_info else "  (não foi possível identificar os valores específicos)"
+        missing_amounts_info = self._find_missing_amounts_in_ocr(ocr_text, result["items"])
+        missing_details = (
+            "\n".join(missing_amounts_info)
+            if missing_amounts_info
+            else "  (não foi possível identificar os valores específicos)"
+        )
 
         feedback = (
             f"\n\n## ⚠️ ERRO NA EXTRAÇÃO ANTERIOR - CORRIJA AGORA\n\n"
@@ -941,39 +1020,43 @@ class MistralProvider(BaseProvider):
         retry_result = None
 
         try:
-            retry_response = await asyncio.to_thread(
-                self._chat_sync, client, retry_prompt
-            )
+            retry_response = await asyncio.to_thread(self._chat_sync, client, retry_prompt)
             retry_text = retry_response.choices[0].message.content
             print(f"[MistralProvider] Retry LLM retornou {len(retry_text)} caracteres")
 
             retry_result = self._parse_response(retry_text)
 
-            if retry_result.get('items'):
+            if retry_result.get("items"):
                 retry_sum = sum(
-                    item.get('amount', 0) for item in retry_result['items']
-                    if item.get('amount', 0) > 0
+                    item.get("amount", 0)
+                    for item in retry_result["items"]
+                    if item.get("amount", 0) > 0
                 )
                 retry_diff = abs(retry_sum - total_amount)
                 original_diff = abs(diff)
 
                 if retry_diff < original_diff:
-                    print(f"[MistralProvider] Retry improved: diff {original_diff:.2f} -> {retry_diff:.2f}")
-                    retry_result['_ocr_text'] = ocr_text
-                    retry_result['_ocr_text_preview'] = ocr_text[:500] + "..." if len(ocr_text) > 500 else ocr_text
+                    print(
+                        f"[MistralProvider] Retry improved: diff {original_diff:.2f} -> {retry_diff:.2f}"
+                    )
+                    retry_result["_ocr_text"] = ocr_text
+                    retry_result["_ocr_text_preview"] = (
+                        ocr_text[:500] + "..." if len(ocr_text) > 500 else ocr_text
+                    )
                     return retry_result
                 else:
-                    print(f"[MistralProvider] Retry did not improve: {retry_diff:.2f} >= {original_diff:.2f}, keeping original")
+                    print(
+                        f"[MistralProvider] Retry did not improve: {retry_diff:.2f} >= {original_diff:.2f}, keeping original"
+                    )
         except Exception as e:
             print(f"[MistralProvider] Retry failed: {e}")
 
         # If retry didn't help enough, try OCR-based recovery
         best_result = result
         best_sum = items_sum
-        if retry_result and retry_result.get('items'):
+        if retry_result and retry_result.get("items"):
             retry_sum_val = sum(
-                item.get('amount', 0) for item in retry_result['items']
-                if item.get('amount', 0) > 0
+                item.get("amount", 0) for item in retry_result["items"] if item.get("amount", 0) > 0
             )
             if abs(retry_sum_val - total_amount) < abs(best_sum - total_amount):
                 best_result = retry_result
@@ -996,11 +1079,11 @@ class MistralProvider(BaseProvider):
         """
         import re
 
-        if not ocr_text or not result.get('items'):
+        if not ocr_text or not result.get("items"):
             return None
 
-        card_info = result.get('card_info') or {}
-        total_amount = card_info.get('total_amount')
+        card_info = result.get("card_info") or {}
+        total_amount = card_info.get("total_amount")
         if not total_amount:
             return None
 
@@ -1008,8 +1091,11 @@ class MistralProvider(BaseProvider):
         ocr_lower = ocr_text.lower()
 
         lancamentos_start = 0
-        for marker in ['lançamentos: compras e saques', 'lancamentos: compras e saques',
-                        'lançamentos:compras e saques']:
+        for marker in [
+            "lançamentos: compras e saques",
+            "lancamentos: compras e saques",
+            "lançamentos:compras e saques",
+        ]:
             idx = ocr_lower.find(marker)
             if idx >= 0:
                 lancamentos_start = idx
@@ -1017,10 +1103,15 @@ class MistralProvider(BaseProvider):
 
         # Find end: "Total dos lançamentos atuais" or "Compras parceladas - próximas faturas"
         lancamentos_end = len(ocr_text)
-        for end_marker in ['total dos lançamentos atuais', 'total dos lancamentos atuais',
-                            'compras parceladas - próximas faturas', 'compras parceladas - proximas faturas',
-                            'compras parceladas-próximas faturas', 'compras parceladas - próximas',
-                            'compras parceladas-próximas']:
+        for end_marker in [
+            "total dos lançamentos atuais",
+            "total dos lancamentos atuais",
+            "compras parceladas - próximas faturas",
+            "compras parceladas - proximas faturas",
+            "compras parceladas-próximas faturas",
+            "compras parceladas - próximas",
+            "compras parceladas-próximas",
+        ]:
             idx = ocr_lower.find(end_marker)
             if idx > lancamentos_start:
                 lancamentos_end = min(lancamentos_end, idx)
@@ -1030,14 +1121,16 @@ class MistralProvider(BaseProvider):
             print("[MistralProvider] OCR recovery: no relevant section found in OCR text")
             return None
 
-        print(f"[MistralProvider] OCR recovery: scanning {len(relevant_text)} chars of relevant OCR text")
+        print(
+            f"[MistralProvider] OCR recovery: scanning {len(relevant_text)} chars of relevant OCR text"
+        )
 
         # Parse transaction lines: DD/MM description amount
         # Itaú format: "09/07 MOTOCHEFE BRASILIA08/12 574,13"
         tx_pattern = re.compile(
-            r'(\d{2}/\d{2})\s+'              # date DD/MM
-            r'(.+?)\s+'                       # description (non-greedy)
-            r'(\d{1,3}(?:\.\d{3})*,\d{2})'   # amount
+            r"(\d{2}/\d{2})\s+"  # date DD/MM
+            r"(.+?)\s+"  # description (non-greedy)
+            r"(\d{1,3}(?:\.\d{3})*,\d{2})"  # amount
         )
 
         ocr_transactions = []
@@ -1045,37 +1138,43 @@ class MistralProvider(BaseProvider):
             date_str = match.group(1)
             desc = match.group(2).strip()
             amount_str = match.group(3)
-            amount = float(amount_str.replace('.', '').replace(',', '.'))
+            amount = float(amount_str.replace(".", "").replace(",", "."))
 
             if amount < 1:
                 continue
 
-            ocr_transactions.append({
-                'date_str': date_str,
-                'description': desc,
-                'amount': amount,
-            })
+            ocr_transactions.append(
+                {
+                    "date_str": date_str,
+                    "description": desc,
+                    "amount": amount,
+                }
+            )
 
         if not ocr_transactions:
             print("[MistralProvider] OCR recovery: no transaction lines found in OCR text")
             return None
 
-        print(f"[MistralProvider] OCR recovery: found {len(ocr_transactions)} transactions in OCR text")
+        print(
+            f"[MistralProvider] OCR recovery: found {len(ocr_transactions)} transactions in OCR text"
+        )
 
         # Find which OCR transactions are missing from extracted items
         extracted_amounts = []
-        for item in result['items']:
-            extracted_amounts.append({
-                'amount': item.get('amount', 0),
-                'used': False,
-            })
+        for item in result["items"]:
+            extracted_amounts.append(
+                {
+                    "amount": item.get("amount", 0),
+                    "used": False,
+                }
+            )
 
         missing_txs = []
         for ocr_tx in ocr_transactions:
             matched = False
             for ext in extracted_amounts:
-                if not ext['used'] and abs(ext['amount'] - ocr_tx['amount']) < 0.02:
-                    ext['used'] = True
+                if not ext["used"] and abs(ext["amount"] - ocr_tx["amount"]) < 0.02:
+                    ext["used"] = True
                     matched = True
                     break
             if not matched:
@@ -1086,12 +1185,12 @@ class MistralProvider(BaseProvider):
             return None
 
         # Build new items from missing transactions
-        invoice_month = card_info.get('invoice_month')
-        invoice_year = card_info.get('invoice_year')
+        invoice_month = card_info.get("invoice_month")
+        invoice_year = card_info.get("invoice_year")
 
         new_items = []
         for tx in missing_txs:
-            day, month = tx['date_str'].split('/')
+            day, month = tx["date_str"].split("/")
             day, month = int(day), int(month)
 
             if invoice_year and invoice_month:
@@ -1102,7 +1201,7 @@ class MistralProvider(BaseProvider):
             date_str = f"{year}-{month:02d}-{day:02d}"
 
             # Parse installment info from description (e.g., "MOTOCHEFE BRASILIA08/12")
-            installment_match = re.search(r'(\d{2})/(\d{2})\s*$', tx['description'])
+            installment_match = re.search(r"(\d{2})/(\d{2})\s*$", tx["description"])
             is_installment = False
             installment_current = None
             installment_total = None
@@ -1113,37 +1212,44 @@ class MistralProvider(BaseProvider):
                 is_installment = True
 
             new_item = {
-                'description': tx['description'],
-                'amount': tx['amount'],
-                'date': date_str,
-                'category': 'diversos',
-                'confidence': 0.75,
-                'transaction_type': 'compra',
-                'is_installment': is_installment,
-                'installment_current': installment_current,
-                'installment_total': installment_total,
+                "description": tx["description"],
+                "amount": tx["amount"],
+                "date": date_str,
+                "category": "diversos",
+                "confidence": 0.75,
+                "transaction_type": "compra",
+                "is_installment": is_installment,
+                "installment_current": installment_current,
+                "installment_total": installment_total,
             }
             new_items.append(new_item)
-            print(f"[MistralProvider] OCR recovery: adding '{tx['description']}' R${tx['amount']:.2f} ({date_str})")
+            print(
+                f"[MistralProvider] OCR recovery: adding '{tx['description']}' R${tx['amount']:.2f} ({date_str})"
+            )
 
         if not new_items:
             return None
 
         # Verify adding items improves sum match
         current_sum = sum(
-            item.get('amount', 0) for item in result['items']
-            if item.get('amount', 0) > 0
+            item.get("amount", 0) for item in result["items"] if item.get("amount", 0) > 0
         )
-        new_sum = current_sum + sum(item['amount'] for item in new_items if item['amount'] > 0)
+        new_sum = current_sum + sum(item["amount"] for item in new_items if item["amount"] > 0)
 
         if abs(new_sum - total_amount) >= abs(current_sum - total_amount):
-            print(f"[MistralProvider] OCR recovery: would not improve sum ({current_sum:.2f} -> {new_sum:.2f}, target {total_amount:.2f}), skipping")
+            print(
+                f"[MistralProvider] OCR recovery: would not improve sum ({current_sum:.2f} -> {new_sum:.2f}, target {total_amount:.2f}), skipping"
+            )
             return None
 
-        print(f"[MistralProvider] OCR recovery: improved sum {current_sum:.2f} -> {new_sum:.2f} (target {total_amount:.2f}), added {len(new_items)} items")
+        print(
+            f"[MistralProvider] OCR recovery: improved sum {current_sum:.2f} -> {new_sum:.2f} (target {total_amount:.2f}), added {len(new_items)} items"
+        )
 
         updated_result = dict(result)
-        updated_result['items'] = list(result['items']) + new_items
-        updated_result['_ocr_text'] = ocr_text
-        updated_result['_ocr_text_preview'] = ocr_text[:500] + "..." if len(ocr_text) > 500 else ocr_text
+        updated_result["items"] = list(result["items"]) + new_items
+        updated_result["_ocr_text"] = ocr_text
+        updated_result["_ocr_text_preview"] = (
+            ocr_text[:500] + "..." if len(ocr_text) > 500 else ocr_text
+        )
         return updated_result

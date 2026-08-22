@@ -14,6 +14,7 @@ Tipos de categorias:
 Dependencias:
 - models: Category (centralizado em app.models)
 """
+
 from app.modules.categories.routers.categories import router
 from app.modules.categories.schemas.category import (
     CategoryBase,

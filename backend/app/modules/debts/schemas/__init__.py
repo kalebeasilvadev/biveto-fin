@@ -1,4 +1,5 @@
 """Debts schemas"""
+
 from app.modules.debts.schemas.debt import (
     AvalanchePlan,
     DebtBase,

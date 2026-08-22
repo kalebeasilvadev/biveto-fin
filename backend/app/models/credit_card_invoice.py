@@ -21,11 +21,12 @@ from ..core.utils import utc_now
 
 class InvoiceStatus(str, Enum):
     """Status da fatura do cartão de crédito"""
-    OPEN = "open"           # Período atual, acumulando transações
-    CLOSED = "closed"       # Fechada, aguardando pagamento
-    PAID = "paid"           # Paga integralmente
-    PARTIAL = "partial"     # Parcialmente paga
-    OVERDUE = "overdue"     # Vencida
+
+    OPEN = "open"  # Período atual, acumulando transações
+    CLOSED = "closed"  # Fechada, aguardando pagamento
+    PAID = "paid"  # Paga integralmente
+    PARTIAL = "partial"  # Parcialmente paga
+    OVERDUE = "overdue"  # Vencida
 
 
 class CreditCardInvoice(Base):
@@ -33,16 +34,16 @@ class CreditCardInvoice(Base):
     Fatura de cartão de crédito.
     Agrupa transações por período de cobrança e controla pagamento.
     """
+
     __tablename__ = "credit_card_invoices"
     __table_args__ = (
-        UniqueConstraint('credit_card_id', 'reference_month', 'reference_year',
-                         name='uq_invoice_card_period'),
+        UniqueConstraint(
+            "credit_card_id", "reference_month", "reference_year", name="uq_invoice_card_period"
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), index=True
-    )
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     credit_card_id: Mapped[int] = mapped_column(
         ForeignKey("credit_cards.id", ondelete="CASCADE"), index=True
     )
@@ -54,7 +55,7 @@ class CreditCardInvoice(Base):
     reference_month: Mapped[int] = mapped_column(Integer)  # 1-12
     reference_year: Mapped[int] = mapped_column(Integer)
     closing_date: Mapped[date] = mapped_column(Date)  # Data de fechamento
-    due_date: Mapped[date] = mapped_column(Date)      # Data de vencimento
+    due_date: Mapped[date] = mapped_column(Date)  # Data de vencimento
 
     # Valores
     total_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
@@ -82,24 +83,19 @@ class CreditCardInvoice(Base):
     notes: Mapped[str | None] = mapped_column(Text)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=utc_now, onupdate=utc_now
-    )
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, onupdate=utc_now)
 
     # Relationships
     user: Mapped["User"] = relationship(back_populates="credit_card_invoices")
     credit_card: Mapped["CreditCard"] = relationship(back_populates="invoices")
     document: Mapped["Document | None"] = relationship(back_populates="invoice")
     transactions: Mapped[list["Transaction"]] = relationship(
-        back_populates="invoice",
-        foreign_keys="Transaction.invoice_id"
+        back_populates="invoice", foreign_keys="Transaction.invoice_id"
     )
-    payment_account: Mapped["Account | None"] = relationship(
-        foreign_keys=[payment_account_id]
-    )
+    payment_account: Mapped["Account | None"] = relationship(foreign_keys=[payment_account_id])
     payment_transaction: Mapped["Transaction | None"] = relationship(
         foreign_keys=[payment_transaction_id],
-        post_update=True  # Evita referência circular
+        post_update=True,  # Evita referência circular
     )
 
     @property
@@ -118,8 +114,18 @@ class CreditCardInvoice(Base):
     def period_display(self) -> str:
         """Exibe o período formatado"""
         months = [
-            'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun',
-            'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'
+            "Jan",
+            "Fev",
+            "Mar",
+            "Abr",
+            "Mai",
+            "Jun",
+            "Jul",
+            "Ago",
+            "Set",
+            "Out",
+            "Nov",
+            "Dez",
         ]
         return f"{months[self.reference_month - 1]}/{self.reference_year}"
 

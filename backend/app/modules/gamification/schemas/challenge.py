@@ -20,6 +20,7 @@ class ChallengeStatus(str, Enum):
 
 class ChallengeResponse(BaseModel):
     """Resposta de um desafio"""
+
     id: int
     name: str
     description: str
@@ -47,6 +48,7 @@ class ChallengeResponse(BaseModel):
 
 class ChallengeListResponse(BaseModel):
     """Lista de desafios organizados por status"""
+
     active: list[ChallengeResponse]
     completed: list[ChallengeResponse]
     failed: list[ChallengeResponse]
@@ -55,5 +57,6 @@ class ChallengeListResponse(BaseModel):
 
 class ChallengeStartResponse(BaseModel):
     """Resposta ao iniciar um desafio"""
+
     challenge: ChallengeResponse
     message: str

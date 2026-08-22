@@ -17,12 +17,46 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # Common passwords list (basic list - can be expanded)
 COMMON_PASSWORDS = {
-    "password", "123456", "12345678", "qwerty", "abc123", "monkey", "1234567",
-    "letmein", "trustno1", "dragon", "baseball", "iloveyou", "master", "sunshine",
-    "ashley", "bailey", "shadow", "123123", "654321", "superman", "qazwsx",
-    "michael", "football", "password1", "password123", "welcome", "jesus",
-    "ninja", "mustang", "password2", "admin", "login", "passw0rd", "hello",
-    "charlie", "donald", "password1234", "qwerty123", "senha", "senha123",
+    "password",
+    "123456",
+    "12345678",
+    "qwerty",
+    "abc123",
+    "monkey",
+    "1234567",
+    "letmein",
+    "trustno1",
+    "dragon",
+    "baseball",
+    "iloveyou",
+    "master",
+    "sunshine",
+    "ashley",
+    "bailey",
+    "shadow",
+    "123123",
+    "654321",
+    "superman",
+    "qazwsx",
+    "michael",
+    "football",
+    "password1",
+    "password123",
+    "welcome",
+    "jesus",
+    "ninja",
+    "mustang",
+    "password2",
+    "admin",
+    "login",
+    "passw0rd",
+    "hello",
+    "charlie",
+    "donald",
+    "password1234",
+    "qwerty123",
+    "senha",
+    "senha123",
 }
 
 
@@ -64,7 +98,7 @@ def validate_password_strength(password: str) -> dict:
     return {
         "is_valid": len(errors) == 0,
         "errors": errors,
-        "strength": _calculate_password_strength(password, errors)
+        "strength": _calculate_password_strength(password, errors),
     }
 
 
@@ -105,8 +139,8 @@ def validate_password_or_raise(password: str) -> None:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={
                 "message": "Senha não atende aos requisitos de segurança",
-                "errors": result["errors"]
-            }
+                "errors": result["errors"],
+            },
         )
 
 
@@ -143,6 +177,7 @@ def decode_token(token: str) -> dict | None:
 
 
 # ============== API Key Functions ==============
+
 
 def generate_api_key() -> tuple[str, str, str]:
     """

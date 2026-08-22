@@ -1,4 +1,5 @@
 """Notification schemas."""
+
 from .notification import (
     NotificationCreate,
     NotificationPreferenceResponse,

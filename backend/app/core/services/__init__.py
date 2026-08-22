@@ -1,6 +1,7 @@
 """
 Core Services - Serviços compartilhados entre módulos.
 """
+
 from .business_day_service import (
     calculate_easter,
     get_brazilian_holidays,

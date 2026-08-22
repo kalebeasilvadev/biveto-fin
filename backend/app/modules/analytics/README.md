@@ -39,8 +39,11 @@ analytics/
 ```python
 from app.modules.analytics import (
     router,
-    AnalyticsSummary, CategorySummary, MerchantSummary,
-    InsightResponse, InsightType,
+    AnalyticsSummary,
+    CategorySummary,
+    MerchantSummary,
+    InsightResponse,
+    InsightType,
     AnalyticsService,
 )
 ```

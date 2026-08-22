@@ -1,6 +1,7 @@
 """
 Schemas de household: membros da familia, contexto e convites.
 """
+
 from datetime import datetime
 
 from pydantic import BaseModel, EmailStr
@@ -8,6 +9,7 @@ from pydantic import BaseModel, EmailStr
 from app.models.household import HouseholdRole, OwnershipType
 
 # ========== Household Member Schemas ==========
+
 
 class HouseholdMemberBase(BaseModel):
     nickname: str | None = None
@@ -47,8 +49,10 @@ class HouseholdMemberUpdate(BaseModel):
 
 # ========== Family Context Schemas ==========
 
+
 class FamilyContext(BaseModel):
     """Contexto da familia do usuario logado"""
+
     license_id: int
     license_type: str
     is_owner: bool
@@ -60,14 +64,17 @@ class FamilyContext(BaseModel):
 
 # ========== Family Invite Schemas ==========
 
+
 class FamilyInviteRequest(BaseModel):
     """Request para convidar membro da familia"""
+
     email: EmailStr
     nickname: str | None = None
 
 
 class FamilyInviteResponse(BaseModel):
     """Response do convite da familia"""
+
     invitation_id: int
     email: str
     status: str
@@ -76,8 +83,10 @@ class FamilyInviteResponse(BaseModel):
 
 # ========== Pending Invitations ==========
 
+
 class FamilyInvitationResponse(BaseModel):
     """Convite pendente da familia"""
+
     id: int
     email: str
     status: str
@@ -87,6 +96,8 @@ class FamilyInvitationResponse(BaseModel):
 
 # ========== Ownership Type ==========
 
+
 class OwnershipUpdate(BaseModel):
     """Update para ownership_type de um recurso"""
+
     ownership_type: OwnershipType = OwnershipType.PERSONAL

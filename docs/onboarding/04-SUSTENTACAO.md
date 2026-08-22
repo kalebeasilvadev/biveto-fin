@@ -56,7 +56,7 @@ Este repositório **já teve um incidente**: segredos e dados financeiros reais 
 1. **Nunca commite:** `.env`, chaves de API, certificados/chaves (`.pem`, `.key`), dumps de banco (`.dump`, `.sql`), extratos/faturas reais (PDF/CSV), prints com dados reais. O `.gitignore` bloqueia os padrões — **não o contorne com `git add -f`**.
 2. **Dados de teste são sintéticos.** Precisa de uma fatura para testar extração? Gere uma fictícia — jamais use a sua real.
 3. Suspeita que commitou um segredo? **Avise o mantenedor imediatamente** — não tente apagar sozinho com mais commits (o segredo continua no histórico); a chave exposta deve ser rotacionada na hora.
-4. Antes do PR, rode um scanner se tiver mexido em configs: `gitleaks git .` (binário em https://github.com/gitleaks/gitleaks/releases).
+4. **O scan de segredos é automático em duas camadas**: o gitleaks roda como hook de pre-commit na sua máquina (configure com `pre-commit install` — ver CONTRIBUTING.md) e de novo no CI, onde bloqueia o merge. A allowlist de placeholders de documentação fica em `.gitleaks.toml` — só adicione entradas ali se tiver certeza absoluta de que não é um segredo real.
 5. `SECRET_KEY` forte em produção é vital: além de assinar os JWTs, deriva a chave que criptografa senhas de PDF dos usuários (`app/core/crypto.py`). Rotacioná-la invalida esses dados cifrados — não é uma env var qualquer.
 
 ## Backlog de dívidas técnicas conhecidas

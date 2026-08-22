@@ -13,9 +13,7 @@ async def list_categories(current_user: CurrentUser, db: DbSession):
     """Lista todas as categorias do usuario (padrao + personalizadas)"""
     # Retorna apenas categorias do usuario (tanto is_system=True quanto False)
     # Cada usuario tem suas proprias categorias criadas no setup inicial
-    result = await db.execute(
-        select(Category).where(Category.user_id == current_user.id)
-    )
+    result = await db.execute(select(Category).where(Category.user_id == current_user.id))
     return result.scalars().all()
 
 

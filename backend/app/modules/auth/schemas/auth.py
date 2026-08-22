@@ -1,6 +1,7 @@
 """
 Schemas de autenticacao: login, tokens e payloads.
 """
+
 from pydantic import BaseModel, EmailStr
 
 

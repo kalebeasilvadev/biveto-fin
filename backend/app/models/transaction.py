@@ -17,19 +17,20 @@ class TransactionType(str, Enum):
 
 class PaymentMethod(str, Enum):
     """Metodo de pagamento utilizado na transacao"""
-    CREDIT_CARD = "credit_card"       # Cartao de credito (vinculado a fatura)
-    DEBIT_CARD = "debit_card"         # Cartao de debito (debito imediato)
-    PIX = "pix"                       # PIX (transferencia instantanea)
-    BANK_TRANSFER = "bank_transfer"   # TED/DOC (transferencia bancaria)
-    BOLETO = "boleto"                 # Boleto bancario
-    CASH = "cash"                     # Dinheiro
-    VOUCHER = "voucher"               # Vale generico (legado)
+
+    CREDIT_CARD = "credit_card"  # Cartao de credito (vinculado a fatura)
+    DEBIT_CARD = "debit_card"  # Cartao de debito (debito imediato)
+    PIX = "pix"  # PIX (transferencia instantanea)
+    BANK_TRANSFER = "bank_transfer"  # TED/DOC (transferencia bancaria)
+    BOLETO = "boleto"  # Boleto bancario
+    CASH = "cash"  # Dinheiro
+    VOUCHER = "voucher"  # Vale generico (legado)
     # Tipos especificos de voucher (novos)
-    VOUCHER_VA = "voucher_va"         # Vale Alimentacao
-    VOUCHER_VR = "voucher_vr"         # Vale Refeicao
-    VOUCHER_FLEX = "voucher_flex"     # Cartao Flex (VA + VR)
-    VOUCHER_VT = "voucher_vt"         # Vale Transporte
-    VOUCHER_OTHER = "voucher_other"   # Outros beneficios
+    VOUCHER_VA = "voucher_va"  # Vale Alimentacao
+    VOUCHER_VR = "voucher_vr"  # Vale Refeicao
+    VOUCHER_FLEX = "voucher_flex"  # Cartao Flex (VA + VR)
+    VOUCHER_VT = "voucher_vt"  # Vale Transporte
+    VOUCHER_OTHER = "voucher_other"  # Outros beneficios
 
 
 class RecurrenceType(str, Enum):
@@ -45,7 +46,9 @@ class Transaction(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
-    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id", ondelete="CASCADE"), index=True)
+    account_id: Mapped[int] = mapped_column(
+        ForeignKey("accounts.id", ondelete="CASCADE"), index=True
+    )
     category_id: Mapped[int | None] = mapped_column(ForeignKey("categories.id"), index=True)
     merchant_id: Mapped[int | None] = mapped_column(ForeignKey("merchants.id"))
     document_id: Mapped[int | None] = mapped_column(ForeignKey("documents.id"))
@@ -96,8 +99,8 @@ class Transaction(Base):
         ForeignKey("installment_series.id", ondelete="SET NULL"), index=True
     )
     installment_number: Mapped[int | None] = mapped_column()  # Parcela atual (ex: 3)
-    installment_total: Mapped[int | None] = mapped_column()   # Total de parcelas (ex: 12)
-    is_paid: Mapped[bool] = mapped_column(default=True)       # Se a parcela foi paga
+    installment_total: Mapped[int | None] = mapped_column()  # Total de parcelas (ex: 12)
+    is_paid: Mapped[bool] = mapped_column(default=True)  # Se a parcela foi paga
 
     # Income split support - links split-generated expenses back to original income
     source_transaction_id: Mapped[int | None] = mapped_column(
@@ -109,11 +112,11 @@ class Transaction(Base):
 
     # Metadados
     is_fixed: Mapped[bool] = mapped_column(default=False)  # gasto fixo vs variável
-    ownership_type: Mapped[str] = mapped_column(String(20), default="personal")  # personal, household
+    ownership_type: Mapped[str] = mapped_column(
+        String(20), default="personal"
+    )  # personal, household
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=utc_now, onupdate=utc_now
-    )
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, onupdate=utc_now)
 
     # Relationships - use noload to avoid N+1 queries
     user: Mapped["User"] = relationship(back_populates="transactions")
@@ -122,14 +125,10 @@ class Transaction(Base):
     merchant: Mapped["Merchant | None"] = relationship(back_populates="transactions", lazy="noload")
     document: Mapped["Document | None"] = relationship(back_populates="transaction", lazy="noload")
     installment_series: Mapped["InstallmentSeries | None"] = relationship(
-        back_populates="transactions",
-        foreign_keys=[installment_series_id],
-        lazy="noload"
+        back_populates="transactions", foreign_keys=[installment_series_id], lazy="noload"
     )
     recurring_source: Mapped["RecurringTransaction | None"] = relationship(
-        back_populates="generated_transactions",
-        foreign_keys=[recurring_id],
-        lazy="noload"
+        back_populates="generated_transactions", foreign_keys=[recurring_id], lazy="noload"
     )
     audit_logs: Mapped[list["TransactionAudit"]] = relationship(
         back_populates="transaction", lazy="noload"
@@ -139,32 +138,26 @@ class Transaction(Base):
         back_populates="transactions", lazy="noload"
     )
     invoice: Mapped["CreditCardInvoice | None"] = relationship(
-        back_populates="transactions",
-        foreign_keys=[invoice_id],
-        lazy="noload"
+        back_populates="transactions", foreign_keys=[invoice_id], lazy="noload"
     )
     receipt: Mapped["Receipt | None"] = relationship(
-        back_populates="items",
-        foreign_keys=[receipt_id],
-        lazy="noload"
+        back_populates="items", foreign_keys=[receipt_id], lazy="noload"
     )
     payments: Mapped[list["TransactionPayment"]] = relationship(
-        back_populates="transaction",
-        lazy="noload",
-        order_by="TransactionPayment.sequence"
+        back_populates="transaction", lazy="noload", order_by="TransactionPayment.sequence"
     )
     # Split transactions - expenses generated from this income
     split_transactions: Mapped[list["Transaction"]] = relationship(
         back_populates="source_transaction",
         foreign_keys="Transaction.source_transaction_id",
-        lazy="noload"
+        lazy="noload",
     )
     # Source income that generated this split expense
     source_transaction: Mapped["Transaction | None"] = relationship(
         back_populates="split_transactions",
         foreign_keys=[source_transaction_id],
         remote_side=[id],
-        lazy="noload"
+        lazy="noload",
     )
 
     # Computed properties for API responses
@@ -193,8 +186,20 @@ class Transaction(Base):
     @property
     def invoice_display(self) -> str | None:
         if self.invoice:
-            months = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
-                      "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
+            months = [
+                "Jan",
+                "Fev",
+                "Mar",
+                "Abr",
+                "Mai",
+                "Jun",
+                "Jul",
+                "Ago",
+                "Set",
+                "Out",
+                "Nov",
+                "Dez",
+            ]
             month_name = months[self.invoice.reference_month - 1]
             return f"{month_name}/{self.invoice.reference_year}"
         return None
@@ -266,6 +271,7 @@ class Transaction(Base):
 
 class TransactionAudit(Base):
     """Log de alterações para auditoria"""
+
     __tablename__ = "transaction_audit"
 
     id: Mapped[int] = mapped_column(primary_key=True)

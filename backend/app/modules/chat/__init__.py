@@ -1,4 +1,5 @@
 """Chat module for AI financial assistant."""
+
 from app.modules.chat.routers.chat import router
 from app.modules.chat.schemas.chat import (
     ChatMessage,

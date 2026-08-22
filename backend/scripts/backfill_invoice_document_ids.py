@@ -32,22 +32,21 @@ Uso:
     python backend/scripts/backfill_invoice_document_ids.py --execute --user-id 1
 """
 
-import asyncio
 import argparse
+import asyncio
 from collections import Counter
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import async_session_maker
-from app.models.credit_card_invoice import CreditCardInvoice
 from app.models.credit_card import CreditCard
-from app.models.transaction import Transaction
+from app.models.credit_card_invoice import CreditCardInvoice
 from app.models.document import Document
+from app.models.transaction import Transaction
 from app.modules.notifications.services.notification_service import (
     NotificationService,
 )
-
 
 # Se X% ou mais das transacoes da invoice apontam pro mesmo document_id,
 # consideramos confianca suficiente para vincular. Abaixo disso, reportamos
@@ -63,9 +62,7 @@ async def find_backfill_candidates(
     Retorna lista de faturas elegiveis para backfill.
     Cada item contem: invoice, inferred_document_id, confidence, tx_count.
     """
-    query = select(CreditCardInvoice).where(
-        CreditCardInvoice.document_id.is_(None)
-    )
+    query = select(CreditCardInvoice).where(CreditCardInvoice.document_id.is_(None))
     if user_id:
         query = query.where(CreditCardInvoice.user_id == user_id)
 
@@ -83,8 +80,7 @@ async def find_backfill_candidates(
     for invoice in invoices:
         # Buscar transacoes vinculadas que tenham document_id setado
         tx_result = await db.execute(
-            select(Transaction.document_id)
-            .where(
+            select(Transaction.document_id).where(
                 Transaction.invoice_id == invoice.id,
                 Transaction.document_id.is_not(None),
             )
@@ -104,27 +100,26 @@ async def find_backfill_candidates(
 
         # Contar tambem o total de transacoes da fatura (incluindo sem doc)
         total_tx_result = await db.execute(
-            select(Transaction.id)
-            .where(Transaction.invoice_id == invoice.id)
+            select(Transaction.id).where(Transaction.invoice_id == invoice.id)
         )
         total_tx_count = len(list(total_tx_result.all()))
 
-        candidates.append({
-            "invoice": invoice,
-            "inferred_document_id": dominant_doc_id,
-            "confidence": confidence,
-            "tx_with_doc": len(document_ids),
-            "tx_total": total_tx_count,
-            "unique_docs": len(counter),
-            "all_doc_counts": dict(counter),
-        })
+        candidates.append(
+            {
+                "invoice": invoice,
+                "inferred_document_id": dominant_doc_id,
+                "confidence": confidence,
+                "tx_with_doc": len(document_ids),
+                "tx_total": total_tx_count,
+                "unique_docs": len(counter),
+                "all_doc_counts": dict(counter),
+            }
+        )
 
     return candidates
 
 
-async def format_candidate_line(
-    db: AsyncSession, candidate: dict
-) -> str:
+async def format_candidate_line(db: AsyncSession, candidate: dict) -> str:
     """Formata uma linha de relatorio amigavel para um candidato."""
     invoice: CreditCardInvoice = candidate["invoice"]
 
@@ -133,7 +128,11 @@ async def format_candidate_line(
         select(CreditCard).where(CreditCard.id == invoice.credit_card_id)
     )
     card = card_result.scalar_one_or_none()
-    card_name = (card.nickname or card.bank_id or f"Cartao#{card.id}") if card else f"Cartao#{invoice.credit_card_id}"
+    card_name = (
+        (card.nickname or card.bank_id or f"Cartao#{card.id}")
+        if card
+        else f"Cartao#{invoice.credit_card_id}"
+    )
 
     # Buscar nome do arquivo do documento
     doc_result = await db.execute(
@@ -210,13 +209,15 @@ async def run(user_id: int | None, execute: bool):
             print("Nenhuma fatura elegivel encontrada. Nada a fazer.")
             return
 
-        print(f"Encontradas {len(candidates)} faturas sem document_id com transacoes ligadas a documentos.")
+        print(
+            f"Encontradas {len(candidates)} faturas sem document_id com transacoes ligadas a documentos."
+        )
         print()
 
         high_conf = [c for c in candidates if c["confidence"] >= CONFIDENCE_THRESHOLD]
         low_conf = [c for c in candidates if c["confidence"] < CONFIDENCE_THRESHOLD]
 
-        print(f"Alta confianca (>= {int(CONFIDENCE_THRESHOLD*100)}%): {len(high_conf)}")
+        print(f"Alta confianca (>= {int(CONFIDENCE_THRESHOLD * 100)}%): {len(high_conf)}")
         print(f"Baixa confianca (ignoradas): {len(low_conf)}")
         print()
 
@@ -247,7 +248,7 @@ async def run(user_id: int | None, execute: bool):
             print(f"[OK] {dismissed_total} notificacoes 'fatura pendente' dispensadas.")
         else:
             print(f"[DRY-RUN] {applied_count} faturas SERIAM atualizadas.")
-            print(f"[DRY-RUN] Use --execute para aplicar de verdade.")
+            print("[DRY-RUN] Use --execute para aplicar de verdade.")
         print()
 
 

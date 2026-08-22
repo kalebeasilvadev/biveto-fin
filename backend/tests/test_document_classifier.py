@@ -1,5 +1,7 @@
 """Testes para o DocumentClassifier"""
+
 import pytest
+
 from app.modules.documents.services.document_classifier import DocumentClassifier, DocumentType
 
 
@@ -145,7 +147,11 @@ class TestScoreSystem:
         # Deve ser inconclusivo ou usar heurística
         result = classifier._classify_by_rules(ocr_text)
         # Pode ser UNKNOWN ou usar heurística
-        assert result in [DocumentType.CUPOM_FISCAL, DocumentType.FATURA_CARTAO, DocumentType.UNKNOWN]
+        assert result in [
+            DocumentType.CUPOM_FISCAL,
+            DocumentType.FATURA_CARTAO,
+            DocumentType.UNKNOWN,
+        ]
 
 
 class TestHeuristics:
@@ -218,9 +224,9 @@ class TestStats:
         await classifier.classify("Lorem ipsum")
 
         stats = classifier.get_stats()
-        assert stats['total'] == 3
-        assert stats['by_rules'] == 2  # Cupom e Fatura
-        assert stats['unknown'] == 1   # Lorem ipsum
+        assert stats["total"] == 3
+        assert stats["by_rules"] == 2  # Cupom e Fatura
+        assert stats["unknown"] == 1  # Lorem ipsum
 
 
 @pytest.mark.asyncio

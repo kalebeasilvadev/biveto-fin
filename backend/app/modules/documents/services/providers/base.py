@@ -1,4 +1,5 @@
 """Classe base abstrata para providers de LLM"""
+
 from abc import ABC, abstractmethod
 
 
@@ -22,7 +23,9 @@ class BaseProvider(ABC):
         pass
 
     @abstractmethod
-    async def extract_from_pdf(self, pdf_content: bytes, filename: str = "document.pdf", password: str | None = None) -> dict:
+    async def extract_from_pdf(
+        self, pdf_content: bytes, filename: str = "document.pdf", password: str | None = None
+    ) -> dict:
         """Extrai dados de um PDF
 
         Args:
@@ -38,7 +41,14 @@ class BaseProvider(ABC):
     def _is_retryable_error(self, error: Exception) -> bool:
         """Verifica se o erro permite retry (503, 429, etc.)"""
         error_str = str(error).lower()
-        return any(code in error_str for code in [
-            "503", "429", "unavailable", "overloaded",
-            "rate limit", "resource_exhausted"
-        ])
+        return any(
+            code in error_str
+            for code in [
+                "503",
+                "429",
+                "unavailable",
+                "overloaded",
+                "rate limit",
+                "resource_exhausted",
+            ]
+        )

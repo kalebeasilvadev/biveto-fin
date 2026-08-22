@@ -13,9 +13,9 @@ from ..core.database import Base
 def generate_license_code() -> str:
     """Gera código amigável: BIV-XXXX-XXXX"""
     # Caracteres sem I,O,0,1 para evitar confusão
-    chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-    part1 = ''.join(secrets.choice(chars) for _ in range(4))
-    part2 = ''.join(secrets.choice(chars) for _ in range(4))
+    chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+    part1 = "".join(secrets.choice(chars) for _ in range(4))
+    part2 = "".join(secrets.choice(chars) for _ in range(4))
     return f"BIV-{part1}-{part2}"
 
 
@@ -38,7 +38,9 @@ class License(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     key: Mapped[str] = mapped_column(String(64), unique=True, index=True)
-    code: Mapped[str] = mapped_column(String(13), unique=True, index=True, default=generate_license_code)
+    code: Mapped[str] = mapped_column(
+        String(13), unique=True, index=True, default=generate_license_code
+    )
     type: Mapped[LicenseType] = mapped_column(String(20), default=LicenseType.BASIC)
     status: Mapped[LicenseStatus] = mapped_column(String(20), default=LicenseStatus.ACTIVE)
 
@@ -67,24 +69,14 @@ class License(Base):
     # Metadados
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=utc_now, onupdate=utc_now
-    )
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, onupdate=utc_now)
 
     # Relationships
     users: Mapped[list["User"]] = relationship(
-        back_populates="license",
-        lazy="noload",
-        foreign_keys="User.license_id"
+        back_populates="license", lazy="noload", foreign_keys="User.license_id"
     )
-    owner: Mapped["User | None"] = relationship(
-        foreign_keys=[owner_user_id],
-        lazy="noload"
-    )
-    members: Mapped[list["HouseholdMember"]] = relationship(
-        back_populates="license",
-        lazy="noload"
-    )
+    owner: Mapped["User | None"] = relationship(foreign_keys=[owner_user_id], lazy="noload")
+    members: Mapped[list["HouseholdMember"]] = relationship(back_populates="license", lazy="noload")
 
     @property
     def is_valid(self) -> bool:

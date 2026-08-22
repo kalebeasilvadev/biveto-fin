@@ -29,15 +29,13 @@ class ChallengeService:
 
         # Buscar todos os desafios ativos do sistema
         definitions_result = await self.db.execute(
-            select(ChallengeDefinition)
-            .where(ChallengeDefinition.is_active == True)
+            select(ChallengeDefinition).where(ChallengeDefinition.is_active == True)
         )
         all_definitions = {d.id: d for d in definitions_result.scalars().all()}
 
         # Buscar desafios do usuário
         user_challenges_result = await self.db.execute(
-            select(UserChallenge)
-            .where(UserChallenge.user_id == user.id)
+            select(UserChallenge).where(UserChallenge.user_id == user.id)
         )
         user_challenges = list(user_challenges_result.scalars().all())
 
@@ -78,9 +76,7 @@ class ChallengeService:
                 if definition.is_recurring:
                     # Pode participar novamente se o último foi em outro mês
                     last_challenge = next(
-                        (uc for uc in user_challenges
-                         if uc.challenge_id == def_id),
-                        None
+                        (uc for uc in user_challenges if uc.challenge_id == def_id), None
                     )
                     if last_challenge:
                         last_month = last_challenge.started_at.month
@@ -95,32 +91,29 @@ class ChallengeService:
             if definition.available_until and definition.available_until < today:
                 continue
 
-            available.append(ChallengeResponse(
-                id=definition.id,
-                name=definition.name,
-                description=definition.description,
-                icon=definition.icon,
-                difficulty=ChallengeDifficultySchema(definition.difficulty),
-                status=None,
-                progress=None,
-                progress_percentage=0.0,
-                points_reward=definition.points_reward,
-                badge_reward_id=definition.badge_reward_id,
-                duration_days=definition.duration_days,
-                is_available=True,
-            ))
+            available.append(
+                ChallengeResponse(
+                    id=definition.id,
+                    name=definition.name,
+                    description=definition.description,
+                    icon=definition.icon,
+                    difficulty=ChallengeDifficultySchema(definition.difficulty),
+                    status=None,
+                    progress=None,
+                    progress_percentage=0.0,
+                    points_reward=definition.points_reward,
+                    badge_reward_id=definition.badge_reward_id,
+                    duration_days=definition.duration_days,
+                    is_available=True,
+                )
+            )
 
         return ChallengeListResponse(
-            active=active,
-            completed=completed,
-            failed=failed,
-            available=available
+            active=active, completed=completed, failed=failed, available=available
         )
 
     def _build_challenge_response(
-        self,
-        definition: ChallengeDefinition,
-        user_challenge: UserChallenge
+        self, definition: ChallengeDefinition, user_challenge: UserChallenge
     ) -> ChallengeResponse:
         """Constrói resposta de desafio"""
 
@@ -176,8 +169,7 @@ class ChallengeService:
 
         # Verificar se desafio existe
         def_result = await self.db.execute(
-            select(ChallengeDefinition)
-            .where(ChallengeDefinition.id == challenge_id)
+            select(ChallengeDefinition).where(ChallengeDefinition.id == challenge_id)
         )
         definition = def_result.scalar_one_or_none()
 
@@ -186,11 +178,10 @@ class ChallengeService:
 
         # Verificar se já tem o desafio ativo
         existing = await self.db.execute(
-            select(UserChallenge)
-            .where(
+            select(UserChallenge).where(
                 UserChallenge.user_id == user.id,
                 UserChallenge.challenge_id == challenge_id,
-                UserChallenge.status == ChallengeStatus.ACTIVE.value
+                UserChallenge.status == ChallengeStatus.ACTIVE.value,
             )
         )
         if existing.scalar_one_or_none():
@@ -209,7 +200,7 @@ class ChallengeService:
             status=ChallengeStatus.ACTIVE.value,
             progress=initial_progress,
             started_at=now,
-            expires_at=expires_at
+            expires_at=expires_at,
         )
         self.db.add(user_challenge)
         await self.db.flush()
@@ -234,32 +225,27 @@ class ChallengeService:
             return {
                 "days_completed": 0,
                 "category_name": criteria.get("category_name", ""),
-                "start_date": date.today().isoformat()
+                "start_date": date.today().isoformat(),
             }
 
         elif definition.challenge_type == "reduce_spending":
             return {
                 "reduction_percentage": 0,
                 "previous_month_spending": 0,
-                "current_month_spending": 0
+                "current_month_spending": 0,
             }
 
         return {}
 
-    async def on_transaction(
-        self,
-        user: User,
-        transaction: Transaction
-    ) -> list[ChallengeResponse]:
+    async def on_transaction(self, user: User, transaction: Transaction) -> list[ChallengeResponse]:
         """Atualiza desafios baseado em nova transação"""
         updated = []
 
         # Buscar desafios ativos
         result = await self.db.execute(
-            select(UserChallenge)
-            .where(
+            select(UserChallenge).where(
                 UserChallenge.user_id == user.id,
-                UserChallenge.status == ChallengeStatus.ACTIVE.value
+                UserChallenge.status == ChallengeStatus.ACTIVE.value,
             )
         )
         active_challenges = list(result.scalars().all())
@@ -267,8 +253,7 @@ class ChallengeService:
         for uc in active_challenges:
             # Buscar definição
             def_result = await self.db.execute(
-                select(ChallengeDefinition)
-                .where(ChallengeDefinition.id == uc.challenge_id)
+                select(ChallengeDefinition).where(ChallengeDefinition.id == uc.challenge_id)
             )
             definition = def_result.scalar_one_or_none()
             if not definition:
@@ -281,9 +266,7 @@ class ChallengeService:
                 was_updated = await self._update_register_streak(uc, definition)
 
             elif definition.challenge_type == "no_spending_category":
-                was_updated = await self._update_no_spending(
-                    uc, definition, transaction
-                )
+                was_updated = await self._update_no_spending(uc, definition, transaction)
 
             if was_updated:
                 # Verificar se completou
@@ -296,9 +279,7 @@ class ChallengeService:
         return updated
 
     async def _update_register_streak(
-        self,
-        uc: UserChallenge,
-        definition: ChallengeDefinition
+        self, uc: UserChallenge, definition: ChallengeDefinition
     ) -> bool:
         """Atualiza desafio de registro diário"""
         today = date.today().isoformat()
@@ -313,10 +294,7 @@ class ChallengeService:
         return False
 
     async def _update_no_spending(
-        self,
-        uc: UserChallenge,
-        definition: ChallengeDefinition,
-        transaction: Transaction
+        self, uc: UserChallenge, definition: ChallengeDefinition, transaction: Transaction
     ) -> bool:
         """Atualiza desafio de não gastar em categoria"""
         if transaction.type != "expense":
@@ -331,11 +309,7 @@ class ChallengeService:
 
         return False
 
-    def _is_completed(
-        self,
-        uc: UserChallenge,
-        definition: ChallengeDefinition
-    ) -> bool:
+    def _is_completed(self, uc: UserChallenge, definition: ChallengeDefinition) -> bool:
         """Verifica se o desafio foi completado"""
         progress = uc.progress or {}
         criteria = definition.criteria or {}
@@ -360,10 +334,7 @@ class ChallengeService:
         return False
 
     async def _complete_challenge(
-        self,
-        user: User,
-        uc: UserChallenge,
-        definition: ChallengeDefinition
+        self, user: User, uc: UserChallenge, definition: ChallengeDefinition
     ):
         """Marca desafio como completado e concede recompensas"""
         uc.status = ChallengeStatus.COMPLETED.value
@@ -376,22 +347,22 @@ class ChallengeService:
             amount=definition.points_reward,
             reason=f"challenge_completed:{definition.id}",
             reference_type="challenge",
-            reference_id=str(definition.id)
+            reference_id=str(definition.id),
         )
 
         # Conceder badge se houver
         if definition.badge_reward_id:
             from .badge_service import BadgeService
+
             badge_service = BadgeService(self.db)
             await badge_service.check_and_award_badge(user, definition.badge_reward_id)
 
     async def count_active(self, user: User) -> int:
         """Conta desafios ativos"""
         result = await self.db.execute(
-            select(func.count(UserChallenge.id))
-            .where(
+            select(func.count(UserChallenge.id)).where(
                 UserChallenge.user_id == user.id,
-                UserChallenge.status == ChallengeStatus.ACTIVE.value
+                UserChallenge.status == ChallengeStatus.ACTIVE.value,
             )
         )
         return result.scalar() or 0
@@ -402,11 +373,10 @@ class ChallengeService:
         first_of_month = today.replace(day=1)
 
         result = await self.db.execute(
-            select(func.count(UserChallenge.id))
-            .where(
+            select(func.count(UserChallenge.id)).where(
                 UserChallenge.user_id == user.id,
                 UserChallenge.status == ChallengeStatus.COMPLETED.value,
-                UserChallenge.completed_at >= first_of_month
+                UserChallenge.completed_at >= first_of_month,
             )
         )
         return result.scalar() or 0

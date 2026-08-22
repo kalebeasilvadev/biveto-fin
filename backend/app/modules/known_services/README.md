@@ -85,8 +85,8 @@ items_with_detection = await detector.detect_all(
 
 # Cada item tera recurring_detection preenchido
 for item in items_with_detection:
-    detection = item.get('recurring_detection')
-    if detection and detection.get('suggested_recurring'):
+    detection = item.get("recurring_detection")
+    if detection and detection.get("suggested_recurring"):
         # Mostrar sugestao para criar recorrencia
         pass
 ```

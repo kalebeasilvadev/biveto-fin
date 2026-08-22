@@ -1,4 +1,5 @@
 """Schemas para Debt (Gestao de Dividas)"""
+
 from datetime import date, datetime
 from decimal import Decimal
 
@@ -39,7 +40,7 @@ class DebtBase(BaseModel):
     current_balance: Decimal = Field(..., ge=0)
     minimum_payment: Decimal = Field(default=Decimal(0), ge=0)
     interest_rate: Decimal = Field(default=Decimal(0), ge=0, le=100)
-    interest_type: str = Field(default="monthly", pattern=r'^(monthly|yearly)$')
+    interest_type: str = Field(default="monthly", pattern=r"^(monthly|yearly)$")
     start_date: date
     due_day: int | None = Field(None, ge=1, le=31)
     priority: int = Field(default=0, ge=0)
@@ -87,12 +88,14 @@ class DebtResponse(DebtBase):
 
 class DebtDetailResponse(DebtResponse):
     """Resposta detalhada com pagamentos"""
+
     payments: list[DebtPaymentResponse] = []
     payoff_projection: "DebtPayoffProjection | None" = None
 
 
 class DebtPayoffProjection(BaseModel):
     """Projeção de quitação da dívida"""
+
     months_to_payoff: int
     total_interest_if_minimum: Decimal
     total_paid_if_minimum: Decimal
@@ -106,6 +109,7 @@ class DebtPayoffProjection(BaseModel):
 
 class DebtSummary(BaseModel):
     """Resumo de todas as dívidas para dashboard"""
+
     total_debts: int
     active_debts: int
     paid_off_debts: int
@@ -119,6 +123,7 @@ class DebtSummary(BaseModel):
 
 class DebtHighlight(BaseModel):
     """Destaque de dívida para estratégias"""
+
     debt_id: int
     name: str
     balance: Decimal
@@ -131,6 +136,7 @@ class SnowballPlan(BaseModel):
     Plano de quitação pelo método Snowball (Dave Ramsey)
     Foca em quitar a menor dívida primeiro para motivação
     """
+
     strategy: str = "snowball"
     monthly_payment: Decimal  # Valor total disponível para dívidas
     debts_order: list["SnowballDebtStep"]
@@ -144,6 +150,7 @@ class AvalanchePlan(BaseModel):
     Plano de quitação pelo método Avalanche
     Foca em quitar a dívida com maior juros primeiro (matemático)
     """
+
     strategy: str = "avalanche"
     monthly_payment: Decimal
     debts_order: list["SnowballDebtStep"]
@@ -155,6 +162,7 @@ class AvalanchePlan(BaseModel):
 
 class SnowballDebtStep(BaseModel):
     """Passo no plano de quitação"""
+
     debt_id: int
     debt_name: str
     starting_balance: Decimal
@@ -168,6 +176,7 @@ class SnowballDebtStep(BaseModel):
 
 class PayoffStrategyComparison(BaseModel):
     """Comparação entre estratégias Snowball e Avalanche"""
+
     snowball: SnowballPlan
     avalanche: AvalanchePlan
     recommendation: str  # "snowball" ou "avalanche"

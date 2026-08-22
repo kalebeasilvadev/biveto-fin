@@ -98,6 +98,7 @@ class ShoppingListResponse(ShoppingListBase):
 
 class ShoppingListGenerateRequest(BaseModel):
     """Request to generate a shopping list from history"""
+
     period_days: int = Field(default=90, ge=7, le=180)
     min_frequency: int = Field(default=1, ge=1, le=10)  # 1 = include single purchases
     min_urgency: float = Field(default=0.5, ge=0.0, le=2.0)  # 0.5 = include items at 50%+ of cycle

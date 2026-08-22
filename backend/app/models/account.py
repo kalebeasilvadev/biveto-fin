@@ -30,15 +30,17 @@ class Account(Base):
     color: Mapped[str | None] = mapped_column(String(7))  # hex color
     icon: Mapped[str | None] = mapped_column(String(50))
     is_active: Mapped[bool] = mapped_column(default=True)
-    ownership_type: Mapped[str] = mapped_column(String(20), default="personal")  # personal, household
+    ownership_type: Mapped[str] = mapped_column(
+        String(20), default="personal"
+    )  # personal, household
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=utc_now, onupdate=utc_now
-    )
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, onupdate=utc_now)
 
     # Relationships - use noload to avoid N+1 queries
     user: Mapped["User"] = relationship(back_populates="accounts")
-    transactions: Mapped[list["Transaction"]] = relationship(back_populates="account", lazy="noload")
+    transactions: Mapped[list["Transaction"]] = relationship(
+        back_populates="account", lazy="noload"
+    )
     installment_series: Mapped[list["InstallmentSeries"]] = relationship(
         back_populates="account", lazy="noload"
     )

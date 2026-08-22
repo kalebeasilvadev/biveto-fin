@@ -31,7 +31,9 @@ class Category(Base):
     parent: Mapped["Category | None"] = relationship(
         "Category", remote_side=[id], backref="subcategories"
     )
-    transactions: Mapped[list["Transaction"]] = relationship(back_populates="category", lazy="noload")
+    transactions: Mapped[list["Transaction"]] = relationship(
+        back_populates="category", lazy="noload"
+    )
 
 
 from .transaction import Transaction

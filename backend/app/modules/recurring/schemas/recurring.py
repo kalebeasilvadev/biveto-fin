@@ -27,6 +27,7 @@ class TransactionType(str, Enum):
 
 class RecurringCreate(BaseModel):
     """Schema para criar uma transacao recorrente"""
+
     name: str = Field(..., min_length=1, max_length=100)
     description: str | None = Field(None, max_length=500)
     amount: float = Field(..., gt=0)
@@ -44,6 +45,7 @@ class RecurringCreate(BaseModel):
 
 class RecurringUpdate(BaseModel):
     """Schema para atualizar uma transação recorrente"""
+
     name: str | None = Field(None, min_length=1, max_length=100)
     description: str | None = Field(None, max_length=500)
     amount: float | None = Field(None, gt=0)
@@ -60,6 +62,7 @@ class RecurringUpdate(BaseModel):
 
 class RecurringResponse(BaseModel):
     """Schema de resposta de uma transacao recorrente"""
+
     id: int
     name: str
     description: str | None
@@ -87,6 +90,7 @@ class RecurringResponse(BaseModel):
 
 class RecurringSummary(BaseModel):
     """Resumo das transações recorrentes"""
+
     total_monthly_expenses: float
     total_monthly_income: float
     active_count: int
@@ -95,6 +99,7 @@ class RecurringSummary(BaseModel):
 
 class RecurringFromSuggestionCreate(BaseModel):
     """Schema para criar recorrência a partir de sugestão detectada"""
+
     # Campos obrigatórios
     name: str = Field(..., min_length=1, max_length=100)
     amount: float = Field(..., gt=0)
@@ -120,13 +125,16 @@ class RecurringFromSuggestionCreate(BaseModel):
 # Schemas para Batch Create from Suggestion
 # ============================================
 
+
 class BatchRecurringFromSuggestionRequest(BaseModel):
     """Request para criar múltiplas recorrências de uma vez"""
+
     items: list[RecurringFromSuggestionCreate] = Field(min_length=1, max_length=50)
 
 
 class BatchRecurringItemResult(BaseModel):
     """Resultado de um item do batch"""
+
     index: int
     success: bool
     recurring_id: int | None = None
@@ -137,6 +145,7 @@ class BatchRecurringItemResult(BaseModel):
 
 class BatchRecurringResponse(BaseModel):
     """Resposta do batch create"""
+
     total: int
     success_count: int
     duplicate_count: int
@@ -146,11 +155,16 @@ class BatchRecurringResponse(BaseModel):
 
 class RecurringCancelRequest(BaseModel):
     """Schema para cancelamento de recorrencia"""
-    cancel_from_month: int | None = Field(None, ge=1, le=12, description="Mes a partir do qual cancelar (1-12)")
-    cancel_from_year: int | None = Field(None, ge=2020, le=2100, description="Ano a partir do qual cancelar")
+
+    cancel_from_month: int | None = Field(
+        None, ge=1, le=12, description="Mes a partir do qual cancelar (1-12)"
+    )
+    cancel_from_year: int | None = Field(
+        None, ge=2020, le=2100, description="Ano a partir do qual cancelar"
+    )
     remove_projected: bool = Field(True, description="Remover transacoes projetadas?")
 
-    @model_validator(mode='after')
+    @model_validator(mode="after")
     def validate_dates(self):
         # Se um for fornecido, ambos devem ser
         if (self.cancel_from_month is None) != (self.cancel_from_year is None):

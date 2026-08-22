@@ -37,12 +37,8 @@ class Invitation(Base):
     license_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("licenses.id"), nullable=True
     )
-    invited_by_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("users.id"), nullable=False
-    )
-    status: Mapped[InvitationStatus] = mapped_column(
-        String(20), default=InvitationStatus.PENDING
-    )
+    invited_by_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
+    status: Mapped[InvitationStatus] = mapped_column(String(20), default=InvitationStatus.PENDING)
     expires_at: Mapped[datetime] = mapped_column(DateTime, default=default_expires_at)
     accepted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)

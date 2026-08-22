@@ -1,4 +1,5 @@
 """Utility functions for the application."""
+
 from datetime import UTC, datetime
 
 

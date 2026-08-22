@@ -28,8 +28,12 @@ class NotificationType(str, Enum):
     INVOICE_OVERDUE = "invoice_overdue"
 
     # Faturas pendentes de carregamento
-    INVOICE_MISSING_CURRENT = "invoice_missing_current"  # Dia 1: fatura do mês anterior ainda não carregada
-    INVOICE_MISSING_PRE_DUE = "invoice_missing_pre_due"  # D-3 vencimento: fatura do mês ainda não carregada
+    INVOICE_MISSING_CURRENT = (
+        "invoice_missing_current"  # Dia 1: fatura do mês anterior ainda não carregada
+    )
+    INVOICE_MISSING_PRE_DUE = (
+        "invoice_missing_pre_due"  # D-3 vencimento: fatura do mês ainda não carregada
+    )
 
     # Orçamento
     BUDGET_WARNING_80 = "budget_warning_80"
@@ -83,9 +87,7 @@ class Notification(Base):
     __tablename__ = "notifications"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), index=True
-    )
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
 
     # Conteúdo
     type: Mapped[str] = mapped_column(String(50))
@@ -144,9 +146,7 @@ class NotificationPreference(Base):
     __tablename__ = "notification_preferences"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), index=True
-    )
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     notification_type: Mapped[str] = mapped_column(String(50))
 
     # Canais habilitados
@@ -166,9 +166,7 @@ class NotificationPreference(Base):
     )  # Ex: alertar X dias antes do vencimento
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=utc_now, onupdate=utc_now
-    )
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, onupdate=utc_now)
 
     # Relationships
     user: Mapped["User"] = relationship(back_populates="notification_preferences")
@@ -205,9 +203,7 @@ class NotificationSettings(Base):
     push_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=utc_now, onupdate=utc_now
-    )
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, onupdate=utc_now)
 
     # Relationships
     user: Mapped["User"] = relationship(back_populates="notification_settings")
@@ -219,9 +215,7 @@ class PushSubscription(Base):
     __tablename__ = "push_subscriptions"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), index=True
-    )
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
 
     # Web Push API
     endpoint: Mapped[str] = mapped_column(String(500))

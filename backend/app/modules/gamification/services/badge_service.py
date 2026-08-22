@@ -1,6 +1,5 @@
 """Badge Service for gamification"""
 
-
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,9 +24,7 @@ class BadgeService:
         self.db = db
 
     async def list_all_with_status(
-        self,
-        user: User,
-        category: str | None = None
+        self, user: User, category: str | None = None
     ) -> list[BadgeResponse]:
         """Lista todos os badges com status do usuário"""
 
@@ -62,27 +59,25 @@ class BadgeService:
             if definition.is_secret and not is_earned:
                 continue
 
-            badges.append(BadgeResponse(
-                id=definition.id,
-                name=definition.name,
-                description=definition.description,
-                icon=definition.icon,
-                category=BadgeCategorySchema(definition.category),
-                rarity=definition.rarity,
-                points_reward=definition.points_reward,
-                is_earned=is_earned,
-                earned_at=user_badge.earned_at if user_badge else None,
-                seen_at=user_badge.seen_at if user_badge else None,
-                progress=progress,
-            ))
+            badges.append(
+                BadgeResponse(
+                    id=definition.id,
+                    name=definition.name,
+                    description=definition.description,
+                    icon=definition.icon,
+                    category=BadgeCategorySchema(definition.category),
+                    rarity=definition.rarity,
+                    points_reward=definition.points_reward,
+                    is_earned=is_earned,
+                    earned_at=user_badge.earned_at if user_badge else None,
+                    seen_at=user_badge.seen_at if user_badge else None,
+                    progress=progress,
+                )
+            )
 
         return badges
 
-    async def _calculate_progress(
-        self,
-        user: User,
-        definition: BadgeDefinition
-    ) -> float:
+    async def _calculate_progress(self, user: User, definition: BadgeDefinition) -> float:
         """Calcula o progresso para um badge não conquistado"""
         criteria_type = definition.criteria_type
         criteria_value = definition.criteria_value
@@ -91,44 +86,36 @@ class BadgeService:
 
         if criteria_type == "transaction_count":
             result = await self.db.execute(
-                select(func.count(Transaction.id))
-                .where(Transaction.user_id == user.id)
+                select(func.count(Transaction.id)).where(Transaction.user_id == user.id)
             )
             current_value = result.scalar() or 0
 
         elif criteria_type == "streak_days":
             result = await self.db.execute(
-                select(UserStreak.current_count)
-                .where(
-                    UserStreak.user_id == user.id,
-                    UserStreak.streak_type == "daily_register"
+                select(UserStreak.current_count).where(
+                    UserStreak.user_id == user.id, UserStreak.streak_type == "daily_register"
                 )
             )
             current_value = result.scalar() or 0
 
         elif criteria_type == "goal_created":
             result = await self.db.execute(
-                select(func.count(Goal.id))
-                .where(Goal.user_id == user.id)
+                select(func.count(Goal.id)).where(Goal.user_id == user.id)
             )
             current_value = result.scalar() or 0
 
         elif criteria_type == "goal_completed":
             result = await self.db.execute(
-                select(func.count(Goal.id))
-                .where(
-                    Goal.user_id == user.id,
-                    Goal.status == GoalStatus.COMPLETED.value
+                select(func.count(Goal.id)).where(
+                    Goal.user_id == user.id, Goal.status == GoalStatus.COMPLETED.value
                 )
             )
             current_value = result.scalar() or 0
 
         elif criteria_type == "debt_paid":
             result = await self.db.execute(
-                select(func.count(Debt.id))
-                .where(
-                    Debt.user_id == user.id,
-                    Debt.status == DebtStatus.PAID.value
+                select(func.count(Debt.id)).where(
+                    Debt.user_id == user.id, Debt.status == DebtStatus.PAID.value
                 )
             )
             current_value = result.scalar() or 0
@@ -138,19 +125,12 @@ class BadgeService:
             return min(current_value / criteria_value, 1.0)
         return 0.0
 
-    async def check_and_award_badge(
-        self,
-        user: User,
-        badge_id: str
-    ) -> BadgeResponse | None:
+    async def check_and_award_badge(self, user: User, badge_id: str) -> BadgeResponse | None:
         """Verifica e concede um badge específico se os critérios forem atendidos"""
 
         # Verificar se já tem o badge
         existing = await self.db.execute(
-            select(UserBadge).where(
-                UserBadge.user_id == user.id,
-                UserBadge.badge_id == badge_id
-            )
+            select(UserBadge).where(UserBadge.user_id == user.id, UserBadge.badge_id == badge_id)
         )
         if existing.scalar_one_or_none():
             return None
@@ -169,11 +149,7 @@ class BadgeService:
             return None
 
         # Conceder badge
-        user_badge = UserBadge(
-            user_id=user.id,
-            badge_id=badge_id,
-            earned_at=utc_now()
-        )
+        user_badge = UserBadge(user_id=user.id, badge_id=badge_id, earned_at=utc_now())
         self.db.add(user_badge)
 
         # Adicionar pontos
@@ -183,7 +159,7 @@ class BadgeService:
             amount=definition.points_reward,
             reason=f"badge_earned:{badge_id}",
             reference_type="badge",
-            reference_id=badge_id
+            reference_id=badge_id,
         )
 
         await self.db.flush()
@@ -211,7 +187,7 @@ class BadgeService:
             "transactions_50",
             "transactions_100",
             "transactions_500",
-            "transactions_1000"
+            "transactions_1000",
         ]
 
         for badge_id in transaction_badges:
@@ -221,11 +197,7 @@ class BadgeService:
 
         return badges_earned
 
-    async def check_streak_badges(
-        self,
-        user: User,
-        streak: UserStreak
-    ) -> list[BadgeResponse]:
+    async def check_streak_badges(self, user: User, streak: UserStreak) -> list[BadgeResponse]:
         """Verifica badges de streak"""
         badges_earned = []
 
@@ -236,7 +208,7 @@ class BadgeService:
             30: "streak_30",
             60: "streak_60",
             100: "streak_100",
-            365: "streak_365"
+            365: "streak_365",
         }
 
         # Verificar se atingiu algum milestone
@@ -272,10 +244,8 @@ class BadgeService:
 
         # Verificar se quitou todas as dívidas
         result = await self.db.execute(
-            select(func.count(Debt.id))
-            .where(
-                Debt.user_id == user.id,
-                Debt.status != DebtStatus.PAID.value
+            select(func.count(Debt.id)).where(
+                Debt.user_id == user.id, Debt.status != DebtStatus.PAID.value
             )
         )
         unpaid_count = result.scalar() or 0
@@ -283,10 +253,8 @@ class BadgeService:
         if unpaid_count == 0:
             # Verificar se tem pelo menos uma dívida paga
             paid_result = await self.db.execute(
-                select(func.count(Debt.id))
-                .where(
-                    Debt.user_id == user.id,
-                    Debt.status == DebtStatus.PAID.value
+                select(func.count(Debt.id)).where(
+                    Debt.user_id == user.id, Debt.status == DebtStatus.PAID.value
                 )
             )
             paid_count = paid_result.scalar() or 0
@@ -300,18 +268,15 @@ class BadgeService:
     async def count_earned(self, user: User) -> int:
         """Conta badges conquistados"""
         result = await self.db.execute(
-            select(func.count(UserBadge.id))
-            .where(UserBadge.user_id == user.id)
+            select(func.count(UserBadge.id)).where(UserBadge.user_id == user.id)
         )
         return result.scalar() or 0
 
     async def count_total(self) -> int:
         """Conta total de badges disponíveis"""
         result = await self.db.execute(
-            select(func.count(BadgeDefinition.id))
-            .where(
-                BadgeDefinition.is_active == True,
-                BadgeDefinition.is_secret == False
+            select(func.count(BadgeDefinition.id)).where(
+                BadgeDefinition.is_active == True, BadgeDefinition.is_secret == False
             )
         )
         return result.scalar() or 0
@@ -354,10 +319,8 @@ class BadgeService:
     async def count_unseen(self, user: User) -> int:
         """Conta badges não vistos"""
         result = await self.db.execute(
-            select(func.count(UserBadge.id))
-            .where(
-                UserBadge.user_id == user.id,
-                UserBadge.seen_at == None
+            select(func.count(UserBadge.id)).where(
+                UserBadge.user_id == user.id, UserBadge.seen_at == None
             )
         )
         return result.scalar() or 0
@@ -366,11 +329,7 @@ class BadgeService:
         """Marca todos os badges como vistos"""
 
         result = await self.db.execute(
-            select(UserBadge)
-            .where(
-                UserBadge.user_id == user.id,
-                UserBadge.seen_at == None
-            )
+            select(UserBadge).where(UserBadge.user_id == user.id, UserBadge.seen_at == None)
         )
         unseen_badges = list(result.scalars().all())
 

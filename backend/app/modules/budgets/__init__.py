@@ -1,4 +1,5 @@
 """Budgets module - Budget management"""
+
 from app.modules.budgets.routers.budgets import router
 from app.modules.budgets.schemas.budget import (
     BudgetComparisonResponse,

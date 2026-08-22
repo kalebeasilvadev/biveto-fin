@@ -1,4 +1,5 @@
 """Goals schemas"""
+
 from app.modules.goals.schemas.goal import (
     EmergencyFundCalculation,
     GoalBase,

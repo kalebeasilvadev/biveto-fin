@@ -71,11 +71,11 @@ O modulo suporta **multiplos providers** para extracao de dados, com possibilida
 ### Configuracao do Provider
 ```python
 # .env
-VISION_PROVIDER=google  # google, openai, anthropic, mistral
-GOOGLE_API_KEY=xxx
-OPENAI_API_KEY=xxx
-ANTHROPIC_API_KEY=xxx
-MISTRAL_API_KEY=xxx
+VISION_PROVIDER = google  # google, openai, anthropic, mistral
+GOOGLE_API_KEY = xxx
+OPENAI_API_KEY = xxx
+ANTHROPIC_API_KEY = xxx
+MISTRAL_API_KEY = xxx
 ```
 
 ### Mistral OCR (Recomendado)

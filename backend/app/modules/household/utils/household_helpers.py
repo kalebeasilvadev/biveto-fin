@@ -1,6 +1,7 @@
 """
 Helpers para lógica de household reutilizáveis em todos os módulos
 """
+
 from fastapi import HTTPException, status
 from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,9 +26,7 @@ async def get_household_user_ids(db: AsyncSession, user: User) -> list[int]:
         return []
 
     result = await db.execute(
-        select(HouseholdMember.user_id).where(
-            HouseholdMember.license_id == user.license_id
-        )
+        select(HouseholdMember.user_id).where(HouseholdMember.license_id == user.license_id)
     )
     return list(result.scalars().all())
 
@@ -48,8 +47,7 @@ async def get_household_member(db: AsyncSession, user: User) -> HouseholdMember 
 
     result = await db.execute(
         select(HouseholdMember).where(
-            HouseholdMember.user_id == user.id,
-            HouseholdMember.license_id == user.license_id
+            HouseholdMember.user_id == user.id, HouseholdMember.license_id == user.license_id
         )
     )
     return result.scalar_one_or_none()
@@ -61,7 +59,7 @@ def build_ownership_filter(
     ownership_field,
     current_user_id: int,
     household_user_ids: list[int],
-    member: HouseholdMember | None = None
+    member: HouseholdMember | None = None,
 ):
     """
     Constrói filtro SQLAlchemy padrão para ownership.
@@ -96,26 +94,16 @@ def build_ownership_filter(
     if household_user_ids:
         return or_(
             # Recursos PERSONAL do usuário atual
-            and_(
-                user_id_field == current_user_id,
-                ownership_field == "personal"
-            ),
+            and_(user_id_field == current_user_id, ownership_field == "personal"),
             # Recursos HOUSEHOLD de qualquer membro
-            and_(
-                user_id_field.in_(household_user_ids),
-                ownership_field == "household"
-            )
+            and_(user_id_field.in_(household_user_ids), ownership_field == "household"),
         )
     else:
         # Sem household, apenas recursos do próprio usuário
         return user_id_field == current_user_id
 
 
-async def validate_create_permission(
-    db: AsyncSession,
-    user: User,
-    ownership_type: str
-) -> None:
+async def validate_create_permission(db: AsyncSession, user: User, ownership_type: str) -> None:
     """
     Valida se usuário tem permissão para criar recurso com ownership_type especificado.
     Levanta HTTPException 403 se não tiver permissão.
@@ -142,21 +130,18 @@ async def validate_create_permission(
     if not member:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Você não está em uma família para criar recursos compartilhados"
+            detail="Você não está em uma família para criar recursos compartilhados",
         )
 
     if not member.can_create_transactions:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Você não tem permissão para criar recursos compartilhados"
+            detail="Você não tem permissão para criar recursos compartilhados",
         )
 
 
 async def validate_edit_permission(
-    db: AsyncSession,
-    user: User,
-    resource_user_id: int,
-    resource_ownership: str
+    db: AsyncSession, user: User, resource_user_id: int, resource_ownership: str
 ) -> None:
     """
     Valida se usuário tem permissão para editar recurso.
@@ -187,7 +172,7 @@ async def validate_edit_permission(
     if resource_ownership == "personal":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Você não pode editar recursos pessoais de outros membros"
+            detail="Você não pode editar recursos pessoais de outros membros",
         )
 
     # household - verificar permissão
@@ -195,15 +180,12 @@ async def validate_edit_permission(
     if not member or not member.can_edit_shared:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Você não tem permissão para editar recursos compartilhados"
+            detail="Você não tem permissão para editar recursos compartilhados",
         )
 
 
 async def validate_delete_permission(
-    db: AsyncSession,
-    user: User,
-    resource_user_id: int,
-    resource_ownership: str
+    db: AsyncSession, user: User, resource_user_id: int, resource_ownership: str
 ) -> None:
     """
     Valida se usuário tem permissão para excluir recurso.
@@ -239,5 +221,5 @@ async def validate_delete_permission(
 
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
-        detail="Apenas o criador ou dono da família pode excluir este recurso"
+        detail="Apenas o criador ou dono da família pode excluir este recurso",
     )

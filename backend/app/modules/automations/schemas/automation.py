@@ -18,8 +18,10 @@ from app.models.automation_rule import (
 
 # ==================== Trigger Configs ====================
 
+
 class TriggerConfigSchedule(BaseModel):
     """Configuration for schedule-based triggers."""
+
     frequency: ScheduleFrequency
     day_of_month: int | None = Field(None, ge=1, le=31)
     day_of_week: int | None = Field(None, ge=0, le=6)  # 0=Monday, 6=Sunday
@@ -41,6 +43,7 @@ class TriggerConfigSchedule(BaseModel):
 
 class TriggerConfigEvent(BaseModel):
     """Configuration for event-based triggers."""
+
     event_type: EventType
     filters: dict = Field(default_factory=dict)
     """
@@ -56,6 +59,7 @@ class TriggerConfigEvent(BaseModel):
 
 class TriggerConfigThreshold(BaseModel):
     """Configuration for threshold-based triggers."""
+
     threshold_type: ThresholdType
     account_id: int | None = None
     category_id: int | None = None
@@ -65,8 +69,10 @@ class TriggerConfigThreshold(BaseModel):
 
 # ==================== Action Configs ====================
 
+
 class ActionConfigTransfer(BaseModel):
     """Configuration for transfer actions."""
+
     from_account_id: int
     to_account_id: int
     amount_type: Literal["fixed", "percentage", "remaining"]
@@ -76,11 +82,13 @@ class ActionConfigTransfer(BaseModel):
 
 class ActionConfigCategorize(BaseModel):
     """Configuration for categorization actions."""
+
     category_id: int
 
 
 class ActionConfigNotify(BaseModel):
     """Configuration for notification actions."""
+
     title: str
     message: str
     channels: list[str] = ["in_app"]  # in_app, push, email
@@ -88,11 +96,13 @@ class ActionConfigNotify(BaseModel):
 
 class ActionConfigTag(BaseModel):
     """Configuration for tagging actions."""
+
     tags: list[str]
 
 
 class ActionConfigGenerate(BaseModel):
     """Configuration for transaction generation actions."""
+
     type: Literal["income", "expense"]
     amount: Decimal
     description: str
@@ -102,8 +112,10 @@ class ActionConfigGenerate(BaseModel):
 
 # ==================== Conditions ====================
 
+
 class ConditionRule(BaseModel):
     """A single condition rule."""
+
     type: str  # balance_above, balance_below, day_of_month, etc.
     account_id: int | None = None
     category_id: int | None = None
@@ -113,14 +125,17 @@ class ConditionRule(BaseModel):
 
 class ConditionsConfig(BaseModel):
     """Configuration for conditions."""
+
     rules: list[ConditionRule] = Field(default_factory=list)
     match: Literal["all", "any"] = "all"
 
 
 # ==================== Request/Response Schemas ====================
 
+
 class AutomationRuleCreate(BaseModel):
     """Schema for creating an automation rule."""
+
     name: str = Field(..., min_length=1, max_length=100)
     description: str | None = None
 
@@ -138,6 +153,7 @@ class AutomationRuleCreate(BaseModel):
 
 class AutomationRuleUpdate(BaseModel):
     """Schema for updating an automation rule."""
+
     name: str | None = Field(None, min_length=1, max_length=100)
     description: str | None = None
 
@@ -155,6 +171,7 @@ class AutomationRuleUpdate(BaseModel):
 
 class AutomationRuleResponse(BaseModel):
     """Response schema for an automation rule."""
+
     id: int
     name: str
     description: str | None
@@ -189,6 +206,7 @@ class AutomationRuleResponse(BaseModel):
 
 class AutomationRuleListResponse(BaseModel):
     """Response for listing automation rules."""
+
     rules: list[AutomationRuleResponse]
     total: int
     active_count: int
@@ -197,6 +215,7 @@ class AutomationRuleListResponse(BaseModel):
 
 class AutomationExecutionResponse(BaseModel):
     """Response schema for an automation execution."""
+
     id: int
     rule_id: int
     executed_at: datetime
@@ -212,6 +231,7 @@ class AutomationExecutionResponse(BaseModel):
 
 class AutomationTestResult(BaseModel):
     """Result of testing an automation rule."""
+
     would_execute: bool
     conditions_met: bool
     conditions_detail: list[dict]

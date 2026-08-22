@@ -23,6 +23,7 @@ from ..core.database import Base
 # ENUMS
 # =============================================================================
 
+
 class BadgeRarity(str, Enum):
     COMMON = "common"
     UNCOMMON = "uncommon"
@@ -63,8 +64,10 @@ class StreakType(str, Enum):
 # BADGES
 # =============================================================================
 
+
 class BadgeDefinition(Base):
     """Catálogo de badges disponíveis no sistema"""
+
     __tablename__ = "badge_definitions"
 
     id: Mapped[str] = mapped_column(String(50), primary_key=True)  # ex: "first_transaction"
@@ -94,25 +97,22 @@ class BadgeDefinition(Base):
 
 class UserBadge(Base):
     """Badges conquistados por usuário"""
+
     __tablename__ = "user_badges"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    user_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"),
-        index=True
-    )
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     badge_id: Mapped[str] = mapped_column(
-        ForeignKey("badge_definitions.id", ondelete="CASCADE"),
-        index=True
+        ForeignKey("badge_definitions.id", ondelete="CASCADE"), index=True
     )
 
     earned_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
-    seen_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)  # Quando viu a notificação
+    seen_at: Mapped[datetime | None] = mapped_column(
+        DateTime, nullable=True
+    )  # Quando viu a notificação
 
     # Índice único para evitar duplicatas
-    __table_args__ = (
-        UniqueConstraint('user_id', 'badge_id', name='uq_user_badges_user_badge'),
-    )
+    __table_args__ = (UniqueConstraint("user_id", "badge_id", name="uq_user_badges_user_badge"),)
 
     # Relationships
     user: Mapped["User"] = relationship(back_populates="badges")
@@ -123,15 +123,14 @@ class UserBadge(Base):
 # STREAKS
 # =============================================================================
 
+
 class UserStreak(Base):
     """Streaks ativos do usuário"""
+
     __tablename__ = "user_streaks"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    user_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"),
-        index=True
-    )
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     streak_type: Mapped[str] = mapped_column(String(30), nullable=False)  # StreakType
 
     current_count: Mapped[int] = mapped_column(Integer, default=0)
@@ -143,29 +142,21 @@ class UserStreak(Base):
     freeze_used_at: Mapped[date | None] = mapped_column(Date, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime,
-        default=utc_now,
-        onupdate=utc_now
-    )
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, onupdate=utc_now)
 
     # Índice composto
-    __table_args__ = (
-        UniqueConstraint('user_id', 'streak_type', name='uq_user_streaks_user_type'),
-    )
+    __table_args__ = (UniqueConstraint("user_id", "streak_type", name="uq_user_streaks_user_type"),)
 
     user: Mapped["User"] = relationship(back_populates="streaks")
 
 
 class StreakHistory(Base):
     """Histórico de streaks (para analytics)"""
+
     __tablename__ = "streak_history"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    user_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"),
-        index=True
-    )
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     streak_type: Mapped[str] = mapped_column(String(30), nullable=False)
 
     started_at: Mapped[date] = mapped_column(Date, nullable=False)
@@ -178,8 +169,10 @@ class StreakHistory(Base):
 # CHALLENGES (DESAFIOS)
 # =============================================================================
 
+
 class ChallengeDefinition(Base):
     """Catálogo de desafios disponíveis"""
+
     __tablename__ = "challenge_definitions"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -201,8 +194,7 @@ class ChallengeDefinition(Base):
     # Recompensas
     points_reward: Mapped[int] = mapped_column(Integer, default=50)
     badge_reward_id: Mapped[str | None] = mapped_column(
-        ForeignKey("badge_definitions.id", ondelete="SET NULL"),
-        nullable=True
+        ForeignKey("badge_definitions.id", ondelete="SET NULL"), nullable=True
     )
 
     # Quando fica disponível
@@ -215,21 +207,20 @@ class ChallengeDefinition(Base):
 
     # Relationships
     badge_reward: Mapped["BadgeDefinition | None"] = relationship()
-    user_challenges: Mapped[list["UserChallenge"]] = relationship(back_populates="challenge", lazy="noload")
+    user_challenges: Mapped[list["UserChallenge"]] = relationship(
+        back_populates="challenge", lazy="noload"
+    )
 
 
 class UserChallenge(Base):
     """Progresso do usuário em desafios"""
+
     __tablename__ = "user_challenges"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    user_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"),
-        index=True
-    )
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     challenge_id: Mapped[int] = mapped_column(
-        ForeignKey("challenge_definitions.id", ondelete="CASCADE"),
-        index=True
+        ForeignKey("challenge_definitions.id", ondelete="CASCADE"), index=True
     )
 
     status: Mapped[str] = mapped_column(String(20), default="active")  # ChallengeStatus
@@ -252,38 +243,32 @@ class UserChallenge(Base):
 # PONTOS
 # =============================================================================
 
+
 class UserPoints(Base):
     """Saldo de pontos do usuário"""
+
     __tablename__ = "user_points"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"),
-        unique=True,
-        index=True
+        ForeignKey("users.id", ondelete="CASCADE"), unique=True, index=True
     )
 
     current_points: Mapped[int] = mapped_column(Integer, default=0)
     lifetime_points: Mapped[int] = mapped_column(Integer, default=0)
 
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime,
-        default=utc_now,
-        onupdate=utc_now
-    )
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, onupdate=utc_now)
 
     user: Mapped["User"] = relationship(back_populates="points")
 
 
 class PointsTransaction(Base):
     """Histórico de movimentação de pontos"""
+
     __tablename__ = "points_transactions"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    user_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"),
-        index=True
-    )
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
 
     amount: Mapped[int] = mapped_column(Integer, nullable=False)  # Positivo ou negativo
     balance_after: Mapped[int] = mapped_column(Integer, nullable=False)

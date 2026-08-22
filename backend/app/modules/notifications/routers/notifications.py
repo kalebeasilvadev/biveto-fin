@@ -136,9 +136,7 @@ async def list_preferences(
     return await service.list_preferences(current_user)
 
 
-@router.get(
-    "/preferences/{notification_type}", response_model=NotificationPreferenceResponse
-)
+@router.get("/preferences/{notification_type}", response_model=NotificationPreferenceResponse)
 async def get_preference(
     notification_type: NotificationType,
     current_user: CurrentUser,
@@ -155,9 +153,7 @@ async def get_preference(
     return preference
 
 
-@router.put(
-    "/preferences/{notification_type}", response_model=NotificationPreferenceResponse
-)
+@router.put("/preferences/{notification_type}", response_model=NotificationPreferenceResponse)
 async def update_preference(
     notification_type: NotificationType,
     data: NotificationPreferenceUpdate,

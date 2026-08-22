@@ -1,4 +1,5 @@
 """Debts module - Debt management"""
+
 from app.modules.debts.routers.debts import router
 from app.modules.debts.schemas.debt import (
     AvalanchePlan,

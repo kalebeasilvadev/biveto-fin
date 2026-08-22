@@ -11,6 +11,7 @@ from ..core.database import Base
 
 class SplitType(str, Enum):
     """Type of split calculation"""
+
     PERCENTAGE = "percentage"  # Percentage of income (e.g., 10%)
     FIXED = "fixed"  # Fixed amount (e.g., R$ 100.00)
 
@@ -24,12 +25,11 @@ class IncomeSplitRule(Base):
     split rules to apply. Each rule generates a pending expense
     linked back to the original income.
     """
+
     __tablename__ = "income_split_rules"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), index=True
-    )
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
 
     # Basic info
     name: Mapped[str] = mapped_column(String(100))  # e.g., "Dizimo", "Poupanca"
@@ -53,9 +53,7 @@ class IncomeSplitRule(Base):
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=utc_now, onupdate=utc_now
-    )
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, onupdate=utc_now)
 
     # Relationships
     user: Mapped["User"] = relationship(back_populates="income_split_rules")
@@ -81,7 +79,7 @@ class IncomeSplitRule(Base):
             name=self.name,
             description=original_description or "",
             percentage=self.percentage or "",
-            amount=self.fixed_amount or ""
+            amount=self.fixed_amount or "",
         ).strip()
 
 

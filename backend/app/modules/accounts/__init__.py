@@ -17,6 +17,7 @@ Dependências:
 - models: Account (centralizado em app.models)
 - modules: household (para contas compartilhadas)
 """
+
 from app.modules.accounts.routers.accounts import router
 from app.modules.accounts.schemas.account import (
     AccountBase,

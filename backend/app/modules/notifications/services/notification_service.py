@@ -160,9 +160,7 @@ class NotificationService:
 
         return notification
 
-    async def mark_as_read(
-        self, user: User, notification_id: int
-    ) -> NotificationResponse | None:
+    async def mark_as_read(self, user: User, notification_id: int) -> NotificationResponse | None:
         """Mark a notification as read."""
         query = select(Notification).where(
             Notification.id == notification_id,
@@ -216,10 +214,12 @@ class NotificationService:
         query = select(Notification).where(
             Notification.user_id == user_id,
             Notification.is_dismissed == False,
-            Notification.type.in_([
-                NotificationType.INVOICE_MISSING_CURRENT.value,
-                NotificationType.INVOICE_MISSING_PRE_DUE.value,
-            ]),
+            Notification.type.in_(
+                [
+                    NotificationType.INVOICE_MISSING_CURRENT.value,
+                    NotificationType.INVOICE_MISSING_PRE_DUE.value,
+                ]
+            ),
             Notification.entity_type == "credit_card",
             Notification.entity_id == credit_card_id,
         )
@@ -230,10 +230,7 @@ class NotificationService:
         now = utc_now()
         for notification in candidates:
             data = notification.extra_data or {}
-            if (
-                data.get("ref_month") == reference_month
-                and data.get("ref_year") == reference_year
-            ):
+            if data.get("ref_month") == reference_month and data.get("ref_year") == reference_year:
                 notification.is_dismissed = True
                 notification.dismissed_at = now
                 dismissed += 1
@@ -243,9 +240,7 @@ class NotificationService:
 
         return dismissed
 
-    async def dismiss_notification(
-        self, user: User, notification_id: int
-    ) -> bool:
+    async def dismiss_notification(self, user: User, notification_id: int) -> bool:
         """Dismiss (soft delete) a notification."""
         query = select(Notification).where(
             Notification.id == notification_id,
@@ -314,14 +309,10 @@ class NotificationService:
 
     # === Notification Preferences ===
 
-    async def list_preferences(
-        self, user: User
-    ) -> list[NotificationPreferenceWithDefaults]:
+    async def list_preferences(self, user: User) -> list[NotificationPreferenceWithDefaults]:
         """List all notification preferences with defaults."""
         # Get existing preferences
-        query = select(NotificationPreference).where(
-            NotificationPreference.user_id == user.id
-        )
+        query = select(NotificationPreference).where(NotificationPreference.user_id == user.id)
         result = await self.db.execute(query)
         existing = {p.notification_type: p for p in result.scalars().all()}
 
@@ -439,9 +430,7 @@ class NotificationService:
 
     async def get_settings(self, user: User) -> NotificationSettingsResponse:
         """Get notification settings for a user."""
-        query = select(NotificationSettings).where(
-            NotificationSettings.user_id == user.id
-        )
+        query = select(NotificationSettings).where(NotificationSettings.user_id == user.id)
         result = await self.db.execute(query)
         settings = result.scalar_one_or_none()
 
@@ -457,9 +446,7 @@ class NotificationService:
         self, user: User, data: NotificationSettingsUpdate
     ) -> NotificationSettingsResponse:
         """Update notification settings."""
-        query = select(NotificationSettings).where(
-            NotificationSettings.user_id == user.id
-        )
+        query = select(NotificationSettings).where(NotificationSettings.user_id == user.id)
         result = await self.db.execute(query)
         settings = result.scalar_one_or_none()
 
@@ -528,9 +515,7 @@ class NotificationService:
         await self.db.flush()
         return True
 
-    async def list_push_subscriptions(
-        self, user: User
-    ) -> list[PushSubscriptionResponse]:
+    async def list_push_subscriptions(self, user: User) -> list[PushSubscriptionResponse]:
         """List active push subscriptions for a user."""
         query = select(PushSubscription).where(
             PushSubscription.user_id == user.id,
@@ -543,9 +528,7 @@ class NotificationService:
 
     # === Helpers ===
 
-    def _build_notification_response(
-        self, notification: Notification
-    ) -> NotificationResponse:
+    def _build_notification_response(self, notification: Notification) -> NotificationResponse:
         """Build notification response from model."""
         return NotificationResponse(
             id=notification.id,

@@ -45,7 +45,7 @@ class TransactionCreate(TransactionBase):
 
     # Campos de fatura (quando cartao de credito)
     invoice_month: int | None = None  # Mes de referencia da fatura (1-12)
-    invoice_year: int | None = None   # Ano de referencia da fatura
+    invoice_year: int | None = None  # Ano de referencia da fatura
 
     # Income split rules - IDs das regras a serem aplicadas (ex: dizimo, poupanca)
     # Apenas usado quando type=income. Gera despesas pendentes vinculadas.
@@ -54,6 +54,7 @@ class TransactionCreate(TransactionBase):
 
 class TransactionConfirm(BaseModel):
     """Confirmacao de transacao a partir de documento processado"""
+
     document_id: int | None = None  # Opcional para transacoes sem documento
     account_id: int
     amount: float = Field(ge=0)
@@ -75,7 +76,7 @@ class TransactionConfirm(BaseModel):
 
     # Campos de fatura (quando vem de PDF de fatura)
     invoice_month: int | None = None  # Mes de referencia da fatura (1-12)
-    invoice_year: int | None = None   # Ano de referencia da fatura
+    invoice_year: int | None = None  # Ano de referencia da fatura
 
     # Campos de parcelamento
     is_installment: bool = False
@@ -136,7 +137,7 @@ class TransactionResponse(TransactionBase):
     # Transfer support
     linked_transaction_id: int | None = None
     is_transfer_out: bool = False  # True se é a saída de uma transferência
-    is_transfer_in: bool = False   # True se é a entrada de uma transferência
+    is_transfer_in: bool = False  # True se é a entrada de uma transferência
 
     # Income split support
     source_transaction_id: int | None = None  # ID da receita que gerou esta despesa
@@ -167,8 +168,10 @@ class TransactionResponse(TransactionBase):
 # Schemas para Batch Confirm
 # ============================================
 
+
 class BatchConfirmItem(BaseModel):
     """Item individual do batch confirm - mesmo schema do TransactionConfirm"""
+
     document_id: int | None = None
     account_id: int
     amount: float = Field(ge=0)
@@ -204,6 +207,7 @@ class BatchConfirmItem(BaseModel):
 
 class BatchConfirmRequest(BaseModel):
     """Request para confirmar múltiplas transações de uma vez"""
+
     items: list[BatchConfirmItem] = Field(min_length=1, max_length=100)
 
     # Informacoes do cartao extraidas do PDF (para atualizar o cartao automaticamente)
@@ -213,6 +217,7 @@ class BatchConfirmRequest(BaseModel):
 
 class BatchConfirmItemResult(BaseModel):
     """Resultado de um item do batch"""
+
     index: int
     success: bool
     transaction_id: int | None = None
@@ -222,6 +227,7 @@ class BatchConfirmItemResult(BaseModel):
 
 class BatchConfirmResponse(BaseModel):
     """Resposta do batch confirm"""
+
     total: int
     success_count: int
     duplicate_count: int
@@ -233,17 +239,20 @@ class BatchConfirmResponse(BaseModel):
 # Schemas para Split Payment (pagamento dividido)
 # ============================================
 
+
 class SplitPaymentItem(BaseModel):
     """Item de pagamento em uma transacao com pagamento dividido"""
+
     payment_method: PaymentMethod
     amount: float = Field(ge=0)
     account_id: int
     benefit_card_id: int | None = None  # Se for pagamento com VA/VR
-    credit_card_id: int | None = None   # Se for pagamento com cartao de credito
+    credit_card_id: int | None = None  # Se for pagamento com cartao de credito
 
 
 class SplitPaymentRequest(BaseModel):
     """Request para criar transacao com pagamento dividido"""
+
     document_id: int | None = None
     date: date_type
     total_amount: float = Field(ge=0)
@@ -265,6 +274,7 @@ class SplitPaymentRequest(BaseModel):
 
 class SplitPaymentResponse(BaseModel):
     """Resposta de transacao com pagamento dividido"""
+
     transaction_id: int
     total_amount: float
     payments: list["TransactionPaymentResponse"]
@@ -272,6 +282,7 @@ class SplitPaymentResponse(BaseModel):
 
 class TransactionPaymentResponse(BaseModel):
     """Resposta de um pagamento individual"""
+
     id: int
     payment_method: str
     payment_method_display: str
@@ -285,6 +296,7 @@ class TransactionPaymentResponse(BaseModel):
 
 class DetectedPaymentMethod(BaseModel):
     """Metodo de pagamento detectado pelo OCR"""
+
     payment_method: str  # voucher_va, debit_card, etc.
     amount: float
     label: str  # Label original do cupom: "CARTAO ALIMENTACAO", "DEBITO"
@@ -292,6 +304,7 @@ class DetectedPaymentMethod(BaseModel):
 
 class SuggestSplitResponse(BaseModel):
     """Sugestao de split baseada em deteccao do OCR"""
+
     detected_payments: list[DetectedPaymentMethod]
     total_detected: float
     suggested_benefit_card_id: int | None = None  # Se detectou VA/VR, sugere cartao cadastrado

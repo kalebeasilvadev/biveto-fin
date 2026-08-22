@@ -15,7 +15,9 @@ class IncomeSourceBase(BaseModel):
     frequency: IncomeFrequency = IncomeFrequency.MONTHLY
     payment_day: int | None = Field(None, ge=1, le=31)
     use_business_day: bool = False  # Se True, usa dia útil ao invés de dia fixo
-    business_day_number: int | None = Field(None, ge=1, le=23)  # Qual dia útil (ex: 5 para 5º dia útil)
+    business_day_number: int | None = Field(
+        None, ge=1, le=23
+    )  # Qual dia útil (ex: 5 para 5º dia útil)
     benefit_card_number: str | None = Field(None, max_length=20)
     benefit_provider: str | None = None
     is_taxable: bool = True
@@ -69,6 +71,7 @@ class IncomeSourceResponse(IncomeSourceBase):
 
 class IncomeSourceListResponse(BaseModel):
     """Simplified response for listing"""
+
     id: int
     name: str
     type: str

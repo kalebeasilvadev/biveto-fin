@@ -9,21 +9,22 @@ Covers the key methods that will be refactored into separate files:
 - DecimalEncoder (utility)
 - chat() orchestration (with mocked DB + LLM)
 """
+
 import json
-import pytest
-import pytest_asyncio
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.chat.services.financial_agent_service import (
-    FinancialAgentService,
     DecimalEncoder,
+    FinancialAgentService,
 )
 
-
 # ========== Fixtures ==========
+
 
 @pytest.fixture
 def mock_db():
@@ -38,6 +39,7 @@ def service(mock_db):
 
 
 # ========== DecimalEncoder Tests ==========
+
 
 class TestDecimalEncoder:
     def test_encodes_decimal(self):
@@ -61,6 +63,7 @@ class TestDecimalEncoder:
 
 
 # ========== _parse_query Tests ==========
+
 
 class TestParseQuery:
     def test_default_period_is_current_month(self, service):
@@ -112,6 +115,7 @@ class TestParseQuery:
 
 # ========== _extract_monetary_value Tests ==========
 
+
 class TestExtractMonetaryValue:
     def test_extracts_with_r_dollar(self, service):
         result = service._extract_monetary_value("tenho R$ 5000 para pagar")
@@ -140,6 +144,7 @@ class TestExtractMonetaryValue:
 
 
 # ========== _classify_intent_by_keywords Tests ==========
+
 
 class TestClassifyIntentByKeywords:
     def test_detects_credit_card(self, service):
@@ -209,6 +214,7 @@ class TestClassifyIntentByKeywords:
 
 # ========== _generate_smart_suggestions Tests ==========
 
+
 class TestGenerateSmartSuggestions:
     def test_returns_max_4_suggestions(self, service):
         context = {
@@ -232,11 +238,9 @@ class TestGenerateSmartSuggestions:
 
     def test_suggests_overdue_invoices(self, service):
         context = {
-            "cartoes_credito": [{
-                "limite_total": 5000,
-                "saldo_em_aberto": 1000,
-                "faturas": [{"vencida": True}]
-            }],
+            "cartoes_credito": [
+                {"limite_total": 5000, "saldo_em_aberto": 1000, "faturas": [{"vencida": True}]}
+            ],
         }
         suggestions = service._generate_smart_suggestions("resumo geral", context)
         assert any("vencidas" in s.lower() for s in suggestions)
@@ -264,6 +268,7 @@ class TestGenerateSmartSuggestions:
 
 # ========== _build_expert_system_prompt Tests ==========
 
+
 class TestBuildExpertSystemPrompt:
     def test_includes_context_json(self, service):
         context = {"resumo": {"receitas": 5000, "despesas": 3000}}
@@ -284,6 +289,7 @@ class TestBuildExpertSystemPrompt:
 
 
 # ========== chat() Integration Test (mocked LLM + DB) ==========
+
 
 class TestChatOrchestration:
     @pytest.mark.asyncio
@@ -307,25 +313,22 @@ class TestChatOrchestration:
 
         # Mock the LLM call
         with patch.object(
-            service, '_call_llm',
+            service,
+            "_call_llm",
             new_callable=AsyncMock,
-            return_value="Voce gastou R$ 3.000 esse mes."
+            return_value="Voce gastou R$ 3.000 esse mes.",
         ):
             # Mock conversation management
             with patch.object(
-                service, '_get_or_create_conversation',
+                service,
+                "_get_or_create_conversation",
                 new_callable=AsyncMock,
-                return_value=("conv-123", MagicMock(title=None, updated_at=None))
+                return_value=("conv-123", MagicMock(title=None, updated_at=None)),
             ):
                 with patch.object(
-                    service, '_get_conversation_history',
-                    new_callable=AsyncMock,
-                    return_value=[]
+                    service, "_get_conversation_history", new_callable=AsyncMock, return_value=[]
                 ):
-                    with patch.object(
-                        service, '_save_message',
-                        new_callable=AsyncMock
-                    ):
+                    with patch.object(service, "_save_message", new_callable=AsyncMock):
                         response = await service.chat(user, "quanto gastei esse mes")
 
         assert response.message == "Voce gastou R$ 3.000 esse mes."
@@ -362,6 +365,7 @@ class TestChatOrchestration:
 
 
 # ========== Conversation Management Tests ==========
+
 
 class TestConversationManagement:
     @pytest.mark.asyncio
@@ -410,6 +414,7 @@ class TestConversationManagement:
 
 
 # ========== Edge Cases ==========
+
 
 class TestEdgeCases:
     def test_parse_query_with_empty_message(self, service):

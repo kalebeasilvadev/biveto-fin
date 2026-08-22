@@ -26,6 +26,7 @@ class BadgeCategory(str, Enum):
 
 class BadgeResponse(BaseModel):
     """Resposta de um badge"""
+
     id: str
     name: str
     description: str
@@ -46,6 +47,7 @@ class BadgeResponse(BaseModel):
 
 class BadgeEarnedEvent(BaseModel):
     """Evento quando badge é conquistado"""
+
     badge: BadgeResponse
     points_earned: int
     new_total_points: int
@@ -53,6 +55,7 @@ class BadgeEarnedEvent(BaseModel):
 
 class BadgeListResponse(BaseModel):
     """Lista de badges"""
+
     badges: list[BadgeResponse]
     total_earned: int
     total_available: int

@@ -3,6 +3,7 @@ Grocery (Mercado) Module
 
 Manages grocery shopping tracking, shopping lists, and price history.
 """
+
 from .routers import router
 from .schemas import (
     CheapestPriceResponse,

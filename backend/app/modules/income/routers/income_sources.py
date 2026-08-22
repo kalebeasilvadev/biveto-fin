@@ -48,6 +48,7 @@ class BusinessDayResponse(BaseModel):
     business_day_number: int
     date: str
 
+
 router = APIRouter()
 
 
@@ -57,14 +58,13 @@ async def get_household_user_ids(db, user) -> list[int]:
         return []
 
     result = await db.execute(
-        select(HouseholdMember.user_id).where(
-            HouseholdMember.license_id == user.license_id
-        )
+        select(HouseholdMember.user_id).where(HouseholdMember.license_id == user.license_id)
     )
     return list(result.scalars().all())
 
 
 # ========== Rotas estáticas DEVEM vir antes de /{source_id} ==========
+
 
 @router.get("/utils/business-day", response_model=BusinessDayResponse)
 async def get_business_day(
@@ -80,10 +80,7 @@ async def get_business_day(
     try:
         business_day = get_nth_business_day(year, month, n)
         return BusinessDayResponse(
-            year=year,
-            month=month,
-            business_day_number=n,
-            date=business_day.isoformat()
+            year=year, month=month, business_day_number=n, date=business_day.isoformat()
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -101,11 +98,7 @@ async def preview_income_transactions(
     Não cria nada no banco, apenas mostra o que seria gerado.
     """
     service = IncomeTransactionService(db)
-    preview = await service.preview_transactions(
-        user_id=current_user.id,
-        year=year,
-        month=month
-    )
+    preview = await service.preview_transactions(user_id=current_user.id, year=year, month=month)
     return preview
 
 
@@ -124,8 +117,7 @@ async def generate_income_transactions(
     amount_overrides_dict = None
     if data.amount_overrides:
         amount_overrides_dict = {
-            override.source_id: override.amount
-            for override in data.amount_overrides
+            override.source_id: override.amount for override in data.amount_overrides
         }
 
     service = IncomeTransactionService(db)
@@ -135,7 +127,7 @@ async def generate_income_transactions(
         month=data.month,
         overwrite=data.overwrite,
         source_ids=data.source_ids,  # Filtrar por IDs específicos
-        amount_overrides=amount_overrides_dict
+        amount_overrides=amount_overrides_dict,
     )
 
     return {
@@ -147,6 +139,7 @@ async def generate_income_transactions(
 
 
 # ========== Rotas CRUD ==========
+
 
 @router.get("", response_model=list[IncomeSourceListResponse])
 async def list_income_sources(current_user: CurrentUser, db: DbSession):
@@ -161,12 +154,12 @@ async def list_income_sources(current_user: CurrentUser, db: DbSession):
                 or_(
                     and_(
                         IncomeSource.user_id == current_user.id,
-                        IncomeSource.ownership_type == "personal"
+                        IncomeSource.ownership_type == "personal",
                     ),
                     and_(
                         IncomeSource.user_id.in_(household_user_ids),
-                        IncomeSource.ownership_type == "household"
-                    )
+                        IncomeSource.ownership_type == "household",
+                    ),
                 )
             )
         )
@@ -234,9 +227,7 @@ async def create_income_source(
 
     # Validate category_id if provided
     if data.category_id:
-        cat_result = await db.execute(
-            select(Category).where(Category.id == data.category_id)
-        )
+        cat_result = await db.execute(select(Category).where(Category.id == data.category_id))
         if not cat_result.scalar_one_or_none():
             raise HTTPException(status_code=400, detail="Categoria não encontrada")
 
@@ -269,9 +260,7 @@ async def create_income_source(
     category_name = None
 
     if source.account_id:
-        acc_result = await db.execute(
-            select(Account.name).where(Account.id == source.account_id)
-        )
+        acc_result = await db.execute(select(Account.name).where(Account.id == source.account_id))
         account_name = acc_result.scalar_one_or_none()
 
     if source.category_id:
@@ -328,9 +317,7 @@ async def get_income_source(
     category_name = None
 
     if source.account_id:
-        acc_result = await db.execute(
-            select(Account.name).where(Account.id == source.account_id)
-        )
+        acc_result = await db.execute(select(Account.name).where(Account.id == source.account_id))
         account_name = acc_result.scalar_one_or_none()
 
     if source.category_id:
@@ -411,9 +398,7 @@ async def update_income_source(
     category_name = None
 
     if source.account_id:
-        acc_result = await db.execute(
-            select(Account.name).where(Account.id == source.account_id)
-        )
+        acc_result = await db.execute(select(Account.name).where(Account.id == source.account_id))
         account_name = acc_result.scalar_one_or_none()
 
     if source.category_id:
@@ -471,6 +456,7 @@ async def delete_income_source(
 
 # ========== Rotas com {source_id} no final ==========
 
+
 @router.post("/{source_id}/generate-transaction")
 async def generate_single_source_transaction(
     source_id: int,
@@ -487,14 +473,11 @@ async def generate_single_source_transaction(
         user_id=current_user.id,
         year=data.year,
         month=data.month,
-        overwrite=data.overwrite
+        overwrite=data.overwrite,
     )
 
     if not transactions:
-        raise HTTPException(
-            status_code=404,
-            detail="Fonte não encontrada ou transação já existe"
-        )
+        raise HTTPException(status_code=404, detail="Fonte não encontrada ou transação já existe")
 
     return {
         "message": f"{len(transactions)} transação(ões) criada(s)",

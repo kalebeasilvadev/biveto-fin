@@ -4,6 +4,7 @@ API Router Configuration
 Este arquivo configura todos os routers da API, importando dos módulos modularizados.
 A estrutura modular permite fácil manutenção e futura extração para microserviços.
 """
+
 from fastapi import APIRouter
 
 from app.modules.accounts.routers.accounts import router as accounts_router
@@ -79,7 +80,9 @@ api_router.include_router(recurring_router, prefix="/recurring", tags=["Recorren
 
 # Household module
 api_router.include_router(family_router, prefix="/family", tags=["Familia"])
-api_router.include_router(migration_router, prefix="/household/migration", tags=["Migração Household"])
+api_router.include_router(
+    migration_router, prefix="/household/migration", tags=["Migração Household"]
+)
 
 # Chat module
 api_router.include_router(chat_router, prefix="/chat", tags=["Chat - Agente IA"])
@@ -92,11 +95,17 @@ api_router.include_router(credit_cards_router, prefix="/credit-cards", tags=["Ca
 api_router.include_router(invoices_router, prefix="/invoices", tags=["Faturas"])
 
 # Benefit Cards module
-api_router.include_router(benefit_cards_router, prefix="/benefit-cards", tags=["Cartões de Benefício"])
+api_router.include_router(
+    benefit_cards_router, prefix="/benefit-cards", tags=["Cartões de Benefício"]
+)
 
 # Income module
-api_router.include_router(income_sources_router, prefix="/income-sources", tags=["Fontes de Receita"])
-api_router.include_router(income_splits_router, prefix="/income-split-rules", tags=["Regras de Divisão de Receita"])
+api_router.include_router(
+    income_sources_router, prefix="/income-sources", tags=["Fontes de Receita"]
+)
+api_router.include_router(
+    income_splits_router, prefix="/income-split-rules", tags=["Regras de Divisão de Receita"]
+)
 
 # API Keys module (para integrações externas)
 api_router.include_router(api_keys_router, tags=["API Keys"])

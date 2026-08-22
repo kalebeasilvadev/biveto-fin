@@ -44,10 +44,7 @@ async def get_series(
     service = InstallmentService(db)
     series = await service.get_series_by_id(current_user, series_id)
     if not series:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Série não encontrada"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Série não encontrada")
     return series
 
 
@@ -153,10 +150,7 @@ async def update_series(
     series = await service.get_series_by_id(current_user, series_id)
 
     if not series:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Série não encontrada"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Série não encontrada")
 
     # Atualizar campos fornecidos
     if data.description is not None:

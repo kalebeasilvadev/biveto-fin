@@ -39,8 +39,7 @@ async def get_weekly_review(
     """
     if week < 1 or week > 53:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Week must be between 1 and 53"
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Week must be between 1 and 53"
         )
 
     service = WeeklyReviewService(session)

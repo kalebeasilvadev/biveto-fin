@@ -12,7 +12,6 @@ Argumentos:
 """
 
 import argparse
-import os
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -53,12 +52,12 @@ def cleanup_uploads(days: int = 30, dry_run: bool = False) -> dict:
     }
 
     mode = "DRY-RUN" if dry_run else "LIMPEZA"
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f" {mode} DE UPLOADS - Arquivos > {days} dias")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"Diretório: {uploads_dir}")
     print(f"Data limite: {cutoff_date.strftime('%Y-%m-%d %H:%M:%S')}")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
     # Percorrer todos os arquivos no diretório de uploads
     for user_dir in uploads_dir.iterdir():
@@ -66,7 +65,7 @@ def cleanup_uploads(days: int = 30, dry_run: bool = False) -> dict:
             continue
 
         # Ignorar arquivos de sistema
-        if user_dir.name.startswith('.'):
+        if user_dir.name.startswith("."):
             continue
 
         print(f"Processando pasta do usuário: {user_dir.name}")
@@ -76,7 +75,7 @@ def cleanup_uploads(days: int = 30, dry_run: bool = False) -> dict:
                 continue
 
             # Ignorar arquivos de sistema
-            if file_path.name.startswith('.'):
+            if file_path.name.startswith("."):
                 continue
 
             stats["files_checked"] += 1
@@ -114,34 +113,29 @@ def cleanup_uploads(days: int = 30, dry_run: bool = False) -> dict:
                 user_dir.rmdir()
 
     # Resumo
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(" RESUMO")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"Arquivos verificados: {stats['files_checked']}")
-    print(f"Arquivos {'que seriam removidos' if dry_run else 'removidos'}: {stats['files_removed']}")
+    print(
+        f"Arquivos {'que seriam removidos' if dry_run else 'removidos'}: {stats['files_removed']}"
+    )
     print(f"Arquivos mantidos: {stats['files_skipped']}")
-    print(f"Espaço {'que seria liberado' if dry_run else 'liberado'}: {stats['bytes_freed'] / 1024 / 1024:.2f} MB")
+    print(
+        f"Espaço {'que seria liberado' if dry_run else 'liberado'}: {stats['bytes_freed'] / 1024 / 1024:.2f} MB"
+    )
     print(f"Erros: {stats['errors']}")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
     return stats
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Limpa arquivos de upload antigos"
-    )
+    parser = argparse.ArgumentParser(description="Limpa arquivos de upload antigos")
     parser.add_argument(
-        "--days",
-        type=int,
-        default=30,
-        help="Remove arquivos com mais de N dias (padrão: 30)"
+        "--days", type=int, default=30, help="Remove arquivos com mais de N dias (padrão: 30)"
     )
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Apenas mostra o que seria removido"
-    )
+    parser.add_argument("--dry-run", action="store_true", help="Apenas mostra o que seria removido")
 
     args = parser.parse_args()
 

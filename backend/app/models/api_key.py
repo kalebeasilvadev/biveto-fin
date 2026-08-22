@@ -11,6 +11,7 @@ from ..core.database import Base
 
 class APIKeyStatus(str, Enum):
     """Status da API Key"""
+
     active = "active"
     revoked = "revoked"
     expired = "expired"
@@ -21,6 +22,7 @@ class APIKey(Base):
     API Keys para acesso externo (MCP, integrações).
     Cada usuário pode ter múltiplas API Keys.
     """
+
     __tablename__ = "api_keys"
 
     id: Mapped[int] = mapped_column(primary_key=True)

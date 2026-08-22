@@ -2,6 +2,7 @@
 REST API endpoints for income split rules.
 Allows users to configure rules for splitting income into expenses (e.g., tithe, savings).
 """
+
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Query
@@ -23,6 +24,7 @@ router = APIRouter()
 
 class PreviewRequest(BaseModel):
     """Request body for previewing splits"""
+
     amount: float
     rule_ids: list[int] | None = None
     description: str | None = None
@@ -58,9 +60,7 @@ async def create_income_split_rule(
     """
     # Validate category_id if provided
     if data.category_id:
-        cat_result = await db.execute(
-            select(Category).where(Category.id == data.category_id)
-        )
+        cat_result = await db.execute(select(Category).where(Category.id == data.category_id))
         if not cat_result.scalar_one_or_none():
             raise HTTPException(status_code=400, detail="Categoria não encontrada")
 
@@ -72,9 +72,7 @@ async def create_income_split_rule(
     # Get category name
     category_name = None
     if rule.category_id:
-        cat_result = await db.execute(
-            select(Category.name).where(Category.id == rule.category_id)
-        )
+        cat_result = await db.execute(select(Category.name).where(Category.id == rule.category_id))
         category_name = cat_result.scalar_one_or_none()
 
     return IncomeSplitRuleResponse(
@@ -110,9 +108,7 @@ async def get_income_split_rule(
     # Get category name
     category_name = None
     if rule.category_id:
-        cat_result = await db.execute(
-            select(Category.name).where(Category.id == rule.category_id)
-        )
+        cat_result = await db.execute(select(Category.name).where(Category.id == rule.category_id))
         category_name = cat_result.scalar_one_or_none()
 
     return IncomeSplitRuleResponse(
@@ -142,9 +138,7 @@ async def update_income_split_rule(
     """Atualiza uma regra de divisão existente"""
     # Validate category_id if being updated
     if data.category_id:
-        cat_result = await db.execute(
-            select(Category).where(Category.id == data.category_id)
-        )
+        cat_result = await db.execute(select(Category).where(Category.id == data.category_id))
         if not cat_result.scalar_one_or_none():
             raise HTTPException(status_code=400, detail="Categoria não encontrada")
 
@@ -160,9 +154,7 @@ async def update_income_split_rule(
     # Get category name
     category_name = None
     if rule.category_id:
-        cat_result = await db.execute(
-            select(Category.name).where(Category.id == rule.category_id)
-        )
+        cat_result = await db.execute(select(Category.name).where(Category.id == rule.category_id))
         category_name = cat_result.scalar_one_or_none()
 
     return IncomeSplitRuleResponse(

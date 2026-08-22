@@ -1,6 +1,7 @@
 """
 Grocery Analytics Service - Analytics and insights
 """
+
 from collections import defaultdict
 from datetime import date, timedelta
 
@@ -63,7 +64,7 @@ class GroceryAnalyticsService:
                 user.id,
                 household_user_ids,
                 member,
-            )
+            ),
         )
 
         result = await self.db.execute(query)
@@ -102,8 +103,8 @@ class GroceryAnalyticsService:
 
         # Determine trend
         if len(data_points) >= 2:
-            first_half = sum(p.total for p in data_points[:len(data_points)//2])
-            second_half = sum(p.total for p in data_points[len(data_points)//2:])
+            first_half = sum(p.total for p in data_points[: len(data_points) // 2])
+            second_half = sum(p.total for p in data_points[len(data_points) // 2 :])
             if second_half > first_half * 1.1:
                 trend = "up"
             elif second_half < first_half * 0.9:
@@ -147,16 +148,14 @@ class GroceryAnalyticsService:
                 user.id,
                 household_user_ids,
                 member,
-            )
+            ),
         )
 
         result = await self.db.execute(query)
         purchases = result.scalars().all()
 
         # Group by category
-        category_data: dict[str, dict] = defaultdict(
-            lambda: {"total": 0, "count": 0, "prices": []}
-        )
+        category_data: dict[str, dict] = defaultdict(lambda: {"total": 0, "count": 0, "prices": []})
 
         for purchase in purchases:
             cat = purchase.category
@@ -176,7 +175,9 @@ class GroceryAnalyticsService:
                 total=round(data["total"], 2),
                 percentage=round(data["total"] / total * 100, 1) if total > 0 else 0,
                 item_count=data["count"],
-                average_price=round(sum(data["prices"]) / len(data["prices"]), 2) if data["prices"] else 0,
+                average_price=round(sum(data["prices"]) / len(data["prices"]), 2)
+                if data["prices"]
+                else 0,
             )
             for cat, data in category_data.items()
         ]
@@ -216,7 +217,7 @@ class GroceryAnalyticsService:
                 user.id,
                 household_user_ids,
                 member,
-            )
+            ),
         )
 
         result = await self.db.execute(query)
@@ -283,7 +284,7 @@ class GroceryAnalyticsService:
                 user.id,
                 household_user_ids,
                 member,
-            )
+            ),
         )
 
         result = await self.db.execute(query)
@@ -294,7 +295,8 @@ class GroceryAnalyticsService:
         # Calculate totals
         total = sum(float(p.total_price) for p in purchases)
         non_essential_total = sum(
-            float(p.total_price) for p in purchases
+            float(p.total_price)
+            for p in purchases
             if p.necessity_type == NecessityType.NON_ESSENTIAL.value
         )
 
@@ -302,26 +304,26 @@ class GroceryAnalyticsService:
         if total > 0:
             non_essential_pct = non_essential_total / total * 100
             if non_essential_pct > 30:
-                insights.append(Insight(
-                    type="warning",
-                    title="Gastos supérfluos elevados",
-                    description=f"Você gastou {non_essential_pct:.0f}% do total em itens não essenciais. Considere reduzir.",
-                    percentage=round(non_essential_pct, 1),
-                ))
+                insights.append(
+                    Insight(
+                        type="warning",
+                        title="Gastos supérfluos elevados",
+                        description=f"Você gastou {non_essential_pct:.0f}% do total em itens não essenciais. Considere reduzir.",
+                        percentage=round(non_essential_pct, 1),
+                    )
+                )
             elif non_essential_pct < 15:
-                insights.append(Insight(
-                    type="success",
-                    title="Bom controle de supérfluos",
-                    description=f"Apenas {non_essential_pct:.0f}% dos gastos foram em itens não essenciais.",
-                    percentage=round(non_essential_pct, 1),
-                ))
+                insights.append(
+                    Insight(
+                        type="success",
+                        title="Bom controle de supérfluos",
+                        description=f"Apenas {non_essential_pct:.0f}% dos gastos foram em itens não essenciais.",
+                        percentage=round(non_essential_pct, 1),
+                    )
+                )
 
         # Insight 2: Most expensive items
-        expensive_items = sorted(
-            purchases,
-            key=lambda p: float(p.total_price),
-            reverse=True
-        )[:5]
+        expensive_items = sorted(purchases, key=lambda p: float(p.total_price), reverse=True)[:5]
 
         top_expensive = [
             {
@@ -334,27 +336,23 @@ class GroceryAnalyticsService:
 
         if expensive_items:
             top_item = expensive_items[0]
-            insights.append(Insight(
-                type="info",
-                title="Item mais caro",
-                description=f"{top_item.product_name} foi seu item mais caro (R$ {float(top_item.total_price):.2f}).",
-                value=float(top_item.total_price),
-            ))
+            insights.append(
+                Insight(
+                    type="info",
+                    title="Item mais caro",
+                    description=f"{top_item.product_name} foi seu item mais caro (R$ {float(top_item.total_price):.2f}).",
+                    value=float(top_item.total_price),
+                )
+            )
 
         # Insight 3: Most frequent items
         item_counts: dict[str, int] = defaultdict(int)
         for p in purchases:
             item_counts[p.product_name.lower()] += 1
 
-        most_frequent = sorted(
-            item_counts.items(),
-            key=lambda x: -x[1]
-        )[:5]
+        most_frequent = sorted(item_counts.items(), key=lambda x: -x[1])[:5]
 
-        frequent_items = [
-            {"name": name.title(), "count": count}
-            for name, count in most_frequent
-        ]
+        frequent_items = [{"name": name.title(), "count": count} for name, count in most_frequent]
 
         # Potential savings (assume 10% reduction in non-essential)
         potential_savings = non_essential_total * 0.1
@@ -392,7 +390,7 @@ class GroceryAnalyticsService:
                 user.id,
                 household_user_ids,
                 member,
-            )
+            ),
         )
 
         result = await self.db.execute(query)

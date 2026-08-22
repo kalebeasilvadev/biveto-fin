@@ -56,6 +56,7 @@ class GamificationSummary(BaseModel):
 
 class GamificationEvent(BaseModel):
     """Evento de gamificação (retornado após ações)"""
+
     badges_earned: list[BadgeResponse]
     streak_updated: StreakResponse | None
     challenges_updated: list[ChallengeResponse]

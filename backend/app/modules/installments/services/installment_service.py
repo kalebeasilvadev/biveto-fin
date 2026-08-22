@@ -145,13 +145,17 @@ class InstallmentService:
             InstallmentSeries se encontrar match, None caso contrario
         """
         # DEBUG: Log dos parâmetros recebidos
-        print(f"[FUZZY DEBUG] find_matching_series_fuzzy chamada: "
-              f"merchant='{merchant_name}', amount={installment_amount}, "
-              f"total={installment_total}, card_id={credit_card_id}")
+        print(
+            f"[FUZZY DEBUG] find_matching_series_fuzzy chamada: "
+            f"merchant='{merchant_name}', amount={installment_amount}, "
+            f"total={installment_total}, card_id={credit_card_id}"
+        )
 
         if not merchant_name or not installment_amount or not installment_total:
-            print(f"[FUZZY DEBUG] Retornando None - parametros invalidos: "
-                  f"merchant={bool(merchant_name)}, amount={bool(installment_amount)}, total={bool(installment_total)}")
+            print(
+                f"[FUZZY DEBUG] Retornando None - parametros invalidos: "
+                f"merchant={bool(merchant_name)}, amount={bool(installment_amount)}, total={bool(installment_total)}"
+            )
             return None
 
         # Normalizar merchant name da fatura
@@ -187,12 +191,16 @@ class InstallmentService:
         # DEBUG: Log dos candidatos encontrados
         print(f"[FUZZY DEBUG] Candidatos encontrados: {len(candidates)}")
         for c in candidates[:5]:  # Mostrar max 5
-            print(f"  - id={c.id}, merchant='{c.merchant_name}', amount={c.installment_amount}, "
-                  f"count={c.installment_count}, paid={c.paid_count}")
+            print(
+                f"  - id={c.id}, merchant='{c.merchant_name}', amount={c.installment_amount}, "
+                f"count={c.installment_count}, paid={c.paid_count}"
+            )
 
         if not candidates:
-            print(f"[FUZZY DEBUG] Nenhum candidato encontrado para: "
-                  f"amount_range=[{min_amount:.2f}, {max_amount:.2f}], total={installment_total}")
+            print(
+                f"[FUZZY DEBUG] Nenhum candidato encontrado para: "
+                f"amount_range=[{min_amount:.2f}, {max_amount:.2f}], total={installment_total}"
+            )
             return None
 
         # Score candidates por similaridade do nome do merchant
@@ -234,17 +242,21 @@ class InstallmentService:
                 best_score = similarity
                 best_match = series
 
-                print(f"[InstallmentService] Fuzzy match candidato: "
-                      f"'{merchant_name}' ~= '{series.merchant_name}' "
-                      f"(score: {similarity:.2f})")
+                print(
+                    f"[InstallmentService] Fuzzy match candidato: "
+                    f"'{merchant_name}' ~= '{series.merchant_name}' "
+                    f"(score: {similarity:.2f})"
+                )
 
                 # Se match quase perfeito, usar imediatamente
                 if similarity >= 0.9:
                     break
 
         if best_match:
-            print(f"[InstallmentService] Fuzzy match encontrado: series_id={best_match.id}, "
-                  f"merchant='{best_match.merchant_name}', score={best_score:.2f}")
+            print(
+                f"[InstallmentService] Fuzzy match encontrado: series_id={best_match.id}, "
+                f"merchant='{best_match.merchant_name}', score={best_score:.2f}"
+            )
 
         return best_match
 
@@ -264,8 +276,8 @@ class InstallmentService:
             return ""
 
         # Remove acentos
-        name = unicodedata.normalize('NFD', name)
-        name = ''.join(c for c in name if unicodedata.category(c) != 'Mn')
+        name = unicodedata.normalize("NFD", name)
+        name = "".join(c for c in name if unicodedata.category(c) != "Mn")
 
         # Lowercase
         name = name.lower()
@@ -273,30 +285,31 @@ class InstallmentService:
         # Remove padroes de parcela: "3/12", "PARC.3/12", "PARC 3/12", "(Parcela 3 de 12)"
         # IMPORTANTE: Padroes mais especificos devem vir ANTES dos genericos
         import re
+
         parcela_patterns = [
-            r'\s*\(parcela\s*\d+\s*de\s*\d+\)',  # "(Parcela 3 de 12)"
-            r'\s*parc\.?\s*\d+/\d+',  # "PARC.3/12" ou "PARC 3/12"
-            r'\s*\d+/\d+\s*$',  # "3/12" no final (mais generico)
+            r"\s*\(parcela\s*\d+\s*de\s*\d+\)",  # "(Parcela 3 de 12)"
+            r"\s*parc\.?\s*\d+/\d+",  # "PARC.3/12" ou "PARC 3/12"
+            r"\s*\d+/\d+\s*$",  # "3/12" no final (mais generico)
         ]
         for pattern in parcela_patterns:
-            name = re.sub(pattern, '', name, flags=re.IGNORECASE)
+            name = re.sub(pattern, "", name, flags=re.IGNORECASE)
 
         # Remove sufixos de empresa
         company_suffixes = [
-            r'\s+ltda\.?$',
-            r'\s+s\.?a\.?$',
-            r'\s+eireli$',
-            r'\s+mei$',
-            r'\s+me$',
+            r"\s+ltda\.?$",
+            r"\s+s\.?a\.?$",
+            r"\s+eireli$",
+            r"\s+mei$",
+            r"\s+me$",
         ]
         for pattern in company_suffixes:
-            name = re.sub(pattern, '', name, flags=re.IGNORECASE)
+            name = re.sub(pattern, "", name, flags=re.IGNORECASE)
 
         # Remove caracteres especiais
-        name = re.sub(r'[\*\-_\.]', ' ', name)
+        name = re.sub(r"[\*\-_\.]", " ", name)
 
         # Remove espacos extras
-        name = ' '.join(name.split())
+        name = " ".join(name.split())
 
         return name.strip()
 
@@ -435,9 +448,9 @@ class InstallmentService:
         """
         # Buscar todas as transações da série
         result = await self.db.execute(
-            select(Transaction).where(
-                Transaction.installment_series_id == series.id
-            ).order_by(Transaction.installment_number)
+            select(Transaction)
+            .where(Transaction.installment_series_id == series.id)
+            .order_by(Transaction.installment_number)
         )
         transactions = list(result.scalars().all())
 
@@ -449,36 +462,42 @@ class InstallmentService:
         for i in range(1, series.installment_count + 1):
             if i in registered:
                 t = registered[i]
-                installments_status.append({
-                    'number': i,
-                    'status': 'paid' if t.is_paid else 'registered',
-                    'date': t.date.isoformat() if t.date else None,
-                    'transaction_id': t.id,
-                })
+                installments_status.append(
+                    {
+                        "number": i,
+                        "status": "paid" if t.is_paid else "registered",
+                        "date": t.date.isoformat() if t.date else None,
+                        "transaction_id": t.id,
+                    }
+                )
             else:
                 # Calcular data esperada
                 expected_date = series.first_installment_date + relativedelta(months=i - 1)
-                installments_status.append({
-                    'number': i,
-                    'status': 'pending',
-                    'expected_date': expected_date.isoformat(),
-                    'transaction_id': None,
-                })
+                installments_status.append(
+                    {
+                        "number": i,
+                        "status": "pending",
+                        "expected_date": expected_date.isoformat(),
+                        "transaction_id": None,
+                    }
+                )
 
-        paid_count = sum(1 for s in installments_status if s['status'] == 'paid')
+        paid_count = sum(1 for s in installments_status if s["status"] == "paid")
 
         return {
-            'series_id': series.id,
-            'description': series.description,
-            'merchant_name': series.merchant_name,
-            'total_amount': float(series.total_amount),
-            'installment_amount': float(series.installment_amount),
-            'installment_count': series.installment_count,
-            'paid_count': paid_count,
-            'remaining_count': series.installment_count - paid_count,
-            'remaining_amount': float(series.installment_amount * (series.installment_count - paid_count)),
-            'status': series.status,
-            'installments': installments_status,
+            "series_id": series.id,
+            "description": series.description,
+            "merchant_name": series.merchant_name,
+            "total_amount": float(series.total_amount),
+            "installment_amount": float(series.installment_amount),
+            "installment_count": series.installment_count,
+            "paid_count": paid_count,
+            "remaining_count": series.installment_count - paid_count,
+            "remaining_amount": float(
+                series.installment_amount * (series.installment_count - paid_count)
+            ),
+            "status": series.status,
+            "installments": installments_status,
         }
 
     async def create_series(
@@ -551,7 +570,7 @@ class InstallmentService:
                 # Usar 409 Conflict para que o frontend trate como "skip e continuar"
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
-                    detail=f"Parcela {installment_number}/{series.installment_count} de '{series.description}' (R$ {series.total_amount:.2f}) já cadastrada em {existing.date.strftime('%d/%m/%Y')}"
+                    detail=f"Parcela {installment_number}/{series.installment_count} de '{series.description}' (R$ {series.total_amount:.2f}) já cadastrada em {existing.date.strftime('%d/%m/%Y')}",
                 )
 
         # Usar credit_card_id da série se não fornecido
@@ -660,10 +679,12 @@ class InstallmentService:
         """
         created_transactions = []
 
-        print(f"[INSTALLMENT_SVC] create_future_installments: series_id={series.id}, "
-              f"first_installment_date={series.first_installment_date}, "
-              f"from_installment={from_installment}, total={series.installment_count}, "
-              f"current_invoice={current_invoice_month}/{current_invoice_year}")
+        print(
+            f"[INSTALLMENT_SVC] create_future_installments: series_id={series.id}, "
+            f"first_installment_date={series.first_installment_date}, "
+            f"from_installment={from_installment}, total={series.installment_count}, "
+            f"current_invoice={current_invoice_month}/{current_invoice_year}"
+        )
 
         # Buscar cartão de crédito se houver
         credit_card = None
@@ -676,9 +697,12 @@ class InstallmentService:
 
             if credit_card:
                 from app.modules.credit_cards.services.invoice_service import InvoiceService
+
                 invoice_service = InvoiceService(self.db)
-                print(f"[INSTALLMENT_SVC] Card: closing_day={credit_card.closing_day}, "
-                      f"due_day={credit_card.due_day}")
+                print(
+                    f"[INSTALLMENT_SVC] Card: closing_day={credit_card.closing_day}, "
+                    f"due_day={credit_card.due_day}"
+                )
 
         for i in range(from_installment + 1, series.installment_count + 1):
             existing = await self.find_existing_installment(series, i)
@@ -687,7 +711,9 @@ class InstallmentService:
 
             # Calcular data estimada da parcela (para registro)
             estimated_date = series.first_installment_date + relativedelta(months=i - 1)
-            print(f"[INSTALLMENT_SVC] Parcela {i}/{series.installment_count}: estimated_date={estimated_date}")
+            print(
+                f"[INSTALLMENT_SVC] Parcela {i}/{series.installment_count}: estimated_date={estimated_date}"
+            )
 
             # Se tem cartão de crédito, obter/criar fatura para o período
             invoice_id = None
@@ -701,32 +727,38 @@ class InstallmentService:
                     ref_month = future_date.month
                     ref_year = future_date.year
 
-                    print(f"[INSTALLMENT_SVC] Parcela {i}: usando fatura atual + {months_offset} meses "
-                          f"-> ({ref_month}/{ref_year})")
+                    print(
+                        f"[INSTALLMENT_SVC] Parcela {i}: usando fatura atual + {months_offset} meses "
+                        f"-> ({ref_month}/{ref_year})"
+                    )
 
                     # Calcular datas de fechamento/vencimento para o mês
-                    dates = invoice_service.calculate_invoice_dates(credit_card, ref_month, ref_year)
+                    dates = invoice_service.calculate_invoice_dates(
+                        credit_card, ref_month, ref_year
+                    )
 
                     invoice = await invoice_service.get_or_create_invoice(
                         user=user,
                         credit_card=credit_card,
                         reference_month=ref_month,
                         reference_year=ref_year,
-                        closing_date=dates['closing_date'],
-                        due_date=dates['due_date'],
+                        closing_date=dates["closing_date"],
+                        due_date=dates["due_date"],
                     )
                 else:
                     # Fallback: calcular pelo período baseado na data (comportamento antigo)
                     period = invoice_service.calculate_invoice_period(credit_card, estimated_date)
-                    print(f"[INSTALLMENT_SVC] Parcela {i}: usando calculate_invoice_period "
-                          f"-> ({period['reference_month']}/{period['reference_year']})")
+                    print(
+                        f"[INSTALLMENT_SVC] Parcela {i}: usando calculate_invoice_period "
+                        f"-> ({period['reference_month']}/{period['reference_year']})"
+                    )
                     invoice = await invoice_service.get_or_create_invoice(
                         user=user,
                         credit_card=credit_card,
-                        reference_month=period['reference_month'],
-                        reference_year=period['reference_year'],
-                        closing_date=period['closing_date'],
-                        due_date=period['due_date'],
+                        reference_month=period["reference_month"],
+                        reference_year=period["reference_year"],
+                        closing_date=period["closing_date"],
+                        due_date=period["due_date"],
                     )
 
                 invoice_id = invoice.id
@@ -759,6 +791,7 @@ class InstallmentService:
         # Atualizar totais das faturas criadas (batch)
         if credit_card and invoice_service:
             from app.models.credit_card_invoice import CreditCardInvoice
+
             invoice_ids = list(set(t.invoice_id for t in created_transactions if t.invoice_id))
             if invoice_ids:
                 result = await self.db.execute(
@@ -891,9 +924,7 @@ class InstallmentService:
         limit: int = 50,
     ) -> list[InstallmentSeries]:
         """Lista séries de parcelas do usuário"""
-        query = select(InstallmentSeries).where(
-            InstallmentSeries.user_id == user.id
-        )
+        query = select(InstallmentSeries).where(InstallmentSeries.user_id == user.id)
 
         if status_filter:
             query = query.where(InstallmentSeries.status == status_filter)
@@ -935,21 +966,21 @@ class InstallmentService:
         - Sugestões de ação
         """
         result = {
-            'is_installment': item.get('is_installment', False),
-            'series_found': None,
-            'series_status': None,
-            'installment_exists': False,
-            'suggestion': None,
+            "is_installment": item.get("is_installment", False),
+            "series_found": None,
+            "series_status": None,
+            "installment_exists": False,
+            "suggestion": None,
         }
 
-        if not result['is_installment']:
-            result['suggestion'] = 'create_single'  # Criar transação única
+        if not result["is_installment"]:
+            result["suggestion"] = "create_single"  # Criar transação única
             return result
 
-        installment_current = item.get('installment_current')
-        installment_total = item.get('installment_total')
-        amount = item.get('amount', 0)
-        description = item.get('description', '')
+        installment_current = item.get("installment_current")
+        installment_total = item.get("installment_total")
+        amount = item.get("amount", 0)
+        description = item.get("description", "")
 
         # Buscar série existente
         series = await self.find_matching_series(
@@ -961,43 +992,44 @@ class InstallmentService:
         )
 
         if series:
-            result['series_found'] = {
-                'id': series.id,
-                'description': series.description,
-                'merchant_name': series.merchant_name,
-                'installment_count': series.installment_count,
-                'paid_count': series.paid_count,
+            result["series_found"] = {
+                "id": series.id,
+                "description": series.description,
+                "merchant_name": series.merchant_name,
+                "installment_count": series.installment_count,
+                "paid_count": series.paid_count,
             }
 
             # Verificar se esta parcela específica já existe
             existing = await self.find_existing_installment(series, installment_current)
             if existing:
-                result['installment_exists'] = True
-                result['suggestion'] = 'skip'  # Pular, já existe
+                result["installment_exists"] = True
+                result["suggestion"] = "skip"  # Pular, já existe
             else:
                 # Verificar se há parcelas anteriores não cadastradas
                 series_status = await self.get_series_status(series)
-                result['series_status'] = series_status
+                result["series_status"] = series_status
 
                 pending_before = [
-                    s for s in series_status['installments']
-                    if s['number'] < installment_current and s['status'] == 'pending'
+                    s
+                    for s in series_status["installments"]
+                    if s["number"] < installment_current and s["status"] == "pending"
                 ]
 
                 if pending_before:
-                    result['suggestion'] = 'mark_previous_paid'
-                    result['pending_installments'] = pending_before
+                    result["suggestion"] = "mark_previous_paid"
+                    result["pending_installments"] = pending_before
                 else:
-                    result['suggestion'] = 'add_to_series'
+                    result["suggestion"] = "add_to_series"
         else:
             # Série não existe, sugerir criar
-            result['suggestion'] = 'create_series'
-            result['suggested_series'] = {
-                'description': description,
-                'merchant_name': description,
-                'installment_amount': amount,
-                'installment_count': installment_total,
-                'current_installment': installment_current,
+            result["suggestion"] = "create_series"
+            result["suggested_series"] = {
+                "description": description,
+                "merchant_name": description,
+                "installment_amount": amount,
+                "installment_count": installment_total,
+                "current_installment": installment_current,
             }
 
         return result

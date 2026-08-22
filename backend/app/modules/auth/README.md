@@ -57,12 +57,21 @@ auth/
 ```python
 from app.modules.auth import (
     # Schemas
-    LoginRequest, Token, TokenPayload,
-    UserCreate, UserUpdate, UserResponse, ChangePassword,
-    InviteValidation, InviteRegister,
+    LoginRequest,
+    Token,
+    TokenPayload,
+    UserCreate,
+    UserUpdate,
+    UserResponse,
+    ChangePassword,
+    InviteValidation,
+    InviteRegister,
     # Services
-    AuthService, UserService, setup_new_user,
+    AuthService,
+    UserService,
+    setup_new_user,
     # Routers
-    auth_router, users_router,
+    auth_router,
+    users_router,
 )
 ```

@@ -91,14 +91,8 @@ async def start_challenge(
     service = GamificationService(db)
     result = await service.start_challenge(current_user, challenge_id)
     if not result:
-        raise HTTPException(
-            status_code=404,
-            detail="Desafio não encontrado ou já iniciado"
-        )
-    return ChallengeStartResponse(
-        challenge=result,
-        message="Desafio iniciado com sucesso!"
-    )
+        raise HTTPException(status_code=404, detail="Desafio não encontrado ou já iniciado")
+    return ChallengeStartResponse(challenge=result, message="Desafio iniciado com sucesso!")
 
 
 @router.get("/points/history", response_model=PointsHistoryResponse)
@@ -113,9 +107,7 @@ async def get_points_history(
 
     # Obter histórico
     transactions = await service.points_service.get_history(
-        current_user,
-        limit=limit,
-        offset=offset
+        current_user, limit=limit, offset=offset
     )
 
     # Obter saldo atual
@@ -124,5 +116,5 @@ async def get_points_history(
     return PointsHistoryResponse(
         transactions=transactions,
         current_balance=balance.current_points,
-        lifetime_total=balance.lifetime_points
+        lifetime_total=balance.lifetime_points,
     )

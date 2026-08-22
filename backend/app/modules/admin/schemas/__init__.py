@@ -1,4 +1,5 @@
 """Admin schemas."""
+
 from app.modules.admin.schemas.admin import (
     AdminDashboard,
     HouseholdMemberSummary,

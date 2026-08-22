@@ -1,4 +1,5 @@
 """Grocery (Mercado) API Endpoints"""
+
 from datetime import date
 
 from fastapi import APIRouter, HTTPException, Query, status
@@ -61,6 +62,7 @@ router = APIRouter()
 # Products
 # ============================================
 
+
 @router.get("/products", response_model=list[GroceryProductResponse])
 async def list_products(
     current_user: CurrentUser,
@@ -97,10 +99,7 @@ async def get_product(
     service = GroceryService(db)
     product = await service.get_product(current_user, product_id)
     if not product:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Produto não encontrado"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Produto não encontrado")
     return product
 
 
@@ -132,6 +131,7 @@ async def delete_product(
 # Purchases
 # ============================================
 
+
 @router.get("/purchases", response_model=list[GroceryPurchaseResponse])
 async def list_purchases(
     current_user: CurrentUser,
@@ -148,8 +148,15 @@ async def list_purchases(
     """Lista compras de mercado com filtros"""
     service = GroceryService(db)
     return await service.list_purchases(
-        current_user, start_date, end_date, category,
-        necessity_type, merchant_id, search, limit, offset
+        current_user,
+        start_date,
+        end_date,
+        category,
+        necessity_type,
+        merchant_id,
+        search,
+        limit,
+        offset,
     )
 
 
@@ -211,10 +218,7 @@ async def get_purchase(
     service = GroceryService(db)
     purchase = await service.get_purchase(current_user, purchase_id)
     if not purchase:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Compra não encontrada"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Compra não encontrada")
     return purchase
 
 
@@ -245,6 +249,7 @@ async def delete_purchase(
 # ============================================
 # Shopping Lists
 # ============================================
+
 
 @router.get("/lists", response_model=list[ShoppingListResponse])
 async def list_shopping_lists(
@@ -313,10 +318,7 @@ async def get_shopping_list(
     service = ShoppingListService(db)
     lst = await service.get_shopping_list(current_user, list_id)
     if not lst:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Lista não encontrada"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lista não encontrada")
     return lst
 
 
@@ -347,6 +349,7 @@ async def delete_shopping_list(
 # ============================================
 # Shopping List Items
 # ============================================
+
 
 @router.post("/lists/{list_id}/items", response_model=ShoppingListItemResponse, status_code=201)
 async def add_list_item(
@@ -391,6 +394,7 @@ async def delete_list_item(
 # Price Tracking
 # ============================================
 
+
 @router.get("/prices/{product_id}", response_model=PriceHistoryResponse)
 async def get_price_history(
     product_id: int,
@@ -402,10 +406,7 @@ async def get_price_history(
     service = PriceTrackingService(db)
     history = await service.get_price_history(current_user, product_id, days)
     if not history:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Produto não encontrado"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Produto não encontrado")
     return history
 
 
@@ -429,6 +430,7 @@ async def get_cheapest_prices(
 # ============================================
 # Analytics
 # ============================================
+
 
 @router.get("/analytics/spending", response_model=GroceryAnalyticsSpending)
 async def get_spending_analytics(
@@ -494,6 +496,7 @@ async def get_budget_status(
 # ============================================
 # Backfill
 # ============================================
+
 
 @router.post("/backfill", response_model=BackfillResponse)
 async def backfill_grocery_purchases(

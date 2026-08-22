@@ -1,4 +1,5 @@
 """Chat schemas."""
+
 from app.modules.chat.schemas.chat import (
     ChatMessage,
     ChatRequest,

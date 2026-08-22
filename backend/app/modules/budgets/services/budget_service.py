@@ -5,6 +5,7 @@ Implementa funcionalidades baseadas em YNAB e Dave Ramsey
 Evolução: Incorpora funcionalidades de Envelopes (histórico, status dinâmico,
 transferências, subsídio diário) para uma experiência mais completa de orçamento.
 """
+
 from calendar import monthrange
 from datetime import date
 from decimal import Decimal
@@ -58,12 +59,7 @@ class BudgetService:
 
         query = select(Budget).where(
             build_ownership_filter(
-                Budget,
-                Budget.user_id,
-                Budget.ownership_type,
-                user.id,
-                household_user_ids,
-                member
+                Budget, Budget.user_id, Budget.ownership_type, user.id, household_user_ids, member
             )
         )
 
@@ -78,19 +74,13 @@ class BudgetService:
         """Obtém ou cria orçamento para o mês"""
         result = await self.db.execute(
             select(Budget).where(
-                Budget.user_id == user.id,
-                Budget.year == year,
-                Budget.month == month
+                Budget.user_id == user.id, Budget.year == year, Budget.month == month
             )
         )
         budget = result.scalar_one_or_none()
 
         if not budget:
-            budget = Budget(
-                user_id=user.id,
-                year=year,
-                month=month
-            )
+            budget = Budget(user_id=user.id, year=year, month=month)
             self.db.add(budget)
             await self.db.flush()
             await self.db.refresh(budget)
@@ -107,9 +97,7 @@ class BudgetService:
         end_date = date(year, month, last_day)
 
         # Buscar transações do mês
-        expenses_by_category = await self._get_expenses_by_category(
-            user, start_date, end_date
-        )
+        expenses_by_category = await self._get_expenses_by_category(user, start_date, end_date)
         total_income = await self._get_total_income(user, start_date, end_date)
         total_spent = sum(expenses_by_category.values())
 
@@ -137,7 +125,9 @@ class BudgetService:
         for item in budget.items:
             spent = expenses_by_category.get(item.category_id, Decimal(0))
             available = item.planned_amount + item.rollover_amount - spent
-            percentage_used = float(spent / item.planned_amount * 100) if item.planned_amount > 0 else 0
+            percentage_used = (
+                float(spent / item.planned_amount * 100) if item.planned_amount > 0 else 0
+            )
 
             # Calcular status dinâmico (inspirado em Envelopes)
             item_status = self._calculate_item_status(percentage_used, available)
@@ -147,25 +137,27 @@ class BudgetService:
             if days_remaining > 0 and available > 0:
                 daily_allowance = available / days_remaining
 
-            items_response.append(BudgetItemResponse(
-                id=item.id,
-                budget_id=item.budget_id,
-                category_id=item.category_id,
-                planned_amount=item.planned_amount,
-                rollover_amount=item.rollover_amount,
-                is_fixed=item.is_fixed,
-                priority=item.priority,
-                notes=item.notes,
-                created_at=item.created_at,
-                updated_at=item.updated_at,
-                spent_amount=spent,
-                available_amount=available,
-                percentage_used=percentage_used,
-                category_name=category_names.get(item.category_id),
-                status=item_status,
-                daily_allowance=daily_allowance,
-                days_remaining=days_remaining
-            ))
+            items_response.append(
+                BudgetItemResponse(
+                    id=item.id,
+                    budget_id=item.budget_id,
+                    category_id=item.category_id,
+                    planned_amount=item.planned_amount,
+                    rollover_amount=item.rollover_amount,
+                    is_fixed=item.is_fixed,
+                    priority=item.priority,
+                    notes=item.notes,
+                    created_at=item.created_at,
+                    updated_at=item.updated_at,
+                    spent_amount=spent,
+                    available_amount=available,
+                    percentage_used=percentage_used,
+                    category_name=category_names.get(item.category_id),
+                    status=item_status,
+                    daily_allowance=daily_allowance,
+                    days_remaining=days_remaining,
+                )
+            )
 
         total_planned = sum(item.planned_amount for item in budget.items)
         total_available = sum(i.available_amount for i in items_response)
@@ -191,7 +183,7 @@ class BudgetService:
             total_available=total_available,
             total_income_actual=total_income,
             balance=total_income - total_spent,
-            health_score=health_score
+            health_score=health_score,
         )
 
     async def create_budget(self, user: User, data: BudgetCreate) -> Budget:
@@ -202,15 +194,13 @@ class BudgetService:
         # Verificar se já existe
         existing = await self.db.execute(
             select(Budget).where(
-                Budget.user_id == user.id,
-                Budget.year == data.year,
-                Budget.month == data.month
+                Budget.user_id == user.id, Budget.year == data.year, Budget.month == data.month
             )
         )
         if existing.scalar_one_or_none():
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Já existe orçamento para {data.month}/{data.year}"
+                detail=f"Já existe orçamento para {data.month}/{data.year}",
             )
 
         budget = Budget(
@@ -220,7 +210,7 @@ class BudgetService:
             total_income_planned=data.total_income_planned,
             allow_rollover=data.allow_rollover,
             notes=data.notes,
-            ownership_type=data.ownership_type.value
+            ownership_type=data.ownership_type.value,
         )
         self.db.add(budget)
         await self.db.flush()
@@ -234,7 +224,7 @@ class BudgetService:
                 planned_amount=item_data.planned_amount,
                 is_fixed=item_data.is_fixed,
                 priority=item_data.priority,
-                notes=item_data.notes
+                notes=item_data.notes,
             )
             self.db.add(item)
             total_expense += item_data.planned_amount
@@ -250,12 +240,7 @@ class BudgetService:
         budget = await self.get_or_create_budget(user, year, month)
 
         # Validar permissão para editar
-        await validate_edit_permission(
-            self.db,
-            user,
-            budget.user_id,
-            budget.ownership_type
-        )
+        await validate_edit_permission(self.db, user, budget.user_id, budget.ownership_type)
 
         for field, value in data.model_dump(exclude_unset=True).items():
             setattr(budget, field, value)
@@ -264,21 +249,22 @@ class BudgetService:
         await self.db.refresh(budget)
         return budget
 
-    async def add_budget_item(self, user: User, year: int, month: int, data: BudgetItemCreate) -> BudgetItem:
+    async def add_budget_item(
+        self, user: User, year: int, month: int, data: BudgetItemCreate
+    ) -> BudgetItem:
         """Adiciona item ao orçamento"""
         budget = await self.get_or_create_budget(user, year, month)
 
         # Verificar se categoria já existe no orçamento
         existing = await self.db.execute(
             select(BudgetItem).where(
-                BudgetItem.budget_id == budget.id,
-                BudgetItem.category_id == data.category_id
+                BudgetItem.budget_id == budget.id, BudgetItem.category_id == data.category_id
             )
         )
         if existing.scalar_one_or_none():
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Categoria já existe neste orçamento"
+                detail="Categoria já existe neste orçamento",
             )
 
         item = BudgetItem(
@@ -287,7 +273,7 @@ class BudgetService:
             planned_amount=data.planned_amount,
             is_fixed=data.is_fixed,
             priority=data.priority,
-            notes=data.notes
+            notes=data.notes,
         )
         self.db.add(item)
 
@@ -298,21 +284,19 @@ class BudgetService:
         await self.db.refresh(item)
         return item
 
-    async def update_budget_item(self, user: User, item_id: int, data: BudgetItemUpdate) -> BudgetItem:
+    async def update_budget_item(
+        self, user: User, item_id: int, data: BudgetItemUpdate
+    ) -> BudgetItem:
         """Atualiza item do orçamento"""
         result = await self.db.execute(
-            select(BudgetItem).join(Budget).where(
-                BudgetItem.id == item_id,
-                Budget.user_id == user.id
-            )
+            select(BudgetItem)
+            .join(Budget)
+            .where(BudgetItem.id == item_id, Budget.user_id == user.id)
         )
         item = result.scalar_one_or_none()
 
         if not item:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Item não encontrado"
-            )
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item não encontrado")
 
         old_amount = item.planned_amount
 
@@ -321,11 +305,9 @@ class BudgetService:
 
         # Atualizar total do orçamento se valor mudou
         if data.planned_amount is not None and data.planned_amount != old_amount:
-            budget_result = await self.db.execute(
-                select(Budget).where(Budget.id == item.budget_id)
-            )
+            budget_result = await self.db.execute(select(Budget).where(Budget.id == item.budget_id))
             budget = budget_result.scalar_one()
-            budget.total_expense_planned += (data.planned_amount - old_amount)
+            budget.total_expense_planned += data.planned_amount - old_amount
 
         await self.db.flush()
         await self.db.refresh(item)
@@ -334,37 +316,36 @@ class BudgetService:
     async def delete_budget_item(self, user: User, item_id: int) -> None:
         """Remove item do orçamento"""
         result = await self.db.execute(
-            select(BudgetItem).join(Budget).where(
-                BudgetItem.id == item_id,
-                Budget.user_id == user.id
-            )
+            select(BudgetItem)
+            .join(Budget)
+            .where(BudgetItem.id == item_id, Budget.user_id == user.id)
         )
         item = result.scalar_one_or_none()
 
         if not item:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Item não encontrado"
-            )
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item não encontrado")
 
         # Atualizar total do orçamento
-        budget_result = await self.db.execute(
-            select(Budget).where(Budget.id == item.budget_id)
-        )
+        budget_result = await self.db.execute(select(Budget).where(Budget.id == item.budget_id))
         budget = budget_result.scalar_one()
         budget.total_expense_planned -= item.planned_amount
 
         await self.db.delete(item)
 
-    async def copy_budget(self, user: User, target_year: int, target_month: int,
-                          source_year: int, source_month: int, include_rollover: bool = True) -> Budget:
+    async def copy_budget(
+        self,
+        user: User,
+        target_year: int,
+        target_month: int,
+        source_year: int,
+        source_month: int,
+        include_rollover: bool = True,
+    ) -> Budget:
         """Copia orçamento de outro mês"""
         # Buscar orçamento fonte
         source_result = await self.db.execute(
             select(Budget).where(
-                Budget.user_id == user.id,
-                Budget.year == source_year,
-                Budget.month == source_month
+                Budget.user_id == user.id, Budget.year == source_year, Budget.month == source_month
             )
         )
         source = source_result.scalar_one_or_none()
@@ -372,21 +353,19 @@ class BudgetService:
         if not source:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Orçamento de {source_month}/{source_year} não encontrado"
+                detail=f"Orçamento de {source_month}/{source_year} não encontrado",
             )
 
         # Verificar se já existe orçamento destino
         existing = await self.db.execute(
             select(Budget).where(
-                Budget.user_id == user.id,
-                Budget.year == target_year,
-                Budget.month == target_month
+                Budget.user_id == user.id, Budget.year == target_year, Budget.month == target_month
             )
         )
         if existing.scalar_one_or_none():
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Já existe orçamento para {target_month}/{target_year}"
+                detail=f"Já existe orçamento para {target_month}/{target_year}",
             )
 
         # Criar novo orçamento
@@ -396,7 +375,7 @@ class BudgetService:
             month=target_month,
             total_income_planned=source.total_income_planned,
             total_expense_planned=source.total_expense_planned,
-            allow_rollover=source.allow_rollover
+            allow_rollover=source.allow_rollover,
         )
         self.db.add(new_budget)
         await self.db.flush()
@@ -423,7 +402,7 @@ class BudgetService:
                 rollover_amount=rollover,
                 is_fixed=source_item.is_fixed,
                 priority=source_item.priority,
-                notes=source_item.notes
+                notes=source_item.notes,
             )
             self.db.add(new_item)
 
@@ -446,7 +425,7 @@ class BudgetService:
                 days_remaining=0,
                 daily_budget_remaining=Decimal(0),
                 categories_over_budget=0,
-                categories_on_track=0
+                categories_on_track=0,
             )
 
         # Calcular dias restantes no mês
@@ -465,10 +444,18 @@ class BudgetService:
             daily_remaining = budget_response.total_available / days_remaining
 
         # Contar categorias por status
-        over_budget = sum(1 for i in budget_response.items if i.status == BudgetItemStatus.OVERSPENT.value)
-        depleted = sum(1 for i in budget_response.items if i.status == BudgetItemStatus.DEPLETED.value)
-        warning = sum(1 for i in budget_response.items if i.status == BudgetItemStatus.WARNING.value)
-        on_track = sum(1 for i in budget_response.items if i.status == BudgetItemStatus.ON_TRACK.value)
+        over_budget = sum(
+            1 for i in budget_response.items if i.status == BudgetItemStatus.OVERSPENT.value
+        )
+        depleted = sum(
+            1 for i in budget_response.items if i.status == BudgetItemStatus.DEPLETED.value
+        )
+        warning = sum(
+            1 for i in budget_response.items if i.status == BudgetItemStatus.WARNING.value
+        )
+        on_track = sum(
+            1 for i in budget_response.items if i.status == BudgetItemStatus.ON_TRACK.value
+        )
 
         percentage_used = 0.0
         if budget_response.total_expense_planned > 0:
@@ -488,10 +475,12 @@ class BudgetService:
             categories_over_budget=over_budget,
             categories_on_track=on_track,
             categories_warning=warning,
-            categories_depleted=depleted
+            categories_depleted=depleted,
         )
 
-    async def get_comparison(self, user: User, year: int, month: int) -> list[BudgetComparisonResponse]:
+    async def get_comparison(
+        self, user: User, year: int, month: int
+    ) -> list[BudgetComparisonResponse]:
         """Compara orçamento planejado vs realizado por categoria"""
         budget_response = await self.get_budget(user, year, month)
 
@@ -506,28 +495,30 @@ class BudgetService:
             else:
                 item_status = "on_track"
 
-            comparisons.append(BudgetComparisonResponse(
-                category_id=item.category_id,
-                category_name=item.category_name or "",
-                planned=item.planned_amount,
-                actual=item.spent_amount,
-                difference=difference,
-                percentage=item.percentage_used,
-                status=item_status
-            ))
+            comparisons.append(
+                BudgetComparisonResponse(
+                    category_id=item.category_id,
+                    category_name=item.category_name or "",
+                    planned=item.planned_amount,
+                    actual=item.spent_amount,
+                    difference=difference,
+                    percentage=item.percentage_used,
+                    status=item_status,
+                )
+            )
 
         return sorted(comparisons, key=lambda x: x.actual, reverse=True)
 
-    async def _get_expenses_by_category(self, user: User, start_date: date, end_date: date) -> dict[int, Decimal]:
+    async def _get_expenses_by_category(
+        self, user: User, start_date: date, end_date: date
+    ) -> dict[int, Decimal]:
         """Retorna gastos por categoria no período (considera household)"""
         household_user_ids = await get_household_user_ids(self.db, user)
         member = await get_household_member(self.db, user)
 
         result = await self.db.execute(
-            select(
-                Transaction.category_id,
-                func.sum(Transaction.amount).label('total')
-            ).where(
+            select(Transaction.category_id, func.sum(Transaction.amount).label("total"))
+            .where(
                 Transaction.type == TransactionType.EXPENSE.value,
                 Transaction.date >= start_date,
                 Transaction.date <= end_date,
@@ -538,9 +529,10 @@ class BudgetService:
                     Transaction.ownership_type,
                     user.id,
                     household_user_ids,
-                    member
-                )
-            ).group_by(Transaction.category_id)
+                    member,
+                ),
+            )
+            .group_by(Transaction.category_id)
         )
 
         return {row.category_id: row.total for row in result.all()}
@@ -561,14 +553,15 @@ class BudgetService:
                     Transaction.ownership_type,
                     user.id,
                     household_user_ids,
-                    member
-                )
+                    member,
+                ),
             )
         )
         return result.scalar() or Decimal(0)
 
-    def _calculate_health_score(self, planned: Decimal, spent: Decimal,
-                                 income_planned: Decimal, income_actual: Decimal) -> float:
+    def _calculate_health_score(
+        self, planned: Decimal, spent: Decimal, income_planned: Decimal, income_actual: Decimal
+    ) -> float:
         """
         Calcula score de saúde do orçamento (0-100)
         Considera: aderência ao planejado, margem, e receita vs despesa
@@ -626,7 +619,7 @@ class BudgetService:
         if data.from_category_id == data.to_category_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Categoria de origem e destino devem ser diferentes"
+                detail="Categoria de origem e destino devem ser diferentes",
             )
 
         budget = await self.get_or_create_budget(user, year, month)
@@ -643,12 +636,12 @@ class BudgetService:
         if not from_item:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Categoria de origem não encontrada no orçamento"
+                detail="Categoria de origem não encontrada no orçamento",
             )
         if not to_item:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Categoria de destino não encontrada no orçamento"
+                detail="Categoria de destino não encontrada no orçamento",
             )
 
         # Calcular saldo disponível da categoria de origem
@@ -663,7 +656,7 @@ class BudgetService:
         if data.amount > from_available:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Saldo insuficiente. Disponível: R$ {from_available:.2f}"
+                detail=f"Saldo insuficiente. Disponível: R$ {from_available:.2f}",
             )
 
         # Registrar histórico na origem (saída)
@@ -674,7 +667,7 @@ class BudgetService:
             balance_before=from_available,
             balance_after=from_available - data.amount,
             related_category_id=data.to_category_id,
-            notes=data.notes or "Transferido para outra categoria"
+            notes=data.notes or "Transferido para outra categoria",
         )
         self.db.add(from_history)
 
@@ -690,7 +683,7 @@ class BudgetService:
             balance_before=to_available,
             balance_after=to_available + data.amount,
             related_category_id=data.from_category_id,
-            notes=data.notes or "Recebido de outra categoria"
+            notes=data.notes or "Recebido de outra categoria",
         )
         self.db.add(to_history)
 
@@ -715,7 +708,7 @@ class BudgetService:
             to_item=to_item_response,
             amount=data.amount,
             notes=data.notes,
-            created_at=utc_now()
+            created_at=utc_now(),
         )
 
     async def get_item_history(
@@ -731,7 +724,7 @@ class BudgetService:
         if not item:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Categoria não encontrada no orçamento"
+                detail="Categoria não encontrada no orçamento",
             )
 
         # Buscar histórico com related_category
@@ -756,7 +749,7 @@ class BudgetService:
                 related_category_id=h.related_category_id,
                 related_category_name=h.related_category.name if h.related_category else None,
                 notes=h.notes,
-                created_at=h.created_at
+                created_at=h.created_at,
             )
             for h in history_items
         ]
@@ -767,7 +760,7 @@ class BudgetService:
         category_id: int,
         amount: Decimal,
         transaction_date: date,
-        transaction_id: int
+        transaction_id: int,
     ) -> BudgetItemHistory | None:
         """
         Registra gasto no orçamento quando transação é criada.
@@ -799,7 +792,7 @@ class BudgetService:
             amount=-amount,
             balance_before=balance_before,
             balance_after=balance_before - amount,
-            notes=None
+            notes=None,
         )
         self.db.add(history)
         await self.db.flush()
@@ -812,7 +805,7 @@ class BudgetService:
         category_id: int,
         amount: Decimal,
         transaction_date: date,
-        transaction_id: int
+        transaction_id: int,
     ) -> BudgetItemHistory | None:
         """
         Registra estorno no orçamento quando transação é deletada/editada.
@@ -825,9 +818,7 @@ class BudgetService:
         # Verificar se o orçamento existe (não criar se não existir)
         result = await self.db.execute(
             select(Budget).where(
-                Budget.user_id == user.id,
-                Budget.year == year,
-                Budget.month == month
+                Budget.user_id == user.id, Budget.year == year, Budget.month == month
             )
         )
         budget = result.scalar_one_or_none()
@@ -861,7 +852,7 @@ class BudgetService:
             amount=amount,
             balance_before=balance_before,
             balance_after=balance_before + amount,
-            notes="Estorno de transação"
+            notes="Estorno de transação",
         )
         self.db.add(history)
         await self.db.flush()

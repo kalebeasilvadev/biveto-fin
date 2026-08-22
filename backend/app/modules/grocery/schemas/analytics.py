@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 class SpendingPoint(BaseModel):
     """Single point in spending timeline"""
+
     date: date_type
     total: float
     essential: float
@@ -13,6 +14,7 @@ class SpendingPoint(BaseModel):
 
 class GroceryAnalyticsSpending(BaseModel):
     """Spending over time analytics"""
+
     period_start: date_type
     period_end: date_type
     total: float
@@ -23,6 +25,7 @@ class GroceryAnalyticsSpending(BaseModel):
 
 class CategoryBreakdown(BaseModel):
     """Single category breakdown"""
+
     category: str
     category_display: str
     total: float
@@ -33,6 +36,7 @@ class CategoryBreakdown(BaseModel):
 
 class GroceryAnalyticsByCategory(BaseModel):
     """Analytics grouped by category"""
+
     period_start: date_type
     period_end: date_type
     total: float
@@ -41,6 +45,7 @@ class GroceryAnalyticsByCategory(BaseModel):
 
 class NecessityBreakdown(BaseModel):
     """Breakdown by necessity type"""
+
     necessity_type: str
     necessity_type_display: str
     total: float
@@ -50,6 +55,7 @@ class NecessityBreakdown(BaseModel):
 
 class GroceryAnalyticsByNecessity(BaseModel):
     """Analytics grouped by necessity type"""
+
     period_start: date_type
     period_end: date_type
     total: float
@@ -59,6 +65,7 @@ class GroceryAnalyticsByNecessity(BaseModel):
 
 class Insight(BaseModel):
     """Single insight"""
+
     type: str  # "warning", "info", "success"
     title: str
     description: str
@@ -68,6 +75,7 @@ class Insight(BaseModel):
 
 class GroceryInsights(BaseModel):
     """AI-generated insights about spending"""
+
     insights: list[Insight]
     potential_savings: float
     top_expensive_items: list[dict]
@@ -76,6 +84,7 @@ class GroceryInsights(BaseModel):
 
 class GroceryBudgetStatus(BaseModel):
     """Budget status for the market category"""
+
     budget_amount: float | None
     spent_amount: float
     remaining: float | None
@@ -86,6 +95,7 @@ class GroceryBudgetStatus(BaseModel):
 
 class PricePoint(BaseModel):
     """Single price point in history"""
+
     date: date_type
     price: float
     merchant_name: str | None
@@ -93,6 +103,7 @@ class PricePoint(BaseModel):
 
 class PriceHistoryResponse(BaseModel):
     """Price history for a product"""
+
     product_id: int
     product_name: str
     unit: str
@@ -105,6 +116,7 @@ class PriceHistoryResponse(BaseModel):
 
 class MerchantPrice(BaseModel):
     """Price at a specific merchant"""
+
     merchant_id: int
     merchant_name: str
     price: float
@@ -114,4 +126,5 @@ class MerchantPrice(BaseModel):
 
 class CheapestPriceResponse(BaseModel):
     """Cheapest prices for products"""
+
     products: list[dict]  # List of products with their cheapest merchants

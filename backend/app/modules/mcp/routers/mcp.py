@@ -28,9 +28,7 @@ use SEMPRE o endpoint /context primeiro! Ele retorna dados pré-agregados ideais
 O endpoint /query é para consultas específicas de registros quando você precisa de dados brutos.""",
         "version": "1.1.0",
     },
-    "servers": [
-        {"url": "https://biveto.com/api/v1"}
-    ],
+    "servers": [{"url": "https://biveto.com/api/v1"}],
     "paths": {
         "/mcp/context": {
             "post": {
@@ -44,7 +42,7 @@ O endpoint /query é para consultas específicas de registros quando você preci
                         "application/json": {
                             "schema": {"$ref": "#/components/schemas/ContextRequest"}
                         }
-                    }
+                    },
                 },
                 "responses": {
                     "200": {
@@ -53,9 +51,9 @@ O endpoint /query é para consultas específicas de registros quando você preci
                             "application/json": {
                                 "schema": {"$ref": "#/components/schemas/ContextResponse"}
                             }
-                        }
+                        },
                     }
-                }
+                },
             }
         },
         "/mcp/tables": {
@@ -71,9 +69,9 @@ O endpoint /query é para consultas específicas de registros quando você preci
                             "application/json": {
                                 "schema": {"$ref": "#/components/schemas/TableListResponse"}
                             }
-                        }
+                        },
                     }
-                }
+                },
             }
         },
         "/mcp/query": {
@@ -88,7 +86,7 @@ O endpoint /query é para consultas específicas de registros quando você preci
                         "application/json": {
                             "schema": {"$ref": "#/components/schemas/QueryRequest"}
                         }
-                    }
+                    },
                 },
                 "responses": {
                     "200": {
@@ -97,9 +95,9 @@ O endpoint /query é para consultas específicas de registros quando você preci
                             "application/json": {
                                 "schema": {"$ref": "#/components/schemas/QueryResponse"}
                             }
-                        }
+                        },
                     }
-                }
+                },
             }
         },
         "/mcp/summary": {
@@ -115,9 +113,9 @@ O endpoint /query é para consultas específicas de registros quando você preci
                             "application/json": {
                                 "schema": {"$ref": "#/components/schemas/SummaryResponse"}
                             }
-                        }
+                        },
                     }
-                }
+                },
             }
         },
         "/mcp/tables/{table_name}/stats": {
@@ -132,7 +130,7 @@ O endpoint /query é para consultas específicas de registros quando você preci
                         "in": "path",
                         "required": True,
                         "schema": {"type": "string"},
-                        "description": "Nome da tabela"
+                        "description": "Nome da tabela",
                     }
                 ],
                 "responses": {
@@ -142,11 +140,11 @@ O endpoint /query é para consultas específicas de registros quando você preci
                             "application/json": {
                                 "schema": {"$ref": "#/components/schemas/TableStatsResponse"}
                             }
-                        }
+                        },
                     }
-                }
+                },
             }
-        }
+        },
     },
     "components": {
         "schemas": {
@@ -160,43 +158,75 @@ O endpoint /query é para consultas específicas de registros quando você preci
                             "type": "object",
                             "properties": {
                                 "name": {"type": "string", "description": "Nome da tabela"},
-                                "description": {"type": "string", "description": "Descrição da tabela"},
+                                "description": {
+                                    "type": "string",
+                                    "description": "Descrição da tabela",
+                                },
                                 "columns": {
                                     "type": "array",
                                     "items": {
                                         "type": "object",
                                         "properties": {
                                             "name": {"type": "string"},
-                                            "description": {"type": "string"}
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                                            "description": {"type": "string"},
+                                        },
+                                    },
+                                },
+                            },
+                        },
                     },
-                    "total": {"type": "integer", "description": "Total de tabelas"}
-                }
+                    "total": {"type": "integer", "description": "Total de tabelas"},
+                },
             },
             "QueryRequest": {
                 "type": "object",
                 "required": ["table"],
                 "properties": {
-                    "table": {"type": "string", "description": "Nome da tabela (ex: transactions, accounts, credit_cards)"},
-                    "search": {"type": "string", "description": "RECOMENDADO: Busca por texto em description/name (ex: 'carne', 'mercado', 'uber')"},
-                    "date_from": {"type": "string", "description": "Data inicial YYYY-MM-DD (ex: '2026-01-01' para início de janeiro)"},
-                    "date_to": {"type": "string", "description": "Data final YYYY-MM-DD (ex: '2026-01-31' para fim de janeiro)"},
+                    "table": {
+                        "type": "string",
+                        "description": "Nome da tabela (ex: transactions, accounts, credit_cards)",
+                    },
+                    "search": {
+                        "type": "string",
+                        "description": "RECOMENDADO: Busca por texto em description/name (ex: 'carne', 'mercado', 'uber')",
+                    },
+                    "date_from": {
+                        "type": "string",
+                        "description": "Data inicial YYYY-MM-DD (ex: '2026-01-01' para início de janeiro)",
+                    },
+                    "date_to": {
+                        "type": "string",
+                        "description": "Data final YYYY-MM-DD (ex: '2026-01-31' para fim de janeiro)",
+                    },
                     "amount_min": {"type": "number", "description": "Valor mínimo"},
                     "amount_max": {"type": "number", "description": "Valor máximo"},
                     "filters": {
                         "type": "object",
-                        "description": "Filtros exatos adicionais. Ex: {\"type\": \"expense\"} para despesas",
-                        "additionalProperties": True
+                        "description": 'Filtros exatos adicionais. Ex: {"type": "expense"} para despesas',
+                        "additionalProperties": True,
                     },
-                    "order_by": {"type": "string", "description": "Coluna para ordenação (ex: date, amount)", "default": "date"},
-                    "order_desc": {"type": "boolean", "description": "Se true, ordena descendente", "default": True},
-                    "limit": {"type": "integer", "description": "Máximo de resultados (1-200)", "default": 50, "maximum": 200},
-                    "offset": {"type": "integer", "description": "Offset para paginação", "default": 0}
-                }
+                    "order_by": {
+                        "type": "string",
+                        "description": "Coluna para ordenação (ex: date, amount)",
+                        "default": "date",
+                    },
+                    "order_desc": {
+                        "type": "boolean",
+                        "description": "Se true, ordena descendente",
+                        "default": True,
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Máximo de resultados (1-200)",
+                        "default": 50,
+                        "maximum": 200,
+                    },
+                    "offset": {
+                        "type": "integer",
+                        "description": "Offset para paginação",
+                        "default": 0,
+                    },
+                },
             },
             "QueryResponse": {
                 "type": "object",
@@ -204,15 +234,12 @@ O endpoint /query é para consultas específicas de registros quando você preci
                     "data": {
                         "type": "array",
                         "description": "Registros retornados",
-                        "items": {
-                            "type": "object",
-                            "additionalProperties": True
-                        }
+                        "items": {"type": "object", "additionalProperties": True},
                     },
                     "total": {"type": "integer", "description": "Total de registros encontrados"},
                     "limit": {"type": "integer", "description": "Limite usado na consulta"},
-                    "offset": {"type": "integer", "description": "Offset usado na consulta"}
-                }
+                    "offset": {"type": "integer", "description": "Offset usado na consulta"},
+                },
             },
             "SummaryResponse": {
                 "type": "object",
@@ -221,46 +248,61 @@ O endpoint /query é para consultas específicas de registros quando você preci
                         "type": "object",
                         "properties": {
                             "count": {"type": "integer", "description": "Número de contas"},
-                            "total_balance": {"type": "number", "description": "Saldo total"}
-                        }
+                            "total_balance": {"type": "number", "description": "Saldo total"},
+                        },
                     },
                     "transactions_this_month": {
                         "type": "object",
                         "properties": {
                             "count": {"type": "integer", "description": "Número de transações"},
-                            "total_expenses": {"type": "number", "description": "Total de despesas"},
-                            "total_income": {"type": "number", "description": "Total de receitas"}
-                        }
+                            "total_expenses": {
+                                "type": "number",
+                                "description": "Total de despesas",
+                            },
+                            "total_income": {"type": "number", "description": "Total de receitas"},
+                        },
                     },
                     "credit_cards": {
                         "type": "object",
                         "properties": {
                             "count": {"type": "integer", "description": "Número de cartões ativos"}
-                        }
+                        },
                     },
                     "open_invoices": {
                         "type": "object",
                         "properties": {
-                            "count": {"type": "integer", "description": "Número de faturas abertas"},
-                            "total_amount": {"type": "number", "description": "Valor total das faturas"}
-                        }
+                            "count": {
+                                "type": "integer",
+                                "description": "Número de faturas abertas",
+                            },
+                            "total_amount": {
+                                "type": "number",
+                                "description": "Valor total das faturas",
+                            },
+                        },
                     },
                     "active_goals": {
                         "type": "object",
                         "properties": {
                             "count": {"type": "integer", "description": "Número de metas ativas"},
-                            "current_total": {"type": "number", "description": "Valor atual acumulado"},
-                            "target_total": {"type": "number", "description": "Valor alvo total"}
-                        }
+                            "current_total": {
+                                "type": "number",
+                                "description": "Valor atual acumulado",
+                            },
+                            "target_total": {"type": "number", "description": "Valor alvo total"},
+                        },
                     },
                     "active_debts": {
                         "type": "object",
                         "properties": {
                             "count": {"type": "integer", "description": "Número de dívidas ativas"},
-                            "total_balance": {"type": "number", "description": "Saldo total das dívidas"}
-                        }
-                    }
-                }
+                            "total_balance": {
+                                "type": "number",
+                                "description": "Saldo total das dívidas",
+                            },
+                        },
+                    },
+                },
             },
             "TableStatsResponse": {
                 "type": "object",
@@ -270,9 +312,9 @@ O endpoint /query é para consultas específicas de registros quando você preci
                     "columns": {
                         "type": "object",
                         "description": "Colunas da tabela com descrições",
-                        "additionalProperties": {"type": "string"}
-                    }
-                }
+                        "additionalProperties": {"type": "string"},
+                    },
+                },
             },
             "ContextRequest": {
                 "type": "object",
@@ -280,13 +322,16 @@ O endpoint /query é para consultas específicas de registros quando você preci
                 "properties": {
                     "month": {
                         "oneOf": [{"type": "integer"}, {"type": "string"}],
-                        "description": "Mês para análise (1-12 ou nome: 'janeiro', 'fevereiro'). Ex: 1 ou 'janeiro'"
+                        "description": "Mês para análise (1-12 ou nome: 'janeiro', 'fevereiro'). Ex: 1 ou 'janeiro'",
                     },
                     "year": {"type": "integer", "description": "Ano para análise (ex: 2026)"},
                     "date_from": {"type": "string", "description": "Data inicial YYYY-MM-DD"},
                     "date_to": {"type": "string", "description": "Data final YYYY-MM-DD"},
-                    "search": {"type": "string", "description": "Termo para buscar em descrições e estabelecimentos. Resultados aparecem em 'resultado_busca'. Os dados completos SEMPRE são retornados para análise."}
-                }
+                    "search": {
+                        "type": "string",
+                        "description": "Termo para buscar em descrições e estabelecimentos. Resultados aparecem em 'resultado_busca'. Os dados completos SEMPRE são retornados para análise.",
+                    },
+                },
             },
             "ContextResponse": {
                 "type": "object",
@@ -295,10 +340,7 @@ O endpoint /query é para consultas específicas de registros quando você preci
                     "periodo": {
                         "type": "object",
                         "description": "Período analisado",
-                        "properties": {
-                            "inicio": {"type": "string"},
-                            "fim": {"type": "string"}
-                        }
+                        "properties": {"inicio": {"type": "string"}, "fim": {"type": "string"}},
                     },
                     "resumo": {
                         "type": "object",
@@ -307,16 +349,22 @@ O endpoint /query é para consultas específicas de registros quando você preci
                             "receitas": {"type": "number"},
                             "despesas": {"type": "number"},
                             "saldo": {"type": "number"},
-                            "total_transacoes": {"type": "integer"}
-                        }
+                            "total_transacoes": {"type": "integer"},
+                        },
                     },
                     "resultado_busca": {
                         "type": "object",
                         "description": "Transações que correspondem ao termo de busca (quando search é usado). Se total=0, analise gastos_por_categoria para encontrar gastos relacionados.",
                         "properties": {
                             "termo": {"type": "string", "description": "Termo buscado"},
-                            "total": {"type": "number", "description": "VALOR TOTAL encontrado com o termo"},
-                            "quantidade": {"type": "integer", "description": "Número de transações encontradas"},
+                            "total": {
+                                "type": "number",
+                                "description": "VALOR TOTAL encontrado com o termo",
+                            },
+                            "quantidade": {
+                                "type": "integer",
+                                "description": "Número de transações encontradas",
+                            },
                             "transacoes": {
                                 "type": "array",
                                 "description": "Lista das transações encontradas",
@@ -327,20 +375,23 @@ O endpoint /query é para consultas específicas de registros quando você preci
                                         "data": {"type": "string"},
                                         "estabelecimento": {"type": "string"},
                                         "descricao": {"type": "string"},
-                                        "categoria": {"type": "string"}
-                                    }
-                                }
+                                        "categoria": {"type": "string"},
+                                    },
+                                },
                             },
-                            "dica": {"type": "string", "description": "Dica caso não encontre resultados"}
-                        }
+                            "dica": {
+                                "type": "string",
+                                "description": "Dica caso não encontre resultados",
+                            },
+                        },
                     },
                     "gastos_por_categoria": {
                         "type": "object",
-                        "description": "Gastos agrupados por categoria com totais"
+                        "description": "Gastos agrupados por categoria com totais",
                     },
                     "gastos_por_estabelecimento": {
                         "type": "object",
-                        "description": "Top 10 estabelecimentos com mais gastos"
+                        "description": "Top 10 estabelecimentos com mais gastos",
                     },
                     "maiores_gastos": {
                         "type": "array",
@@ -351,9 +402,9 @@ O endpoint /query é para consultas específicas de registros quando você preci
                                 "valor": {"type": "number"},
                                 "data": {"type": "string"},
                                 "estabelecimento": {"type": "string"},
-                                "categoria": {"type": "string"}
-                            }
-                        }
+                                "categoria": {"type": "string"},
+                            },
+                        },
                     },
                     "contas": {
                         "type": "array",
@@ -363,9 +414,9 @@ O endpoint /query é para consultas específicas de registros quando você preci
                             "properties": {
                                 "nome": {"type": "string"},
                                 "tipo": {"type": "string"},
-                                "saldo": {"type": "number"}
-                            }
-                        }
+                                "saldo": {"type": "number"},
+                            },
+                        },
                     },
                     "cartoes_credito": {
                         "type": "array",
@@ -377,9 +428,9 @@ O endpoint /query é para consultas específicas de registros quando você preci
                                 "bandeira": {"type": "string"},
                                 "limite_total": {"type": "number"},
                                 "saldo_em_aberto": {"type": "number"},
-                                "limite_disponivel": {"type": "number"}
-                            }
-                        }
+                                "limite_disponivel": {"type": "number"},
+                            },
+                        },
                     },
                     "dividas": {
                         "type": "array",
@@ -390,9 +441,9 @@ O endpoint /query é para consultas específicas de registros quando você preci
                                 "nome": {"type": "string"},
                                 "saldo": {"type": "number"},
                                 "taxa_juros": {"type": "number"},
-                                "pagamento_minimo": {"type": "number"}
-                            }
-                        }
+                                "pagamento_minimo": {"type": "number"},
+                            },
+                        },
                     },
                     "metas": {
                         "type": "array",
@@ -404,26 +455,26 @@ O endpoint /query é para consultas específicas de registros quando você preci
                                 "valor_alvo": {"type": "number"},
                                 "valor_atual": {"type": "number"},
                                 "progresso": {"type": "number"},
-                                "falta": {"type": "number"}
-                            }
-                        }
+                                "falta": {"type": "number"},
+                            },
+                        },
                     },
                     "comparacao_periodo_anterior": {
                         "type": "object",
-                        "description": "Comparação com período anterior"
-                    }
-                }
-            }
+                        "description": "Comparação com período anterior",
+                    },
+                },
+            },
         },
         "securitySchemes": {
             "ApiKeyAuth": {
                 "type": "http",
                 "scheme": "bearer",
-                "description": "API Key pessoal gerada em Configurações > API Keys. Use o formato: Bearer biv_xxx"
+                "description": "API Key pessoal gerada em Configurações > API Keys. Use o formato: Bearer biv_xxx",
             }
-        }
+        },
     },
-    "security": [{"ApiKeyAuth": []}]
+    "security": [{"ApiKeyAuth": []}],
 }
 
 

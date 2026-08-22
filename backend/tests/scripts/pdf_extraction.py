@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """Test script para processar um PDF e debugar a extração."""
+
 import asyncio
-import sys
 import os
+import sys
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # Carregar .env
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from pathlib import Path
@@ -26,23 +29,21 @@ async def main():
     print(f"=== Processando: {pdf_path} ===")
     print(f"Tamanho: {pdf_path.stat().st_size} bytes")
 
-    with open(pdf_path, 'rb') as f:
+    with open(pdf_path, "rb") as f:
         pdf_content = f.read()
 
     from app.modules.documents.services.llm_ocr_service import LLMOCRService
 
-    service = LLMOCRService(provider='google')
+    service = LLMOCRService(provider="google")
 
     print("\n--- Iniciando extração ---")
     result = await service.extract_from_image(
-        pdf_content,
-        mime_type='application/pdf',
-        filename=pdf_path.name
+        pdf_content, mime_type="application/pdf", filename=pdf_path.name
     )
 
     # Mostrar OCR text se disponível
-    ocr_text = result.pop('_ocr_text', None)
-    ocr_preview = result.pop('_ocr_text_preview', None)
+    ocr_text = result.pop("_ocr_text", None)
+    result.pop("_ocr_text_preview", None)
 
     if ocr_text:
         print(f"\n=== OCR TEXT ({len(ocr_text)} chars) ===")
@@ -62,13 +63,20 @@ async def main():
 
         # Verificar seções
         print("\n=== SEÇÕES DO OCR TEXT ===")
-        for marker in ['lançamentos', 'lancamentos', 'compras e saques',
-                        'produtos e serviços', 'próximas faturas', 'proximas faturas',
-                        'total dos lançamentos', 'total dos lancamentos',
-                        'compras parceladas']:
+        for marker in [
+            "lançamentos",
+            "lancamentos",
+            "compras e saques",
+            "produtos e serviços",
+            "próximas faturas",
+            "proximas faturas",
+            "total dos lançamentos",
+            "total dos lancamentos",
+            "compras parceladas",
+        ]:
             idx = ocr_text.lower().find(marker)
             if idx >= 0:
-                context = ocr_text[max(0, idx-10):idx+len(marker)+30].replace('\n', '\\n')
+                context = ocr_text[max(0, idx - 10) : idx + len(marker) + 30].replace("\n", "\\n")
                 print(f"  '{marker}' na pos {idx}: ...{context}...")
 
         # Buscar todos os valores 574 no OCR
@@ -84,39 +92,43 @@ async def main():
             search_pos = idx + 1
 
     # Mostrar resultado
-    print(f"\n=== RESULTADO ===")
+    print("\n=== RESULTADO ===")
     print(f"document_type: {result.get('document_type')}")
     print(f"error: {result.get('error')}")
 
-    card_info = result.get('card_info', {})
+    card_info = result.get("card_info", {})
     if card_info:
-        print(f"\ncard_info:")
+        print("\ncard_info:")
         print(f"  issuer: {card_info.get('card_issuer')}")
         print(f"  total_amount: {card_info.get('total_amount')}")
         print(f"  invoice: {card_info.get('invoice_month')}/{card_info.get('invoice_year')}")
 
-    items = result.get('items', [])
+    items = result.get("items", [])
     print(f"\n=== ITEMS ({len(items)}) ===")
     items_sum = 0
     for i, item in enumerate(items):
-        amt = item.get('amount', 0)
+        amt = item.get("amount", 0)
         items_sum += amt if amt > 0 else 0
         installment = ""
-        if item.get('is_installment'):
+        if item.get("is_installment"):
             installment = f" [{item.get('installment_current')}/{item.get('installment_total')}]"
-        card_digits = f" [card:{item.get('card_last_digits')}]" if item.get('card_last_digits') else ""
-        print(f"  {i+1:2}. {item.get('description', ''):35} R$ {amt:>8.2f}  {item.get('date', ''):10}{installment}{card_digits}")
+        card_digits = (
+            f" [card:{item.get('card_last_digits')}]" if item.get("card_last_digits") else ""
+        )
+        print(
+            f"  {i + 1:2}. {item.get('description', ''):35} R$ {amt:>8.2f}  {item.get('date', ''):10}{installment}{card_digits}"
+        )
 
-    total = card_info.get('total_amount', 0) if card_info else 0
+    total = card_info.get("total_amount", 0) if card_info else 0
     diff = total - items_sum
-    print(f"\n=== SOMA ===")
+    print("\n=== SOMA ===")
     print(f"  Items sum:    R$ {items_sum:.2f}")
     print(f"  Total fatura: R$ {total:.2f}")
     print(f"  Diferença:    R$ {diff:.2f}")
     if abs(diff) > 1:
-        print(f"  ⚠️ DIFERENÇA SIGNIFICATIVA!")
+        print("  ⚠️ DIFERENÇA SIGNIFICATIVA!")
     else:
-        print(f"  ✅ SOMA OK!")
+        print("  ✅ SOMA OK!")
 
 
 if __name__ == "__main__":

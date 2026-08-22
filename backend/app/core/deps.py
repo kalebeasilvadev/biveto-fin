@@ -104,9 +104,7 @@ async def get_user_from_api_key(
 
     # Busca a API Key pelo hash
     key_hash = hash_api_key(api_key_value)
-    result = await db.execute(
-        select(APIKey).where(APIKey.key_hash == key_hash)
-    )
+    result = await db.execute(select(APIKey).where(APIKey.key_hash == key_hash))
     api_key = result.scalar_one_or_none()
 
     if api_key is None:
@@ -163,9 +161,7 @@ async def get_api_key_object(
         )
 
     key_hash = hash_api_key(x_api_key)
-    result = await db.execute(
-        select(APIKey).where(APIKey.key_hash == key_hash)
-    )
+    result = await db.execute(select(APIKey).where(APIKey.key_hash == key_hash))
     api_key = result.scalar_one_or_none()
 
     if api_key is None or not api_key.is_active:

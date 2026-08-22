@@ -22,6 +22,7 @@ from app.models.user import User
 
 class PasswordRequiredError(Exception):
     """Special error for inline password request - not a failure"""
+
     pass
 
 
@@ -37,7 +38,14 @@ def _read_file_sync(file_path: str) -> bytes:
         return f.read()
 
 
-async def process_document_background(document_id: int, user_id: int, file_path: str, mime_type: str, filename: str, password: str | None = None):
+async def process_document_background(
+    document_id: int,
+    user_id: int,
+    file_path: str,
+    mime_type: str,
+    filename: str,
+    password: str | None = None,
+):
     """
     Processa documento em background (fora do request context).
     Cria sua propria sessao do banco.
@@ -63,9 +71,7 @@ async def process_document_background(document_id: int, user_id: int, file_path:
     except Exception as e:
         print(f"[DOC_BG] Erro ao ler arquivo {file_path}: {e}")
         async with async_session_maker() as db:
-            result = await db.execute(
-                select(Document).where(Document.id == document_id)
-            )
+            result = await db.execute(select(Document).where(Document.id == document_id))
             document = result.scalar_one_or_none()
             if document:
                 document.status = DocumentStatus.FAILED
@@ -76,9 +82,7 @@ async def process_document_background(document_id: int, user_id: int, file_path:
     async with async_session_maker() as db:
         try:
             # Buscar documento
-            result = await db.execute(
-                select(Document).where(Document.id == document_id)
-            )
+            result = await db.execute(select(Document).where(Document.id == document_id))
             document = result.scalar_one_or_none()
 
             if not document:
@@ -87,9 +91,8 @@ async def process_document_background(document_id: int, user_id: int, file_path:
 
             # Buscar usuario
             from app.models.user import User
-            result = await db.execute(
-                select(User).where(User.id == user_id)
-            )
+
+            result = await db.execute(select(User).where(User.id == user_id))
             user = result.scalar_one_or_none()
 
             if not user:
@@ -104,48 +107,61 @@ async def process_document_background(document_id: int, user_id: int, file_path:
             await db.commit()
 
             from app.modules.documents.services.llm_ocr_service import LLMOCRService
-            if settings.mistral_api_key:
-                llm_service = LLMOCRService(provider='mistral', model=settings.mistral_llm_model)
-            else:
-                llm_service = LLMOCRService(provider='google', model=settings.vision_model or 'gemini-2.0-flash')
 
-            extraction_data = await llm_service.extract_from_image(file_bytes, mime_type, filename=filename, password=password)
+            if settings.mistral_api_key:
+                llm_service = LLMOCRService(provider="mistral", model=settings.mistral_llm_model)
+            else:
+                llm_service = LLMOCRService(
+                    provider="google", model=settings.vision_model or "gemini-2.0-flash"
+                )
+
+            extraction_data = await llm_service.extract_from_image(
+                file_bytes, mime_type, filename=filename, password=password
+            )
 
             # Verificar se houve erro
-            if extraction_data is None or extraction_data.get('error'):
+            if extraction_data is None or extraction_data.get("error"):
                 document.status = DocumentStatus.FAILED
-                document.error_message = extraction_data.get('error') if extraction_data else 'Extracao falhou'
+                document.error_message = (
+                    extraction_data.get("error") if extraction_data else "Extracao falhou"
+                )
                 print(f"[DOC_BG] Documento {document_id} falhou: {document.error_message}")
             else:
                 # Validar se a soma dos itens bate com o total da fatura
-                if extraction_data.get('document_type') == 'fatura_cartao':
-                    total_amount = extraction_data.get('card_info', {}).get('total_amount')
-                    items = extraction_data.get('items', [])
+                if extraction_data.get("document_type") == "fatura_cartao":
+                    total_amount = extraction_data.get("card_info", {}).get("total_amount")
+                    items = extraction_data.get("items", [])
 
                     if total_amount and items:
-                        items_sum = sum(item.get('amount', 0) for item in items)
+                        items_sum = sum(item.get("amount", 0) for item in items)
                         difference = abs(total_amount - items_sum)
 
-                        print(f"[DOC_BG] Validação de soma: total_fatura=R$ {total_amount:.2f}, soma_items=R$ {items_sum:.2f}, diff=R$ {difference:.2f}")
+                        print(
+                            f"[DOC_BG] Validação de soma: total_fatura=R$ {total_amount:.2f}, soma_items=R$ {items_sum:.2f}, diff=R$ {difference:.2f}"
+                        )
 
                         # Se diferença > R$ 50, há itens faltando ou sobrando
                         if difference > 50:
                             print(f"[DOC_BG] ⚠️ ALERTA: Diferença de R$ {difference:.2f} detectada!")
-                            print("[DOC_BG] Possível causa: LLM ignorou alguma coluna/seção de transações")
+                            print(
+                                "[DOC_BG] Possível causa: LLM ignorou alguma coluna/seção de transações"
+                            )
                             # Adicionar flag nos extracted_data para o frontend alertar o usuário
-                            extraction_data['validation_warning'] = {
-                                'type': 'sum_mismatch',
-                                'expected': total_amount,
-                                'actual': items_sum,
-                                'difference': difference,
-                                'message': f"A soma das transações (R$ {items_sum:.2f}) não bate com o total da fatura (R$ {total_amount:.2f}). Diferença: R$ {difference:.2f}"
+                            extraction_data["validation_warning"] = {
+                                "type": "sum_mismatch",
+                                "expected": total_amount,
+                                "actual": items_sum,
+                                "difference": difference,
+                                "message": f"A soma das transações (R$ {items_sum:.2f}) não bate com o total da fatura (R$ {total_amount:.2f}). Diferença: R$ {difference:.2f}",
                             }
 
                 document.status = DocumentStatus.COMPLETED
-                document.document_type = extraction_data.get('document_type')
+                document.document_type = extraction_data.get("document_type")
                 # Salvar dados extraidos para recuperacao posterior
                 document.extracted_data = extraction_data
-                print(f"[DOC_BG] Documento {document_id} processado com sucesso: {len(extraction_data.get('items', []))} itens")
+                print(
+                    f"[DOC_BG] Documento {document_id} processado com sucesso: {len(extraction_data.get('items', []))} itens"
+                )
 
             document.processed_at = utc_now()
             await db.commit()
@@ -153,12 +169,11 @@ async def process_document_background(document_id: int, user_id: int, file_path:
         except Exception as e:
             print(f"[DOC_BG] Erro ao processar documento {document_id}: {e}")
             import traceback
+
             traceback.print_exc()
 
             try:
-                result = await db.execute(
-                    select(Document).where(Document.id == document_id)
-                )
+                result = await db.execute(select(Document).where(Document.id == document_id))
                 document = result.scalar_one_or_none()
                 if document:
                     document.status = DocumentStatus.FAILED
@@ -222,9 +237,10 @@ class DocumentService:
         content = await file.read()
 
         # Check if PDF requires password
-        is_pdf = file.filename and file.filename.lower().endswith('.pdf')
+        is_pdf = file.filename and file.filename.lower().endswith(".pdf")
         if is_pdf:
             from app.modules.documents.services.pdf_converter import check_pdf_needs_password
+
             needs_password = check_pdf_needs_password(content)
 
             if needs_password and password is None:
@@ -232,17 +248,19 @@ class DocumentService:
                 if credit_card_id:
                     result = await self.db.execute(
                         select(CreditCard).where(
-                            CreditCard.id == credit_card_id,
-                            CreditCard.user_id == user.id
+                            CreditCard.id == credit_card_id, CreditCard.user_id == user.id
                         )
                     )
                     card = result.scalar_one_or_none()
 
                     if card and card.invoice_password_encrypted:
                         from app.core.crypto import decrypt_password
+
                         try:
                             password = decrypt_password(card.invoice_password_encrypted)
-                            print(f"[DOC_SVC_ASYNC] Using saved password from credit card {credit_card_id}")
+                            print(
+                                f"[DOC_SVC_ASYNC] Using saved password from credit card {credit_card_id}"
+                            )
                         except Exception as e:
                             print(f"[DOC_SVC_ASYNC] Failed to decrypt password: {e}")
 
@@ -299,7 +317,13 @@ class DocumentService:
             message="Documento enviado. Processamento em andamento.",
         )
 
-    async def upload(self, user: User, file: UploadFile, password: str | None = None, credit_card_id: int | None = None) -> Document:
+    async def upload(
+        self,
+        user: User,
+        file: UploadFile,
+        password: str | None = None,
+        credit_card_id: int | None = None,
+    ) -> Document:
         # Validar extensao
         ext = file.filename.split(".")[-1].lower() if file.filename else ""
         if ext not in settings.allowed_extensions:
@@ -324,9 +348,10 @@ class DocumentService:
         content = await file.read()
 
         # Check if PDF requires password
-        is_pdf = file.filename and file.filename.lower().endswith('.pdf')
+        is_pdf = file.filename and file.filename.lower().endswith(".pdf")
         if is_pdf:
             from app.modules.documents.services.pdf_converter import check_pdf_needs_password
+
             needs_password = check_pdf_needs_password(content)
 
             if needs_password and password is None:
@@ -334,17 +359,19 @@ class DocumentService:
                 if credit_card_id:
                     result = await self.db.execute(
                         select(CreditCard).where(
-                            CreditCard.id == credit_card_id,
-                            CreditCard.user_id == user.id
+                            CreditCard.id == credit_card_id, CreditCard.user_id == user.id
                         )
                     )
                     card = result.scalar_one_or_none()
 
                     if card and card.invoice_password_encrypted:
                         from app.core.crypto import decrypt_password
+
                         try:
                             password = decrypt_password(card.invoice_password_encrypted)
-                            print(f"[DOC_SVC] Using saved password from credit card {credit_card_id}")
+                            print(
+                                f"[DOC_SVC] Using saved password from credit card {credit_card_id}"
+                            )
                         except Exception as e:
                             print(f"[DOC_SVC] Failed to decrypt password: {e}")
                             # Password might be invalid, will raise PasswordRequiredError below
@@ -358,16 +385,20 @@ class DocumentService:
 
         # Verificar se e duplicata (apenas informativo)
         existing_result = await self.db.execute(
-            select(Document).where(
+            select(Document)
+            .where(
                 Document.user_id == user.id,
                 Document.file_hash == file_hash,
-            ).limit(1)
+            )
+            .limit(1)
         )
         existing_document = existing_result.scalar_one_or_none()
         is_duplicate = existing_document is not None
 
         if is_duplicate:
-            print(f"[DOC_SVC] Duplicate detected (informative only): existing_id={existing_document.id}")
+            print(
+                f"[DOC_SVC] Duplicate detected (informative only): existing_id={existing_document.id}"
+            )
 
         # Salvar arquivo
         upload_dir = Path(settings.upload_dir) / str(user.id)
@@ -405,125 +436,139 @@ class DocumentService:
         response.is_duplicate = is_duplicate
 
         # Converter itens extraidos para o formato de resposta e verificar duplicados
-        if extraction_data and extraction_data.get('items'):
+        if extraction_data and extraction_data.get("items"):
             # Detectar recorrencias (Netflix, Spotify, etc.)
             from app.modules.known_services.services.recurring_detector import (
                 RecurringDetectorService,
             )
+
             recurring_detector = RecurringDetectorService(self.db)
 
-            card_info = extraction_data.get('card_info', {})
-            invoice_month = card_info.get('invoice_month') if card_info else None
-            invoice_year = card_info.get('invoice_year') if card_info else None
+            card_info = extraction_data.get("card_info", {})
+            invoice_month = card_info.get("invoice_month") if card_info else None
+            invoice_year = card_info.get("invoice_year") if card_info else None
 
             items_with_detection = await recurring_detector.detect_all(
                 user=user,
-                items=extraction_data['items'],
+                items=extraction_data["items"],
                 invoice_month=invoice_month,
                 invoice_year=invoice_year,
             )
 
             # Filtrar itens com valor != 0
-            valid_items = [item for item in items_with_detection if item.get('amount', 0) != 0]
+            valid_items = [item for item in items_with_detection if item.get("amount", 0) != 0]
 
             # Verificar duplicatas em batch (1 query)
             items_for_dup_check = [
-                (item.get('description', 'Item'), item.get('amount', 0), item.get('date'))
+                (item.get("description", "Item"), item.get("amount", 0), item.get("date"))
                 for item in valid_items
             ]
             duplicate_results = await self._check_duplicates_batch(user, items_for_dup_check)
 
             extracted_items = []
             for idx, item in enumerate(valid_items):
-                duplicate_info = duplicate_results[idx] if idx < len(duplicate_results) else {'is_duplicate': False, 'transaction_id': None}
+                duplicate_info = (
+                    duplicate_results[idx]
+                    if idx < len(duplicate_results)
+                    else {"is_duplicate": False, "transaction_id": None}
+                )
 
                 # Converter future_installments se existir
                 future_installments = None
-                if item.get('future_installments'):
+                if item.get("future_installments"):
                     from app.modules.documents.schemas.document import FutureInstallmentResponse
+
                     future_installments = [
                         FutureInstallmentResponse(
-                            installment=fi.get('installment'),
-                            reference_month=fi.get('reference_month'),
-                            reference_year=fi.get('reference_year'),
+                            installment=fi.get("installment"),
+                            reference_month=fi.get("reference_month"),
+                            reference_year=fi.get("reference_year"),
                         )
-                        for fi in item['future_installments']
-                        if fi.get('installment') and fi.get('reference_month') and fi.get('reference_year')
+                        for fi in item["future_installments"]
+                        if fi.get("installment")
+                        and fi.get("reference_month")
+                        and fi.get("reference_year")
                     ]
 
                 # Converter recurring_detection se existir
                 recurring_detection = None
-                if item.get('recurring_detection'):
+                if item.get("recurring_detection"):
                     from app.modules.known_services.schemas.recurring_detection import (
                         RecurringDetection,
                     )
-                    recurring_detection = RecurringDetection(**item['recurring_detection'])
 
-                extracted_items.append(ExtractedItemResponse(
-                    description=item.get('description', 'Item'),
-                    amount=item.get('amount', 0),
-                    date=item.get('date'),
-                    category=item.get('category'),
-                    confidence=item.get('confidence', 0.9),
-                    transaction_type=item.get('transaction_type'),  # Tipo extraido pelo LLM
-                    is_installment=item.get('is_installment', False),
-                    installment_current=item.get('installment_current'),
-                    installment_total=item.get('installment_total'),
-                    future_installments=future_installments if future_installments else None,
-                    is_duplicate=duplicate_info['is_duplicate'],
-                    existing_transaction_id=duplicate_info.get('transaction_id'),
-                    recurring_detection=recurring_detection,
-                    # Campos para cupom fiscal (grocery tracking)
-                    quantity=item.get('quantity'),
-                    unit=item.get('unit'),
-                    unit_price=item.get('unit_price'),
-                    grocery_category=item.get('grocery_category'),
-                    necessity_type=item.get('necessity_type'),
-                ))
+                    recurring_detection = RecurringDetection(**item["recurring_detection"])
+
+                extracted_items.append(
+                    ExtractedItemResponse(
+                        description=item.get("description", "Item"),
+                        amount=item.get("amount", 0),
+                        date=item.get("date"),
+                        category=item.get("category"),
+                        confidence=item.get("confidence", 0.9),
+                        transaction_type=item.get("transaction_type"),  # Tipo extraido pelo LLM
+                        is_installment=item.get("is_installment", False),
+                        installment_current=item.get("installment_current"),
+                        installment_total=item.get("installment_total"),
+                        future_installments=future_installments if future_installments else None,
+                        is_duplicate=duplicate_info["is_duplicate"],
+                        existing_transaction_id=duplicate_info.get("transaction_id"),
+                        recurring_detection=recurring_detection,
+                        # Campos para cupom fiscal (grocery tracking)
+                        quantity=item.get("quantity"),
+                        unit=item.get("unit"),
+                        unit_price=item.get("unit_price"),
+                        grocery_category=item.get("grocery_category"),
+                        necessity_type=item.get("necessity_type"),
+                    )
+                )
 
             response.extracted_items = extracted_items
 
         # Incluir informacoes do cartao (para faturas)
-        if extraction_data and extraction_data.get('card_info'):
-            card_info = extraction_data['card_info']
+        if extraction_data and extraction_data.get("card_info"):
+            card_info = extraction_data["card_info"]
             response.card_info = CardInfoResponse(
-                card_issuer=card_info.get('card_issuer'),
-                card_bank=card_info.get('card_bank'),
-                card_brand=card_info.get('card_brand'),
-                card_partner=card_info.get('card_partner'),
-                card_last_digits=card_info.get('card_last_digits'),
-                card_name=card_info.get('card_name'),
-                invoice_month=card_info.get('invoice_month'),
-                invoice_year=card_info.get('invoice_year'),
-                closing_date=card_info.get('closing_date'),
-                closing_day=card_info.get('closing_day'),
-                due_date=card_info.get('due_date'),
-                due_day=card_info.get('due_day'),
-                total_amount=card_info.get('total_amount'),
-                credit_limit=card_info.get('credit_limit'),
-                credit_used=card_info.get('credit_used'),
-                credit_available=card_info.get('credit_available'),
+                card_issuer=card_info.get("card_issuer"),
+                card_bank=card_info.get("card_bank"),
+                card_brand=card_info.get("card_brand"),
+                card_partner=card_info.get("card_partner"),
+                card_last_digits=card_info.get("card_last_digits"),
+                card_name=card_info.get("card_name"),
+                invoice_month=card_info.get("invoice_month"),
+                invoice_year=card_info.get("invoice_year"),
+                closing_date=card_info.get("closing_date"),
+                closing_day=card_info.get("closing_day"),
+                due_date=card_info.get("due_date"),
+                due_day=card_info.get("due_day"),
+                total_amount=card_info.get("total_amount"),
+                credit_limit=card_info.get("credit_limit"),
+                credit_used=card_info.get("credit_used"),
+                credit_available=card_info.get("credit_available"),
             )
 
         # Incluir informacoes de pagamento (para cupom fiscal)
-        if extraction_data and extraction_data.get('payment_info'):
+        if extraction_data and extraction_data.get("payment_info"):
             from app.modules.documents.schemas.document import (
                 DetectedPaymentResponse,
                 PaymentInfoResponse,
             )
-            payment_info = extraction_data['payment_info']
+
+            payment_info = extraction_data["payment_info"]
             payments = []
-            for p in payment_info.get('payments', []):
-                payments.append(DetectedPaymentResponse(
-                    method=p.get('method', ''),
-                    amount=p.get('amount', 0),
-                    label=p.get('label', ''),
-                    sequence=p.get('sequence', 0),
-                ))
+            for p in payment_info.get("payments", []):
+                payments.append(
+                    DetectedPaymentResponse(
+                        method=p.get("method", ""),
+                        amount=p.get("amount", 0),
+                        label=p.get("label", ""),
+                        sequence=p.get("sequence", 0),
+                    )
+                )
             response.payment_info = PaymentInfoResponse(
-                total=payment_info.get('total'),
-                subtotal=payment_info.get('subtotal'),
-                discount=payment_info.get('discount'),
+                total=payment_info.get("total"),
+                subtotal=payment_info.get("subtotal"),
+                discount=payment_info.get("discount"),
                 payments=payments,
             )
 
@@ -550,12 +595,12 @@ class DocumentService:
             )
 
         # Extensoes permitidas para batch (apenas imagens)
-        allowed_batch_extensions = {'jpg', 'jpeg', 'png', 'heic', 'heif'}
+        allowed_batch_extensions = {"jpg", "jpeg", "png", "heic", "heif"}
 
         # Processar cada arquivo
         images: list[tuple[bytes, str]] = []
         total_size = 0
-        combined_hash_data = b''
+        combined_hash_data = b""
 
         for file in files:
             ext = file.filename.split(".")[-1].lower() if file.filename else ""
@@ -576,13 +621,13 @@ class DocumentService:
                 )
 
             # Converter HEIC para JPEG se necessario
-            if ext in ('heic', 'heif'):
+            if ext in ("heic", "heif"):
                 content, mime_type = await self._convert_heic_to_jpeg(content)
             else:
                 mime_type = file.content_type or f"image/{ext}"
                 # Normalizar mime_type
-                if mime_type == 'image/jpg':
-                    mime_type = 'image/jpeg'
+                if mime_type == "image/jpg":
+                    mime_type = "image/jpeg"
 
             images.append((content, mime_type))
             combined_hash_data += content
@@ -600,23 +645,27 @@ class DocumentService:
 
         # Verificar se e duplicata
         existing_result = await self.db.execute(
-            select(Document).where(
+            select(Document)
+            .where(
                 Document.user_id == user.id,
                 Document.file_hash == file_hash,
-            ).limit(1)
+            )
+            .limit(1)
         )
         existing_document = existing_result.scalar_one_or_none()
         is_duplicate = existing_document is not None
 
         if is_duplicate:
-            print(f"[DOC_SVC] Batch duplicate detected (informative only): existing_id={existing_document.id}")
+            print(
+                f"[DOC_SVC] Batch duplicate detected (informative only): existing_id={existing_document.id}"
+            )
 
         # Salvar primeira imagem como referencia
         upload_dir = Path(settings.upload_dir) / str(user.id)
         upload_dir.mkdir(parents=True, exist_ok=True)
 
         first_content, first_mime = images[0]
-        ext = 'jpg' if 'jpeg' in first_mime else first_mime.split('/')[-1]
+        ext = "jpg" if "jpeg" in first_mime else first_mime.split("/")[-1]
         file_path = upload_dir / f"{file_hash}.{ext}"
         await asyncio.to_thread(_write_file_sync, file_path, first_content)
 
@@ -642,120 +691,134 @@ class DocumentService:
         response.is_duplicate = is_duplicate
 
         # Converter itens extraidos para o formato de resposta
-        if extraction_data and extraction_data.get('items'):
+        if extraction_data and extraction_data.get("items"):
             from app.modules.known_services.services.recurring_detector import (
                 RecurringDetectorService,
             )
+
             recurring_detector = RecurringDetectorService(self.db)
 
-            card_info = extraction_data.get('card_info', {})
-            invoice_month = card_info.get('invoice_month') if card_info else None
-            invoice_year = card_info.get('invoice_year') if card_info else None
+            card_info = extraction_data.get("card_info", {})
+            invoice_month = card_info.get("invoice_month") if card_info else None
+            invoice_year = card_info.get("invoice_year") if card_info else None
 
             items_with_detection = await recurring_detector.detect_all(
                 user=user,
-                items=extraction_data['items'],
+                items=extraction_data["items"],
                 invoice_month=invoice_month,
                 invoice_year=invoice_year,
             )
 
             # Filtrar itens com valor != 0
-            valid_items = [item for item in items_with_detection if item.get('amount', 0) != 0]
+            valid_items = [item for item in items_with_detection if item.get("amount", 0) != 0]
 
             # Verificar duplicatas em batch (1 query)
             items_for_dup_check = [
-                (item.get('description', 'Item'), item.get('amount', 0), item.get('date'))
+                (item.get("description", "Item"), item.get("amount", 0), item.get("date"))
                 for item in valid_items
             ]
             duplicate_results = await self._check_duplicates_batch(user, items_for_dup_check)
 
             extracted_items = []
             for idx, item in enumerate(valid_items):
-                duplicate_info = duplicate_results[idx] if idx < len(duplicate_results) else {'is_duplicate': False, 'transaction_id': None}
+                duplicate_info = (
+                    duplicate_results[idx]
+                    if idx < len(duplicate_results)
+                    else {"is_duplicate": False, "transaction_id": None}
+                )
 
                 future_installments = None
-                if item.get('future_installments'):
+                if item.get("future_installments"):
                     from app.modules.documents.schemas.document import FutureInstallmentResponse
+
                     future_installments = [
                         FutureInstallmentResponse(
-                            installment=fi.get('installment'),
-                            reference_month=fi.get('reference_month'),
-                            reference_year=fi.get('reference_year'),
+                            installment=fi.get("installment"),
+                            reference_month=fi.get("reference_month"),
+                            reference_year=fi.get("reference_year"),
                         )
-                        for fi in item['future_installments']
-                        if fi.get('installment') and fi.get('reference_month') and fi.get('reference_year')
+                        for fi in item["future_installments"]
+                        if fi.get("installment")
+                        and fi.get("reference_month")
+                        and fi.get("reference_year")
                     ]
 
                 recurring_detection = None
-                if item.get('recurring_detection'):
+                if item.get("recurring_detection"):
                     from app.modules.known_services.schemas.recurring_detection import (
                         RecurringDetection,
                     )
-                    recurring_detection = RecurringDetection(**item['recurring_detection'])
 
-                extracted_items.append(ExtractedItemResponse(
-                    description=item.get('description', 'Item'),
-                    amount=item.get('amount', 0),
-                    date=item.get('date'),
-                    category=item.get('category'),
-                    confidence=item.get('confidence', 0.9),
-                    transaction_type=item.get('transaction_type'),
-                    is_installment=item.get('is_installment', False),
-                    installment_current=item.get('installment_current'),
-                    installment_total=item.get('installment_total'),
-                    future_installments=future_installments if future_installments else None,
-                    is_duplicate=duplicate_info['is_duplicate'],
-                    existing_transaction_id=duplicate_info.get('transaction_id'),
-                    recurring_detection=recurring_detection,
-                    quantity=item.get('quantity'),
-                    unit=item.get('unit'),
-                    unit_price=item.get('unit_price'),
-                    grocery_category=item.get('grocery_category'),
-                    necessity_type=item.get('necessity_type'),
-                ))
+                    recurring_detection = RecurringDetection(**item["recurring_detection"])
+
+                extracted_items.append(
+                    ExtractedItemResponse(
+                        description=item.get("description", "Item"),
+                        amount=item.get("amount", 0),
+                        date=item.get("date"),
+                        category=item.get("category"),
+                        confidence=item.get("confidence", 0.9),
+                        transaction_type=item.get("transaction_type"),
+                        is_installment=item.get("is_installment", False),
+                        installment_current=item.get("installment_current"),
+                        installment_total=item.get("installment_total"),
+                        future_installments=future_installments if future_installments else None,
+                        is_duplicate=duplicate_info["is_duplicate"],
+                        existing_transaction_id=duplicate_info.get("transaction_id"),
+                        recurring_detection=recurring_detection,
+                        quantity=item.get("quantity"),
+                        unit=item.get("unit"),
+                        unit_price=item.get("unit_price"),
+                        grocery_category=item.get("grocery_category"),
+                        necessity_type=item.get("necessity_type"),
+                    )
+                )
 
             response.extracted_items = extracted_items
 
-        if extraction_data and extraction_data.get('card_info'):
-            card_info = extraction_data['card_info']
+        if extraction_data and extraction_data.get("card_info"):
+            card_info = extraction_data["card_info"]
             response.card_info = CardInfoResponse(
-                card_issuer=card_info.get('card_issuer'),
-                card_bank=card_info.get('card_bank'),
-                card_brand=card_info.get('card_brand'),
-                card_partner=card_info.get('card_partner'),
-                card_last_digits=card_info.get('card_last_digits'),
-                card_name=card_info.get('card_name'),
-                invoice_month=card_info.get('invoice_month'),
-                invoice_year=card_info.get('invoice_year'),
-                closing_date=card_info.get('closing_date'),
-                closing_day=card_info.get('closing_day'),
-                due_date=card_info.get('due_date'),
-                due_day=card_info.get('due_day'),
-                total_amount=card_info.get('total_amount'),
-                credit_limit=card_info.get('credit_limit'),
-                credit_used=card_info.get('credit_used'),
-                credit_available=card_info.get('credit_available'),
+                card_issuer=card_info.get("card_issuer"),
+                card_bank=card_info.get("card_bank"),
+                card_brand=card_info.get("card_brand"),
+                card_partner=card_info.get("card_partner"),
+                card_last_digits=card_info.get("card_last_digits"),
+                card_name=card_info.get("card_name"),
+                invoice_month=card_info.get("invoice_month"),
+                invoice_year=card_info.get("invoice_year"),
+                closing_date=card_info.get("closing_date"),
+                closing_day=card_info.get("closing_day"),
+                due_date=card_info.get("due_date"),
+                due_day=card_info.get("due_day"),
+                total_amount=card_info.get("total_amount"),
+                credit_limit=card_info.get("credit_limit"),
+                credit_used=card_info.get("credit_used"),
+                credit_available=card_info.get("credit_available"),
             )
 
         # Incluir informacoes de pagamento (para cupom fiscal)
-        if extraction_data and extraction_data.get('payment_info'):
+        if extraction_data and extraction_data.get("payment_info"):
             from app.modules.documents.schemas.document import (
                 DetectedPaymentResponse,
                 PaymentInfoResponse,
             )
-            payment_info = extraction_data['payment_info']
+
+            payment_info = extraction_data["payment_info"]
             payments = []
-            for p in payment_info.get('payments', []):
-                payments.append(DetectedPaymentResponse(
-                    method=p.get('method', ''),
-                    amount=p.get('amount', 0),
-                    label=p.get('label', ''),
-                    sequence=p.get('sequence', 0),
-                ))
+            for p in payment_info.get("payments", []):
+                payments.append(
+                    DetectedPaymentResponse(
+                        method=p.get("method", ""),
+                        amount=p.get("amount", 0),
+                        label=p.get("label", ""),
+                        sequence=p.get("sequence", 0),
+                    )
+                )
             response.payment_info = PaymentInfoResponse(
-                total=payment_info.get('total'),
-                subtotal=payment_info.get('subtotal'),
-                discount=payment_info.get('discount'),
+                total=payment_info.get("total"),
+                subtotal=payment_info.get("subtotal"),
+                discount=payment_info.get("discount"),
                 payments=payments,
             )
 
@@ -777,12 +840,12 @@ class DocumentService:
                 img = Image.open(io.BytesIO(heic_content))
 
                 # Converter para RGB se necessario (HEIC pode ter alpha)
-                if img.mode in ('RGBA', 'P'):
-                    img = img.convert('RGB')
+                if img.mode in ("RGBA", "P"):
+                    img = img.convert("RGB")
 
                 # Salvar como JPEG
                 output = io.BytesIO()
-                img.save(output, format='JPEG', quality=85)
+                img.save(output, format="JPEG", quality=85)
                 return output.getvalue()
             except ImportError:
                 raise HTTPException(
@@ -796,9 +859,11 @@ class DocumentService:
                 )
 
         jpeg_content = await asyncio.to_thread(_convert)
-        return jpeg_content, 'image/jpeg'
+        return jpeg_content, "image/jpeg"
 
-    async def _process_batch_images(self, document: Document, images: list[tuple[bytes, str]]) -> dict | None:
+    async def _process_batch_images(
+        self, document: Document, images: list[tuple[bytes, str]]
+    ) -> dict | None:
         """Processa multiplas imagens e extrai dados usando LLM"""
         try:
             print(f"[DOC_SVC] _process_batch_images: id={document.id}, num_images={len(images)}")
@@ -808,27 +873,36 @@ class DocumentService:
             # Usar LLM com visao para processar multiplas imagens
             # Mistral como provider principal (melhor OCR)
             from app.modules.documents.services.llm_ocr_service import LLMOCRService
+
             if settings.mistral_api_key:
-                llm_service = LLMOCRService(provider='mistral', model=settings.mistral_llm_model)
+                llm_service = LLMOCRService(provider="mistral", model=settings.mistral_llm_model)
                 print("[DOC_SVC] Using Mistral for batch image extraction")
             else:
-                llm_service = LLMOCRService(provider='google', model=settings.vision_model or 'gemini-2.0-flash')
+                llm_service = LLMOCRService(
+                    provider="google", model=settings.vision_model or "gemini-2.0-flash"
+                )
                 print("[DOC_SVC] Using Google for batch image extraction (Mistral not configured)")
             result = await llm_service.extract_from_multiple_images(images)
 
-            items_count = len(result.get('items', [])) if result else 0
-            print(f"[DOC_SVC] Batch extraction returned: items={items_count}, error={result.get('error')}")
+            items_count = len(result.get("items", [])) if result else 0
+            print(
+                f"[DOC_SVC] Batch extraction returned: items={items_count}, error={result.get('error')}"
+            )
 
-            if result is None or (not result.get('items') and result.get('error')):
+            if result is None or (not result.get("items") and result.get("error")):
                 document.status = DocumentStatus.FAILED
-                document.error_message = result.get('error') if result else 'Extracao falhou'
-                print(f"[DOC_SVC] Document {document.id} marked as FAILED: {document.error_message}")
+                document.error_message = result.get("error") if result else "Extracao falhou"
+                print(
+                    f"[DOC_SVC] Document {document.id} marked as FAILED: {document.error_message}"
+                )
             else:
                 document.status = DocumentStatus.COMPLETED
-                print(f"[DOC_SVC] Document {document.id} marked as COMPLETED with {items_count} items")
+                print(
+                    f"[DOC_SVC] Document {document.id} marked as COMPLETED with {items_count} items"
+                )
 
             # Determinar tipo de documento
-            doc_type = result.get('document_type')
+            doc_type = result.get("document_type")
             if doc_type:
                 document.document_type = doc_type
 
@@ -841,6 +915,7 @@ class DocumentService:
         except Exception as e:
             print(f"[DOC_SVC] EXCEPTION in _process_batch_images: {e}")
             import traceback
+
             traceback.print_exc()
             document.status = DocumentStatus.FAILED
             document.error_message = str(e)
@@ -902,7 +977,9 @@ class DocumentService:
 
         await self.db.delete(document)
 
-    async def _process_document(self, document: Document, content: bytes, password: str | None = None) -> dict | None:
+    async def _process_document(
+        self, document: Document, content: bytes, password: str | None = None
+    ) -> dict | None:
         """Processa documento e extrai dados (NAO salva - retorna para confirmacao)
 
         Args:
@@ -911,23 +988,33 @@ class DocumentService:
             password: Optional password for protected PDFs
         """
         try:
-            print(f"[DOC_SVC] _process_document: id={document.id}, mime_type={document.mime_type}, content_size={len(content)}")
+            print(
+                f"[DOC_SVC] _process_document: id={document.id}, mime_type={document.mime_type}, content_size={len(content)}"
+            )
             document.status = DocumentStatus.PROCESSING
             await self.db.flush()
 
             # Extrair dados com LLM
             print("[DOC_SVC] Calling _extract_data...")
             extraction_data = await self._extract_data(document, content, password)
-            items_count = len(extraction_data.get('items', [])) if extraction_data else 0
-            print(f"[DOC_SVC] _extract_data returned: items={items_count}, error={document.error_message}")
+            items_count = len(extraction_data.get("items", [])) if extraction_data else 0
+            print(
+                f"[DOC_SVC] _extract_data returned: items={items_count}, error={document.error_message}"
+            )
 
             # Se houve erro na extracao, marcar como falha
-            if extraction_data is None or (not extraction_data.get('items') and document.error_message):
+            if extraction_data is None or (
+                not extraction_data.get("items") and document.error_message
+            ):
                 document.status = DocumentStatus.FAILED
-                print(f"[DOC_SVC] Document {document.id} marked as FAILED: {document.error_message}")
+                print(
+                    f"[DOC_SVC] Document {document.id} marked as FAILED: {document.error_message}"
+                )
             else:
                 document.status = DocumentStatus.COMPLETED
-                print(f"[DOC_SVC] Document {document.id} marked as COMPLETED with {items_count} items")
+                print(
+                    f"[DOC_SVC] Document {document.id} marked as COMPLETED with {items_count} items"
+                )
 
             document.processed_at = utc_now()
             await self.db.flush()
@@ -938,6 +1025,7 @@ class DocumentService:
         except Exception as e:
             print(f"[DOC_SVC] EXCEPTION in _process_document: {e}")
             import traceback
+
             traceback.print_exc()
             document.status = DocumentStatus.FAILED
             document.error_message = str(e)
@@ -958,69 +1046,77 @@ class DocumentService:
         print(f"[DOC_SVC] _extract_data: content_size={len(content)}")
 
         # Verificar se e CSV ou Excel
-        mime_type = document.mime_type or ''
-        filename = document.original_filename or ''
+        mime_type = document.mime_type or ""
+        filename = document.original_filename or ""
 
-        is_spreadsheet = (
-            mime_type in ['text/csv', 'application/csv',
-                          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                          'application/vnd.ms-excel'] or
-            filename.lower().endswith(('.csv', '.xlsx', '.xls'))
+        is_spreadsheet = mime_type in [
+            "text/csv",
+            "application/csv",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "application/vnd.ms-excel",
+        ] or filename.lower().endswith((".csv", ".xlsx", ".xls"))
+
+        print(
+            f"[DOC_SVC] mime_type={mime_type}, filename={filename}, is_spreadsheet={is_spreadsheet}"
         )
-
-        print(f"[DOC_SVC] mime_type={mime_type}, filename={filename}, is_spreadsheet={is_spreadsheet}")
 
         if is_spreadsheet:
             # Usar parser de planilha
             from app.modules.documents.services.spreadsheet_parser_service import (
                 SpreadsheetParserService,
             )
+
             parser = SpreadsheetParserService()
             result = await parser.parse_file(content, filename, mime_type)
         else:
             # Usar LLM com visao para imagens/PDFs
             # Respeitar vision_provider configurado (default: google)
             selected_provider = settings.vision_provider
-            if selected_provider == 'mistral' and settings.mistral_api_key:
+            if selected_provider == "mistral" and settings.mistral_api_key:
                 selected_model = settings.mistral_llm_model
-            elif selected_provider == 'google' and settings.google_api_key:
-                selected_model = settings.vision_model or 'gemini-2.0-flash'
+            elif selected_provider == "google" and settings.google_api_key:
+                selected_model = settings.vision_model or "gemini-2.0-flash"
             elif settings.google_api_key:
-                selected_provider = 'google'
-                selected_model = settings.vision_model or 'gemini-2.0-flash'
+                selected_provider = "google"
+                selected_model = settings.vision_model or "gemini-2.0-flash"
             elif settings.mistral_api_key:
-                selected_provider = 'mistral'
+                selected_provider = "mistral"
                 selected_model = settings.mistral_llm_model
             else:
-                selected_provider = 'google'
-                selected_model = 'gemini-2.0-flash'
+                selected_provider = "google"
+                selected_model = "gemini-2.0-flash"
             print(f"[DOC_SVC] Using {selected_provider} for extraction")
 
             from app.modules.documents.services.llm_ocr_service import LLMOCRService
+
             llm_service = LLMOCRService(provider=selected_provider, model=selected_model)
-            result = await llm_service.extract_from_image(content, mime_type, filename=filename, password=password)
-            print(f"[DOC_SVC] LLM OCR result: items={len(result.get('items', []))}, error={result.get('error')}")
+            result = await llm_service.extract_from_image(
+                content, mime_type, filename=filename, password=password
+            )
+            print(
+                f"[DOC_SVC] LLM OCR result: items={len(result.get('items', []))}, error={result.get('error')}"
+            )
 
         # Se houve erro na extracao
-        if result.get('error'):
-            document.error_message = result['error']
+        if result.get("error"):
+            document.error_message = result["error"]
             return None
 
         # Determinar tipo de documento
-        doc_type = result.get('document_type')
+        doc_type = result.get("document_type")
         if doc_type:
             document.document_type = doc_type
 
         # Retornar itens individuais com categoria, info do cartao e info de pagamento
-        items = result.get('items', [])
-        card_info = result.get('card_info')
-        payment_info = result.get('payment_info')
+        items = result.get("items", [])
+        card_info = result.get("card_info")
+        payment_info = result.get("payment_info")
 
         return {
-            'items': items,
-            'document_type': doc_type,
-            'card_info': card_info,
-            'payment_info': payment_info,
+            "items": items,
+            "document_type": doc_type,
+            "card_info": card_info,
+            "payment_info": payment_info,
         }
 
     async def _check_duplicate_transaction(
@@ -1035,7 +1131,7 @@ class DocumentService:
         Usa a versao batch internamente para manter consistencia.
         """
         results = await self._check_duplicates_batch(user, [(description, amount, item_date)])
-        return results[0] if results else {'is_duplicate': False, 'transaction_id': None}
+        return results[0] if results else {"is_duplicate": False, "transaction_id": None}
 
     async def _check_duplicates_batch(
         self,
@@ -1063,7 +1159,7 @@ class DocumentService:
             # Coletar todos os valores unicos para busca
             amounts_set = set()
             dates_set = set()
-            tolerance = Decimal('0.01')
+            tolerance = Decimal("0.01")
 
             for description, amount, item_date in items:
                 amount_decimal = Decimal(str(abs(amount)))
@@ -1077,9 +1173,7 @@ class DocumentService:
             # Construir condições para buscar todos os candidatos em uma query
             amount_conditions = []
             for amt in amounts_set:
-                amount_conditions.append(
-                    func.abs(Transaction.amount - amt) <= tolerance
-                )
+                amount_conditions.append(func.abs(Transaction.amount - amt) <= tolerance)
 
             query = select(Transaction).where(
                 Transaction.user_id == user.id,
@@ -1089,10 +1183,7 @@ class DocumentService:
             # Filtrar por datas se houver
             if dates_set:
                 query = query.where(
-                    or_(
-                        Transaction.date.in_(dates_set),
-                        Transaction.date.is_(None)
-                    )
+                    or_(Transaction.date.in_(dates_set), Transaction.date.is_(None))
                 )
 
             result = await self.db.execute(query.limit(100))
@@ -1112,13 +1203,14 @@ class DocumentService:
 
                 # Filtrar candidatos por valor e data
                 candidates = [
-                    txn for txn in all_candidates
+                    txn
+                    for txn in all_candidates
                     if abs(txn.amount - amount_decimal) <= tolerance
                     and (target_date is None or txn.date == target_date)
                 ]
 
                 if not candidates:
-                    results.append({'is_duplicate': False, 'transaction_id': None})
+                    results.append({"is_duplicate": False, "transaction_id": None})
                     continue
 
                 # Verificar similaridade de descricao
@@ -1128,7 +1220,7 @@ class DocumentService:
                 duplicate_id = None
 
                 for txn in candidates:
-                    txn_desc = (txn.description or '').lower().strip()
+                    txn_desc = (txn.description or "").lower().strip()
                     txn_words = set(txn_desc.split())
 
                     # Considerar duplicado se:
@@ -1157,17 +1249,14 @@ class DocumentService:
                             duplicate_id = txn.id
                             break
 
-                results.append({
-                    'is_duplicate': found_duplicate,
-                    'transaction_id': duplicate_id
-                })
+                results.append({"is_duplicate": found_duplicate, "transaction_id": duplicate_id})
 
             return results
 
         except Exception as e:
             print(f"[DOC_SVC] Error in batch duplicate check: {e}")
             # Em caso de erro, retornar todos como nao duplicados
-            return [{'is_duplicate': False, 'transaction_id': None} for _ in items]
+            return [{"is_duplicate": False, "transaction_id": None} for _ in items]
 
     async def save_card_password(self, user: User, card_id: int, password: str):
         """Encrypt and save invoice password to credit card
@@ -1183,17 +1272,13 @@ class DocumentService:
         from app.core.crypto import encrypt_password
 
         result = await self.db.execute(
-            select(CreditCard).where(
-                CreditCard.id == card_id,
-                CreditCard.user_id == user.id
-            )
+            select(CreditCard).where(CreditCard.id == card_id, CreditCard.user_id == user.id)
         )
         card = result.scalar_one_or_none()
 
         if not card:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Cartão não encontrado"
+                status_code=status.HTTP_404_NOT_FOUND, detail="Cartão não encontrado"
             )
 
         card.invoice_password_encrypted = encrypt_password(password)

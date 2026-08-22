@@ -22,6 +22,7 @@ Dependencias:
 - models: Document, DocumentExtraction (centralizados em app.models)
 - services: DocumentService, LLMOCRService, SpreadsheetParserService
 """
+
 from app.modules.documents.routers.documents import router
 from app.modules.documents.schemas.document import (
     CardInfoResponse,

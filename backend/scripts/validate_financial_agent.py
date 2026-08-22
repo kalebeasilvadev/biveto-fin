@@ -9,27 +9,26 @@ Uso:
     cd backend && python scripts/validate_financial_agent.py
 """
 
-import sys
 import os
+import sys
 
 # Adicionar diretório pai ao path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import asyncio
 from datetime import date
-from decimal import Decimal
-from sqlalchemy import select, func, and_, or_
+
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import async_session_maker
-from app.models.user import User
-from app.models.transaction import Transaction, TransactionType
-from app.models.category import Category
 from app.models.account import Account
+from app.models.category import Category
 from app.models.credit_card import CreditCard
-from app.models.credit_card_invoice import CreditCardInvoice, InvoiceStatus
+from app.models.credit_card_invoice import CreditCardInvoice
 from app.models.installment import InstallmentSeries, InstallmentSeriesStatus
-
+from app.models.transaction import Transaction, TransactionType
+from app.models.user import User
 
 # Valores esperados do documento de validação
 EXPECTED_VALUES = {
@@ -50,7 +49,6 @@ EXPECTED_VALUES = {
         "Santander": 657.92,
     },
     "total_faturas_janeiro": 17032.73,
-
     # Faturas Fevereiro/2026 (todas abertas)
     "faturas_fevereiro": {
         "Bradesco Amazon": 52.54,
@@ -68,11 +66,9 @@ EXPECTED_VALUES = {
         "Santander": 1125.18,
     },
     "total_faturas_fevereiro": 12408.56,
-
     # Gastos Janeiro/2026
     "despesas_janeiro": 36719.61,
     "receitas_janeiro": 39131.02,
-
     # Gastos por categoria Janeiro/2026
     "gastos_por_categoria_janeiro": {
         "Pagamento de Fatura": {"total": 17032.73, "count": 13},
@@ -83,18 +79,15 @@ EXPECTED_VALUES = {
         "Lazer": {"total": 106.09, "count": 1},
         "Alimentação": {"total": 38.18, "count": 4},
     },
-
     # Cartões
     "total_cartoes": 14,
     "limite_total": 237136.00,
     "maior_limite_cartao": "Bradesco Amex",
     "maior_limite_valor": 76000.00,
-
     # Parcelas
     "parcelas_ativas": 109,
     "impacto_mensal_parcelas": 11363.93,
     "total_parcelas_restantes": 63343.95,
-
     # Contas
     "saldo_investimentos": 45000.00,
     "saldo_beneficios": 1479.56,
@@ -103,9 +96,9 @@ EXPECTED_VALUES = {
 
 async def validate_invoices(session: AsyncSession, user_id: int):
     """Valida faturas de cartão de crédito"""
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("VALIDAÇÃO DE FATURAS DE CARTÃO")
-    print("="*70)
+    print("=" * 70)
 
     # Buscar faturas de janeiro
     result = await session.execute(
@@ -115,14 +108,16 @@ async def validate_invoices(session: AsyncSession, user_id: int):
         .where(
             CreditCardInvoice.user_id == user_id,
             CreditCardInvoice.reference_month == 1,
-            CreditCardInvoice.reference_year == 2026
+            CreditCardInvoice.reference_year == 2026,
         )
     )
 
     invoices_jan = result.all()
 
     print("\n--- FATURAS JANEIRO/2026 ---")
-    print(f"{'Cartão':<25} {'Valor Encontrado':>15} {'Valor Esperado':>15} {'Status':>10} {'Match'}")
+    print(
+        f"{'Cartão':<25} {'Valor Encontrado':>15} {'Valor Esperado':>15} {'Status':>10} {'Match'}"
+    )
     print("-" * 80)
 
     total_jan = 0
@@ -137,7 +132,9 @@ async def validate_invoices(session: AsyncSession, user_id: int):
         if expected and abs(valor - expected) >= 0.01:
             errors_jan.append((card_name, valor, expected))
 
-        print(f"{card_name:<25} R$ {valor:>12.2f} R$ {expected or 0:>12.2f} {inv.status:>10} {match}")
+        print(
+            f"{card_name:<25} R$ {valor:>12.2f} R$ {expected or 0:>12.2f} {inv.status:>10} {match}"
+        )
 
     print("-" * 80)
     expected_total = EXPECTED_VALUES["total_faturas_janeiro"]
@@ -157,14 +154,16 @@ async def validate_invoices(session: AsyncSession, user_id: int):
         .where(
             CreditCardInvoice.user_id == user_id,
             CreditCardInvoice.reference_month == 2,
-            CreditCardInvoice.reference_year == 2026
+            CreditCardInvoice.reference_year == 2026,
         )
     )
 
     invoices_feb = result.all()
 
     print("\n--- FATURAS FEVEREIRO/2026 ---")
-    print(f"{'Cartão':<25} {'Valor Encontrado':>15} {'Valor Esperado':>15} {'Status':>10} {'Match'}")
+    print(
+        f"{'Cartão':<25} {'Valor Encontrado':>15} {'Valor Esperado':>15} {'Status':>10} {'Match'}"
+    )
     print("-" * 80)
 
     total_feb = 0
@@ -179,7 +178,9 @@ async def validate_invoices(session: AsyncSession, user_id: int):
         if expected and abs(valor - expected) >= 0.01:
             errors_feb.append((card_name, valor, expected))
 
-        print(f"{card_name:<25} R$ {valor:>12.2f} R$ {expected or 0:>12.2f} {inv.status:>10} {match}")
+        print(
+            f"{card_name:<25} R$ {valor:>12.2f} R$ {expected or 0:>12.2f} {inv.status:>10} {match}"
+        )
 
     print("-" * 80)
     expected_total = EXPECTED_VALUES["total_faturas_fevereiro"]
@@ -191,17 +192,15 @@ async def validate_invoices(session: AsyncSession, user_id: int):
 
 async def validate_expenses(session: AsyncSession, user_id: int):
     """Valida cálculo de despesas"""
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("VALIDAÇÃO DE DESPESAS - JANEIRO/2026")
-    print("="*70)
+    print("=" * 70)
 
     period_start = date(2026, 1, 1)
     period_end = date(2026, 1, 31)
 
     # Buscar categorias
-    cat_result = await session.execute(
-        select(Category).where(Category.user_id == user_id)
-    )
+    cat_result = await session.execute(select(Category).where(Category.user_id == user_id))
     categories = {c.id: c.name for c in cat_result.scalars().all()}
 
     # Buscar transações do período
@@ -209,29 +208,28 @@ async def validate_expenses(session: AsyncSession, user_id: int):
         select(Transaction).where(
             Transaction.user_id == user_id,
             Transaction.date >= period_start,
-            Transaction.date <= period_end
+            Transaction.date <= period_end,
         )
     )
     txs = result.scalars().all()
 
     # Calcular totais SEM exclusões
     total_despesas_sem_filtro = sum(
-        float(t.amount) for t in txs
-        if t.type == TransactionType.EXPENSE.value
+        float(t.amount) for t in txs if t.type == TransactionType.EXPENSE.value
     )
 
     # Calcular totais COM exclusões (como o agente faz agora - apenas linked_transaction)
     total_despesas_com_filtro = sum(
-        float(t.amount) for t in txs
-        if t.type == TransactionType.EXPENSE.value
-        and not t.linked_transaction_id
+        float(t.amount)
+        for t in txs
+        if t.type == TransactionType.EXPENSE.value and not t.linked_transaction_id
     )
 
     # Calcular receitas
     total_receitas = sum(
-        float(t.amount) for t in txs
-        if t.type == TransactionType.INCOME.value
-        and not t.linked_transaction_id
+        float(t.amount)
+        for t in txs
+        if t.type == TransactionType.INCOME.value and not t.linked_transaction_id
     )
 
     # Gastos por categoria
@@ -245,14 +243,18 @@ async def validate_expenses(session: AsyncSession, user_id: int):
             gastos_por_categoria[cat_name]["count"] += 1
 
     # Transações excluídas
-    excluded_linked = [t for t in txs if t.type == TransactionType.EXPENSE.value and t.linked_transaction_id]
+    excluded_linked = [
+        t for t in txs if t.type == TransactionType.EXPENSE.value and t.linked_transaction_id
+    ]
     excluded_receipt = [t for t in txs if t.type == TransactionType.EXPENSE.value and t.receipt_id]
 
     expected_despesas = EXPECTED_VALUES["despesas_janeiro"]
     expected_receitas = EXPECTED_VALUES["receitas_janeiro"]
 
     print(f"\nTotal de transações no período: {len(txs)}")
-    print(f"Transações de despesa (sem filtro): {sum(1 for t in txs if t.type == TransactionType.EXPENSE.value)}")
+    print(
+        f"Transações de despesa (sem filtro): {sum(1 for t in txs if t.type == TransactionType.EXPENSE.value)}"
+    )
     print(f"Transações excluídas por linked_transaction_id: {len(excluded_linked)}")
     print(f"Transações excluídas por receipt_id: {len(excluded_receipt)}")
 
@@ -263,15 +265,19 @@ async def validate_expenses(session: AsyncSession, user_id: int):
     match_desp = "✓" if abs(total_despesas_com_filtro - expected_despesas) < 0.01 else "✗"
     match_rec = "✓" if abs(total_receitas - expected_receitas) < 0.01 else "✗"
 
-    print(f"{'Despesas (com filtro agente)':<40} R$ {total_despesas_com_filtro:>12.2f} R$ {expected_despesas:>12.2f} {match_desp}")
-    print(f"{'Despesas (sem filtro)':<40} R$ {total_despesas_sem_filtro:>12.2f} R$ {expected_despesas:>12.2f}")
+    print(
+        f"{'Despesas (com filtro agente)':<40} R$ {total_despesas_com_filtro:>12.2f} R$ {expected_despesas:>12.2f} {match_desp}"
+    )
+    print(
+        f"{'Despesas (sem filtro)':<40} R$ {total_despesas_sem_filtro:>12.2f} R$ {expected_despesas:>12.2f}"
+    )
     print(f"{'Receitas':<40} R$ {total_receitas:>12.2f} R$ {expected_receitas:>12.2f} {match_rec}")
 
     diff = total_despesas_sem_filtro - total_despesas_com_filtro
     print(f"\nDiferença por exclusões: R$ {diff:.2f}")
 
     if abs(total_despesas_com_filtro - expected_despesas) >= 0.01:
-        print(f"\n⚠️  DISCREPÂNCIA DETECTADA!")
+        print("\n⚠️  DISCREPÂNCIA DETECTADA!")
         print(f"   Esperado: R$ {expected_despesas:.2f}")
         print(f"   Encontrado: R$ {total_despesas_com_filtro:.2f}")
         print(f"   Diferença: R$ {expected_despesas - total_despesas_com_filtro:.2f}")
@@ -281,29 +287,35 @@ async def validate_expenses(session: AsyncSession, user_id: int):
     print(f"{'Categoria':<30} {'Encontrado':>15} {'Esperado':>15} {'Count':>8} {'Match'}")
     print("-" * 80)
 
-    for cat, data in sorted(gastos_por_categoria.items(), key=lambda x: x[1]["total"], reverse=True):
+    for cat, data in sorted(
+        gastos_por_categoria.items(), key=lambda x: x[1]["total"], reverse=True
+    ):
         expected = EXPECTED_VALUES["gastos_por_categoria_janeiro"].get(cat, {})
         exp_total = expected.get("total", 0)
-        exp_count = expected.get("count", 0)
-        match = "✓" if exp_total and abs(data["total"] - exp_total) < 0.01 else "✗" if exp_total else "-"
-        print(f"{cat:<30} R$ {data['total']:>12.2f} R$ {exp_total:>12.2f} {data['count']:>8} {match}")
+        match = (
+            "✓"
+            if exp_total and abs(data["total"] - exp_total) < 0.01
+            else "✗"
+            if exp_total
+            else "-"
+        )
+        print(
+            f"{cat:<30} R$ {data['total']:>12.2f} R$ {exp_total:>12.2f} {data['count']:>8} {match}"
+        )
 
     return 0 if abs(total_despesas_com_filtro - expected_despesas) < 0.01 else 1
 
 
 async def validate_cards(session: AsyncSession, user_id: int):
     """Valida informações de cartões"""
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("VALIDAÇÃO DE CARTÕES DE CRÉDITO")
-    print("="*70)
+    print("=" * 70)
 
     result = await session.execute(
         select(CreditCard, Account.name.label("card_name"))
         .join(Account, CreditCard.account_id == Account.id)
-        .where(
-            CreditCard.user_id == user_id,
-            CreditCard.is_active == True
-        )
+        .where(CreditCard.user_id == user_id, CreditCard.is_active == True)
     )
 
     cards = result.all()
@@ -321,22 +333,26 @@ async def validate_cards(session: AsyncSession, user_id: int):
             maior_limite_valor = limite
             maior_limite_cartao = card_name
 
-    print(f"Limite total: R$ {total_limite:.2f} (esperado: R$ {EXPECTED_VALUES['limite_total']:.2f})")
-    print(f"Maior limite: {maior_limite_cartao} com R$ {maior_limite_valor:.2f} (esperado: {EXPECTED_VALUES['maior_limite_cartao']} com R$ {EXPECTED_VALUES['maior_limite_valor']:.2f})")
+    print(
+        f"Limite total: R$ {total_limite:.2f} (esperado: R$ {EXPECTED_VALUES['limite_total']:.2f})"
+    )
+    print(
+        f"Maior limite: {maior_limite_cartao} com R$ {maior_limite_valor:.2f} (esperado: {EXPECTED_VALUES['maior_limite_cartao']} com R$ {EXPECTED_VALUES['maior_limite_valor']:.2f})"
+    )
 
     return 0
 
 
 async def validate_installments(session: AsyncSession, user_id: int):
     """Valida parcelas ativas"""
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("VALIDAÇÃO DE PARCELAS")
-    print("="*70)
+    print("=" * 70)
 
     result = await session.execute(
         select(InstallmentSeries).where(
             InstallmentSeries.user_id == user_id,
-            InstallmentSeries.status == InstallmentSeriesStatus.ACTIVE.value
+            InstallmentSeries.status == InstallmentSeriesStatus.ACTIVE.value,
         )
     )
 
@@ -350,17 +366,21 @@ async def validate_installments(session: AsyncSession, user_id: int):
     )
 
     print(f"\nParcelas ativas: {total_parcelas} (esperado: {EXPECTED_VALUES['parcelas_ativas']})")
-    print(f"Impacto mensal: R$ {impacto_mensal:.2f} (esperado: R$ {EXPECTED_VALUES['impacto_mensal_parcelas']:.2f})")
-    print(f"Total restante: R$ {total_restante:.2f} (esperado: R$ {EXPECTED_VALUES['total_parcelas_restantes']:.2f})")
+    print(
+        f"Impacto mensal: R$ {impacto_mensal:.2f} (esperado: R$ {EXPECTED_VALUES['impacto_mensal_parcelas']:.2f})"
+    )
+    print(
+        f"Total restante: R$ {total_restante:.2f} (esperado: R$ {EXPECTED_VALUES['total_parcelas_restantes']:.2f})"
+    )
 
     return 0
 
 
 async def run_validation():
     """Executa todas as validações"""
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("VALIDAÇÃO DO AGENTE FINANCEIRO BIVETO")
-    print("="*70)
+    print("=" * 70)
     print("Usuário de teste: kalebeandradesilva@hotmail.com (id: 3)")
     print("Data de referência: Janeiro/2026")
 
@@ -385,9 +405,9 @@ async def run_validation():
         errors += await validate_installments(session, user.id)
 
         # Resumo final
-        print("\n" + "="*70)
+        print("\n" + "=" * 70)
         print("RESUMO DA VALIDAÇÃO")
-        print("="*70)
+        print("=" * 70)
         if errors == 0:
             print("✓ Todas as validações passaram!")
         else:

@@ -1,4 +1,5 @@
 """Household utilities"""
+
 from .household_helpers import (
     build_ownership_filter,
     get_household_member,

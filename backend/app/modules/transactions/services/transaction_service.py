@@ -39,7 +39,7 @@ class TransactionService:
             merchant_id = await self._get_or_create_merchant(data.merchant_name)
 
         # Vincular a fatura se for cartao de credito
-        credit_card_id = getattr(data, 'credit_card_id', None)
+        credit_card_id = getattr(data, "credit_card_id", None)
         invoice_id = None
         invoice = None
         invoice_service = None
@@ -70,15 +70,15 @@ class TransactionService:
                     )
                     reference_month = data.invoice_month
                     reference_year = data.invoice_year
-                    closing_date = dates['closing_date']
-                    due_date = dates['due_date']
+                    closing_date = dates["closing_date"]
+                    due_date = dates["due_date"]
                 else:
                     # Calcular periodo pela data da transacao
                     period = invoice_service.calculate_invoice_period(credit_card, data.date)
-                    reference_month = period['reference_month']
-                    reference_year = period['reference_year']
-                    closing_date = period['closing_date']
-                    due_date = period['due_date']
+                    reference_month = period["reference_month"]
+                    reference_year = period["reference_year"]
+                    closing_date = period["closing_date"]
+                    due_date = period["due_date"]
 
                 invoice = await invoice_service.get_or_create_invoice(
                     user=user,
@@ -94,9 +94,9 @@ class TransactionService:
         payment_method = self._infer_payment_method(data, credit_card_id)
 
         # Verificar se e uma transacao parcelada
-        is_installment = getattr(data, 'is_installment', False)
-        installment_current = getattr(data, 'installment_current', None)
-        installment_total = getattr(data, 'installment_total', None)
+        is_installment = getattr(data, "is_installment", False)
+        installment_current = getattr(data, "installment_current", None)
+        installment_total = getattr(data, "installment_total", None)
 
         if is_installment and installment_current and installment_total:
             # Processar transacao parcelada
@@ -119,7 +119,7 @@ class TransactionService:
             merchant_id=merchant_id,
             credit_card_id=credit_card_id,
             invoice_id=invoice_id,
-            income_source_id=getattr(data, 'income_source_id', None),
+            income_source_id=getattr(data, "income_source_id", None),
             type=data.type,
             payment_method=payment_method,
             amount=data.amount,
@@ -129,7 +129,9 @@ class TransactionService:
             notes=data.notes,
             tags=data.tags,
             is_fixed=data.is_fixed,
-            ownership_type=data.ownership_type.value if hasattr(data.ownership_type, 'value') else data.ownership_type,
+            ownership_type=data.ownership_type.value
+            if hasattr(data.ownership_type, "value")
+            else data.ownership_type,
         )
         self.db.add(transaction)
         await self.db.flush()
@@ -144,7 +146,7 @@ class TransactionService:
             await self._create_recurring_from_transaction(user, data, transaction)
 
         # Aplicar income splits se solicitado (gera despesas pendentes)
-        split_rule_ids = getattr(data, 'split_rule_ids', None)
+        split_rule_ids = getattr(data, "split_rule_ids", None)
         if split_rule_ids and data.type == TransactionType.INCOME:
             income_split_service = IncomeSplitService(self.db)
             await income_split_service.apply_splits(user, transaction, split_rule_ids)
@@ -157,7 +159,7 @@ class TransactionService:
                 category_id=data.category_id,
                 amount=data.amount,
                 transaction_date=data.date,
-                transaction_id=transaction.id
+                transaction_id=transaction.id,
             )
 
         return transaction
@@ -193,7 +195,7 @@ class TransactionService:
         installment_current = data.installment_current
         installment_total = data.installment_total
         create_future_installments = data.create_future_installments
-        installment_series_id = getattr(data, 'installment_series_id', None)
+        installment_series_id = getattr(data, "installment_series_id", None)
 
         # Se série explícita foi fornecida, usar ela
         series = None
@@ -283,8 +285,8 @@ class TransactionService:
                         user=user,
                         series=series,
                         from_installment=installment_current,
-                        current_invoice_month=getattr(data, 'invoice_month', None),
-                        current_invoice_year=getattr(data, 'invoice_year', None),
+                        current_invoice_month=getattr(data, "invoice_month", None),
+                        current_invoice_year=getattr(data, "invoice_year", None),
                     )
 
                 # Atualizar total da fatura se houver
@@ -401,8 +403,8 @@ class TransactionService:
                 user=user,
                 series=series,
                 from_installment=installment_current,
-                current_invoice_month=getattr(data, 'invoice_month', None),
-                current_invoice_year=getattr(data, 'invoice_year', None),
+                current_invoice_month=getattr(data, "invoice_month", None),
+                current_invoice_year=getattr(data, "invoice_year", None),
             )
 
         await self.db.flush()
@@ -425,18 +427,18 @@ class TransactionService:
         Returns:
             Transaction: A transação de saída (primeira criada)
         """
-        destination_account_id = getattr(data, 'destination_account_id', None)
+        destination_account_id = getattr(data, "destination_account_id", None)
 
         if not destination_account_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="destination_account_id é obrigatório para transferências"
+                detail="destination_account_id é obrigatório para transferências",
             )
 
         if data.account_id == destination_account_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Conta de origem e destino não podem ser a mesma"
+                detail="Conta de origem e destino não podem ser a mesma",
             )
 
         # Validar que ambas as contas pertencem ao usuário
@@ -449,8 +451,11 @@ class TransactionService:
                         Account.id == acc_id,
                         or_(
                             and_(Account.user_id == user.id, Account.ownership_type == "personal"),
-                            and_(Account.user_id.in_(household_user_ids), Account.ownership_type == "household")
-                        )
+                            and_(
+                                Account.user_id.in_(household_user_ids),
+                                Account.ownership_type == "household",
+                            ),
+                        ),
                     )
                 )
             else:
@@ -460,10 +465,14 @@ class TransactionService:
             if not result.scalar_one_or_none():
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Conta {acc_id} não encontrada ou não pertence ao usuário"
+                    detail=f"Conta {acc_id} não encontrada ou não pertence ao usuário",
                 )
 
-        ownership_type = data.ownership_type.value if hasattr(data.ownership_type, 'value') else data.ownership_type
+        ownership_type = (
+            data.ownership_type.value
+            if hasattr(data.ownership_type, "value")
+            else data.ownership_type
+        )
         description = data.description or "Transferência entre contas"
 
         # Criar transação de SAÍDA (conta origem)
@@ -521,7 +530,8 @@ class TransactionService:
         existing = await self.db.execute(
             select(RecurringTransaction).where(
                 RecurringTransaction.user_id == user.id,
-                RecurringTransaction.name == (data.description or data.merchant_name or "Recorrente"),
+                RecurringTransaction.name
+                == (data.description or data.merchant_name or "Recorrente"),
                 RecurringTransaction.amount == data.amount,
                 RecurringTransaction.status == "active",
             )
@@ -544,7 +554,7 @@ class TransactionService:
             name=data.description or data.merchant_name or "Recorrente",
             description=data.notes,
             amount=data.amount,
-            type=data.type.value if hasattr(data.type, 'value') else data.type,
+            type=data.type.value if hasattr(data.type, "value") else data.type,
             account_id=data.account_id,
             category_id=data.category_id,
             frequency=data.recurring_frequency,
@@ -558,9 +568,7 @@ class TransactionService:
         await self.db.flush()
         return recurring
 
-    async def confirm_from_document(
-        self, user: User, data: TransactionConfirm
-    ) -> dict:
+    async def confirm_from_document(self, user: User, data: TransactionConfirm) -> dict:
         """
         Cria transacao confirmando dados de documento processado.
 
@@ -652,7 +660,7 @@ class TransactionService:
         }
 
         # Obter cartao de credito e preparar fatura se necessario
-        credit_card_id = getattr(data, 'credit_card_id', None)
+        credit_card_id = getattr(data, "credit_card_id", None)
         credit_card = None
         invoice = None
         invoice_service = None
@@ -684,15 +692,15 @@ class TransactionService:
                     dates = invoice_service.calculate_invoice_dates(
                         credit_card, reference_month, reference_year
                     )
-                    closing_date = dates['closing_date']
-                    due_date = dates['due_date']
+                    closing_date = dates["closing_date"]
+                    due_date = dates["due_date"]
                 else:
                     # Calcular periodo pela data da transacao
                     period = invoice_service.calculate_invoice_period(credit_card, data.date)
-                    reference_month = period['reference_month']
-                    reference_year = period['reference_year']
-                    closing_date = period['closing_date']
-                    due_date = period['due_date']
+                    reference_month = period["reference_month"]
+                    reference_year = period["reference_year"]
+                    closing_date = period["closing_date"]
+                    due_date = period["due_date"]
 
                 # Obter ou criar fatura para o periodo
                 invoice = await invoice_service.get_or_create_invoice(
@@ -722,6 +730,7 @@ class TransactionService:
                         from app.modules.notifications.services.notification_service import (
                             NotificationService,
                         )
+
                         await NotificationService(self.db).resolve_pending_for_invoice(
                             user_id=user.id,
                             credit_card_id=credit_card.id,
@@ -737,12 +746,14 @@ class TransactionService:
 
         # Se e uma transacao parcelada
         # DEBUG: Log dos valores recebidos
-        print(f"[TX_SVC DEBUG] confirm_from_document: description='{data.description}', "
-              f"merchant_name='{data.merchant_name}', amount={data.amount}, "
-              f"is_installment={data.is_installment}, "
-              f"installment_current={data.installment_current}, "
-              f"installment_total={data.installment_total}, "
-              f"credit_card_id={credit_card_id}")
+        print(
+            f"[TX_SVC DEBUG] confirm_from_document: description='{data.description}', "
+            f"merchant_name='{data.merchant_name}', amount={data.amount}, "
+            f"is_installment={data.is_installment}, "
+            f"installment_current={data.installment_current}, "
+            f"installment_total={data.installment_total}, "
+            f"credit_card_id={credit_card_id}"
+        )
 
         if data.is_installment and data.installment_current and data.installment_total:
             installment_service = InstallmentService(self.db)
@@ -764,10 +775,12 @@ class TransactionService:
 
                 # Se solicitado, marcar parcelas anteriores como pagas
                 if data.mark_previous_as_paid and data.installment_current > 1:
-                    previous_transactions = await installment_service.mark_previous_installments_as_paid(
-                        user=user,
-                        series=series,
-                        up_to_installment=data.installment_current,
+                    previous_transactions = (
+                        await installment_service.mark_previous_installments_as_paid(
+                            user=user,
+                            series=series,
+                            up_to_installment=data.installment_current,
+                        )
                     )
                     result["created_transactions"].extend(previous_transactions)
 
@@ -799,7 +812,7 @@ class TransactionService:
                     if not data.force_duplicate:
                         raise HTTPException(
                             status_code=status.HTTP_409_CONFLICT,
-                            detail=f"Parcela {data.installment_current}/{data.installment_total} ja confirmada em {existing_installment.date.strftime('%d/%m/%Y')}"
+                            detail=f"Parcela {data.installment_current}/{data.installment_total} ja confirmada em {existing_installment.date.strftime('%d/%m/%Y')}",
                         )
                     # Se force_duplicate, criar nova transacao
                     transaction = await installment_service.create_installment_transaction(
@@ -857,8 +870,10 @@ class TransactionService:
 
                 if fuzzy_series:
                     # Encontrou série existente via fuzzy match!
-                    print(f"[TX_SVC] Fuzzy match encontrou serie existente: id={fuzzy_series.id}, "
-                          f"merchant='{fuzzy_series.merchant_name}'")
+                    print(
+                        f"[TX_SVC] Fuzzy match encontrou serie existente: id={fuzzy_series.id}, "
+                        f"merchant='{fuzzy_series.merchant_name}'"
+                    )
 
                     result["series"] = fuzzy_series
 
@@ -869,7 +884,9 @@ class TransactionService:
 
                     if existing_installment and not existing_installment.is_paid:
                         # CONFIRMAR parcela projetada existente (não criar nova)
-                        print(f"[TX_SVC] Confirmando parcela projetada: {data.installment_current}/{data.installment_total}")
+                        print(
+                            f"[TX_SVC] Confirmando parcela projetada: {data.installment_current}/{data.installment_total}"
+                        )
 
                         transaction = await installment_service.confirm_existing_installment(
                             user=user,
@@ -901,7 +918,7 @@ class TransactionService:
                         if not data.force_duplicate:
                             raise HTTPException(
                                 status_code=status.HTTP_409_CONFLICT,
-                                detail=f"Parcela {data.installment_current}/{data.installment_total} já confirmada"
+                                detail=f"Parcela {data.installment_current}/{data.installment_total} já confirmada",
                             )
                         # Criar nova com force_duplicate
                         transaction = await installment_service.create_installment_transaction(
@@ -962,15 +979,21 @@ class TransactionService:
                     await self.db.refresh(transaction)
 
                     # PASSO 2: Criar série vinculada a ESTA transação
-                    first_installment_date = data.date - relativedelta(months=data.installment_current - 1)
+                    first_installment_date = data.date - relativedelta(
+                        months=data.installment_current - 1
+                    )
 
                     print("[TX_SVC] Criando serie de parcelas (NOVO FLUXO):")
-                    print(f"[TX_SVC]   data.date={data.date}, installment={data.installment_current}/{data.installment_total}")
+                    print(
+                        f"[TX_SVC]   data.date={data.date}, installment={data.installment_current}/{data.installment_total}"
+                    )
                     print(f"[TX_SVC]   first_installment_date calculado={first_installment_date}")
                     print(f"[TX_SVC]   first_transaction_id={transaction.id}")
                     print(f"[TX_SVC]   invoice_month/year={data.invoice_month}/{data.invoice_year}")
                     if credit_card:
-                        print(f"[TX_SVC]   credit_card closing_day={credit_card.closing_day}, due_day={credit_card.due_day}")
+                        print(
+                            f"[TX_SVC]   credit_card closing_day={credit_card.closing_day}, due_day={credit_card.due_day}"
+                        )
 
                     series = await installment_service.create_series(
                         user=user,
@@ -1001,10 +1024,12 @@ class TransactionService:
 
                     # Se solicitado, marcar parcelas anteriores como pagas
                     if data.mark_previous_as_paid and data.installment_current > 1:
-                        previous_transactions = await installment_service.mark_previous_installments_as_paid(
-                            user=user,
-                            series=series,
-                            up_to_installment=data.installment_current,
+                        previous_transactions = (
+                            await installment_service.mark_previous_installments_as_paid(
+                                user=user,
+                                series=series,
+                                up_to_installment=data.installment_current,
+                            )
                         )
                         result["created_transactions"].extend(previous_transactions)
 
@@ -1067,7 +1092,7 @@ class TransactionService:
                     merchant_id=merchant_id,
                     credit_card_id=credit_card_id,
                     invoice_id=invoice.id if invoice else None,
-                    income_source_id=getattr(data, 'income_source_id', None),
+                    income_source_id=getattr(data, "income_source_id", None),
                     type=transaction_type,
                     payment_method=payment_method,
                     amount=data.amount,
@@ -1075,7 +1100,9 @@ class TransactionService:
                     description=data.description,
                     tags=data.tags,
                     is_fixed=data.is_fixed,
-                    ownership_type=data.ownership_type.value if hasattr(data.ownership_type, 'value') else data.ownership_type,
+                    ownership_type=data.ownership_type.value
+                    if hasattr(data.ownership_type, "value")
+                    else data.ownership_type,
                 )
                 self.db.add(transaction)
                 await self.db.flush()
@@ -1084,8 +1111,9 @@ class TransactionService:
 
         # Criar GroceryPurchase se for item de cupom fiscal
         transaction = result.get("transaction")
-        if transaction and hasattr(data, 'grocery_category') and data.grocery_category:
+        if transaction and hasattr(data, "grocery_category") and data.grocery_category:
             from app.modules.grocery.services.grocery_service import GroceryService
+
             grocery_service = GroceryService(self.db)
             await grocery_service.create_purchase_from_transaction(
                 user=user,
@@ -1095,12 +1123,14 @@ class TransactionService:
                 product_name=data.merchant_name or data.description or "Item",
                 total_price=float(data.amount),
                 purchase_date=data.date,
-                quantity=getattr(data, 'quantity', None),
-                unit=getattr(data, 'unit', None),
-                unit_price=getattr(data, 'unit_price', None),
+                quantity=getattr(data, "quantity", None),
+                unit=getattr(data, "unit", None),
+                unit_price=getattr(data, "unit_price", None),
                 grocery_category=data.grocery_category,
-                necessity_type=getattr(data, 'necessity_type', None),
-                ownership_type=data.ownership_type.value if hasattr(data.ownership_type, 'value') else data.ownership_type,
+                necessity_type=getattr(data, "necessity_type", None),
+                ownership_type=data.ownership_type.value
+                if hasattr(data.ownership_type, "value")
+                else data.ownership_type,
             )
 
         # Atualizar total da fatura se houver
@@ -1112,14 +1142,13 @@ class TransactionService:
         # Aplicar income splits se solicitado (gera despesas pendentes)
         # Apenas para receitas simples (nao parceladas)
         transaction = result.get("transaction")
-        split_rule_ids = getattr(data, 'split_rule_ids', None)
+        split_rule_ids = getattr(data, "split_rule_ids", None)
         if transaction and split_rule_ids:
             # Verificar se a transacao eh uma receita
-            is_income = (
-                transaction.type == TransactionType.INCOME.value or
-                (hasattr(data, 'extracted_transaction_type') and
-                 data.extracted_transaction_type and
-                 data.extracted_transaction_type.lower() in self.INCOME_TRANSACTION_TYPES)
+            is_income = transaction.type == TransactionType.INCOME.value or (
+                hasattr(data, "extracted_transaction_type")
+                and data.extracted_transaction_type
+                and data.extracted_transaction_type.lower() in self.INCOME_TRANSACTION_TYPES
             )
             if is_income:
                 income_split_service = IncomeSplitService(self.db)
@@ -1131,11 +1160,10 @@ class TransactionService:
         # Registrar gasto no orçamento se for despesa com categoria
         transaction = result.get("transaction")
         if transaction and transaction.category_id:
-            is_expense = (
-                transaction.type == TransactionType.EXPENSE.value or
-                (hasattr(data, 'extracted_transaction_type') and
-                 data.extracted_transaction_type and
-                 data.extracted_transaction_type.lower() not in self.INCOME_TRANSACTION_TYPES)
+            is_expense = transaction.type == TransactionType.EXPENSE.value or (
+                hasattr(data, "extracted_transaction_type")
+                and data.extracted_transaction_type
+                and data.extracted_transaction_type.lower() not in self.INCOME_TRANSACTION_TYPES
             )
             if is_expense:
                 budget_service = BudgetService(self.db)
@@ -1144,7 +1172,7 @@ class TransactionService:
                     category_id=transaction.category_id,
                     amount=transaction.amount,
                     transaction_date=transaction.date,
-                    transaction_id=transaction.id
+                    transaction_id=transaction.id,
                 )
 
         return result
@@ -1170,9 +1198,9 @@ class TransactionService:
                         # Transações household de qualquer membro da família
                         and_(
                             Transaction.user_id.in_(household_user_ids),
-                            Transaction.ownership_type == "household"
-                        )
-                    )
+                            Transaction.ownership_type == "household",
+                        ),
+                    ),
                 )
             )
         else:
@@ -1207,15 +1235,12 @@ class TransactionService:
             query = select(Transaction).where(
                 or_(
                     # Personal transactions from user
-                    and_(
-                        Transaction.user_id == user.id,
-                        Transaction.ownership_type == "personal"
-                    ),
+                    and_(Transaction.user_id == user.id, Transaction.ownership_type == "personal"),
                     # Household transactions from any family member
                     and_(
                         Transaction.user_id.in_(household_user_ids),
-                        Transaction.ownership_type == "household"
-                    )
+                        Transaction.ownership_type == "household",
+                    ),
                 )
             )
         else:
@@ -1277,14 +1302,11 @@ class TransactionService:
         if household_user_ids:
             query = select(func.count(Transaction.id)).where(
                 or_(
-                    and_(
-                        Transaction.user_id == user.id,
-                        Transaction.ownership_type == "personal"
-                    ),
+                    and_(Transaction.user_id == user.id, Transaction.ownership_type == "personal"),
                     and_(
                         Transaction.user_id.in_(household_user_ids),
-                        Transaction.ownership_type == "household"
-                    )
+                        Transaction.ownership_type == "household",
+                    ),
                 )
             )
         else:
@@ -1323,15 +1345,11 @@ class TransactionService:
             return []
 
         result = await self.db.execute(
-            select(HouseholdMember.user_id).where(
-                HouseholdMember.license_id == user.license_id
-            )
+            select(HouseholdMember.user_id).where(HouseholdMember.license_id == user.license_id)
         )
         return list(result.scalars().all())
 
-    async def update(
-        self, user: User, transaction_id: int, data: TransactionUpdate
-    ) -> Transaction:
+    async def update(self, user: User, transaction_id: int, data: TransactionUpdate) -> Transaction:
         transaction = await self.get_by_id(user, transaction_id)
         if not transaction:
             raise HTTPException(
@@ -1360,8 +1378,11 @@ class TransactionService:
                         Account.id == account_id,
                         or_(
                             and_(Account.user_id == user.id, Account.ownership_type == "personal"),
-                            and_(Account.user_id.in_(household_ids), Account.ownership_type == "household")
-                        )
+                            and_(
+                                Account.user_id.in_(household_ids),
+                                Account.ownership_type == "household",
+                            ),
+                        ),
                     )
                 )
             else:
@@ -1377,6 +1398,7 @@ class TransactionService:
 
         # Handle invoice_id change - validate ownership and track for total updates
         from app.models.credit_card_invoice import CreditCardInvoice
+
         old_invoice_id = transaction.invoice_id
         new_invoice_id = update_data.get("invoice_id")
         invoice_changed = "invoice_id" in update_data and new_invoice_id != old_invoice_id
@@ -1395,14 +1417,20 @@ class TransactionService:
         # Se a transação é de cartão de crédito mas não tem invoice_id, vincular automaticamente
         # Isso corrige transações antigas que foram criadas sem fatura
         needs_invoice_link = False
-        if transaction.credit_card_id and not transaction.invoice_id and "invoice_id" not in update_data:
+        if (
+            transaction.credit_card_id
+            and not transaction.invoice_id
+            and "invoice_id" not in update_data
+        ):
             needs_invoice_link = True
 
         # Guardar invoice_id para atualizar total depois se amount, type ou category mudar
         amount_changed = "amount" in update_data and update_data["amount"] != transaction.amount
         type_changed = "type" in update_data and update_data["type"] != transaction.type
         date_changed = "date" in update_data and update_data["date"] != transaction.date
-        category_changed = "category_id" in update_data and update_data["category_id"] != transaction.category_id
+        category_changed = (
+            "category_id" in update_data and update_data["category_id"] != transaction.category_id
+        )
 
         # Registrar alteracoes para auditoria
         for field, value in update_data.items():
@@ -1443,10 +1471,10 @@ class TransactionService:
                 invoice = await invoice_service.get_or_create_invoice(
                     user=user,
                     credit_card=credit_card,
-                    reference_month=period['reference_month'],
-                    reference_year=period['reference_year'],
-                    closing_date=period['closing_date'],
-                    due_date=period['due_date'],
+                    reference_month=period["reference_month"],
+                    reference_year=period["reference_year"],
+                    closing_date=period["closing_date"],
+                    due_date=period["due_date"],
                 )
 
                 # Vincular transação à fatura
@@ -1497,8 +1525,10 @@ class TransactionService:
                 needs_move = False
                 if current_invoice:
                     # Verificar se a transação deveria estar em outra fatura
-                    if (current_invoice.reference_month != period['reference_month'] or
-                        current_invoice.reference_year != period['reference_year']):
+                    if (
+                        current_invoice.reference_month != period["reference_month"]
+                        or current_invoice.reference_year != period["reference_year"]
+                    ):
                         needs_move = True
 
                 if needs_move:
@@ -1506,10 +1536,10 @@ class TransactionService:
                     correct_invoice = await invoice_service.get_or_create_invoice(
                         user=user,
                         credit_card=credit_card,
-                        reference_month=period['reference_month'],
-                        reference_year=period['reference_year'],
-                        closing_date=period['closing_date'],
-                        due_date=period['due_date'],
+                        reference_month=period["reference_month"],
+                        reference_year=period["reference_year"],
+                        closing_date=period["closing_date"],
+                        due_date=period["due_date"],
                     )
 
                     # Guardar invoice antiga para atualizar total depois
@@ -1521,12 +1551,18 @@ class TransactionService:
 
                     # Atualizar totais de ambas as faturas
                     if old_invoice:
-                        await invoice_service.update_invoice_total(old_invoice, force_recalculate=True)
-                    await invoice_service.update_invoice_total(correct_invoice, force_recalculate=True)
+                        await invoice_service.update_invoice_total(
+                            old_invoice, force_recalculate=True
+                        )
+                    await invoice_service.update_invoice_total(
+                        correct_invoice, force_recalculate=True
+                    )
                 elif current_invoice:
                     # Mesma fatura, atualizar total se valor ou tipo mudou
                     if amount_changed or type_changed or category_changed:
-                        await invoice_service.update_invoice_total(current_invoice, force_recalculate=True)
+                        await invoice_service.update_invoice_total(
+                            current_invoice, force_recalculate=True
+                        )
 
         elif amount_changed or type_changed or category_changed:
             # Valor, tipo ou categoria mudou, atualizar a fatura atual
@@ -1597,7 +1633,7 @@ class TransactionService:
                 category_id=transaction.category_id,
                 amount=transaction.amount,
                 transaction_date=transaction.date,
-                transaction_id=transaction.id
+                transaction_id=transaction.id,
             )
 
         # Deletar transacoes de split vinculadas (despesas geradas por income splits)
@@ -1676,7 +1712,7 @@ class TransactionService:
 
                 # Contar transacoes restantes de todas as faturas de uma vez
                 count_result = await self.db.execute(
-                    select(Transaction.invoice_id, func.count(Transaction.id).label('count'))
+                    select(Transaction.invoice_id, func.count(Transaction.id).label("count"))
                     .where(Transaction.invoice_id.in_(affected_invoice_ids))
                     .group_by(Transaction.invoice_id)
                 )
@@ -1763,19 +1799,19 @@ class TransactionService:
 
     # Tipos extraidos pelo LLM que indicam CREDITO (type=INCOME)
     # Creditos reduzem o valor da fatura
-    INCOME_TRANSACTION_TYPES = ['pagamento', 'credito', 'estorno']
+    INCOME_TRANSACTION_TYPES = ["pagamento", "credito", "estorno"]
 
     # Padroes de descricao que indicam pagamento de fatura (fallback)
     PAYMENT_DESCRIPTION_PATTERNS = [
-        'pagamento em ',      # Nubank: "Pagamento em 08 DEZ"
-        'pagamento de fatura',
-        'pag fatura',
-        'pgto fatura',
-        'pgto cobranca',
-        'pagamento efetuado',
-        'pgto debito automatico',
-        'pagamento recebido',
-        'credito pagamento',
+        "pagamento em ",  # Nubank: "Pagamento em 08 DEZ"
+        "pagamento de fatura",
+        "pag fatura",
+        "pgto fatura",
+        "pgto cobranca",
+        "pagamento efetuado",
+        "pgto debito automatico",
+        "pagamento recebido",
+        "credito pagamento",
     ]
 
     def _determine_transaction_type(self, data: TransactionConfirm) -> TransactionType:
@@ -1798,14 +1834,14 @@ class TransactionService:
         - saldo_anterior: saldo de fatura anterior
         """
         # 1. Se extracted_transaction_type foi fornecido, usar ele
-        extracted_type = getattr(data, 'extracted_transaction_type', None)
+        extracted_type = getattr(data, "extracted_transaction_type", None)
         if extracted_type:
             if extracted_type.lower() in self.INCOME_TRANSACTION_TYPES:
                 return TransactionType.INCOME
             return TransactionType.EXPENSE
 
         # 2. Fallback: inferir por padroes na descricao
-        desc_lower = (data.description or '').lower()
+        desc_lower = (data.description or "").lower()
         is_payment = any(pattern in desc_lower for pattern in self.PAYMENT_DESCRIPTION_PATTERNS)
         if is_payment:
             return TransactionType.INCOME
@@ -1825,27 +1861,27 @@ class TransactionService:
         - Se type=transfer: None
         """
         # Se foi informado explicitamente, usar o valor
-        payment_method = getattr(data, 'payment_method', None)
+        payment_method = getattr(data, "payment_method", None)
         if payment_method:
-            return payment_method.value if hasattr(payment_method, 'value') else payment_method
+            return payment_method.value if hasattr(payment_method, "value") else payment_method
 
         # Inferir baseado no contexto
         if credit_card_id:
             return PaymentMethod.CREDIT_CARD.value
 
-        income_source_id = getattr(data, 'income_source_id', None)
+        income_source_id = getattr(data, "income_source_id", None)
 
         # Obter o tipo de transacao
         # TransactionCreate tem 'type', TransactionConfirm tem 'extracted_transaction_type'
         transaction_type = None
-        if hasattr(data, 'type') and data.type:
-            transaction_type = data.type.value if hasattr(data.type, 'value') else data.type
-        elif hasattr(data, 'extracted_transaction_type') and data.extracted_transaction_type:
+        if hasattr(data, "type") and data.type:
+            transaction_type = data.type.value if hasattr(data.type, "value") else data.type
+        elif hasattr(data, "extracted_transaction_type") and data.extracted_transaction_type:
             # Converter extracted_transaction_type para TransactionType
             extracted = data.extracted_transaction_type.lower()
-            if extracted in ['compra', 'anuidade', 'encargo']:
+            if extracted in ["compra", "anuidade", "encargo"]:
                 transaction_type = TransactionType.EXPENSE.value
-            elif extracted in ['pagamento', 'credito', 'estorno']:
+            elif extracted in ["pagamento", "credito", "estorno"]:
                 transaction_type = TransactionType.INCOME.value
 
         if transaction_type == TransactionType.INCOME.value:
@@ -1883,8 +1919,8 @@ class TransactionService:
 
         # Remove sufixo de parcela " - Parcela X/Y" e padrão "DD/DD" do final
         def clean(s: str) -> str:
-            s = re.sub(r'\s*-\s*parcela\s*\d+/\d+.*$', '', s, flags=re.IGNORECASE)
-            s = re.sub(r'\d{2}/\d{2}\s*$', '', s)  # Remove "01/05" do final
+            s = re.sub(r"\s*-\s*parcela\s*\d+/\d+.*$", "", s, flags=re.IGNORECASE)
+            s = re.sub(r"\d{2}/\d{2}\s*$", "", s)  # Remove "01/05" do final
             return s.strip()
 
         c1 = clean(d1)

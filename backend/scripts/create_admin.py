@@ -3,18 +3,20 @@
 Script para criar o primeiro usuário admin.
 Execute com: python scripts/create_admin.py
 """
+
 import asyncio
-import sys
 import os
+import sys
 
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from sqlalchemy import select
-from app.core.database import async_session_maker
-from app.models.user import User
-from app.core.security import get_password_hash
 from app.services.user_setup import setup_new_user
+from sqlalchemy import select
+
+from app.core.database import async_session_maker
+from app.core.security import get_password_hash
+from app.models.user import User
 
 
 async def create_admin(email: str, password: str, name: str):
@@ -28,7 +30,7 @@ async def create_admin(email: str, password: str, name: str):
             if not existing.is_admin:
                 existing.is_admin = True
                 await db.commit()
-                print(f"Usuário promovido a admin!")
+                print("Usuário promovido a admin!")
             return
 
         # Create admin user
@@ -48,7 +50,7 @@ async def create_admin(email: str, password: str, name: str):
         await setup_new_user(db, user.id)
 
         await db.commit()
-        print(f"Admin criado com sucesso!")
+        print("Admin criado com sucesso!")
         print(f"  Email: {email}")
         print(f"  Nome: {name}")
         print(f"  ID: {user.id}")

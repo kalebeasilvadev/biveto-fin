@@ -51,13 +51,18 @@ class Document(Base):
     extractions: Mapped[list["DocumentExtraction"]] = relationship(
         back_populates="document", lazy="noload", order_by="desc(DocumentExtraction.version)"
     )
-    transaction: Mapped["Transaction | None"] = relationship(back_populates="document", uselist=False)
-    invoice: Mapped["CreditCardInvoice | None"] = relationship(back_populates="document", uselist=False)
+    transaction: Mapped["Transaction | None"] = relationship(
+        back_populates="document", uselist=False
+    )
+    invoice: Mapped["CreditCardInvoice | None"] = relationship(
+        back_populates="document", uselist=False
+    )
     receipt: Mapped["Receipt | None"] = relationship(back_populates="document", uselist=False)
 
 
 class DocumentExtraction(Base):
     """Resultado da extração de dados do documento (versionado)"""
+
     __tablename__ = "document_extractions"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -85,7 +90,9 @@ class DocumentExtraction(Base):
     installments: Mapped[int | None] = mapped_column()
     raw_text: Mapped[str | None] = mapped_column(Text)  # OCR bruto para debug
 
-    suggested_category_id: Mapped[int | None] = mapped_column(ForeignKey("categories.id", ondelete="SET NULL"), index=True)
+    suggested_category_id: Mapped[int | None] = mapped_column(
+        ForeignKey("categories.id", ondelete="SET NULL"), index=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
     # Relationships

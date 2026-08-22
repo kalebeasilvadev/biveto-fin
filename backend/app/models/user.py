@@ -22,15 +22,11 @@ class User(Base):
     reset_token: Mapped[str | None] = mapped_column(String(64), nullable=True)
     reset_token_expires: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=utc_now, onupdate=utc_now
-    )
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, onupdate=utc_now)
 
     # License relationship - keep selectin for auth checks
     license: Mapped["License | None"] = relationship(
-        back_populates="users",
-        lazy="selectin",
-        foreign_keys="User.license_id"
+        back_populates="users", lazy="selectin", foreign_keys="User.license_id"
     )
 
     # Household membership - keep selectin for auth/permission checks
@@ -38,7 +34,7 @@ class User(Base):
         back_populates="user",
         foreign_keys="HouseholdMember.user_id",
         uselist=False,
-        lazy="selectin"
+        lazy="selectin",
     )
 
     # All other relationships - use noload to avoid N+1 queries on every request

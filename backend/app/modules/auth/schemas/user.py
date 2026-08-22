@@ -1,6 +1,7 @@
 """
 Schemas de usuario: criacao, atualizacao e resposta.
 """
+
 from datetime import datetime
 
 from pydantic import BaseModel, EmailStr, Field

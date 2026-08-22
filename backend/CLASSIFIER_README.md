@@ -54,20 +54,16 @@ curl -X POST "http://localhost:8000/api/v1/documents" \
 import requests
 
 # Login (obter token)
-response = requests.post("http://localhost:8000/api/v1/auth/login", json={
-    "email": "seu@email.com",
-    "password": "sua_senha"
-})
+response = requests.post(
+    "http://localhost:8000/api/v1/auth/login",
+    json={"email": "seu@email.com", "password": "sua_senha"},
+)
 token = response.json()["access_token"]
 
 # Upload de documento
 files = {"file": open("test_fatura_santander.pdf", "rb")}
 headers = {"Authorization": f"Bearer {token}"}
-response = requests.post(
-    "http://localhost:8000/api/v1/documents",
-    files=files,
-    headers=headers
-)
+response = requests.post("http://localhost:8000/api/v1/documents", files=files, headers=headers)
 
 print(response.json())
 ```
@@ -160,8 +156,8 @@ Se precisar voltar ao comportamento antigo:
 ```python
 # Em document_service.py ou onde instancia:
 service = LLMOCRService(
-    provider='mistral',
-    use_classifier=False  # Desabilita
+    provider="mistral",
+    use_classifier=False,  # Desabilita
 )
 ```
 

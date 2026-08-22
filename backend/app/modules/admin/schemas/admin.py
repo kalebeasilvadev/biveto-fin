@@ -6,6 +6,7 @@ from app.models.license import LicenseStatus, LicenseType
 
 # ========== License Schemas ==========
 
+
 class LicenseBase(BaseModel):
     type: LicenseType = LicenseType.BASIC
     max_users: int = 1
@@ -43,6 +44,7 @@ class LicenseUpdate(BaseModel):
 
 class HouseholdMemberSummary(BaseModel):
     """Resumo de membro para listagem de licencas"""
+
     id: int
     user_id: int
     user_name: str | None = None
@@ -77,6 +79,7 @@ class LicenseResponse(LicenseBase):
 
 
 # ========== User Admin Schemas ==========
+
 
 class UserAdminCreate(BaseModel):
     email: EmailStr
@@ -124,6 +127,7 @@ class UserListResponse(BaseModel):
 
 
 # ========== Dashboard Schemas ==========
+
 
 class AdminDashboard(BaseModel):
     total_users: int

@@ -136,16 +136,18 @@ async def export_transactions_csv(
     writer = csv.writer(output)
 
     # Header
-    writer.writerow([
-        "Data",
-        "Tipo",
-        "Descricao",
-        "Categoria",
-        "Conta",
-        "Valor",
-        "Estabelecimento",
-        "Parcela",
-    ])
+    writer.writerow(
+        [
+            "Data",
+            "Tipo",
+            "Descricao",
+            "Categoria",
+            "Conta",
+            "Valor",
+            "Estabelecimento",
+            "Parcela",
+        ]
+    )
 
     # Data rows
     for t in transactions:
@@ -153,16 +155,18 @@ async def export_transactions_csv(
         tipo = tipo_map.get(t.type, t.type)
         valor = f"{t.amount:.2f}"
         parcela = f"{t.installment_number}/{t.installment_total}" if t.installment_total else ""
-        writer.writerow([
-            t.date.strftime("%d/%m/%Y"),
-            tipo,
-            t.description or "",
-            t.category_name or "Sem categoria",
-            t.account_name or "",
-            valor,
-            t.merchant_name or "",
-            parcela,
-        ])
+        writer.writerow(
+            [
+                t.date.strftime("%d/%m/%Y"),
+                tipo,
+                t.description or "",
+                t.category_name or "Sem categoria",
+                t.account_name or "",
+                valor,
+                t.merchant_name or "",
+                parcela,
+            ]
+        )
 
     output.seek(0)
     filename = f"transacoes_{date.today().strftime('%Y%m%d')}.csv"
@@ -192,6 +196,7 @@ async def create_transaction(
 
 class ConfirmTransactionResponse(TransactionResponse):
     """Resposta de confirmacao com dados de parcelas"""
+
     series_id: int | None = None
     series_description: str | None = None
     additional_transactions_count: int = 0
@@ -289,15 +294,19 @@ async def batch_confirm_transactions(
                 updated = False
                 if data.card_closing_day and 1 <= data.card_closing_day <= 31:
                     if credit_card.closing_day != data.card_closing_day:
-                        print(f"[BATCH_CONFIRM] Atualizando closing_day do cartao {credit_card_id}: "
-                              f"{credit_card.closing_day} -> {data.card_closing_day}")
+                        print(
+                            f"[BATCH_CONFIRM] Atualizando closing_day do cartao {credit_card_id}: "
+                            f"{credit_card.closing_day} -> {data.card_closing_day}"
+                        )
                         credit_card.closing_day = data.card_closing_day
                         updated = True
 
                 if data.card_due_day and 1 <= data.card_due_day <= 31:
                     if credit_card.due_day != data.card_due_day:
-                        print(f"[BATCH_CONFIRM] Atualizando due_day do cartao {credit_card_id}: "
-                              f"{credit_card.due_day} -> {data.card_due_day}")
+                        print(
+                            f"[BATCH_CONFIRM] Atualizando due_day do cartao {credit_card_id}: "
+                            f"{credit_card.due_day} -> {data.card_due_day}"
+                        )
                         credit_card.due_day = data.card_due_day
                         updated = True
 
@@ -347,32 +356,38 @@ async def batch_confirm_transactions(
             result = await service.confirm_from_document(current_user, confirm_data)
             transaction = result["transaction"]
 
-            results.append(BatchConfirmItemResult(
-                index=index,
-                success=True,
-                transaction_id=transaction.id,
-            ))
+            results.append(
+                BatchConfirmItemResult(
+                    index=index,
+                    success=True,
+                    transaction_id=transaction.id,
+                )
+            )
             success_count += 1
 
         except HTTPException as e:
             is_duplicate = e.status_code == 409
-            results.append(BatchConfirmItemResult(
-                index=index,
-                success=False,
-                error=e.detail if isinstance(e.detail, str) else str(e.detail),
-                is_duplicate=is_duplicate,
-            ))
+            results.append(
+                BatchConfirmItemResult(
+                    index=index,
+                    success=False,
+                    error=e.detail if isinstance(e.detail, str) else str(e.detail),
+                    is_duplicate=is_duplicate,
+                )
+            )
             if is_duplicate:
                 duplicate_count += 1
             else:
                 error_count += 1
 
         except Exception as e:
-            results.append(BatchConfirmItemResult(
-                index=index,
-                success=False,
-                error=str(e),
-            ))
+            results.append(
+                BatchConfirmItemResult(
+                    index=index,
+                    success=False,
+                    error=str(e),
+                )
+            )
             error_count += 1
 
     # Limpar transações projetadas das faturas que receberam transações reais do PDF.
@@ -400,15 +415,18 @@ async def batch_confirm_transactions(
             projected_txs = projected_result.scalars().all()
 
             if projected_txs:
-                print(f"[BATCH_CONFIRM] Removendo {len(projected_txs)} transações projetadas "
-                      f"da fatura {invoice_id} (PDF é fonte de verdade)")
+                print(
+                    f"[BATCH_CONFIRM] Removendo {len(projected_txs)} transações projetadas "
+                    f"da fatura {invoice_id} (PDF é fonte de verdade)"
+                )
 
                 # Ajustar installment_series: decrementar contadores
                 series_to_update: dict[int, int] = {}  # series_id -> count to decrement
                 for tx in projected_txs:
                     if tx.installment_series_id:
-                        series_to_update[tx.installment_series_id] = \
+                        series_to_update[tx.installment_series_id] = (
                             series_to_update.get(tx.installment_series_id, 0) + 1
+                        )
 
                 # Deletar as projetadas
                 await db.execute(
@@ -432,13 +450,16 @@ async def batch_confirm_transactions(
                         .where(InstallmentSeries.id == series_id)
                         .values(paid_count=actual_paid)
                     )
-                    print(f"[BATCH_CONFIRM] Série {series_id}: paid_count atualizado para {actual_paid}")
+                    print(
+                        f"[BATCH_CONFIRM] Série {series_id}: paid_count atualizado para {actual_paid}"
+                    )
 
                 await db.flush()
 
                 # Recalcular total da fatura
                 from app.models.credit_card_invoice import CreditCardInvoice
                 from app.modules.credit_cards.services.invoice_service import InvoiceService
+
                 invoice_result = await db.execute(
                     select(CreditCardInvoice).where(CreditCardInvoice.id == invoice_id)
                 )
@@ -446,7 +467,9 @@ async def batch_confirm_transactions(
                 if invoice:
                     invoice_service = InvoiceService(db)
                     await invoice_service.update_invoice_total(invoice, force_recalculate=True)
-                    print(f"[BATCH_CONFIRM] Fatura {invoice_id}: total recalculado para {invoice.total_amount}")
+                    print(
+                        f"[BATCH_CONFIRM] Fatura {invoice_id}: total recalculado para {invoice.total_amount}"
+                    )
 
     await db.commit()  # ← COMMIT para persistir todas as mudanças nas faturas!
 
@@ -500,8 +523,7 @@ async def delete_transaction(
     current_user: CurrentUser,
     db: DbSession,
     delete_series: bool = Query(
-        True,
-        description="Se True e a transacao for parcelada, deleta toda a serie de parcelas"
+        True, description="Se True e a transacao for parcelada, deleta toda a serie de parcelas"
     ),
 ):
     """
@@ -515,7 +537,9 @@ async def delete_transaction(
     await db.commit()
 
     if result["series_deleted"]:
-        message = f"Serie de parcelas removida. {result['transactions_deleted']} transacoes deletadas."
+        message = (
+            f"Serie de parcelas removida. {result['transactions_deleted']} transacoes deletadas."
+        )
         if result["invoices_deleted"] > 0:
             message += f" {result['invoices_deleted']} faturas vazias removidas."
     else:
@@ -531,6 +555,7 @@ async def delete_transaction(
 
 class ExtractedItemCheck(BaseModel):
     """Item extraido para verificar se existe projecao"""
+
     index: int
     description: str
     amount: float
@@ -542,6 +567,7 @@ class ExtractedItemCheck(BaseModel):
 
 class PotentialDuplicateSeries(BaseModel):
     """Informações sobre uma série potencialmente duplicada"""
+
     series_id: int
     description: str
     merchant_name: str
@@ -554,6 +580,7 @@ class PotentialDuplicateSeries(BaseModel):
 
 class ProjectedMatchResult(BaseModel):
     """Resultado da verificacao de match com projecao"""
+
     index: int
     has_projected: bool
     projected_transaction_id: int | None = None
@@ -566,6 +593,7 @@ class ProjectedMatchResult(BaseModel):
 
 class CheckProjectedRequest(BaseModel):
     """Request para verificar projecoes"""
+
     items: list[ExtractedItemCheck]
     credit_card_id: int | None = None
     invoice_month: int | None = None
@@ -574,6 +602,7 @@ class CheckProjectedRequest(BaseModel):
 
 class CheckProjectedResponse(BaseModel):
     """Response com resultados das verificacoes"""
+
     results: list[ProjectedMatchResult]
     total_projected: int
 
@@ -606,6 +635,7 @@ async def check_projected_transactions(
             # Para itens parcelados, buscar serie existente
             # Converter date string para date object
             from datetime import datetime as dt
+
             transaction_date = None
             if item.date:
                 try:

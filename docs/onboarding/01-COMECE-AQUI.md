@@ -73,6 +73,8 @@ uvicorn app.main:app --reload --port 8000
 
 **Verificação:** abra http://localhost:8000/docs — deve aparecer o Swagger com todos os endpoints.
 
+Com o venv ativo, instale também os hooks de pre-commit (na raiz do repo): `pip install pre-commit && pre-commit install`. Eles rodam gitleaks (segredos) e ruff (lint/format) automaticamente antes de cada commit — o mesmo que o CI cobra.
+
 > O `Makefile` da raiz automatiza isso (`make install`, `make dev`), mas **só funciona em Linux/Mac** — no Windows use os comandos acima.
 
 ### Criar seu usuário

@@ -8,6 +8,7 @@ from app.modules.known_services.schemas.recurring_detection import RecurringDete
 
 class FutureInstallmentResponse(BaseModel):
     """Parcela futura calculada pelo LLM"""
+
     installment: int  # Numero da parcela (ex: 4)
     reference_month: int  # Mes de referencia (1-12)
     reference_year: int  # Ano de referencia
@@ -15,6 +16,7 @@ class FutureInstallmentResponse(BaseModel):
 
 class ExtractedItemResponse(BaseModel):
     """Item individual extraido do documento"""
+
     description: str
     amount: float
     date: str | None  # YYYY-MM-DD
@@ -28,7 +30,7 @@ class ExtractedItemResponse(BaseModel):
     # Informacoes de parcelamento
     is_installment: bool = False
     installment_current: int | None = None  # Parcela atual (ex: 3)
-    installment_total: int | None = None    # Total de parcelas (ex: 12)
+    installment_total: int | None = None  # Total de parcelas (ex: 12)
 
     # Parcelas futuras calculadas pelo LLM (para Santander/Itau que mostram todas as parcelas)
     future_installments: list[FutureInstallmentResponse] | None = None
@@ -55,17 +57,21 @@ class ExtractedItemResponse(BaseModel):
 
 class InstallmentAnalysisResponse(BaseModel):
     """Resultado da analise de parcela"""
+
     is_installment: bool
     series_found: dict | None = None
     series_status: dict | None = None
     installment_exists: bool = False
-    suggestion: str | None = None  # create_single, create_series, add_to_series, mark_previous_paid, skip
+    suggestion: str | None = (
+        None  # create_single, create_series, add_to_series, mark_previous_paid, skip
+    )
     suggested_series: dict | None = None
     pending_installments: list[dict] | None = None
 
 
 class DocumentExtractionResponse(BaseModel):
     """Extracao salva no banco (para historico)"""
+
     id: int
     version: int
 
@@ -94,6 +100,7 @@ class DocumentExtractionResponse(BaseModel):
 
 class CardInfoResponse(BaseModel):
     """Informacoes do cartao extraidas de uma fatura"""
+
     # Identificacao do cartao
     card_issuer: str | None = None  # Codigo do emissor (nubank, itau, bradesco, bradescard)
     card_bank: str | None = None  # Nome completo do banco (Bradesco, Itau Unibanco)
@@ -119,6 +126,7 @@ class CardInfoResponse(BaseModel):
 
 class DetectedPaymentResponse(BaseModel):
     """Pagamento detectado no cupom fiscal"""
+
     method: str  # voucher_va, debit_card, pix, etc.
     amount: float
     label: str  # Label original do OCR (ex: "CARTAO ALIMENTACAO")
@@ -127,6 +135,7 @@ class DetectedPaymentResponse(BaseModel):
 
 class PaymentInfoResponse(BaseModel):
     """Informacoes de pagamento extraidas do cupom"""
+
     total: float | None = None
     subtotal: float | None = None
     discount: float | None = None
@@ -164,6 +173,7 @@ class DocumentResponse(BaseModel):
 
 class DocumentAsyncUploadResponse(BaseModel):
     """Resposta para upload async (retorno imediato)"""
+
     id: int
     status: DocumentStatus
     message: str

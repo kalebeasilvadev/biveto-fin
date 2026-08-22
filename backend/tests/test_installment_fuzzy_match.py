@@ -1,7 +1,9 @@
 """Testes para fuzzy matching de series de parcelas"""
-import pytest
+
 import re
 import unicodedata
+
+import pytest
 
 
 def normalize_merchant_name(name: str) -> str:
@@ -12,8 +14,8 @@ def normalize_merchant_name(name: str) -> str:
         return ""
 
     # Remove acentos
-    name = unicodedata.normalize('NFD', name)
-    name = ''.join(c for c in name if unicodedata.category(c) != 'Mn')
+    name = unicodedata.normalize("NFD", name)
+    name = "".join(c for c in name if unicodedata.category(c) != "Mn")
 
     # Lowercase
     name = name.lower()
@@ -21,29 +23,29 @@ def normalize_merchant_name(name: str) -> str:
     # Remove padroes de parcela: "3/12", "PARC.3/12", "PARC 3/12", "(Parcela 3 de 12)"
     # IMPORTANTE: Padroes mais especificos devem vir ANTES dos genericos
     parcela_patterns = [
-        r'\s*\(parcela\s*\d+\s*de\s*\d+\)',  # "(Parcela 3 de 12)"
-        r'\s*parc\.?\s*\d+/\d+',  # "PARC.3/12" ou "PARC 3/12"
-        r'\s*\d+/\d+\s*$',  # "3/12" no final (mais generico)
+        r"\s*\(parcela\s*\d+\s*de\s*\d+\)",  # "(Parcela 3 de 12)"
+        r"\s*parc\.?\s*\d+/\d+",  # "PARC.3/12" ou "PARC 3/12"
+        r"\s*\d+/\d+\s*$",  # "3/12" no final (mais generico)
     ]
     for pattern in parcela_patterns:
-        name = re.sub(pattern, '', name, flags=re.IGNORECASE)
+        name = re.sub(pattern, "", name, flags=re.IGNORECASE)
 
     # Remove sufixos de empresa
     company_suffixes = [
-        r'\s+ltda\.?$',
-        r'\s+s\.?a\.?$',
-        r'\s+eireli$',
-        r'\s+mei$',
-        r'\s+me$',
+        r"\s+ltda\.?$",
+        r"\s+s\.?a\.?$",
+        r"\s+eireli$",
+        r"\s+mei$",
+        r"\s+me$",
     ]
     for pattern in company_suffixes:
-        name = re.sub(pattern, '', name, flags=re.IGNORECASE)
+        name = re.sub(pattern, "", name, flags=re.IGNORECASE)
 
     # Remove caracteres especiais
-    name = re.sub(r'[\*\-_\.]', ' ', name)
+    name = re.sub(r"[\*\-_\.]", " ", name)
 
     # Remove espacos extras
-    name = ' '.join(name.split())
+    name = " ".join(name.split())
 
     return name.strip()
 
@@ -117,7 +119,11 @@ class TestWordOverlapCalculation:
         words1 = set(norm1.split())
         words2 = set(norm2.split())
         intersection = words1 & words2
-        overlap = len(intersection) / max(len(words1), len(words2)) if max(len(words1), len(words2)) > 0 else 0
+        overlap = (
+            len(intersection) / max(len(words1), len(words2))
+            if max(len(words1), len(words2)) > 0
+            else 0
+        )
         assert overlap < 0.5, f"Overlap deve ser < 0.5, obteve {overlap}"
 
     def test_partial_match(self):
@@ -174,9 +180,15 @@ class TestFuzzyMatchScenarios:
         words_incoming = set(norm_incoming.split())
 
         intersection = words_existing & words_incoming
-        overlap = len(intersection) / max(len(words_existing), len(words_incoming)) if max(len(words_existing), len(words_incoming)) > 0 else 0
+        overlap = (
+            len(intersection) / max(len(words_existing), len(words_incoming))
+            if max(len(words_existing), len(words_incoming)) > 0
+            else 0
+        )
 
-        assert overlap >= 0.5, f"Deveria fazer match: {norm_existing} vs {norm_incoming}, overlap={overlap}"
+        assert overlap >= 0.5, (
+            f"Deveria fazer match: {norm_existing} vs {norm_incoming}, overlap={overlap}"
+        )
 
     def test_inside_games_match(self):
         """INSIDE GAMES 2/6 deve fazer match com INSIDE GAMES existente"""
@@ -210,10 +222,14 @@ class TestFuzzyMatchScenarios:
         words2 = set(norm2.split())
 
         intersection = words1 & words2
-        overlap = len(intersection) / max(len(words1), len(words2)) if max(len(words1), len(words2)) > 0 else 0
+        overlap = (
+            len(intersection) / max(len(words1), len(words2))
+            if max(len(words1), len(words2)) > 0
+            else 0
+        )
 
         assert overlap < 0.5, f"Nao deveria fazer match: {norm1} vs {norm2}, overlap={overlap}"
 
 
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

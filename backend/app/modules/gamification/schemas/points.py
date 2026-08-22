@@ -7,12 +7,14 @@ from pydantic import BaseModel
 
 class PointsResponse(BaseModel):
     """Saldo de pontos"""
+
     current_points: int
     lifetime_points: int
 
 
 class PointsTransactionResponse(BaseModel):
     """Transação de pontos"""
+
     id: int
     amount: int
     balance_after: int
@@ -27,6 +29,7 @@ class PointsTransactionResponse(BaseModel):
 
 class PointsHistoryResponse(BaseModel):
     """Histórico de pontos"""
+
     transactions: list[PointsTransactionResponse]
     current_balance: int
     lifetime_total: int

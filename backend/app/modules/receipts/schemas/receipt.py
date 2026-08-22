@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field, model_validator
 
 class ReceiptPaymentCreate(BaseModel):
     """Pagamento individual do receipt"""
+
     payment_method: str
     amount: Decimal = Field(gt=0)
     account_id: int
@@ -17,21 +18,22 @@ class ReceiptPaymentCreate(BaseModel):
     installment_count: int | None = None  # Total de parcelas (ex: 3)
     credit_card_id: int | None = None
 
-    @model_validator(mode='after')
+    @model_validator(mode="after")
     def validate_installment(self):
         """Valida campos de parcelamento"""
         if self.is_installment:
             if not self.installment_count or self.installment_count < 2:
-                raise ValueError('Parcelamento requer pelo menos 2 parcelas')
+                raise ValueError("Parcelamento requer pelo menos 2 parcelas")
             if not self.credit_card_id:
-                raise ValueError('Parcelamento requer cartão de crédito selecionado')
-            if self.payment_method != 'credit_card':
-                raise ValueError('Parcelamento só é permitido para pagamentos no crédito')
+                raise ValueError("Parcelamento requer cartão de crédito selecionado")
+            if self.payment_method != "credit_card":
+                raise ValueError("Parcelamento só é permitido para pagamentos no crédito")
         return self
 
 
 class ReceiptItemCreate(BaseModel):
     """Item a ser convertido em Transaction"""
+
     description: str
     amount: Decimal = Field(gt=0)
     category_id: int | None = None
@@ -39,11 +41,12 @@ class ReceiptItemCreate(BaseModel):
     unit: str | None = None
     unit_price: Decimal | None = None
     grocery_category: str | None = None  # Categoria de mercado (dairy, cleaning, etc)
-    necessity_type: str | None = None    # essential ou non_essential
+    necessity_type: str | None = None  # essential ou non_essential
 
 
 class ReceiptConfirmRequest(BaseModel):
     """Request para confirmar um receipt"""
+
     document_id: int
 
     # Dados do estabelecimento (extraídos ou editados)
@@ -65,18 +68,19 @@ class ReceiptConfirmRequest(BaseModel):
     # Categoria padrão para itens sem categoria
     default_category_id: int | None = None
 
-    @model_validator(mode='after')
+    @model_validator(mode="after")
     def validate_payment_total(self):
         payment_total = sum(p.amount for p in self.payments)
-        if abs(payment_total - self.total_amount) > Decimal('0.01'):
+        if abs(payment_total - self.total_amount) > Decimal("0.01"):
             raise ValueError(
-                f'Soma dos pagamentos ({payment_total}) diferente do total ({self.total_amount})'
+                f"Soma dos pagamentos ({payment_total}) diferente do total ({self.total_amount})"
             )
         return self
 
 
 class ReceiptPaymentResponse(BaseModel):
     """Resposta de um pagamento do receipt"""
+
     id: int
     payment_method: str
     amount: float
@@ -99,6 +103,7 @@ class ReceiptPaymentResponse(BaseModel):
 
 class ReceiptResponse(BaseModel):
     """Resposta completa de um receipt"""
+
     id: int
     document_id: int | None
     store_name: str
@@ -126,6 +131,7 @@ class ReceiptResponse(BaseModel):
 
 class ReceiptListResponse(BaseModel):
     """Resposta simplificada para listagem"""
+
     id: int
     document_id: int | None
     store_name: str
@@ -144,6 +150,7 @@ class ReceiptListResponse(BaseModel):
 
 class ReceiptUpdate(BaseModel):
     """Request para atualizar um receipt"""
+
     store_name: str | None = None
     store_cnpj: str | None = None
     purchase_date: date | None = None

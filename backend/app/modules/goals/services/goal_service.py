@@ -2,6 +2,7 @@
 Serviço de Metas Financeiras (Goals)
 Implementa funcionalidades baseadas em YNAB, Cerbasi (PNIF) e Ramsey (Emergency Fund)
 """
+
 from datetime import date
 from decimal import Decimal
 
@@ -41,19 +42,16 @@ class GoalService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def list_goals(self, user: User, status_filter: GoalStatus | None = None) -> list[GoalResponse]:
+    async def list_goals(
+        self, user: User, status_filter: GoalStatus | None = None
+    ) -> list[GoalResponse]:
         """Lista metas do usuário (personal + household da família)"""
         household_user_ids = await get_household_user_ids(self.db, user)
         member = await get_household_member(self.db, user)
 
         query = select(Goal).where(
             build_ownership_filter(
-                Goal,
-                Goal.user_id,
-                Goal.ownership_type,
-                user.id,
-                household_user_ids,
-                member
+                Goal, Goal.user_id, Goal.ownership_type, user.id, household_user_ids, member
             )
         )
 
@@ -69,10 +67,7 @@ class GoalService:
     async def get_goal(self, user: User, goal_id: int) -> GoalDetailResponse | None:
         """Retorna meta com detalhes e projeção"""
         result = await self.db.execute(
-            select(Goal).where(
-                Goal.id == goal_id,
-                Goal.user_id == user.id
-            )
+            select(Goal).where(Goal.id == goal_id, Goal.user_id == user.id)
         )
         goal = result.scalar_one_or_none()
 
@@ -88,16 +83,15 @@ class GoalService:
                 contribution_date=c.contribution_date,
                 notes=c.notes,
                 transaction_id=c.transaction_id,
-                created_at=c.created_at
-            ) for c in goal.contributions
+                created_at=c.created_at,
+            )
+            for c in goal.contributions
         ]
 
         projection = self._calculate_projection(goal)
 
         return GoalDetailResponse(
-            **response.model_dump(),
-            contributions=contributions,
-            projection=projection
+            **response.model_dump(), contributions=contributions, projection=projection
         )
 
     async def create_goal(self, user: User, data: GoalCreate) -> Goal:
@@ -118,15 +112,13 @@ class GoalService:
             target_date=data.target_date,
             priority=data.priority,
             account_id=data.account_id,
-            ownership_type=data.ownership_type.value
+            ownership_type=data.ownership_type.value,
         )
 
         # Calcular contribuição mensal sugerida
         if data.target_date and goal.auto_calculate_contribution:
             goal.monthly_contribution = self._calculate_monthly_contribution(
-                goal.target_amount - goal.current_amount,
-                date.today(),
-                data.target_date
+                goal.target_amount - goal.current_amount, date.today(), data.target_date
             )
 
         self.db.add(goal)
@@ -137,26 +129,15 @@ class GoalService:
     async def update_goal(self, user: User, goal_id: int, data: GoalUpdate) -> Goal:
         """Atualiza meta"""
         result = await self.db.execute(
-            select(Goal).where(
-                Goal.id == goal_id,
-                Goal.user_id == user.id
-            )
+            select(Goal).where(Goal.id == goal_id, Goal.user_id == user.id)
         )
         goal = result.scalar_one_or_none()
 
         if not goal:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Meta não encontrada"
-            )
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Meta não encontrada")
 
         # Validar permissão para editar
-        await validate_edit_permission(
-            self.db,
-            user,
-            goal.user_id,
-            goal.ownership_type
-        )
+        await validate_edit_permission(self.db, user, goal.user_id, goal.ownership_type)
 
         for field, value in data.model_dump(exclude_unset=True).items():
             if field == "status" and value:
@@ -168,9 +149,7 @@ class GoalService:
         # Recalcular contribuição se necessário
         if goal.auto_calculate_contribution and goal.target_date:
             goal.monthly_contribution = self._calculate_monthly_contribution(
-                goal.target_amount - goal.current_amount,
-                date.today(),
-                goal.target_date
+                goal.target_amount - goal.current_amount, date.today(), goal.target_date
             )
 
         # Marcar como concluída se atingiu o valor
@@ -185,49 +164,34 @@ class GoalService:
     async def delete_goal(self, user: User, goal_id: int) -> None:
         """Remove meta"""
         result = await self.db.execute(
-            select(Goal).where(
-                Goal.id == goal_id,
-                Goal.user_id == user.id
-            )
+            select(Goal).where(Goal.id == goal_id, Goal.user_id == user.id)
         )
         goal = result.scalar_one_or_none()
 
         if not goal:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Meta não encontrada"
-            )
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Meta não encontrada")
 
         # Validar permissão para deletar
-        await validate_delete_permission(
-            self.db,
-            user,
-            goal.user_id,
-            goal.ownership_type
-        )
+        await validate_delete_permission(self.db, user, goal.user_id, goal.ownership_type)
 
         await self.db.delete(goal)
 
-    async def add_contribution(self, user: User, goal_id: int, data: GoalContributionCreate) -> GoalContribution:
+    async def add_contribution(
+        self, user: User, goal_id: int, data: GoalContributionCreate
+    ) -> GoalContribution:
         """Adiciona contribuição à meta"""
         result = await self.db.execute(
-            select(Goal).where(
-                Goal.id == goal_id,
-                Goal.user_id == user.id
-            )
+            select(Goal).where(Goal.id == goal_id, Goal.user_id == user.id)
         )
         goal = result.scalar_one_or_none()
 
         if not goal:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Meta não encontrada"
-            )
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Meta não encontrada")
 
         if goal.status != GoalStatus.ACTIVE.value:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Não é possível adicionar contribuição a meta inativa"
+                detail="Não é possível adicionar contribuição a meta inativa",
             )
 
         contribution = GoalContribution(
@@ -235,7 +199,7 @@ class GoalService:
             amount=data.amount,
             contribution_date=data.contribution_date,
             notes=data.notes,
-            transaction_id=data.transaction_id
+            transaction_id=data.transaction_id,
         )
         self.db.add(contribution)
 
@@ -253,9 +217,7 @@ class GoalService:
 
     async def get_summary(self, user: User) -> GoalSummary:
         """Retorna resumo de todas as metas"""
-        result = await self.db.execute(
-            select(Goal).where(Goal.user_id == user.id)
-        )
+        result = await self.db.execute(select(Goal).where(Goal.user_id == user.id))
         goals = result.scalars().all()
 
         active = [g for g in goals if g.status == GoalStatus.ACTIVE.value]
@@ -273,7 +235,10 @@ class GoalService:
         next_milestone = None
         for goal in active:
             milestone = self._get_next_milestone(goal)
-            if milestone and (next_milestone is None or milestone.amount_to_milestone < next_milestone.amount_to_milestone):
+            if milestone and (
+                next_milestone is None
+                or milestone.amount_to_milestone < next_milestone.amount_to_milestone
+            ):
                 next_milestone = milestone
 
         return GoalSummary(
@@ -284,10 +249,12 @@ class GoalService:
             total_saved=total_saved,
             total_remaining=total_remaining,
             overall_progress=overall_progress,
-            next_milestone=next_milestone
+            next_milestone=next_milestone,
         )
 
-    async def calculate_emergency_fund(self, user: User, months: int = 6) -> EmergencyFundCalculation:
+    async def calculate_emergency_fund(
+        self, user: User, months: int = 6
+    ) -> EmergencyFundCalculation:
         """
         Calcula fundo de emergência (Baby Step 3 - Dave Ramsey)
         Recomenda 3-6 meses de despesas
@@ -299,7 +266,7 @@ class GoalService:
             select(func.sum(Transaction.amount)).where(
                 Transaction.user_id == user.id,
                 Transaction.type == TransactionType.EXPENSE.value,
-                Transaction.date >= three_months_ago
+                Transaction.date >= three_months_ago,
             )
         )
         total_expenses = result.scalar() or Decimal(0)
@@ -310,7 +277,7 @@ class GoalService:
             select(Goal).where(
                 Goal.user_id == user.id,
                 Goal.type == GoalType.EMERGENCY_FUND.value,
-                Goal.status == GoalStatus.ACTIVE.value
+                Goal.status == GoalStatus.ACTIVE.value,
             )
         )
         emergency_goal = emergency_goals.scalar_one_or_none()
@@ -336,7 +303,7 @@ class GoalService:
             recommended_6_months=recommended_6,
             current_saved=current_saved,
             months_covered=months_covered,
-            status=fund_status
+            status=fund_status,
         )
 
     async def calculate_pnif(self, user: User, expected_return: float = 0.08) -> PNIFCalculation:
@@ -351,7 +318,7 @@ class GoalService:
             select(func.sum(Transaction.amount)).where(
                 Transaction.user_id == user.id,
                 Transaction.type == TransactionType.EXPENSE.value,
-                Transaction.date >= twelve_months_ago
+                Transaction.date >= twelve_months_ago,
             )
         )
         annual_expenses = result.scalar() or Decimal(0)
@@ -378,7 +345,7 @@ class GoalService:
             select(func.sum(Transaction.amount)).where(
                 Transaction.user_id == user.id,
                 Transaction.type == TransactionType.INCOME.value,
-                Transaction.date >= twelve_months_ago
+                Transaction.date >= twelve_months_ago,
             )
         )
         annual_income = income_result.scalar() or Decimal(0)
@@ -403,7 +370,7 @@ class GoalService:
             current_net_worth=current_net_worth,
             percentage_achieved=percentage_achieved,
             years_to_pnif=years_to_pnif,
-            monthly_savings_needed=monthly_savings_needed
+            monthly_savings_needed=monthly_savings_needed,
         )
 
     async def _build_goal_response(self, goal: Goal) -> GoalResponse:
@@ -456,10 +423,12 @@ class GoalService:
             remaining_amount=remaining,
             months_to_goal=months_to_goal,
             on_track=on_track,
-            suggested_monthly=suggested_monthly
+            suggested_monthly=suggested_monthly,
         )
 
-    def _calculate_monthly_contribution(self, remaining: Decimal, start: date, end: date) -> Decimal | None:
+    def _calculate_monthly_contribution(
+        self, remaining: Decimal, start: date, end: date
+    ) -> Decimal | None:
         """Calcula contribuição mensal necessária"""
         if end <= start:
             return None
@@ -483,7 +452,7 @@ class GoalService:
                 current_pace_date=date.today(),
                 target_pace_date=date.today(),
                 monthly_needed=Decimal(0),
-                is_achievable=True
+                is_achievable=True,
             )
 
         # Calcular ritmo atual baseado em contribuições
@@ -520,19 +489,14 @@ class GoalService:
             current_pace_date=current_pace_date,
             target_pace_date=target_pace_date,
             monthly_needed=monthly_needed,
-            is_achievable=is_achievable
+            is_achievable=is_achievable,
         )
 
     def _get_next_milestone(self, goal: Goal) -> GoalMilestone | None:
         """Retorna próximo marco da meta"""
         progress = goal.progress_percentage
 
-        milestones = [
-            (25, "25%"),
-            (50, "50%"),
-            (75, "75%"),
-            (100, "complete")
-        ]
+        milestones = [(25, "25%"), (50, "50%"), (75, "75%"), (100, "complete")]
 
         for pct, label in milestones:
             if progress < pct:
@@ -543,7 +507,7 @@ class GoalService:
                     goal_id=goal.id,
                     goal_name=goal.name,
                     amount_to_milestone=amount_to_milestone,
-                    milestone_type=label
+                    milestone_type=label,
                 )
 
         return None

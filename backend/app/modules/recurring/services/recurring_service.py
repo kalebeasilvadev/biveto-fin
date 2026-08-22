@@ -87,11 +87,11 @@ class RecurringTransactionService:
 
         return next_date
 
-    async def _get_credit_card_from_account(self, user_id: int, account_id: int) -> CreditCard | None:
+    async def _get_credit_card_from_account(
+        self, user_id: int, account_id: int
+    ) -> CreditCard | None:
         """Verifica se a conta e do tipo credit_card e retorna o CreditCard."""
-        account_result = await self.db.execute(
-            select(Account).where(Account.id == account_id)
-        )
+        account_result = await self.db.execute(select(Account).where(Account.id == account_id))
         account = account_result.scalar_one_or_none()
 
         if not account or account.type != "credit_card":
@@ -109,10 +109,7 @@ class RecurringTransactionService:
 
         # Verificar se a conta pertence ao usuário
         account = await self.db.scalar(
-            select(Account).where(
-                Account.id == data.account_id,
-                Account.user_id == user.id
-            )
+            select(Account).where(Account.id == data.account_id, Account.user_id == user.id)
         )
         if not account:
             raise ValueError("Conta não encontrada")
@@ -120,21 +117,14 @@ class RecurringTransactionService:
         # Verificar categoria se fornecida
         if data.category_id:
             category = await self.db.scalar(
-                select(Category).where(
-                    Category.id == data.category_id,
-                    Category.user_id == user.id
-                )
+                select(Category).where(Category.id == data.category_id, Category.user_id == user.id)
             )
             if not category:
                 raise ValueError("Categoria não encontrada")
 
         # Calcular próxima data
         next_due = self._calculate_next_due_date(
-            data.frequency.value,
-            data.start_date,
-            None,
-            data.day_of_month,
-            data.day_of_week
+            data.frequency.value, data.start_date, None, data.day_of_month, data.day_of_week
         )
 
         recurring = RecurringTransaction(
@@ -174,14 +164,14 @@ class RecurringTransactionService:
             RecurringTransaction.ownership_type,
             user.id,
             household_user_ids,
-            member
+            member,
         )
 
         query = (
             select(RecurringTransaction)
             .options(
                 selectinload(RecurringTransaction.account),
-                selectinload(RecurringTransaction.category)
+                selectinload(RecurringTransaction.category),
             )
             .where(ownership_filter)
             .order_by(RecurringTransaction.next_due_date)
@@ -226,12 +216,9 @@ class RecurringTransactionService:
             select(RecurringTransaction)
             .options(
                 selectinload(RecurringTransaction.account),
-                selectinload(RecurringTransaction.category)
+                selectinload(RecurringTransaction.category),
             )
-            .where(
-                RecurringTransaction.id == recurring_id,
-                RecurringTransaction.user_id == user.id
-            )
+            .where(RecurringTransaction.id == recurring_id, RecurringTransaction.user_id == user.id)
         )
         return result.scalar_one_or_none()
 
@@ -244,12 +231,7 @@ class RecurringTransactionService:
             return None
 
         # Validate edit permissions
-        await validate_edit_permission(
-            self.db,
-            user,
-            recurring.user_id,
-            recurring.ownership_type
-        )
+        await validate_edit_permission(self.db, user, recurring.user_id, recurring.ownership_type)
 
         update_data = data.model_dump(exclude_unset=True)
 
@@ -257,8 +239,7 @@ class RecurringTransactionService:
         if "account_id" in update_data:
             account = await self.db.scalar(
                 select(Account).where(
-                    Account.id == update_data["account_id"],
-                    Account.user_id == user.id
+                    Account.id == update_data["account_id"], Account.user_id == user.id
                 )
             )
             if not account:
@@ -268,8 +249,7 @@ class RecurringTransactionService:
         if "category_id" in update_data and update_data["category_id"]:
             category = await self.db.scalar(
                 select(Category).where(
-                    Category.id == update_data["category_id"],
-                    Category.user_id == user.id
+                    Category.id == update_data["category_id"], Category.user_id == user.id
                 )
             )
             if not category:
@@ -278,13 +258,13 @@ class RecurringTransactionService:
         # Aplicar atualizações
         for field, value in update_data.items():
             if field == "type" and value:
-                setattr(recurring, field, value.value if hasattr(value, 'value') else value)
+                setattr(recurring, field, value.value if hasattr(value, "value") else value)
             elif field == "frequency" and value:
-                setattr(recurring, field, value.value if hasattr(value, 'value') else value)
+                setattr(recurring, field, value.value if hasattr(value, "value") else value)
             elif field == "status" and value:
-                setattr(recurring, field, value.value if hasattr(value, 'value') else value)
+                setattr(recurring, field, value.value if hasattr(value, "value") else value)
             elif field == "payment_method" and value:
-                setattr(recurring, field, value.value if hasattr(value, 'value') else value)
+                setattr(recurring, field, value.value if hasattr(value, "value") else value)
             else:
                 setattr(recurring, field, value)
 
@@ -309,12 +289,7 @@ class RecurringTransactionService:
             return False
 
         # Validate delete permissions
-        await validate_delete_permission(
-            self.db,
-            user,
-            recurring.user_id,
-            recurring.ownership_type
-        )
+        await validate_delete_permission(self.db, user, recurring.user_id, recurring.ownership_type)
 
         await self.db.delete(recurring)
         await self.db.commit()
@@ -431,8 +406,7 @@ class RecurringTransactionService:
         invoice_ids_to_update = set()
 
         result = await self.db.execute(
-            select(RecurringTransaction)
-            .where(
+            select(RecurringTransaction).where(
                 RecurringTransaction.user_id == user.id,
                 RecurringTransaction.status == RecurringStatus.ACTIVE.value,
                 RecurringTransaction.next_due_date <= today,
@@ -459,16 +433,18 @@ class RecurringTransactionService:
 
                 # Calcular período da fatura
                 invoice_service = InvoiceService(self.db)
-                period = invoice_service.calculate_invoice_period(credit_card, recurring.next_due_date)
+                period = invoice_service.calculate_invoice_period(
+                    credit_card, recurring.next_due_date
+                )
 
                 # Obter ou criar fatura
                 invoice = await invoice_service.get_or_create_invoice(
                     user=user,
                     credit_card=credit_card,
-                    reference_month=period['reference_month'],
-                    reference_year=period['reference_year'],
-                    closing_date=period['closing_date'],
-                    due_date=period['due_date'],
+                    reference_month=period["reference_month"],
+                    reference_year=period["reference_year"],
+                    closing_date=period["closing_date"],
+                    due_date=period["due_date"],
                 )
                 invoice_id = invoice.id
                 invoice_ids_to_update.add(invoice_id)
@@ -602,11 +578,13 @@ class RecurringTransactionService:
                 )
                 for invoice in inv_result.scalars().all():
                     await invoice_service.update_invoice_total(invoice)
-                    result["invoices_updated"].append({
-                        "id": invoice.id,
-                        "month": invoice.reference_month,
-                        "year": invoice.reference_year,
-                    })
+                    result["invoices_updated"].append(
+                        {
+                            "id": invoice.id,
+                            "month": invoice.reference_month,
+                            "year": invoice.reference_year,
+                        }
+                    )
 
         await self.db.commit()
         return result

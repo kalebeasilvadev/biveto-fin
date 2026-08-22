@@ -1,6 +1,7 @@
 """
 Smart Shopping List Schemas - LLM-powered intelligent list generation
 """
+
 from datetime import date, datetime
 
 from pydantic import BaseModel, Field
@@ -15,17 +16,18 @@ from app.models.grocery import (
 
 class SmartListGenerateRequest(BaseModel):
     """Request to generate a smart shopping list using LLM analysis"""
+
     period_days: int = Field(default=90, ge=30, le=180)
     include_non_essential: bool = True
     filter_non_grocery: bool = Field(
-        default=True,
-        description="Filter out non-grocery items (restaurants, delivery, etc.)"
+        default=True, description="Filter out non-grocery items (restaurants, delivery, etc.)"
     )
     name: str | None = None
 
 
 class OriginalProductDetail(BaseModel):
     """Detail of an original product from purchase history"""
+
     product_name: str
     purchase_date: date
     unit_price: float
@@ -35,6 +37,7 @@ class OriginalProductDetail(BaseModel):
 
 class SmartListItemResponse(BaseModel):
     """Smart list item with LLM-generated insights"""
+
     product_type: str  # Normalized type (e.g., "Frango Congelado")
     display_name: str  # Shorter display name (e.g., "Frango")
     category: GroceryCategory
@@ -56,12 +59,14 @@ class SmartListItemResponse(BaseModel):
 
 class ExcludedItem(BaseModel):
     """Item excluded from the list by LLM"""
+
     name: str
     reason: str
 
 
 class SmartListLLMResponse(BaseModel):
     """Response structure expected from LLM"""
+
     shopping_list: list[SmartListItemResponse]
     excluded: list[ExcludedItem]
     insights: list[str]
@@ -69,6 +74,7 @@ class SmartListLLMResponse(BaseModel):
 
 class SmartListFullResponse(BaseModel):
     """Full response for smart list generation"""
+
     id: int
     user_id: int
     license_id: int | None

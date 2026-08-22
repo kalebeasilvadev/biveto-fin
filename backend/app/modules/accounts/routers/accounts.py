@@ -21,9 +21,7 @@ async def get_household_user_ids(db, user) -> list[int]:
         return []
 
     result = await db.execute(
-        select(HouseholdMember.user_id).where(
-            HouseholdMember.license_id == user.license_id
-        )
+        select(HouseholdMember.user_id).where(HouseholdMember.license_id == user.license_id)
     )
     return list(result.scalars().all())
 
@@ -52,40 +50,38 @@ async def calculate_account_balance(db, account_id: int) -> Decimal:
                             and_(
                                 Transaction.type == TransactionType.TRANSFER.value,
                                 Transaction.linked_transaction_id.isnot(None),
-                                Transaction.id < Transaction.linked_transaction_id
+                                Transaction.id < Transaction.linked_transaction_id,
                             ),
-                            -Transaction.amount
+                            -Transaction.amount,
                         ),
                         # Transfer: entrada (id maior que linked) = soma
                         (
                             and_(
                                 Transaction.type == TransactionType.TRANSFER.value,
                                 Transaction.linked_transaction_id.isnot(None),
-                                Transaction.id > Transaction.linked_transaction_id
+                                Transaction.id > Transaction.linked_transaction_id,
                             ),
-                            Transaction.amount
+                            Transaction.amount,
                         ),
-                        else_=0
+                        else_=0,
                     )
                 ),
-                0
+                0,
             )
         ).where(
             Transaction.account_id == account_id,
-            Transaction.receipt_id.is_(None)  # Apenas transações sem receipt
+            Transaction.receipt_id.is_(None),  # Apenas transações sem receipt
         )
     )
     transactions_balance = transactions_result.scalar() or Decimal(0)
 
     # 2. Total de ReceiptPayments (sempre despesas)
     receipt_payments_result = await db.execute(
-        select(
-            func.coalesce(func.sum(ReceiptPayment.amount), 0)
-        ).select_from(ReceiptPayment)
+        select(func.coalesce(func.sum(ReceiptPayment.amount), 0))
+        .select_from(ReceiptPayment)
         .join(Receipt)
         .where(
-            ReceiptPayment.account_id == account_id,
-            Receipt.status == ReceiptStatus.CONFIRMED.value
+            ReceiptPayment.account_id == account_id, Receipt.status == ReceiptStatus.CONFIRMED.value
         )
     )
     receipt_payments_total = receipt_payments_result.scalar() or Decimal(0)
@@ -113,24 +109,24 @@ async def list_accounts(current_user: CurrentUser, db: DbSession):
                             and_(
                                 Transaction.type == TransactionType.TRANSFER.value,
                                 Transaction.linked_transaction_id.isnot(None),
-                                Transaction.id < Transaction.linked_transaction_id
+                                Transaction.id < Transaction.linked_transaction_id,
                             ),
-                            -Transaction.amount
+                            -Transaction.amount,
                         ),
                         # Transfer: entrada (id maior que linked) = soma
                         (
                             and_(
                                 Transaction.type == TransactionType.TRANSFER.value,
                                 Transaction.linked_transaction_id.isnot(None),
-                                Transaction.id > Transaction.linked_transaction_id
+                                Transaction.id > Transaction.linked_transaction_id,
                             ),
-                            Transaction.amount
+                            Transaction.amount,
                         ),
-                        else_=0
+                        else_=0,
                     )
                 ),
-                0
-            ).label('transaction_balance')
+                0,
+            ).label("transaction_balance"),
         )
         .where(Transaction.receipt_id.is_(None))  # Excluir transações de receipt
         .group_by(Transaction.account_id)
@@ -141,7 +137,7 @@ async def list_accounts(current_user: CurrentUser, db: DbSession):
     receipt_payments_subquery = (
         select(
             ReceiptPayment.account_id,
-            func.coalesce(func.sum(ReceiptPayment.amount), 0).label('receipt_payments_total')
+            func.coalesce(func.sum(ReceiptPayment.amount), 0).label("receipt_payments_total"),
         )
         .select_from(ReceiptPayment)
         .join(Receipt)
@@ -154,10 +150,16 @@ async def list_accounts(current_user: CurrentUser, db: DbSession):
     base_query = (
         select(
             Account,
-            func.coalesce(transactions_balance_subquery.c.transaction_balance, 0).label('tx_balance'),
-            func.coalesce(receipt_payments_subquery.c.receipt_payments_total, 0).label('receipt_total')
+            func.coalesce(transactions_balance_subquery.c.transaction_balance, 0).label(
+                "tx_balance"
+            ),
+            func.coalesce(receipt_payments_subquery.c.receipt_payments_total, 0).label(
+                "receipt_total"
+            ),
         )
-        .outerjoin(transactions_balance_subquery, transactions_balance_subquery.c.account_id == Account.id)
+        .outerjoin(
+            transactions_balance_subquery, transactions_balance_subquery.c.account_id == Account.id
+        )
         .outerjoin(receipt_payments_subquery, receipt_payments_subquery.c.account_id == Account.id)
     )
 
@@ -166,15 +168,11 @@ async def list_accounts(current_user: CurrentUser, db: DbSession):
         base_query = base_query.where(
             or_(
                 # Personal accounts from user
-                and_(
-                    Account.user_id == current_user.id,
-                    Account.ownership_type == "personal"
-                ),
+                and_(Account.user_id == current_user.id, Account.ownership_type == "personal"),
                 # Household accounts from any family member
                 and_(
-                    Account.user_id.in_(household_user_ids),
-                    Account.ownership_type == "household"
-                )
+                    Account.user_id.in_(household_user_ids), Account.ownership_type == "household"
+                ),
             )
         )
     else:
@@ -246,15 +244,12 @@ async def get_account(
             select(Account).where(
                 Account.id == account_id,
                 or_(
-                    and_(
-                        Account.user_id == current_user.id,
-                        Account.ownership_type == "personal"
-                    ),
+                    and_(Account.user_id == current_user.id, Account.ownership_type == "personal"),
                     and_(
                         Account.user_id.in_(household_user_ids),
-                        Account.ownership_type == "household"
-                    )
-                )
+                        Account.ownership_type == "household",
+                    ),
+                ),
             )
         )
     else:
@@ -301,15 +296,12 @@ async def update_account(
             select(Account).where(
                 Account.id == account_id,
                 or_(
-                    and_(
-                        Account.user_id == current_user.id,
-                        Account.ownership_type == "personal"
-                    ),
+                    and_(Account.user_id == current_user.id, Account.ownership_type == "personal"),
                     and_(
                         Account.user_id.in_(household_user_ids),
-                        Account.ownership_type == "household"
-                    )
-                )
+                        Account.ownership_type == "household",
+                    ),
+                ),
             )
         )
     else:
@@ -345,15 +337,12 @@ async def delete_account(
             select(Account).where(
                 Account.id == account_id,
                 or_(
-                    and_(
-                        Account.user_id == current_user.id,
-                        Account.ownership_type == "personal"
-                    ),
+                    and_(Account.user_id == current_user.id, Account.ownership_type == "personal"),
                     and_(
                         Account.user_id.in_(household_user_ids),
-                        Account.ownership_type == "household"
-                    )
-                )
+                        Account.ownership_type == "household",
+                    ),
+                ),
             )
         )
     else:

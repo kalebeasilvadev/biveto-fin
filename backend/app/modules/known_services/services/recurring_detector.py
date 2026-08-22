@@ -1,4 +1,5 @@
 """Serviço para detectar transações recorrentes em itens extraídos de faturas"""
+
 from __future__ import annotations
 
 import re
@@ -62,7 +63,7 @@ class RecurringDetectorService:
                 invoice_month=invoice_month,
                 invoice_year=invoice_year,
             )
-            item['recurring_detection'] = detection.model_dump() if detection else None
+            item["recurring_detection"] = detection.model_dump() if detection else None
 
         return items
 
@@ -76,13 +77,13 @@ class RecurringDetectorService:
         invoice_year: int | None,
     ) -> RecurringDetection | None:
         """Detecta recorrência para um único item"""
-        description = item.get('description', '')
-        amount = item.get('amount', 0)
-        item_date = item.get('date')
+        description = item.get("description", "")
+        amount = item.get("amount", 0)
+        item_date = item.get("date")
 
         # Ignorar itens que não são compras (pagamentos, créditos, etc.)
-        transaction_type = item.get('transaction_type', 'compra')
-        if transaction_type not in ['compra', 'anuidade']:
+        transaction_type = item.get("transaction_type", "compra")
+        if transaction_type not in ["compra", "anuidade"]:
             return None
 
         # 1. Verificar se é um serviço conhecido
@@ -106,7 +107,7 @@ class RecurringDetectorService:
             if item_date:
                 try:
                     if isinstance(item_date, str):
-                        parsed_date = datetime.strptime(item_date, '%Y-%m-%d')
+                        parsed_date = datetime.strptime(item_date, "%Y-%m-%d")
                         day_of_month = parsed_date.day
                     elif isinstance(item_date, date):
                         day_of_month = item_date.day
@@ -155,7 +156,7 @@ class RecurringDetectorService:
         for service in known_services:
             for pattern in service.patterns:
                 # Suporta wildcards (* no final)
-                if pattern.endswith('*'):
+                if pattern.endswith("*"):
                     if description_upper.startswith(pattern[:-1]):
                         return service
                 elif pattern in description_upper:
@@ -191,7 +192,9 @@ class RecurringDetectorService:
                     if self._amount_matches(amount, recurring.amount):
                         return recurring
                 # Também verifica se o nome da recorrência contém o nome do serviço conhecido
-                if self._descriptions_match(recurring_name_normalized, known_service_name_normalized):
+                if self._descriptions_match(
+                    recurring_name_normalized, known_service_name_normalized
+                ):
                     if self._amount_matches(amount, recurring.amount):
                         return recurring
 
@@ -248,9 +251,9 @@ class RecurringDetectorService:
         items_by_description: dict[str, list[dict]],
     ) -> DuplicateAnalysis | None:
         """Analisa se há duplicidade no período"""
-        description = item.get('description', '')
-        amount = item.get('amount', 0)
-        item_date_str = item.get('date')
+        description = item.get("description", "")
+        amount = item.get("amount", 0)
+        item_date_str = item.get("date")
 
         # Normalizar descrição para agrupamento
         desc_key = self._normalize_description(description)
@@ -267,7 +270,7 @@ class RecurringDetectorService:
             )
 
         # Analisar as outras ocorrências
-        other_amounts = [i['amount'] for i in similar_items if i is not item]
+        other_amounts = [i["amount"] for i in similar_items if i is not item]
         occurrences_count = len(similar_items)
 
         # Caso 1: Valores diferentes → provavelmente 2 assinaturas diferentes
@@ -294,8 +297,8 @@ class RecurringDetectorService:
             if other_item is item:
                 continue
 
-            other_date = self._parse_date(other_item.get('date'))
-            other_amount = other_item.get('amount', 0)
+            other_date = self._parse_date(other_item.get("date"))
+            other_amount = other_item.get("amount", 0)
 
             # Valores iguais e datas próximas (<7 dias) → suspeito
             if abs(other_amount - amount) < 1.0:
@@ -345,7 +348,7 @@ class RecurringDetectorService:
             # Verificar quão bem o padrão combina
             description_upper = description.upper()
             for pattern in known_service.patterns:
-                if pattern.endswith('*'):
+                if pattern.endswith("*"):
                     if description_upper.startswith(pattern[:-1]):
                         return 0.95
                 elif pattern == description_upper:
@@ -358,7 +361,7 @@ class RecurringDetectorService:
     def _normalize_description(self, description: str) -> str:
         """Normaliza descrição para comparação"""
         # Remove caracteres especiais, converte para maiúsculas
-        normalized = re.sub(r'[^A-Za-z0-9]', '', description.upper())
+        normalized = re.sub(r"[^A-Za-z0-9]", "", description.upper())
         return normalized
 
     def _descriptions_match(self, desc1: str, desc2: str) -> bool:
@@ -392,13 +395,13 @@ class RecurringDetectorService:
         groups: dict[str, list[dict]] = defaultdict(list)
 
         for item in items:
-            description = item.get('description', '')
+            description = item.get("description", "")
             # Extrair parte principal da descrição (sem sufixos numéricos)
             desc_key = self._normalize_description(description)
 
             # Remove apenas sufixos numéricos de parcelamento (ex: "02/06", "04/12")
             # mas mantém o resto da descrição intacta
-            desc_key = re.sub(r'\d{2}\d{2}$', '', desc_key)  # Remove padrões como "0206", "0412"
+            desc_key = re.sub(r"\d{2}\d{2}$", "", desc_key)  # Remove padrões como "0206", "0412"
 
             groups[desc_key].append(item)
 
@@ -409,7 +412,7 @@ class RecurringDetectorService:
         if not date_str:
             return None
         try:
-            return datetime.strptime(date_str, '%Y-%m-%d').date()
+            return datetime.strptime(date_str, "%Y-%m-%d").date()
         except ValueError:
             return None
 
@@ -417,9 +420,7 @@ class RecurringDetectorService:
         """Carrega serviços conhecidos do banco (com cache)"""
         if self._known_services_cache is None:
             result = await self.db.execute(
-                select(KnownRecurringService).where(
-                    KnownRecurringService.is_active == True
-                )
+                select(KnownRecurringService).where(KnownRecurringService.is_active == True)
             )
             self._known_services_cache = list(result.scalars().all())
         return self._known_services_cache

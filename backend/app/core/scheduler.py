@@ -36,6 +36,7 @@ BACKLOG_WINDOW_DAYS = 7
 async def _get_active_users():
     """Get all active users."""
     from app.models.user import User
+
     async with async_session_maker() as db:
         result = await db.execute(select(User).where(User.is_active == True))
         return result.scalars().all()
@@ -57,16 +58,21 @@ async def _run_alert_for_all_users(alert_method_name: str):
                     await db.commit()
                 else:
                     await db.rollback()
-                    logger.info(f"[DRY RUN] {alert_method_name} would send {count} notifications for user {user.id}")
+                    logger.info(
+                        f"[DRY RUN] {alert_method_name} would send {count} notifications for user {user.id}"
+                    )
                 total += count
         except Exception as e:
             logger.exception(f"Error in {alert_method_name} for user {user.id}: {e}")
 
-    logger.info(f"Scheduler: {alert_method_name} completed — {total} notifications {'(dry run)' if DRY_RUN else 'sent'}")
+    logger.info(
+        f"Scheduler: {alert_method_name} completed — {total} notifications {'(dry run)' if DRY_RUN else 'sent'}"
+    )
     return total
 
 
 # ===== Alert Tasks =====
+
 
 async def task_check_invoice_due_dates():
     await _run_alert_for_all_users("check_invoice_due_dates")
@@ -94,6 +100,7 @@ async def task_check_low_balance():
 
 # ===== Recurring Transaction Generation =====
 
+
 def _advance_next_due_date(rec):
     """Calculate and set the next due date based on the recurrence frequency."""
     from dateutil.relativedelta import relativedelta
@@ -110,6 +117,7 @@ def _advance_next_due_date(rec):
         # Respect day_of_month if set (e.g., always on the 15th)
         if rec.day_of_month:
             import calendar
+
             year = rec.next_due_date.year
             month = rec.next_due_date.month
             max_day = calendar.monthrange(year, month)[1]
@@ -203,6 +211,7 @@ async def task_generate_recurring_transactions():
 
 # ===== Automation Tasks =====
 
+
 async def task_process_scheduled_automations():
     """Process scheduled automation rules."""
     from datetime import datetime
@@ -236,13 +245,22 @@ async def task_process_scheduled_automations():
                         freq = rule.trigger_config.get("frequency", "daily")
                         if freq == "daily" and last_date == current_date:
                             continue
-                        elif freq == "weekly" and last_date.isocalendar()[1] == current_date.isocalendar()[1]:
+                        elif (
+                            freq == "weekly"
+                            and last_date.isocalendar()[1] == current_date.isocalendar()[1]
+                        ):
                             continue
-                        elif freq == "monthly" and last_date.year == current_date.year and last_date.month == current_date.month:
+                        elif (
+                            freq == "monthly"
+                            and last_date.year == current_date.year
+                            and last_date.month == current_date.month
+                        ):
                             continue
 
                     if DRY_RUN:
-                        logger.info(f"[DRY RUN] Would execute scheduled rule {rule.id}: {rule.name}")
+                        logger.info(
+                            f"[DRY RUN] Would execute scheduled rule {rule.id}: {rule.name}"
+                        )
                     else:
                         trigger_reason = f"schedule:{rule.trigger_config.get('frequency')}:{current_date.isoformat()}"
                         await service.execute_rule(rule, trigger_reason)
@@ -252,7 +270,9 @@ async def task_process_scheduled_automations():
 
             if not DRY_RUN:
                 await session.commit()
-            logger.info(f"Scheduler: scheduled automations — {executed} executed {'(dry run)' if DRY_RUN else ''}")
+            logger.info(
+                f"Scheduler: scheduled automations — {executed} executed {'(dry run)' if DRY_RUN else ''}"
+            )
     except Exception as e:
         logger.exception(f"Error in scheduled automations: {e}")
 
@@ -283,7 +303,9 @@ async def task_process_threshold_automations():
                     conditions_met, _ = await service._evaluate_conditions(rule, None)
                     if conditions_met:
                         if DRY_RUN:
-                            logger.info(f"[DRY RUN] Would execute threshold rule {rule.id}: {rule.name}")
+                            logger.info(
+                                f"[DRY RUN] Would execute threshold rule {rule.id}: {rule.name}"
+                            )
                         else:
                             trigger_reason = f"threshold:{rule.trigger_config.get('threshold_type')}:{today.isoformat()}"
                             await service.execute_rule(rule, trigger_reason)
@@ -293,16 +315,20 @@ async def task_process_threshold_automations():
 
             if not DRY_RUN:
                 await session.commit()
-            logger.info(f"Scheduler: threshold automations — {executed} executed {'(dry run)' if DRY_RUN else ''}")
+            logger.info(
+                f"Scheduler: threshold automations — {executed} executed {'(dry run)' if DRY_RUN else ''}"
+            )
     except Exception as e:
         logger.exception(f"Error in threshold automations: {e}")
 
 
 # ===== Startup Migration Task =====
 
+
 async def task_migrate_credit_card_transactions():
     """One-time migration: assign credit card transactions to invoices."""
     from app.main import migrate_credit_card_transactions
+
     logger.info("Scheduler: running credit card transaction migration...")
     await migrate_credit_card_transactions()
     logger.info("Scheduler: credit card migration complete.")
@@ -310,36 +336,77 @@ async def task_migrate_credit_card_transactions():
 
 # ===== Scheduler Setup =====
 
+
 def register_jobs():
     """Register all scheduled jobs. Called once at startup."""
 
     # Alert tasks — same schedule as old Celery Beat
-    scheduler.add_job(task_check_invoice_due_dates, CronTrigger(hour=8, minute=0),
-                      id="check_invoice_due_dates", replace_existing=True)
-    scheduler.add_job(task_check_budget_thresholds, CronTrigger(hour="0,6,12,18", minute=15),
-                      id="check_budget_thresholds", replace_existing=True)
-    scheduler.add_job(task_check_credit_card_limits, CronTrigger(hour="0,6,12,18", minute=30),
-                      id="check_credit_card_limits", replace_existing=True)
-    scheduler.add_job(task_check_goal_milestones, CronTrigger(hour="9,18", minute=0),
-                      id="check_goal_milestones", replace_existing=True)
-    scheduler.add_job(task_check_recurring_due, CronTrigger(hour=18, minute=0),
-                      id="check_recurring_due", replace_existing=True)
-    scheduler.add_job(task_check_low_balance, CronTrigger(hour=9, minute=30),
-                      id="check_low_balance", replace_existing=True)
+    scheduler.add_job(
+        task_check_invoice_due_dates,
+        CronTrigger(hour=8, minute=0),
+        id="check_invoice_due_dates",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        task_check_budget_thresholds,
+        CronTrigger(hour="0,6,12,18", minute=15),
+        id="check_budget_thresholds",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        task_check_credit_card_limits,
+        CronTrigger(hour="0,6,12,18", minute=30),
+        id="check_credit_card_limits",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        task_check_goal_milestones,
+        CronTrigger(hour="9,18", minute=0),
+        id="check_goal_milestones",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        task_check_recurring_due,
+        CronTrigger(hour=18, minute=0),
+        id="check_recurring_due",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        task_check_low_balance,
+        CronTrigger(hour=9, minute=30),
+        id="check_low_balance",
+        replace_existing=True,
+    )
 
     # Recurring transaction generation — run daily at 6:00 AM
-    scheduler.add_job(task_generate_recurring_transactions, CronTrigger(hour=6, minute=0),
-                      id="generate_recurring_transactions", replace_existing=True)
+    scheduler.add_job(
+        task_generate_recurring_transactions,
+        CronTrigger(hour=6, minute=0),
+        id="generate_recurring_transactions",
+        replace_existing=True,
+    )
 
     # Automation tasks
-    scheduler.add_job(task_process_scheduled_automations, CronTrigger(minute=0),
-                      id="process_scheduled_automations", replace_existing=True)
-    scheduler.add_job(task_process_threshold_automations, CronTrigger(hour="0,6,12,18", minute=45),
-                      id="process_threshold_automations", replace_existing=True)
+    scheduler.add_job(
+        task_process_scheduled_automations,
+        CronTrigger(minute=0),
+        id="process_scheduled_automations",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        task_process_threshold_automations,
+        CronTrigger(hour="0,6,12,18", minute=45),
+        id="process_threshold_automations",
+        replace_existing=True,
+    )
 
     # One-time startup migration — run 30s after boot
-    scheduler.add_job(task_migrate_credit_card_transactions, DateTrigger(run_date=None),
-                      id="startup_migration", replace_existing=True)
+    scheduler.add_job(
+        task_migrate_credit_card_transactions,
+        DateTrigger(run_date=None),
+        id="startup_migration",
+        replace_existing=True,
+    )
 
     logger.info(f"Scheduler: {len(scheduler.get_jobs())} jobs registered (dry_run={DRY_RUN})")
 

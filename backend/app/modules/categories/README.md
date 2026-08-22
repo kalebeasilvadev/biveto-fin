@@ -42,7 +42,9 @@ categories/
 ```python
 from app.modules.categories import (
     router,
-    CategoryBase, CategoryCreate, CategoryResponse,
+    CategoryBase,
+    CategoryCreate,
+    CategoryResponse,
 )
 ```
 

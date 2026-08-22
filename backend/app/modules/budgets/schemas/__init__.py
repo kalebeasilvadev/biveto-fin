@@ -1,4 +1,5 @@
 """Budgets schemas"""
+
 from app.modules.budgets.schemas.budget import (
     BudgetBase,
     BudgetComparisonResponse,

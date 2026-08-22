@@ -51,7 +51,10 @@ api_keys/
 from app.modules.api_keys import (
     router,
     APIKeyService,
-    APIKeyCreate, APIKeyResponse, APIKeyCreatedResponse, APIKeyListResponse,
+    APIKeyCreate,
+    APIKeyResponse,
+    APIKeyCreatedResponse,
+    APIKeyListResponse,
 )
 ```
 

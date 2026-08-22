@@ -36,9 +36,7 @@ class AnalyticsService:
             self._household_user_ids_cache[user.id] = await self._get_household_user_ids(user)
         return self._household_user_ids_cache[user.id]
 
-    async def get_monthly_summary(
-        self, user: User, year: int, month: int
-    ) -> AnalyticsSummary:
+    async def get_monthly_summary(self, user: User, year: int, month: int) -> AnalyticsSummary:
         # Calcular periodo
         _, last_day = monthrange(year, month)
         period_start = date(year, month, 1)
@@ -53,48 +51,65 @@ class AnalyticsService:
         user_ids = [user.id] + household_user_ids if household_user_ids else [user.id]
 
         # Executar queries sequencialmente (SQLAlchemy async nao suporta paralelo na mesma sessao)
-        transactions = await self._get_transactions_fast(user_ids, household_user_ids, period_start, period_end)
+        transactions = await self._get_transactions_fast(
+            user_ids, household_user_ids, period_start, period_end
+        )
         payment_transaction_ids = await self._get_invoice_payment_ids_fast(user_ids)
         credit_card_expenses = await self._get_invoices_total_fast(user_ids, year, month)
         pending_invoices = await self._get_pending_invoices_fast(user_ids, year, month)
 
         # Calcular totais (converter para float para evitar problemas com Decimal)
         # Excluir transfers dos totais de receita/despesa
-        total_income = float(sum(
-            t.amount for t in transactions
-            if t.type == TransactionType.INCOME
-            and t.type != TransactionType.TRANSFER  # Excluir transfers
-        ) or 0)
+        total_income = float(
+            sum(
+                t.amount
+                for t in transactions
+                if t.type == TransactionType.INCOME
+                and t.type != TransactionType.TRANSFER  # Excluir transfers
+            )
+            or 0
+        )
 
         # Debito/Dinheiro = despesas SEM invoice_id (nao sao de cartao) no periodo
         # Excluir transfers dos totais
-        debit_cash_expenses = float(sum(
-            t.amount for t in transactions
-            if t.type == TransactionType.EXPENSE
-            and t.type != TransactionType.TRANSFER  # Excluir transfers
-            and t.id not in payment_transaction_ids
-            and getattr(t, 'invoice_id', None) is None
-        ) or 0)
+        debit_cash_expenses = float(
+            sum(
+                t.amount
+                for t in transactions
+                if t.type == TransactionType.EXPENSE
+                and t.type != TransactionType.TRANSFER  # Excluir transfers
+                and t.id not in payment_transaction_ids
+                and getattr(t, "invoice_id", None) is None
+            )
+            or 0
+        )
 
         # Total de despesas = faturas do mes + gastos no debito/dinheiro
         total_expense = credit_card_expenses + debit_cash_expenses
 
         # Fixos = despesas fixas no debito (nao conta cartao pois ja esta na fatura)
         # Excluir transfers
-        fixed_expenses = float(sum(
-            t.amount
-            for t in transactions
-            if t.type == TransactionType.EXPENSE
-            and t.type != TransactionType.TRANSFER  # Excluir transfers
-            and t.is_fixed
-            and t.id not in payment_transaction_ids
-            and getattr(t, 'invoice_id', None) is None
-        ) or 0)
+        fixed_expenses = float(
+            sum(
+                t.amount
+                for t in transactions
+                if t.type == TransactionType.EXPENSE
+                and t.type != TransactionType.TRANSFER  # Excluir transfers
+                and t.is_fixed
+                and t.id not in payment_transaction_ids
+                and getattr(t, "invoice_id", None) is None
+            )
+            or 0
+        )
         variable_expenses = debit_cash_expenses - fixed_expenses
 
         # Agrupar por categoria e merchant via SQL GROUP BY (mais eficiente)
-        categories = await self._group_by_category_sql(user_ids, household_user_ids, period_start, period_end, payment_transaction_ids)
-        top_merchants = await self._group_by_merchant_sql(user_ids, household_user_ids, period_start, period_end, payment_transaction_ids)
+        categories = await self._group_by_category_sql(
+            user_ids, household_user_ids, period_start, period_end, payment_transaction_ids
+        )
+        top_merchants = await self._group_by_merchant_sql(
+            user_ids, household_user_ids, period_start, period_end, payment_transaction_ids
+        )
 
         # Buscar nomes de categorias e merchants em batch
         category_ids = [c["category_id"] for c in categories if c["category_id"]]
@@ -105,24 +120,32 @@ class AnalyticsService:
 
         # Aplicar nomes
         for c in categories:
-            c["category_name"] = cat_names.get(c["category_id"], "Sem categoria") if c["category_id"] else "Sem categoria"
+            c["category_name"] = (
+                cat_names.get(c["category_id"], "Sem categoria")
+                if c["category_id"]
+                else "Sem categoria"
+            )
         for m in top_merchants:
-            m["merchant_name"] = merch_names.get(m["merchant_id"], "Outros") if m["merchant_id"] else "Outros"
+            m["merchant_name"] = (
+                merch_names.get(m["merchant_id"], "Outros") if m["merchant_id"] else "Outros"
+            )
 
         # Converter para schemas
-        categories_response = [
-            CategorySummary(**c) for c in categories
-        ]
-        merchants_response = [
-            MerchantSummary(**m) for m in top_merchants[:10]
-        ]
+        categories_response = [CategorySummary(**c) for c in categories]
+        merchants_response = [MerchantSummary(**m) for m in top_merchants[:10]]
 
         # Buscar transacoes do periodo anterior para comparacao
-        prev_transactions = await self._get_transactions_fast(user_ids, household_user_ids, prev_start, prev_end)
-        prev_expense = float(sum(
-            t.amount for t in prev_transactions
-            if t.type == TransactionType.EXPENSE and t.id not in payment_transaction_ids
-        ) or 0)
+        prev_transactions = await self._get_transactions_fast(
+            user_ids, household_user_ids, prev_start, prev_end
+        )
+        prev_expense = float(
+            sum(
+                t.amount
+                for t in prev_transactions
+                if t.type == TransactionType.EXPENSE and t.id not in payment_transaction_ids
+            )
+            or 0
+        )
 
         expense_variation = None
         if prev_expense > 0:
@@ -166,13 +189,13 @@ class AnalyticsService:
                     or_(
                         and_(
                             Transaction.user_id.in_(user_ids),
-                            Transaction.ownership_type == "personal"
+                            Transaction.ownership_type == "personal",
                         ),
                         and_(
                             Transaction.user_id.in_(user_ids),
-                            Transaction.ownership_type == "household"
-                        )
-                    )
+                            Transaction.ownership_type == "household",
+                        ),
+                    ),
                 )
             )
         else:
@@ -191,7 +214,7 @@ class AnalyticsService:
             result = await self.db.execute(
                 select(CreditCardInvoice.payment_transaction_id).where(
                     CreditCardInvoice.user_id.in_(user_ids),
-                    CreditCardInvoice.payment_transaction_id.isnot(None)
+                    CreditCardInvoice.payment_transaction_id.isnot(None),
                 )
             )
             return set(result.scalars().all())
@@ -218,18 +241,23 @@ class AnalyticsService:
             result = await self.db.execute(
                 select(
                     func.coalesce(
-                        func.sum(CreditCardInvoice.total_amount - func.coalesce(CreditCardInvoice.paid_amount, 0)),
-                        0
+                        func.sum(
+                            CreditCardInvoice.total_amount
+                            - func.coalesce(CreditCardInvoice.paid_amount, 0)
+                        ),
+                        0,
                     )
                 ).where(
                     CreditCardInvoice.user_id.in_(user_ids),
                     CreditCardInvoice.reference_year == year,
                     CreditCardInvoice.reference_month == month,
-                    CreditCardInvoice.status.in_([
-                        InvoiceStatus.OPEN.value,
-                        InvoiceStatus.CLOSED.value,
-                        InvoiceStatus.OVERDUE.value,
-                    ])
+                    CreditCardInvoice.status.in_(
+                        [
+                            InvoiceStatus.OPEN.value,
+                            InvoiceStatus.CLOSED.value,
+                            InvoiceStatus.OVERDUE.value,
+                        ]
+                    ),
                 )
             )
             return float(result.scalar() or 0)
@@ -237,8 +265,12 @@ class AnalyticsService:
             return 0.0
 
     async def _group_by_category_sql(
-        self, user_ids: list[int], household_user_ids: list[int],
-        start_date: date, end_date: date, payment_exclude_ids: set[int]
+        self,
+        user_ids: list[int],
+        household_user_ids: list[int],
+        start_date: date,
+        end_date: date,
+        payment_exclude_ids: set[int],
     ) -> list[dict]:
         """Group expenses by category using SQL GROUP BY (replaces in-memory version)."""
         # Build base filter
@@ -252,8 +284,12 @@ class AnalyticsService:
         if household_user_ids:
             base_filter.append(
                 or_(
-                    and_(Transaction.user_id.in_(user_ids), Transaction.ownership_type == "personal"),
-                    and_(Transaction.user_id.in_(user_ids), Transaction.ownership_type == "household"),
+                    and_(
+                        Transaction.user_id.in_(user_ids), Transaction.ownership_type == "personal"
+                    ),
+                    and_(
+                        Transaction.user_id.in_(user_ids), Transaction.ownership_type == "household"
+                    ),
                 )
             )
         else:
@@ -290,8 +326,12 @@ class AnalyticsService:
         ]
 
     async def _group_by_merchant_sql(
-        self, user_ids: list[int], household_user_ids: list[int],
-        start_date: date, end_date: date, payment_exclude_ids: set[int]
+        self,
+        user_ids: list[int],
+        household_user_ids: list[int],
+        start_date: date,
+        end_date: date,
+        payment_exclude_ids: set[int],
     ) -> list[dict]:
         """Group expenses by merchant using SQL GROUP BY (replaces in-memory version)."""
         base_filter = [
@@ -304,8 +344,12 @@ class AnalyticsService:
         if household_user_ids:
             base_filter.append(
                 or_(
-                    and_(Transaction.user_id.in_(user_ids), Transaction.ownership_type == "personal"),
-                    and_(Transaction.user_id.in_(user_ids), Transaction.ownership_type == "household"),
+                    and_(
+                        Transaction.user_id.in_(user_ids), Transaction.ownership_type == "personal"
+                    ),
+                    and_(
+                        Transaction.user_id.in_(user_ids), Transaction.ownership_type == "household"
+                    ),
                 )
             )
         else:
@@ -342,18 +386,38 @@ class AnalyticsService:
     ) -> list[dict]:
         """DEPRECATED: Use _group_by_category_sql instead. Kept for comparison."""
         from collections import defaultdict
+
         by_category: dict[int | None, list[Transaction]] = defaultdict(list)
         for t in transactions:
-            if t.type == TransactionType.EXPENSE and t.type != TransactionType.TRANSFER and t.id not in exclude_ids:
+            if (
+                t.type == TransactionType.EXPENSE
+                and t.type != TransactionType.TRANSFER
+                and t.id not in exclude_ids
+            ):
                 by_category[t.category_id].append(t)
-        total = float(sum(t.amount for t in transactions if t.type == TransactionType.EXPENSE and t.type != TransactionType.TRANSFER and t.id not in exclude_ids) or 0)
+        total = float(
+            sum(
+                t.amount
+                for t in transactions
+                if t.type == TransactionType.EXPENSE
+                and t.type != TransactionType.TRANSFER
+                and t.id not in exclude_ids
+            )
+            or 0
+        )
         summaries = []
         for category_id, txs in by_category.items():
             cat_total = float(sum(t.amount for t in txs) or 0)
-            summaries.append({
-                "category_id": category_id, "category_name": "", "total": cat_total, "count": len(txs),
-                "percentage": (cat_total / total * 100) if total > 0 else 0, "average": cat_total / len(txs) if txs else 0,
-            })
+            summaries.append(
+                {
+                    "category_id": category_id,
+                    "category_name": "",
+                    "total": cat_total,
+                    "count": len(txs),
+                    "percentage": (cat_total / total * 100) if total > 0 else 0,
+                    "average": cat_total / len(txs) if txs else 0,
+                }
+            )
         return sorted(summaries, key=lambda x: x["total"], reverse=True)
 
     def _group_by_merchant_sync(
@@ -361,13 +425,25 @@ class AnalyticsService:
     ) -> list[dict]:
         """DEPRECATED: Use _group_by_merchant_sql instead. Kept for comparison."""
         from collections import defaultdict
+
         by_merchant: dict[int | None, list[Transaction]] = defaultdict(list)
         for t in transactions:
-            if t.type == TransactionType.EXPENSE and t.type != TransactionType.TRANSFER and t.id not in exclude_ids:
+            if (
+                t.type == TransactionType.EXPENSE
+                and t.type != TransactionType.TRANSFER
+                and t.id not in exclude_ids
+            ):
                 by_merchant[t.merchant_id].append(t)
         summaries = []
         for merchant_id, txs in by_merchant.items():
-            summaries.append({"merchant_id": merchant_id, "merchant_name": "", "total": float(sum(t.amount for t in txs) or 0), "count": len(txs)})
+            summaries.append(
+                {
+                    "merchant_id": merchant_id,
+                    "merchant_name": "",
+                    "total": float(sum(t.amount for t in txs) or 0),
+                    "count": len(txs),
+                }
+            )
         return sorted(summaries, key=lambda x: x["total"], reverse=True)
 
     async def _get_category_names(self, category_ids: list[int]) -> dict[int, str]:
@@ -401,7 +477,8 @@ class AnalyticsService:
             payment_transaction_ids = await self._get_invoice_payment_transaction_ids(user)
 
             expense_transactions = [
-                t for t in transactions
+                t
+                for t in transactions
                 if t.type == TransactionType.EXPENSE
                 and t.id not in payment_transaction_ids  # Excluir pagamentos de fatura
             ]
@@ -451,6 +528,7 @@ class AnalyticsService:
         except Exception as e:
             print(f"Fatal error in get_insights: {e}")
             import traceback
+
             traceback.print_exc()
             raise
 
@@ -463,9 +541,7 @@ class AnalyticsService:
         transactions = await self._get_transactions(user, start_date, end_date)
 
         # Filtrar apenas despesas
-        expense_transactions = [
-            t for t in transactions if t.type == TransactionType.EXPENSE
-        ]
+        expense_transactions = [t for t in transactions if t.type == TransactionType.EXPENSE]
 
         # Excluir pagamentos de fatura
         try:
@@ -543,15 +619,14 @@ class AnalyticsService:
                     or_(
                         # Personal transactions from user
                         and_(
-                            Transaction.user_id == user.id,
-                            Transaction.ownership_type == "personal"
+                            Transaction.user_id == user.id, Transaction.ownership_type == "personal"
                         ),
                         # Household transactions from any family member
                         and_(
                             Transaction.user_id.in_(household_user_ids),
-                            Transaction.ownership_type == "household"
-                        )
-                    )
+                            Transaction.ownership_type == "household",
+                        ),
+                    ),
                 )
             )
         else:
@@ -571,9 +646,7 @@ class AnalyticsService:
             return []
 
         result = await self.db.execute(
-            select(HouseholdMember.user_id).where(
-                HouseholdMember.license_id == user.license_id
-            )
+            select(HouseholdMember.user_id).where(HouseholdMember.license_id == user.license_id)
         )
         return list(result.scalars().all())
 
@@ -590,7 +663,7 @@ class AnalyticsService:
             result = await self.db.execute(
                 select(CreditCardInvoice.payment_transaction_id).where(
                     CreditCardInvoice.user_id.in_(user_ids),
-                    CreditCardInvoice.payment_transaction_id.isnot(None)
+                    CreditCardInvoice.payment_transaction_id.isnot(None),
                 )
             )
             return set(result.scalars().all())
@@ -634,19 +707,20 @@ class AnalyticsService:
                     CreditCardInvoice.user_id.in_(user_ids),
                     CreditCardInvoice.reference_year == year,
                     CreditCardInvoice.reference_month == month,
-                    CreditCardInvoice.status.in_([
-                        InvoiceStatus.OPEN.value,
-                        InvoiceStatus.CLOSED.value,
-                        InvoiceStatus.OVERDUE.value,
-                    ])
+                    CreditCardInvoice.status.in_(
+                        [
+                            InvoiceStatus.OPEN.value,
+                            InvoiceStatus.CLOSED.value,
+                            InvoiceStatus.OVERDUE.value,
+                        ]
+                    ),
                 )
             )
             invoices = result.scalars().all()
 
             # Somar total das faturas menos o que ja foi pago parcialmente
             total = sum(
-                float(inv.total_amount or 0) - float(inv.paid_amount or 0)
-                for inv in invoices
+                float(inv.total_amount or 0) - float(inv.paid_amount or 0) for inv in invoices
             )
             return total
         except Exception:
@@ -664,7 +738,11 @@ class AnalyticsService:
             if t.type == TransactionType.EXPENSE and t.category_id and t.id not in exclude_ids:
                 by_category[t.category_id].append(t)
 
-        total = sum(t.amount for t in transactions if t.type == TransactionType.EXPENSE and t.id not in exclude_ids)
+        total = sum(
+            t.amount
+            for t in transactions
+            if t.type == TransactionType.EXPENSE and t.id not in exclude_ids
+        )
 
         # Buscar nomes de todas as categorias de uma vez
         category_ids = list(by_category.keys())
@@ -776,7 +854,7 @@ class AnalyticsService:
                     description=f"{len(txs)} gastos pequenos em {name} somaram R$ {leak_total:.2f}",
                     impact_value=float(leak_total),
                     calculation=f"{len(txs)} transacoes x media de R$ {avg_value:.2f}",
-                    action=f"Reduza visitas a {name} pela metade para economizar R$ {leak_total/2:.2f}/mes",
+                    action=f"Reduza visitas a {name} pela metade para economizar R$ {leak_total / 2:.2f}/mes",
                     merchant_id=merchant_id,
                 )
             )
@@ -806,9 +884,7 @@ class AnalyticsService:
 
         return insights
 
-    async def _find_opportunities(
-        self, transactions: list[Transaction]
-    ) -> list[InsightResponse]:
+    async def _find_opportunities(self, transactions: list[Transaction]) -> list[InsightResponse]:
         """Encontra oportunidades de economia"""
         insights = []
 
@@ -841,8 +917,7 @@ class AnalyticsService:
 
             cards_result = await self.db.execute(
                 select(CreditCard).where(
-                    CreditCard.user_id.in_(user_ids),
-                    CreditCard.is_active == True
+                    CreditCard.user_id.in_(user_ids), CreditCard.is_active == True
                 )
             )
             cards = cards_result.scalars().all()
@@ -866,23 +941,24 @@ class AnalyticsService:
                 invoices_result = await self.db.execute(
                     select(CreditCardInvoice).where(
                         CreditCardInvoice.credit_card_id == card.id,
-                        CreditCardInvoice.status.in_(['open', 'closed', 'partial', 'overdue'])
+                        CreditCardInvoice.status.in_(["open", "closed", "partial", "overdue"]),
                     )
                 )
                 invoices = invoices_result.scalars().all()
 
-                outstanding_balance = float(sum(
-                    inv.total_amount - inv.paid_amount
-                    for inv in invoices
-                ) or 0)
+                outstanding_balance = float(
+                    sum(inv.total_amount - inv.paid_amount for inv in invoices) or 0
+                )
 
                 if outstanding_balance > 0:
-                    cards_with_balance.append({
-                        'card': card,
-                        'name': card_name,
-                        'balance': outstanding_balance,
-                        'invoices': invoices
-                    })
+                    cards_with_balance.append(
+                        {
+                            "card": card,
+                            "name": card_name,
+                            "balance": outstanding_balance,
+                            "invoices": invoices,
+                        }
+                    )
                     total_outstanding += outstanding_balance
 
                 # 1. Alerta de limite de credito (>70% utilizado)
@@ -902,7 +978,7 @@ class AnalyticsService:
                                 impact_value=amount_to_pay,
                                 calculation=f"Utilizacao: {utilization:.1f}% (ideal: <50%)",
                                 action=f"Pague R$ {amount_to_pay:,.2f} para reduzir utilizacao para 50% e proteger seu score de credito",
-                                credit_card_id=card.id
+                                credit_card_id=card.id,
                             )
                         )
 
@@ -919,17 +995,17 @@ class AnalyticsService:
                             title="💰 Atenção aos Juros",
                             description=f"Voce tem R$ {total_outstanding:,.2f} em saldo devedor em {len(cards_with_balance)} cartao(oes)",
                             impact_value=float(monthly_interest),
-                            calculation=f"Juros estimados: R$ {monthly_interest:,.2f}/mes (taxa media: {avg_interest_rate*100}% a.m.)",
-                            action="Priorize quitar os cartoes com maiores saldos. Se tiver R$ 10.000 disponiveis, use para abater e economizar juros"
+                            calculation=f"Juros estimados: R$ {monthly_interest:,.2f}/mes (taxa media: {avg_interest_rate * 100}% a.m.)",
+                            action="Priorize quitar os cartoes com maiores saldos. Se tiver R$ 10.000 disponiveis, use para abater e economizar juros",
                         )
                     )
 
             # 3. Oportunidade de consolidacao (se tiver 2+ cartoes com saldo)
             if len(cards_with_balance) >= 2:
                 # Ordenar por maior saldo
-                cards_with_balance.sort(key=lambda x: x['balance'], reverse=True)
+                cards_with_balance.sort(key=lambda x: x["balance"], reverse=True)
                 top_2 = cards_with_balance[:2]
-                top_2_total = sum(c['balance'] for c in top_2)
+                top_2_total = sum(c["balance"] for c in top_2)
 
                 insights.append(
                     InsightResponse(
@@ -938,13 +1014,14 @@ class AnalyticsService:
                         description=f"Seus 2 maiores saldos: {top_2[0]['name']} (R$ {top_2[0]['balance']:,.2f}) e {top_2[1]['name']} (R$ {top_2[1]['balance']:,.2f})",
                         impact_value=float(top_2_total),
                         calculation=f"Total consolidavel: R$ {top_2_total:,.2f}",
-                        action="Priorize pagar estes cartoes primeiro para reduzir juros e simplificar suas financas"
+                        action="Priorize pagar estes cartoes primeiro para reduzir juros e simplificar suas financas",
                     )
                 )
 
         except Exception as e:
             print(f"Error in _analyze_credit_cards: {e}")
             import traceback
+
             traceback.print_exc()
 
         return insights
@@ -975,17 +1052,12 @@ class AnalyticsService:
 
             # Categorias excedidas (overspent)
             overspent_items = [
-                item for item in budget.items
-                if item.status == BudgetItemStatus.OVERSPENT.value
+                item for item in budget.items if item.status == BudgetItemStatus.OVERSPENT.value
             ]
 
             if overspent_items:
-                total_overspent = sum(
-                    abs(item.available_amount) for item in overspent_items
-                )
-                category_names = ', '.join(
-                    item.category_name for item in overspent_items[:3]
-                )
+                total_overspent = sum(abs(item.available_amount) for item in overspent_items)
+                category_names = ", ".join(item.category_name for item in overspent_items[:3])
                 insights.append(
                     InsightResponse(
                         type="budget_alert",
@@ -993,18 +1065,17 @@ class AnalyticsService:
                         description=f"{len(overspent_items)} categoria(s) excedeu o limite: {category_names}",
                         impact_value=float(total_overspent),
                         calculation=f"Total excedido: R$ {total_overspent:,.2f}",
-                        action="Considere transferir de categorias com sobra ou ajustar o planejamento"
+                        action="Considere transferir de categorias com sobra ou ajustar o planejamento",
                     )
                 )
 
             # Categorias em alerta (warning - acima de 80%)
             warning_items = [
-                item for item in budget.items
-                if item.status == BudgetItemStatus.WARNING.value
+                item for item in budget.items if item.status == BudgetItemStatus.WARNING.value
             ]
 
             if warning_items and not overspent_items:  # Nao duplicar alertas
-                category_names = ', '.join(
+                category_names = ", ".join(
                     f"{item.category_name} ({item.percentage_used:.0f}%)"
                     for item in warning_items[:3]
                 )
@@ -1015,13 +1086,14 @@ class AnalyticsService:
                         description=f"{len(warning_items)} categoria(s) acima de 80%: {category_names}",
                         impact_value=float(sum(item.available_amount for item in warning_items)),
                         calculation=f"Saldo restante: R$ {sum(item.available_amount for item in warning_items):,.2f}",
-                        action="Monitore seus gastos nestas categorias para nao exceder o limite"
+                        action="Monitore seus gastos nestas categorias para nao exceder o limite",
                     )
                 )
 
             # Oportunidade de rebalanceamento (categorias com muita sobra)
             on_track_items = [
-                item for item in budget.items
+                item
+                for item in budget.items
                 if item.status == BudgetItemStatus.ON_TRACK.value
                 and item.percentage_used < 50
                 and item.days_remaining <= 10
@@ -1030,9 +1102,7 @@ class AnalyticsService:
 
             if on_track_items and overspent_items:
                 total_available = sum(item.available_amount for item in on_track_items)
-                category_names = ', '.join(
-                    item.category_name for item in on_track_items[:3]
-                )
+                category_names = ", ".join(item.category_name for item in on_track_items[:3])
                 insights.append(
                     InsightResponse(
                         type="budget_opportunity",
@@ -1040,13 +1110,14 @@ class AnalyticsService:
                         description=f"Categorias com sobra: {category_names}",
                         impact_value=float(total_available),
                         calculation=f"Total disponivel para transferencia: R$ {total_available:,.2f}",
-                        action="Use a funcao 'Transferir' no Orcamento para mover verba entre categorias"
+                        action="Use a funcao 'Transferir' no Orcamento para mover verba entre categorias",
                     )
                 )
 
         except Exception as e:
             print(f"Error in _analyze_budget: {e}")
             import traceback
+
             traceback.print_exc()
 
         return insights

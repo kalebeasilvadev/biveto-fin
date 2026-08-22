@@ -45,12 +45,25 @@ SMART_LIST_RESPONSE_SCHEMA = {
                     "category": {
                         "type": "string",
                         "enum": [
-                            "fruits_vegetables", "meat_fish", "dairy", "bakery",
-                            "beverages", "snacks", "frozen", "canned",
-                            "grains_pasta", "grains", "condiments", "cleaning",
-                            "hygiene", "personal_care", "baby", "pet",
-                            "household", "other"
-                        ]
+                            "fruits_vegetables",
+                            "meat_fish",
+                            "dairy",
+                            "bakery",
+                            "beverages",
+                            "snacks",
+                            "frozen",
+                            "canned",
+                            "grains_pasta",
+                            "grains",
+                            "condiments",
+                            "cleaning",
+                            "hygiene",
+                            "personal_care",
+                            "baby",
+                            "pet",
+                            "household",
+                            "other",
+                        ],
                     },
                     "necessity_type": {"type": "string", "enum": ["essential", "non_essential"]},
                     "suggested_quantity": {"type": "number"},
@@ -58,14 +71,29 @@ SMART_LIST_RESPONSE_SCHEMA = {
                     "estimated_price": {"type": "number", "nullable": True},
                     "urgency": {"type": "string", "enum": ["high", "medium", "low"]},
                     "purchase_count": {"type": "integer"},
-                    "days_since_last_purchase": {"type": "integer"}
+                    "days_since_last_purchase": {"type": "integer"},
                 },
-                "required": ["product_type", "display_name", "category", "necessity_type",
-                             "suggested_quantity", "unit", "urgency", "purchase_count", "days_since_last_purchase"]
-            }
+                "required": [
+                    "product_type",
+                    "display_name",
+                    "category",
+                    "necessity_type",
+                    "suggested_quantity",
+                    "unit",
+                    "urgency",
+                    "purchase_count",
+                    "days_since_last_purchase",
+                ],
+            },
         },
-        "excluded": {"type": "array", "items": {"type": "object", "properties": {"name": {"type": "string"}, "reason": {"type": "string"}}}},
-        "insights": {"type": "array", "items": {"type": "string"}}
+        "excluded": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {"name": {"type": "string"}, "reason": {"type": "string"}},
+            },
+        },
+        "insights": {"type": "array", "items": {"type": "string"}},
     },
-    "required": ["shopping_list", "excluded", "insights"]
+    "required": ["shopping_list", "excluded", "insights"],
 }

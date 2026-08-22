@@ -10,6 +10,7 @@ from pydantic import BaseModel
 
 class WeekSummary(BaseModel):
     """Summary of the week's financial activity."""
+
     week_start: date
     week_end: date
     week_number: int
@@ -38,6 +39,7 @@ class WeekSummary(BaseModel):
 
 class UncategorizedTransaction(BaseModel):
     """An uncategorized transaction."""
+
     id: int
     date: date
     description: str
@@ -50,6 +52,7 @@ class UncategorizedTransaction(BaseModel):
 
 class BudgetCategoryComparison(BaseModel):
     """Budget vs actual for a category."""
+
     category_id: int
     category_name: str
     budgeted: Decimal
@@ -61,6 +64,7 @@ class BudgetCategoryComparison(BaseModel):
 
 class BudgetComparison(BaseModel):
     """Overall budget comparison."""
+
     total_budgeted: Decimal
     total_spent: Decimal
     total_remaining: Decimal
@@ -72,6 +76,7 @@ class BudgetComparison(BaseModel):
 
 class GoalProgress(BaseModel):
     """Progress on a goal."""
+
     id: int
     name: str
     target_amount: Decimal
@@ -85,6 +90,7 @@ class GoalProgress(BaseModel):
 
 class UpcomingItem(BaseModel):
     """An upcoming financial item."""
+
     type: str  # recurring, invoice, debt_payment
     description: str
     amount: Decimal
@@ -96,6 +102,7 @@ class UpcomingItem(BaseModel):
 
 class WeeklyReviewResponse(BaseModel):
     """Complete weekly review data."""
+
     week_summary: WeekSummary
     uncategorized_transactions: list[UncategorizedTransaction]
     uncategorized_count: int
@@ -109,6 +116,7 @@ class WeeklyReviewResponse(BaseModel):
 
 class WeeklyReviewComplete(BaseModel):
     """Request to mark weekly review as complete."""
+
     year: int
     week: int
     notes: str | None = None

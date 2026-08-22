@@ -37,9 +37,7 @@ class GamificationService:
     # =========================================================================
 
     async def on_transaction_created(
-        self,
-        user: User,
-        transaction: Transaction
+        self, user: User, transaction: Transaction
     ) -> GamificationEvent:
         """
         Chamado quando uma transação é criada.
@@ -50,14 +48,8 @@ class GamificationService:
         points_earned = 0
 
         # 1. Atualizar streak de registro diário
-        streak = await self.streak_service.record_action(
-            user,
-            StreakType.DAILY_REGISTER
-        )
-        streak_response = await self.streak_service.get_streak(
-            user,
-            StreakType.DAILY_REGISTER
-        )
+        streak = await self.streak_service.record_action(user, StreakType.DAILY_REGISTER)
+        streak_response = await self.streak_service.get_streak(user, StreakType.DAILY_REGISTER)
 
         # 2. Verificar badges de transação
         transaction_badges = await self.badge_service.check_transaction_badges(user)
@@ -83,7 +75,7 @@ class GamificationService:
             streak_updated=streak_response,
             challenges_updated=challenges_updated,
             points_earned=points_earned,
-            new_total_points=points_balance.current_points
+            new_total_points=points_balance.current_points,
         )
 
     async def on_goal_created(self, user: User) -> GamificationEvent:
@@ -98,7 +90,7 @@ class GamificationService:
             streak_updated=None,
             challenges_updated=[],
             points_earned=points_earned,
-            new_total_points=points_balance.current_points
+            new_total_points=points_balance.current_points,
         )
 
     async def on_goal_completed(self, user: User) -> GamificationEvent:
@@ -113,7 +105,7 @@ class GamificationService:
             streak_updated=None,
             challenges_updated=[],
             points_earned=points_earned,
-            new_total_points=points_balance.current_points
+            new_total_points=points_balance.current_points,
         )
 
     async def on_debt_paid(self, user: User) -> GamificationEvent:
@@ -128,7 +120,7 @@ class GamificationService:
             streak_updated=None,
             challenges_updated=[],
             points_earned=points_earned,
-            new_total_points=points_balance.current_points
+            new_total_points=points_balance.current_points,
         )
 
     async def on_month_closed(self, user: User, month: date) -> GamificationEvent:
@@ -157,7 +149,7 @@ class GamificationService:
             streak_updated=None,
             challenges_updated=challenges_updated,
             points_earned=points_earned,
-            new_total_points=points_balance.current_points
+            new_total_points=points_balance.current_points,
         )
 
     # =========================================================================
@@ -177,10 +169,7 @@ class GamificationService:
         unseen_badges = await self.badge_service.count_unseen(user)
 
         # Streak principal
-        main_streak = await self.streak_service.get_streak(
-            user,
-            StreakType.DAILY_REGISTER
-        )
+        main_streak = await self.streak_service.get_streak(user, StreakType.DAILY_REGISTER)
 
         # Desafios
         active_challenges = await self.challenge_service.count_active(user)
@@ -200,16 +189,9 @@ class GamificationService:
 
     async def get_streak_week_view(self, user: User) -> StreakWeekView:
         """Dados para o widget de streak da semana"""
-        return await self.streak_service.get_week_view(
-            user,
-            StreakType.DAILY_REGISTER
-        )
+        return await self.streak_service.get_week_view(user, StreakType.DAILY_REGISTER)
 
-    async def get_all_badges(
-        self,
-        user: User,
-        category: str | None = None
-    ) -> list[BadgeResponse]:
+    async def get_all_badges(self, user: User, category: str | None = None) -> list[BadgeResponse]:
         """Lista todos os badges com status do usuário"""
         return await self.badge_service.list_all_with_status(user, category)
 
@@ -221,10 +203,6 @@ class GamificationService:
         """Marca badges não vistos como vistos"""
         return await self.badge_service.mark_all_seen(user)
 
-    async def start_challenge(
-        self,
-        user: User,
-        challenge_id: int
-    ) -> ChallengeResponse | None:
+    async def start_challenge(self, user: User, challenge_id: int) -> ChallengeResponse | None:
         """Inicia um desafio para o usuário"""
         return await self.challenge_service.start(user, challenge_id)

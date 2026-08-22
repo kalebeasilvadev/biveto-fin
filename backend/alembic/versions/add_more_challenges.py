@@ -6,10 +6,11 @@ Create Date: 2025-01-26
 
 Adiciona mais desafios padrão para gamificação
 """
+
 from alembic import op
 
-revision = 'add_more_challenges'
-down_revision = 'add_gamification_tables'
+revision = "add_more_challenges"
+down_revision = "add_gamification_tables"
 branch_labels = None
 depends_on = None
 

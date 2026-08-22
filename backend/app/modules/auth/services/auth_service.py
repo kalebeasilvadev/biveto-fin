@@ -1,6 +1,7 @@
 """
 Servico de autenticacao: registro, login e refresh de tokens.
 """
+
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,9 +24,7 @@ class AuthService:
 
     async def register(self, user_data: UserCreate) -> User:
         # Verificar se email já existe
-        result = await self.db.execute(
-            select(User).where(User.email == user_data.email)
-        )
+        result = await self.db.execute(select(User).where(User.email == user_data.email))
         if result.scalar_one_or_none():
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,

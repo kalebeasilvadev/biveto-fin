@@ -3,6 +3,7 @@ Automation Service for financial automations.
 
 Handles CRUD operations for automation rules and their execution.
 """
+
 from __future__ import annotations
 
 import logging
@@ -45,11 +46,7 @@ class AutomationService:
 
     # ==================== CRUD Operations ====================
 
-    async def create(
-        self,
-        user: User,
-        data: AutomationRuleCreate
-    ) -> AutomationRule:
+    async def create(self, user: User, data: AutomationRuleCreate) -> AutomationRule:
         """Create a new automation rule."""
         rule = AutomationRule(
             user_id=user.id,
@@ -74,10 +71,8 @@ class AutomationService:
     async def get(self, user: User, rule_id: int) -> AutomationRule | None:
         """Get an automation rule by ID."""
         result = await self.session.execute(
-            select(AutomationRule)
-            .where(
-                AutomationRule.id == rule_id,
-                AutomationRule.user_id == user.id
+            select(AutomationRule).where(
+                AutomationRule.id == rule_id, AutomationRule.user_id == user.id
             )
         )
         return result.scalar_one_or_none()
@@ -108,16 +103,13 @@ class AutomationService:
 
         # Count totals
         total_result = await self.session.execute(
-            select(func.count(AutomationRule.id))
-            .where(AutomationRule.user_id == user.id)
+            select(func.count(AutomationRule.id)).where(AutomationRule.user_id == user.id)
         )
         total = total_result.scalar() or 0
 
         active_result = await self.session.execute(
-            select(func.count(AutomationRule.id))
-            .where(
-                AutomationRule.user_id == user.id,
-                AutomationRule.is_active == True
+            select(func.count(AutomationRule.id)).where(
+                AutomationRule.user_id == user.id, AutomationRule.is_active == True
             )
         )
         active_count = active_result.scalar() or 0
@@ -130,10 +122,7 @@ class AutomationService:
         )
 
     async def update(
-        self,
-        user: User,
-        rule_id: int,
-        data: AutomationRuleUpdate
+        self, user: User, rule_id: int, data: AutomationRuleUpdate
     ) -> AutomationRule | None:
         """Update an automation rule."""
         rule = await self.get(user, rule_id)
@@ -196,10 +185,7 @@ class AutomationService:
     # ==================== Execution ====================
 
     async def execute_rule(
-        self,
-        rule: AutomationRule,
-        trigger_reason: str,
-        context: dict | None = None
+        self, rule: AutomationRule, trigger_reason: str, context: dict | None = None
     ) -> AutomationExecution:
         """Execute an automation rule."""
         start_time = utc_now()
@@ -212,9 +198,7 @@ class AutomationService:
 
         try:
             # Check conditions
-            conditions_met, conditions_result = await self._evaluate_conditions(
-                rule, context
-            )
+            conditions_met, conditions_result = await self._evaluate_conditions(rule, context)
             execution.conditions_met = conditions_met
             execution.conditions_result = conditions_result
 
@@ -267,7 +251,9 @@ class AutomationService:
                         priority=NotificationPriority.HIGH,
                     )
                 except Exception as notif_err:
-                    logger.error(f"Failed to send auto-disable notification for rule {rule.id}: {notif_err}")
+                    logger.error(
+                        f"Failed to send auto-disable notification for rule {rule.id}: {notif_err}"
+                    )
 
         finally:
             end_time = utc_now()
@@ -279,9 +265,7 @@ class AutomationService:
         return execution
 
     async def _evaluate_conditions(
-        self,
-        rule: AutomationRule,
-        context: dict | None = None
+        self, rule: AutomationRule, context: dict | None = None
     ) -> tuple[bool, dict]:
         """Evaluate rule conditions."""
         conditions = rule.conditions
@@ -294,10 +278,7 @@ class AutomationService:
 
         for condition in rules:
             met = await self._evaluate_single_condition(rule.user_id, condition, context)
-            results.append({
-                "condition": condition,
-                "met": met
-            })
+            results.append({"condition": condition, "met": met})
 
         if match_type == "all":
             all_met = all(r["met"] for r in results)
@@ -307,10 +288,7 @@ class AutomationService:
         return all_met, {"evaluated": results, "match_type": match_type, "result": all_met}
 
     async def _evaluate_single_condition(
-        self,
-        user_id: int,
-        condition: dict,
-        context: dict | None = None
+        self, user_id: int, condition: dict, context: dict | None = None
     ) -> bool:
         """Evaluate a single condition."""
         cond_type = condition.get("type")
@@ -358,36 +336,23 @@ class AutomationService:
             return left >= right
         return False
 
-    async def _get_account_balance(
-        self,
-        user_id: int,
-        account_id: int | None
-    ) -> Decimal:
+    async def _get_account_balance(self, user_id: int, account_id: int | None) -> Decimal:
         """Get account balance."""
         if account_id:
             result = await self.session.execute(
-                select(Account.balance)
-                .where(
-                    Account.id == account_id,
-                    Account.user_id == user_id
-                )
+                select(Account.balance).where(Account.id == account_id, Account.user_id == user_id)
             )
             balance = result.scalar_one_or_none()
             return balance or Decimal(0)
         else:
             # Sum all account balances
             result = await self.session.execute(
-                select(func.sum(Account.balance))
-                .where(Account.user_id == user_id)
+                select(func.sum(Account.balance)).where(Account.user_id == user_id)
             )
             total = result.scalar()
             return total or Decimal(0)
 
-    async def _execute_action(
-        self,
-        rule: AutomationRule,
-        context: dict | None = None
-    ) -> dict:
+    async def _execute_action(self, rule: AutomationRule, context: dict | None = None) -> dict:
         """Execute the rule's action."""
         action_type = rule.action_type
         config = rule.action_config
@@ -415,18 +380,12 @@ class AutomationService:
 
         # Get accounts
         from_result = await self.session.execute(
-            select(Account).where(
-                Account.id == from_account_id,
-                Account.user_id == user_id
-            )
+            select(Account).where(Account.id == from_account_id, Account.user_id == user_id)
         )
         from_account = from_result.scalar_one_or_none()
 
         to_result = await self.session.execute(
-            select(Account).where(
-                Account.id == to_account_id,
-                Account.user_id == user_id
-            )
+            select(Account).where(Account.id == to_account_id, Account.user_id == user_id)
         )
         to_account = to_result.scalar_one_or_none()
 
@@ -500,12 +459,7 @@ class AutomationService:
             "income_transaction_id": income.id,
         }
 
-    async def _action_categorize(
-        self,
-        user_id: int,
-        config: dict,
-        context: dict | None
-    ) -> dict:
+    async def _action_categorize(self, user_id: int, config: dict, context: dict | None) -> dict:
         """Execute a categorization action."""
         category_id = config.get("category_id")
         transaction_id = context.get("transaction_id") if context else None
@@ -515,8 +469,7 @@ class AutomationService:
 
         result = await self.session.execute(
             select(Transaction).where(
-                Transaction.id == transaction_id,
-                Transaction.user_id == user_id
+                Transaction.id == transaction_id, Transaction.user_id == user_id
             )
         )
         transaction = result.scalar_one_or_none()
@@ -542,9 +495,7 @@ class AutomationService:
         channels = config.get("channels", ["in_app"])
 
         # Get user
-        result = await self.session.execute(
-            select(User).where(User.id == user_id)
-        )
+        result = await self.session.execute(select(User).where(User.id == user_id))
         user = result.scalar_one_or_none()
 
         if not user:
@@ -567,12 +518,7 @@ class AutomationService:
             "channels": channels,
         }
 
-    async def _action_tag(
-        self,
-        user_id: int,
-        config: dict,
-        context: dict | None
-    ) -> dict:
+    async def _action_tag(self, user_id: int, config: dict, context: dict | None) -> dict:
         """Execute a tagging action (placeholder)."""
         # Tags feature not fully implemented yet
         return {
@@ -594,10 +540,7 @@ class AutomationService:
 
         # Verify account exists
         result = await self.session.execute(
-            select(Account).where(
-                Account.id == account_id,
-                Account.user_id == user_id
-            )
+            select(Account).where(Account.id == account_id, Account.user_id == user_id)
         )
         account = result.scalar_one_or_none()
 
@@ -663,10 +606,7 @@ class AutomationService:
         result = await self.session.execute(query)
         executions = result.scalars().all()
 
-        return [
-            AutomationExecutionResponse.model_validate(e)
-            for e in executions
-        ]
+        return [AutomationExecutionResponse.model_validate(e) for e in executions]
 
     # ==================== Testing ====================
 

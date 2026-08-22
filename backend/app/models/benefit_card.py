@@ -11,16 +11,18 @@ from ..core.database import Base
 
 class BenefitCardType(str, Enum):
     """Tipos de cartao de beneficio"""
-    VA = "va"                   # Vale Alimentacao (supermercados)
-    VR = "vr"                   # Vale Refeicao (restaurantes)
-    FLEX = "flex"               # Flexivel (aceito como VA e VR)
-    VT = "vt"                   # Vale Transporte
-    CULTURA = "cultura"         # Vale Cultura
-    COMBUSTIVEL = "combustivel" # Vale Combustivel
+
+    VA = "va"  # Vale Alimentacao (supermercados)
+    VR = "vr"  # Vale Refeicao (restaurantes)
+    FLEX = "flex"  # Flexivel (aceito como VA e VR)
+    VT = "vt"  # Vale Transporte
+    CULTURA = "cultura"  # Vale Cultura
+    COMBUSTIVEL = "combustivel"  # Vale Combustivel
 
 
 class BenefitCardProvider(str, Enum):
     """Operadoras de cartao de beneficio"""
+
     ALELO = "alelo"
     SODEXO = "sodexo"
     VR = "vr"
@@ -38,13 +40,12 @@ class BenefitCard(Base):
     Cartao de beneficio (VA/VR/VT/Flex) vinculado a uma conta.
     Similar ao CreditCard, mas para beneficios.
     """
+
     __tablename__ = "benefit_cards"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     account_id: Mapped[int] = mapped_column(
-        ForeignKey("accounts.id", ondelete="CASCADE"),
-        unique=True,
-        index=True
+        ForeignKey("accounts.id", ondelete="CASCADE"), unique=True, index=True
     )
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
 
@@ -65,9 +66,7 @@ class BenefitCard(Base):
     # Status
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=utc_now, onupdate=utc_now
-    )
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, onupdate=utc_now)
 
     # Relationships
     account: Mapped["Account"] = relationship(back_populates="benefit_card_details")

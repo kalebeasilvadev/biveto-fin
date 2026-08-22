@@ -3,6 +3,7 @@
 Prompts são carregados de arquivos .md em documents/prompts/ com cache global.
 Para iterar em prompts, edite os .md sem alterar código Python.
 """
+
 from functools import lru_cache
 from pathlib import Path
 

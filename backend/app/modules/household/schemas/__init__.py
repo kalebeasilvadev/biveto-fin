@@ -2,6 +2,7 @@
 Schemas do modulo household.
 Exporta os schemas de membros da familia, contexto e convites.
 """
+
 from app.modules.household.schemas.household import (
     FamilyContext,
     FamilyInvitationResponse,

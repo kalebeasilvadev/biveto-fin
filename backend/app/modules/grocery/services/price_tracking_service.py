@@ -1,6 +1,7 @@
 """
 Price Tracking Service - Track and analyze price history
 """
+
 from datetime import date, timedelta
 
 from sqlalchemy import func, select
@@ -42,12 +43,15 @@ class PriceTrackingService:
 
         # Get price history
         start_date = date.today() - timedelta(days=days)
-        query = select(GroceryPriceHistory).where(
-            GroceryPriceHistory.product_id == product_id,
-            GroceryPriceHistory.recorded_at >= start_date,
-        ).options(
-            selectinload(GroceryPriceHistory.merchant)
-        ).order_by(GroceryPriceHistory.recorded_at.asc())
+        query = (
+            select(GroceryPriceHistory)
+            .where(
+                GroceryPriceHistory.product_id == product_id,
+                GroceryPriceHistory.recorded_at >= start_date,
+            )
+            .options(selectinload(GroceryPriceHistory.merchant))
+            .order_by(GroceryPriceHistory.recorded_at.asc())
+        )
 
         result = await self.db.execute(query)
         history_records = result.scalars().all()

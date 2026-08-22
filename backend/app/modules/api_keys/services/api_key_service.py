@@ -19,7 +19,7 @@ def _check_is_owner(user: User) -> None:
     if not user.is_license_owner:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Apenas o proprietário da conta pode gerenciar API Keys"
+            detail="Apenas o proprietário da conta pode gerenciar API Keys",
         )
 
 
@@ -44,8 +44,7 @@ class APIKeyService:
         # Limite de 10 API Keys por usuário
         result = await self.db.execute(
             select(APIKey).where(
-                APIKey.user_id == user.id,
-                APIKey.status == APIKeyStatus.active.value
+                APIKey.user_id == user.id, APIKey.status == APIKeyStatus.active.value
             )
         )
         existing_keys = result.scalars().all()
@@ -53,7 +52,7 @@ class APIKeyService:
         if len(existing_keys) >= 10:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Limite máximo de 10 API Keys ativas atingido"
+                detail="Limite máximo de 10 API Keys ativas atingido",
             )
 
         # Gera a chave
@@ -89,9 +88,7 @@ class APIKeyService:
         _check_is_owner(user)
 
         result = await self.db.execute(
-            select(APIKey)
-            .where(APIKey.user_id == user.id)
-            .order_by(APIKey.created_at.desc())
+            select(APIKey).where(APIKey.user_id == user.id).order_by(APIKey.created_at.desc())
         )
         return list(result.scalars().all())
 
@@ -101,17 +98,13 @@ class APIKeyService:
         _check_is_owner(user)
 
         result = await self.db.execute(
-            select(APIKey).where(
-                APIKey.id == key_id,
-                APIKey.user_id == user.id
-            )
+            select(APIKey).where(APIKey.id == key_id, APIKey.user_id == user.id)
         )
         api_key = result.scalar_one_or_none()
 
         if not api_key:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="API Key não encontrada"
+                status_code=status.HTTP_404_NOT_FOUND, detail="API Key não encontrada"
             )
 
         return api_key
@@ -122,8 +115,7 @@ class APIKeyService:
 
         if api_key.status == APIKeyStatus.revoked.value:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="API Key já está revogada"
+                status_code=status.HTTP_400_BAD_REQUEST, detail="API Key já está revogada"
             )
 
         api_key.status = APIKeyStatus.revoked.value

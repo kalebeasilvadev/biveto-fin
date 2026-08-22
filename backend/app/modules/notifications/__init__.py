@@ -1,4 +1,5 @@
 """Notifications module for alerts and push notifications."""
+
 from app.modules.notifications.routers.notifications import router
 from app.modules.notifications.schemas.notification import (
     NotificationCreate,

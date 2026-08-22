@@ -8,6 +8,7 @@ from app.models.installment import InstallmentSeriesStatus
 
 class InstallmentSeriesBase(BaseModel):
     """Base para série de parcelas"""
+
     description: str = Field(max_length=500)
     merchant_name: str = Field(max_length=200)
     installment_amount: float = Field(gt=0)
@@ -21,6 +22,7 @@ class InstallmentSeriesBase(BaseModel):
 
 class InstallmentSeriesCreate(InstallmentSeriesBase):
     """Criação de série de parcelas"""
+
     # Opcionalmente marcar parcelas anteriores como pagas
     mark_paid_until: int | None = None  # Marcar parcelas 1 até N como pagas
     create_future: bool = False  # Criar transações para parcelas futuras
@@ -28,6 +30,7 @@ class InstallmentSeriesCreate(InstallmentSeriesBase):
 
 class InstallmentSeriesResponse(BaseModel):
     """Resposta de série de parcelas"""
+
     id: int
     description: str
     merchant_name: str
@@ -52,6 +55,7 @@ class InstallmentSeriesResponse(BaseModel):
 
 class InstallmentStatusResponse(BaseModel):
     """Status detalhado de uma parcela individual"""
+
     number: int
     status: str  # paid, registered, pending
     date: str | None = None
@@ -61,6 +65,7 @@ class InstallmentStatusResponse(BaseModel):
 
 class InstallmentSeriesDetailResponse(BaseModel):
     """Detalhes completos de uma série com status de cada parcela"""
+
     series_id: int
     description: str
     merchant_name: str
@@ -76,6 +81,7 @@ class InstallmentSeriesDetailResponse(BaseModel):
 
 class ConfirmInstallmentRequest(BaseModel):
     """Confirmar transação de parcela"""
+
     # Identificação
     document_id: int | None = None
     account_id: int
@@ -98,18 +104,21 @@ class ConfirmInstallmentRequest(BaseModel):
 
 class MarkInstallmentsPaidRequest(BaseModel):
     """Marcar parcelas anteriores como pagas"""
+
     series_id: int
     up_to_installment: int = Field(ge=1)
 
 
 class CreateFutureInstallmentsRequest(BaseModel):
     """Criar transações para parcelas futuras"""
+
     series_id: int
     from_installment: int = Field(ge=1)
 
 
 class PotentialDuplicateSeriesResponse(BaseModel):
     """Informações sobre uma série potencialmente duplicada"""
+
     series_id: int
     description: str
     merchant_name: str

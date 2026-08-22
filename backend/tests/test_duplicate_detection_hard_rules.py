@@ -1,11 +1,13 @@
 """Testes para hard rules de detecção de duplicatas"""
-import pytest
-from decimal import Decimal
-from datetime import datetime, UTC
-from unittest.mock import Mock, AsyncMock
 
-from app.modules.installments.services.duplicate_detection_service import DuplicateDetectionService
+from datetime import UTC, datetime
+from decimal import Decimal
+from unittest.mock import AsyncMock, Mock
+
+import pytest
+
 from app.models.installment import InstallmentSeries, InstallmentSeriesStatus
+from app.modules.installments.services.duplicate_detection_service import DuplicateDetectionService
 
 
 @pytest.fixture
@@ -46,36 +48,26 @@ class TestHardRuleAmountDifference:
         """Bloqueia séries com valores muito diferentes (R$ 47,61 vs R$ 119,04)"""
         # Exemplo real do bug: CASAS BECKER
         series_a = create_mock_series(
-            series_id=1,
-            merchant_name="CASAS BECKER",
-            amount=47.61,
-            installment_count=21
+            series_id=1, merchant_name="CASAS BECKER", amount=47.61, installment_count=21
         )
         series_b = create_mock_series(
-            series_id=2,
-            merchant_name="CASAS BECKER",
-            amount=119.04,
-            installment_count=21
+            series_id=2, merchant_name="CASAS BECKER", amount=119.04, installment_count=21
         )
 
         score = service._calculate_similarity_score(series_a, series_b)
 
         # Deve retornar 0.0 (bloqueado pela hard rule)
-        assert score == 0.0, f"Deveria bloquear valores muito diferentes (diff=R$ 71,43), score={score}"
+        assert score == 0.0, (
+            f"Deveria bloquear valores muito diferentes (diff=R$ 71,43), score={score}"
+        )
 
     def test_allows_identical_amounts(self, service):
         """Permite valores idênticos"""
         series_a = create_mock_series(
-            series_id=1,
-            merchant_name="NETFLIX",
-            amount=49.90,
-            installment_count=12
+            series_id=1, merchant_name="NETFLIX", amount=49.90, installment_count=12
         )
         series_b = create_mock_series(
-            series_id=2,
-            merchant_name="NETFLIX",
-            amount=49.90,
-            installment_count=12
+            series_id=2, merchant_name="NETFLIX", amount=49.90, installment_count=12
         )
 
         score = service._calculate_similarity_score(series_a, series_b)
@@ -86,16 +78,13 @@ class TestHardRuleAmountDifference:
     def test_allows_small_difference_within_threshold(self, service):
         """Permite diferença menor que R$ 0,05"""
         series_a = create_mock_series(
-            series_id=1,
-            merchant_name="NETFLIX",
-            amount=49.90,
-            installment_count=12
+            series_id=1, merchant_name="NETFLIX", amount=49.90, installment_count=12
         )
         series_b = create_mock_series(
             series_id=2,
             merchant_name="NETFLIX",
             amount=49.94,  # Diff = R$ 0,04 (< R$ 0,05)
-            installment_count=12
+            installment_count=12,
         )
 
         score = service._calculate_similarity_score(series_a, series_b)
@@ -106,16 +95,13 @@ class TestHardRuleAmountDifference:
     def test_blocks_small_difference_above_threshold(self, service):
         """Bloqueia diferença maior que R$ 0,05"""
         series_a = create_mock_series(
-            series_id=1,
-            merchant_name="NETFLIX",
-            amount=49.90,
-            installment_count=12
+            series_id=1, merchant_name="NETFLIX", amount=49.90, installment_count=12
         )
         series_b = create_mock_series(
             series_id=2,
             merchant_name="NETFLIX",
             amount=49.96,  # Diff = R$ 0,06 (> R$ 0,05)
-            installment_count=12
+            installment_count=12,
         )
 
         score = service._calculate_similarity_score(series_a, series_b)
@@ -130,16 +116,10 @@ class TestHardRuleNameOverlap:
     def test_blocks_different_merchants(self, service):
         """Bloqueia merchants completamente diferentes"""
         series_a = create_mock_series(
-            series_id=1,
-            merchant_name="STEAM",
-            amount=100.00,
-            installment_count=12
+            series_id=1, merchant_name="STEAM", amount=100.00, installment_count=12
         )
         series_b = create_mock_series(
-            series_id=2,
-            merchant_name="NETFLIX",
-            amount=100.00,
-            installment_count=12
+            series_id=2, merchant_name="NETFLIX", amount=100.00, installment_count=12
         )
 
         score = service._calculate_similarity_score(series_a, series_b)
@@ -150,16 +130,10 @@ class TestHardRuleNameOverlap:
     def test_allows_identical_merchants(self, service):
         """Permite merchants idênticos"""
         series_a = create_mock_series(
-            series_id=1,
-            merchant_name="CASAS BECKER",
-            amount=47.61,
-            installment_count=21
+            series_id=1, merchant_name="CASAS BECKER", amount=47.61, installment_count=21
         )
         series_b = create_mock_series(
-            series_id=2,
-            merchant_name="CASAS BECKER",
-            amount=47.61,
-            installment_count=21
+            series_id=2, merchant_name="CASAS BECKER", amount=47.61, installment_count=21
         )
 
         score = service._calculate_similarity_score(series_a, series_b)
@@ -170,16 +144,13 @@ class TestHardRuleNameOverlap:
     def test_blocks_low_name_overlap(self, service):
         """Bloqueia merchants com overlap < 80%"""
         series_a = create_mock_series(
-            series_id=1,
-            merchant_name="MERCADO LIVRE",
-            amount=100.00,
-            installment_count=12
+            series_id=1, merchant_name="MERCADO LIVRE", amount=100.00, installment_count=12
         )
         series_b = create_mock_series(
             series_id=2,
             merchant_name="MERCADO PAG",  # Overlap = 50% (1 de 2 palavras)
             amount=100.00,
-            installment_count=12
+            installment_count=12,
         )
 
         score = service._calculate_similarity_score(series_a, series_b)
@@ -194,16 +165,13 @@ class TestHardRuleInstallmentCount:
     def test_blocks_different_installment_counts(self, service):
         """Bloqueia séries com número de parcelas diferente"""
         series_a = create_mock_series(
-            series_id=1,
-            merchant_name="NETFLIX",
-            amount=49.90,
-            installment_count=12
+            series_id=1, merchant_name="NETFLIX", amount=49.90, installment_count=12
         )
         series_b = create_mock_series(
             series_id=2,
             merchant_name="NETFLIX",
             amount=49.90,
-            installment_count=24  # Diferente!
+            installment_count=24,  # Diferente!
         )
 
         score = service._calculate_similarity_score(series_a, series_b)
@@ -214,16 +182,10 @@ class TestHardRuleInstallmentCount:
     def test_allows_same_installment_counts(self, service):
         """Permite séries com mesmo número de parcelas"""
         series_a = create_mock_series(
-            series_id=1,
-            merchant_name="NETFLIX",
-            amount=49.90,
-            installment_count=12
+            series_id=1, merchant_name="NETFLIX", amount=49.90, installment_count=12
         )
         series_b = create_mock_series(
-            series_id=2,
-            merchant_name="NETFLIX",
-            amount=49.90,
-            installment_count=12
+            series_id=2, merchant_name="NETFLIX", amount=49.90, installment_count=12
         )
 
         score = service._calculate_similarity_score(series_a, series_b)
@@ -241,22 +203,18 @@ class TestRealWorldScenarios:
         detectado como duplicata com 70% de similaridade.
         """
         series_a = create_mock_series(
-            series_id=1,
-            merchant_name="CASAS BECKER",
-            amount=47.61,
-            installment_count=21
+            series_id=1, merchant_name="CASAS BECKER", amount=47.61, installment_count=21
         )
         series_b = create_mock_series(
-            series_id=2,
-            merchant_name="CASAS BECKER",
-            amount=119.04,
-            installment_count=21
+            series_id=2, merchant_name="CASAS BECKER", amount=119.04, installment_count=21
         )
 
         score = service._calculate_similarity_score(series_a, series_b)
 
         # Deve retornar 0.0 (NÃO é duplicata)
-        assert score == 0.0, "CASAS BECKER com valores diferentes NÃO deve ser detectado como duplicata"
+        assert score == 0.0, (
+            "CASAS BECKER com valores diferentes NÃO deve ser detectado como duplicata"
+        )
 
     def test_netflix_real_duplicate(self, service):
         """Cenário válido: Netflix com valores idênticos é duplicata real"""
@@ -265,14 +223,14 @@ class TestRealWorldScenarios:
             merchant_name="NETFLIX",
             amount=49.90,
             installment_count=12,
-            credit_card_id=1
+            credit_card_id=1,
         )
         series_b = create_mock_series(
             series_id=2,
             merchant_name="NETFLIX",
             amount=49.90,
             installment_count=12,
-            credit_card_id=1
+            credit_card_id=1,
         )
 
         score = service._calculate_similarity_score(series_a, series_b)
@@ -283,16 +241,13 @@ class TestRealWorldScenarios:
     def test_small_rounding_allowed(self, service):
         """Pequenos arredondamentos devem ser permitidos"""
         series_a = create_mock_series(
-            series_id=1,
-            merchant_name="SPOTIFY",
-            amount=19.90,
-            installment_count=12
+            series_id=1, merchant_name="SPOTIFY", amount=19.90, installment_count=12
         )
         series_b = create_mock_series(
             series_id=2,
             merchant_name="SPOTIFY",
             amount=19.93,  # Diff = R$ 0,03 (dentro do limite)
-            installment_count=12
+            installment_count=12,
         )
 
         score = service._calculate_similarity_score(series_a, series_b)
@@ -307,16 +262,10 @@ class TestEdgeCases:
     def test_handles_none_amounts(self, service):
         """Lida com valores None"""
         series_a = create_mock_series(
-            series_id=1,
-            merchant_name="TEST",
-            amount=100.00,
-            installment_count=12
+            series_id=1, merchant_name="TEST", amount=100.00, installment_count=12
         )
         series_b = create_mock_series(
-            series_id=2,
-            merchant_name="TEST",
-            amount=100.00,
-            installment_count=12
+            series_id=2, merchant_name="TEST", amount=100.00, installment_count=12
         )
         series_b.installment_amount = None
 
@@ -328,16 +277,10 @@ class TestEdgeCases:
     def test_handles_none_merchant_names(self, service):
         """Lida com nomes None"""
         series_a = create_mock_series(
-            series_id=1,
-            merchant_name="TEST",
-            amount=100.00,
-            installment_count=12
+            series_id=1, merchant_name="TEST", amount=100.00, installment_count=12
         )
         series_b = create_mock_series(
-            series_id=2,
-            merchant_name="TEST",
-            amount=100.00,
-            installment_count=12
+            series_id=2, merchant_name="TEST", amount=100.00, installment_count=12
         )
         series_b.merchant_name = None
 
@@ -349,16 +292,10 @@ class TestEdgeCases:
     def test_zero_amounts(self, service):
         """Lida com valores zero"""
         series_a = create_mock_series(
-            series_id=1,
-            merchant_name="TEST",
-            amount=0.00,
-            installment_count=12
+            series_id=1, merchant_name="TEST", amount=0.00, installment_count=12
         )
         series_b = create_mock_series(
-            series_id=2,
-            merchant_name="TEST",
-            amount=0.00,
-            installment_count=12
+            series_id=2, merchant_name="TEST", amount=0.00, installment_count=12
         )
 
         score = service._calculate_similarity_score(series_a, series_b)
@@ -367,5 +304,5 @@ class TestEdgeCases:
         assert score >= 0.0, "Deve lidar com valores zero sem erro"
 
 
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

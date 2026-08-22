@@ -44,8 +44,10 @@ household/
 ```python
 from app.modules.household import (
     # Schemas
-    HouseholdMemberResponse, FamilyContext,
-    FamilyInviteRequest, FamilyInviteResponse,
+    HouseholdMemberResponse,
+    FamilyContext,
+    FamilyInviteRequest,
+    FamilyInviteResponse,
     # Router
     family_router,
 )

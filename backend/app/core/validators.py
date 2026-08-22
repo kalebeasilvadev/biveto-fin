@@ -1,4 +1,5 @@
 """Validadores reutilizaveis para o sistema"""
+
 from fastapi import HTTPException
 
 from app.models.account import Account
@@ -16,11 +17,7 @@ class InsufficientBalanceError(HTTPException):
         super().__init__(status_code=422, detail=detail)
 
 
-def validate_sufficient_balance(
-    account: Account,
-    amount: float,
-    operation: str = "débito"
-) -> None:
+def validate_sufficient_balance(account: Account, amount: float, operation: str = "débito") -> None:
     """Valida se a conta tem saldo suficiente para a operacao
 
     Args:
@@ -41,17 +38,11 @@ def validate_sufficient_balance(
 
     if current_balance < debit_amount:
         raise InsufficientBalanceError(
-            account_name=account.name,
-            available=current_balance,
-            required=debit_amount
+            account_name=account.name, available=current_balance, required=debit_amount
         )
 
 
-def validate_and_debit(
-    account: Account,
-    amount: float,
-    operation: str = "débito"
-) -> float:
+def validate_and_debit(account: Account, amount: float, operation: str = "débito") -> float:
     """Valida saldo e realiza debito atomicamente
 
     Args:

@@ -20,18 +20,18 @@ else:
     engine = create_async_engine(
         settings.database_url,
         echo=settings.sql_echo,
-        pool_size=5,           # Conexões mantidas no pool
-        max_overflow=10,       # Conexões extras sob demanda
-        pool_pre_ping=True,    # Verifica conexão antes de usar
-        pool_recycle=300,      # Recicla conexões a cada 5 min
-        pool_timeout=30,       # Timeout para obter conexão do pool
+        pool_size=5,  # Conexões mantidas no pool
+        max_overflow=10,  # Conexões extras sob demanda
+        pool_pre_ping=True,  # Verifica conexão antes de usar
+        pool_recycle=300,  # Recicla conexões a cada 5 min
+        pool_timeout=30,  # Timeout para obter conexão do pool
     )
 
 async_session_maker = async_sessionmaker(
     engine,
     class_=AsyncSession,
     expire_on_commit=False,
-    autoflush=False,           # Controle manual de flush
+    autoflush=False,  # Controle manual de flush
 )
 
 

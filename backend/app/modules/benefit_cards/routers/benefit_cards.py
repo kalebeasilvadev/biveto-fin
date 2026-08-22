@@ -31,9 +31,7 @@ async def get_household_user_ids(db, user) -> list[int]:
         return []
 
     result = await db.execute(
-        select(HouseholdMember.user_id).where(
-            HouseholdMember.license_id == user.license_id
-        )
+        select(HouseholdMember.user_id).where(HouseholdMember.license_id == user.license_id)
     )
     return list(result.scalars().all())
 
@@ -89,24 +87,24 @@ async def list_benefit_cards(current_user: CurrentUser, db: DbSession):
                             and_(
                                 Transaction.type == TransactionType.TRANSFER.value,
                                 Transaction.linked_transaction_id.isnot(None),
-                                Transaction.id < Transaction.linked_transaction_id
+                                Transaction.id < Transaction.linked_transaction_id,
                             ),
-                            -Transaction.amount
+                            -Transaction.amount,
                         ),
                         # Transfer: entrada (id maior que linked) = soma
                         (
                             and_(
                                 Transaction.type == TransactionType.TRANSFER.value,
                                 Transaction.linked_transaction_id.isnot(None),
-                                Transaction.id > Transaction.linked_transaction_id
+                                Transaction.id > Transaction.linked_transaction_id,
                             ),
-                            Transaction.amount
+                            Transaction.amount,
                         ),
-                        else_=0
+                        else_=0,
                     )
                 ),
-                0
-            ).label('transaction_balance')
+                0,
+            ).label("transaction_balance"),
         )
         .where(Transaction.receipt_id.is_(None))  # Excluir transações de receipt
         .group_by(Transaction.account_id)
@@ -117,7 +115,7 @@ async def list_benefit_cards(current_user: CurrentUser, db: DbSession):
     receipt_payments_subquery = (
         select(
             ReceiptPayment.account_id,
-            func.coalesce(func.sum(ReceiptPayment.amount), 0).label('receipt_payments_total')
+            func.coalesce(func.sum(ReceiptPayment.amount), 0).label("receipt_payments_total"),
         )
         .select_from(ReceiptPayment)
         .join(Receipt)
@@ -131,25 +129,28 @@ async def list_benefit_cards(current_user: CurrentUser, db: DbSession):
         select(
             BenefitCard,
             Account,
-            func.coalesce(transactions_balance_subquery.c.transaction_balance, 0).label('tx_balance'),
-            func.coalesce(receipt_payments_subquery.c.receipt_payments_total, 0).label('receipt_total')
+            func.coalesce(transactions_balance_subquery.c.transaction_balance, 0).label(
+                "tx_balance"
+            ),
+            func.coalesce(receipt_payments_subquery.c.receipt_payments_total, 0).label(
+                "receipt_total"
+            ),
         )
         .join(Account, BenefitCard.account_id == Account.id)
-        .outerjoin(transactions_balance_subquery, transactions_balance_subquery.c.account_id == Account.id)
+        .outerjoin(
+            transactions_balance_subquery, transactions_balance_subquery.c.account_id == Account.id
+        )
         .outerjoin(receipt_payments_subquery, receipt_payments_subquery.c.account_id == Account.id)
     )
 
     if household_user_ids:
         base_query = base_query.where(
             or_(
-                and_(
-                    BenefitCard.user_id == current_user.id,
-                    Account.ownership_type == "personal"
-                ),
+                and_(BenefitCard.user_id == current_user.id, Account.ownership_type == "personal"),
                 and_(
                     BenefitCard.user_id.in_(household_user_ids),
-                    Account.ownership_type == "household"
-                )
+                    Account.ownership_type == "household",
+                ),
             )
         )
     else:
@@ -170,8 +171,12 @@ async def list_benefit_cards(current_user: CurrentUser, db: DbSession):
             provider=card.provider,
             provider_display=get_provider_display(card.provider),
             last_four_digits=card.last_four_digits,
-            current_balance=float(account.balance) + float(tx_balance or Decimal(0)) - float(receipt_total or Decimal(0)),
-            expected_monthly_recharge=float(card.expected_monthly_recharge) if card.expected_monthly_recharge else None,
+            current_balance=float(account.balance)
+            + float(tx_balance or Decimal(0))
+            - float(receipt_total or Decimal(0)),
+            expected_monthly_recharge=float(card.expected_monthly_recharge)
+            if card.expected_monthly_recharge
+            else None,
             recharge_day=card.recharge_day,
             color=account.color,
             icon=account.icon,
@@ -229,7 +234,9 @@ async def create_benefit_card(
         provider=benefit_card.provider,
         last_four_digits=benefit_card.last_four_digits,
         linked_income_source_id=benefit_card.linked_income_source_id,
-        expected_monthly_recharge=float(benefit_card.expected_monthly_recharge) if benefit_card.expected_monthly_recharge else None,
+        expected_monthly_recharge=float(benefit_card.expected_monthly_recharge)
+        if benefit_card.expected_monthly_recharge
+        else None,
         recharge_day=benefit_card.recharge_day,
         is_active=benefit_card.is_active,
         created_at=benefit_card.created_at,
@@ -264,24 +271,24 @@ async def get_benefit_card(
                             and_(
                                 Transaction.type == TransactionType.TRANSFER.value,
                                 Transaction.linked_transaction_id.isnot(None),
-                                Transaction.id < Transaction.linked_transaction_id
+                                Transaction.id < Transaction.linked_transaction_id,
                             ),
-                            -Transaction.amount
+                            -Transaction.amount,
                         ),
                         # Transfer: entrada (id maior que linked) = soma
                         (
                             and_(
                                 Transaction.type == TransactionType.TRANSFER.value,
                                 Transaction.linked_transaction_id.isnot(None),
-                                Transaction.id > Transaction.linked_transaction_id
+                                Transaction.id > Transaction.linked_transaction_id,
                             ),
-                            Transaction.amount
+                            Transaction.amount,
                         ),
-                        else_=0
+                        else_=0,
                     )
                 ),
-                0
-            ).label('transaction_balance')
+                0,
+            ).label("transaction_balance"),
         )
         .where(Transaction.receipt_id.is_(None))
         .group_by(Transaction.account_id)
@@ -292,7 +299,7 @@ async def get_benefit_card(
     receipt_payments_subquery = (
         select(
             ReceiptPayment.account_id,
-            func.coalesce(func.sum(ReceiptPayment.amount), 0).label('receipt_payments_total')
+            func.coalesce(func.sum(ReceiptPayment.amount), 0).label("receipt_payments_total"),
         )
         .select_from(ReceiptPayment)
         .join(Receipt)
@@ -305,11 +312,17 @@ async def get_benefit_card(
         select(
             BenefitCard,
             Account,
-            func.coalesce(transactions_balance_subquery.c.transaction_balance, 0).label('tx_balance'),
-            func.coalesce(receipt_payments_subquery.c.receipt_payments_total, 0).label('receipt_total')
+            func.coalesce(transactions_balance_subquery.c.transaction_balance, 0).label(
+                "tx_balance"
+            ),
+            func.coalesce(receipt_payments_subquery.c.receipt_payments_total, 0).label(
+                "receipt_total"
+            ),
         )
         .join(Account, BenefitCard.account_id == Account.id)
-        .outerjoin(transactions_balance_subquery, transactions_balance_subquery.c.account_id == Account.id)
+        .outerjoin(
+            transactions_balance_subquery, transactions_balance_subquery.c.account_id == Account.id
+        )
         .outerjoin(receipt_payments_subquery, receipt_payments_subquery.c.account_id == Account.id)
         .where(
             BenefitCard.id == card_id,
@@ -321,7 +334,11 @@ async def get_benefit_card(
         raise HTTPException(status_code=404, detail="Cartao de beneficio nao encontrado")
 
     card, account, tx_balance, receipt_total = row
-    computed_balance = float(account.balance) + float(tx_balance or Decimal(0)) - float(receipt_total or Decimal(0))
+    computed_balance = (
+        float(account.balance)
+        + float(tx_balance or Decimal(0))
+        - float(receipt_total or Decimal(0))
+    )
 
     return BenefitCardResponse(
         id=card.id,
@@ -331,7 +348,9 @@ async def get_benefit_card(
         provider=card.provider,
         last_four_digits=card.last_four_digits,
         linked_income_source_id=card.linked_income_source_id,
-        expected_monthly_recharge=float(card.expected_monthly_recharge) if card.expected_monthly_recharge else None,
+        expected_monthly_recharge=float(card.expected_monthly_recharge)
+        if card.expected_monthly_recharge
+        else None,
         recharge_day=card.recharge_day,
         is_active=card.is_active,
         created_at=card.created_at,
@@ -369,9 +388,13 @@ async def update_benefit_card(
 
     # Update card fields
     card_fields = [
-        "card_type", "provider", "last_four_digits",
-        "linked_income_source_id", "expected_monthly_recharge",
-        "recharge_day", "is_active"
+        "card_type",
+        "provider",
+        "last_four_digits",
+        "linked_income_source_id",
+        "expected_monthly_recharge",
+        "recharge_day",
+        "is_active",
     ]
     account_fields = ["name", "color", "icon"]
 
@@ -406,7 +429,9 @@ async def update_benefit_card(
         provider=card.provider,
         last_four_digits=card.last_four_digits,
         linked_income_source_id=card.linked_income_source_id,
-        expected_monthly_recharge=float(card.expected_monthly_recharge) if card.expected_monthly_recharge else None,
+        expected_monthly_recharge=float(card.expected_monthly_recharge)
+        if card.expected_monthly_recharge
+        else None,
         recharge_day=card.recharge_day,
         is_active=card.is_active,
         created_at=card.created_at,
@@ -438,9 +463,7 @@ async def delete_benefit_card(
         raise HTTPException(status_code=404, detail="Cartao de beneficio nao encontrado")
 
     # Delete account (cascades to card)
-    account_result = await db.execute(
-        select(Account).where(Account.id == card.account_id)
-    )
+    account_result = await db.execute(select(Account).where(Account.id == card.account_id))
     account = account_result.scalar_one_or_none()
 
     if account:
@@ -453,10 +476,7 @@ async def delete_benefit_card(
 
 @router.post("/{card_id}/adjust-balance", response_model=BalanceAdjustmentResponse)
 async def adjust_balance(
-    card_id: int,
-    data: BalanceAdjustmentRequest,
-    db: DbSession,
-    current_user: CurrentUser
+    card_id: int, data: BalanceAdjustmentRequest, db: DbSession, current_user: CurrentUser
 ):
     """Ajusta manualmente o saldo de um cartão de benefício
 
@@ -481,8 +501,11 @@ async def adjust_balance(
             BenefitCard.id == card_id,
             or_(
                 and_(BenefitCard.user_id == current_user.id, Account.ownership_type == "personal"),
-                and_(BenefitCard.user_id.in_(household_user_ids), Account.ownership_type == "household")
-            )
+                and_(
+                    BenefitCard.user_id.in_(household_user_ids),
+                    Account.ownership_type == "household",
+                ),
+            ),
         )
     )
     card = result.scalar_one_or_none()
@@ -491,9 +514,7 @@ async def adjust_balance(
         raise HTTPException(status_code=404, detail="Cartao de beneficio nao encontrado")
 
     # Buscar conta vinculada
-    account_result = await db.execute(
-        select(Account).where(Account.id == card.account_id)
-    )
+    account_result = await db.execute(select(Account).where(Account.id == card.account_id))
     account = account_result.scalar_one_or_none()
 
     if not account:
@@ -505,7 +526,7 @@ async def adjust_balance(
         account=account,
         adjustment_amount=data.adjustment_amount,
         reason=data.reason,
-        user_id=current_user.id
+        user_id=current_user.id,
     )
 
     await db.commit()
@@ -516,5 +537,5 @@ async def adjust_balance(
         new_balance=adjustment_result["new_balance"],
         transaction_id=adjustment_result["transaction_id"],
         reason=adjustment_result["reason"],
-        timestamp=utc_now()
+        timestamp=utc_now(),
     )

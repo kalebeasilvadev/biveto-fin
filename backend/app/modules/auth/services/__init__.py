@@ -2,6 +2,7 @@
 Services do modulo auth.
 Exporta os servicos de autenticacao, usuario e setup inicial.
 """
+
 from app.modules.auth.services.auth_service import AuthService
 from app.modules.auth.services.user_service import UserService
 from app.modules.auth.services.user_setup import (

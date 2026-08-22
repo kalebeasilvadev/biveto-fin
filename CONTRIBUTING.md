@@ -48,10 +48,22 @@ O detalhe está em [`docs/development/CONVENTIONS.md`](docs/development/CONVENTI
 
 Em todo push/PR para `main` (`.github/workflows/ci.yml`):
 
-- **Backend:** `ruff check app/` (lint, bloqueia) + `pytest` (SQLite)
+- **Segurança:** gitleaks escaneia os commits em busca de segredos (chaves, tokens, senhas) — qualquer vazamento **bloqueia o merge** (config/allowlist em `.gitleaks.toml`)
+- **Backend:** `ruff check app/` (lint) + `ruff format --check` (formatação) + `pytest` (SQLite)
 - **Frontend:** `npm run lint` (eslint — *erros* bloqueiam; warnings não) + `tsc --noEmit` + `vite build`
 
-Rode os quatro localmente antes do PR (`make lint` e `make test` no Linux/Mac). Não introduza warnings novos de eslint — a meta é zerá-los, não acumulá-los.
+Não introduza warnings novos de eslint — a meta é zerá-los, não acumulá-los. Dependências desatualizadas chegam como PRs semanais do **Dependabot** — revisar e mergear esses PRs é tarefa de sustentação como qualquer outra.
+
+## Pre-commit hooks (recomendado — configure no primeiro dia)
+
+Os mesmos checks rodam na sua máquina antes de cada commit, o que evita descobrir o problema só no CI:
+
+```bash
+pip install pre-commit     # com o venv do backend ativo
+pre-commit install         # na raiz do repo
+```
+
+A partir daí, todo `git commit` roda automaticamente: gitleaks (segredos), ruff (lint+format do backend) e checagens de higiene (arquivos grandes, marcadores de merge). Para rodar manualmente em tudo: `pre-commit run --all-files`.
 
 ## Dúvidas
 

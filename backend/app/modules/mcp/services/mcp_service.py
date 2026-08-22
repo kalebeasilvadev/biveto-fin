@@ -61,7 +61,7 @@ ALLOWED_TABLES = {
             "ownership_type": "personal ou household",
             "created_at": "Data de criação",
             "updated_at": "Data de atualização",
-        }
+        },
     },
     "transactions": {
         "model": Transaction,
@@ -87,7 +87,7 @@ ALLOWED_TABLES = {
             "is_fixed": "Se é despesa fixa",
             "ownership_type": "personal ou household",
             "created_at": "Data de criação",
-        }
+        },
     },
     "categories": {
         "model": Category,
@@ -101,7 +101,7 @@ ALLOWED_TABLES = {
             "parent_id": "ID da categoria pai",
             "is_system": "Se é do sistema",
             "created_at": "Data de criação",
-        }
+        },
     },
     "credit_cards": {
         "model": CreditCard,
@@ -120,7 +120,7 @@ ALLOWED_TABLES = {
             "annual_fee": "Anuidade",
             "is_active": "Se está ativo",
             "created_at": "Data de criação",
-        }
+        },
     },
     "credit_card_invoices": {
         "model": CreditCardInvoice,
@@ -138,7 +138,7 @@ ALLOWED_TABLES = {
             "paid_amount": "Valor pago",
             "paid_at": "Data de pagamento",
             "created_at": "Data de criação",
-        }
+        },
     },
     "installment_series": {
         "model": InstallmentSeries,
@@ -156,7 +156,7 @@ ALLOWED_TABLES = {
             "status": "active, completed, cancelled",
             "paid_count": "Parcelas pagas",
             "created_at": "Data de criação",
-        }
+        },
     },
     "budgets": {
         "model": Budget,
@@ -170,7 +170,7 @@ ALLOWED_TABLES = {
             "allow_rollover": "Permite acumular",
             "ownership_type": "personal ou household",
             "created_at": "Data de criação",
-        }
+        },
     },
     "budget_items": {
         "model": BudgetItem,
@@ -184,7 +184,7 @@ ALLOWED_TABLES = {
             "is_fixed": "Se é despesa fixa",
             "priority": "Prioridade",
             "created_at": "Data de criação",
-        }
+        },
     },
     "goals": {
         "model": Goal,
@@ -201,7 +201,7 @@ ALLOWED_TABLES = {
             "status": "active, paused, completed, cancelled",
             "ownership_type": "personal ou household",
             "created_at": "Data de criação",
-        }
+        },
     },
     "goal_contributions": {
         "model": GoalContribution,
@@ -213,7 +213,7 @@ ALLOWED_TABLES = {
             "contribution_date": "Data",
             "notes": "Observações",
             "created_at": "Data de criação",
-        }
+        },
     },
     "debts": {
         "model": Debt,
@@ -230,7 +230,7 @@ ALLOWED_TABLES = {
             "status": "active, paid_off, negotiating, defaulted",
             "ownership_type": "personal ou household",
             "created_at": "Data de criação",
-        }
+        },
     },
     "debt_payments": {
         "model": DebtPayment,
@@ -243,7 +243,7 @@ ALLOWED_TABLES = {
             "interest_amount": "Valor de juros",
             "payment_date": "Data",
             "created_at": "Data de criação",
-        }
+        },
     },
     "recurring_transactions": {
         "model": RecurringTransaction,
@@ -263,7 +263,7 @@ ALLOWED_TABLES = {
             "next_due_date": "Próxima data",
             "ownership_type": "personal ou household",
             "created_at": "Data de criação",
-        }
+        },
     },
     "income_sources": {
         "model": IncomeSource,
@@ -280,7 +280,7 @@ ALLOWED_TABLES = {
             "is_active": "Se está ativa",
             "ownership_type": "personal ou household",
             "created_at": "Data de criação",
-        }
+        },
     },
     "documents": {
         "model": Document,
@@ -293,7 +293,7 @@ ALLOWED_TABLES = {
             "document_type": "Tipo do documento",
             "created_at": "Data de criação",
             "processed_at": "Data de processamento",
-        }
+        },
     },
     "merchants": {
         "model": Merchant,
@@ -305,7 +305,7 @@ ALLOWED_TABLES = {
             "cnpj": "CNPJ",
             "category_id": "Categoria sugerida",
             "created_at": "Data de criação",
-        }
+        },
     },
     "receipts": {
         "model": Receipt,
@@ -322,7 +322,7 @@ ALLOWED_TABLES = {
             "status": "pending, confirmed, cancelled",
             "created_at": "Data de criação",
             "confirmed_at": "Data de confirmação",
-        }
+        },
     },
     "receipt_payments": {
         "model": ReceiptPayment,
@@ -337,7 +337,7 @@ ALLOWED_TABLES = {
             "sequence": "Sequência do pagamento",
             "original_label": "Label original do OCR",
             "created_at": "Data de criação",
-        }
+        },
     },
     "benefit_cards": {
         "model": BenefitCard,
@@ -352,7 +352,7 @@ ALLOWED_TABLES = {
             "recharge_day": "Dia da recarga (1-31)",
             "is_active": "Se está ativo",
             "created_at": "Data de criação",
-        }
+        },
     },
     "grocery_products": {
         "model": GroceryProduct,
@@ -366,7 +366,7 @@ ALLOWED_TABLES = {
             "default_unit": "Unidade padrão (kg, un, L)",
             "is_system": "Se é produto do sistema",
             "created_at": "Data de criação",
-        }
+        },
     },
     "grocery_purchases": {
         "model": GroceryPurchase,
@@ -388,7 +388,7 @@ ALLOWED_TABLES = {
             "purchase_date": "Data da compra",
             "ownership_type": "personal ou household",
             "created_at": "Data de criação",
-        }
+        },
     },
     "grocery_price_history": {
         "model": GroceryPriceHistory,
@@ -401,7 +401,7 @@ ALLOWED_TABLES = {
             "unit": "Unidade",
             "recorded_at": "Data do registro",
             "created_at": "Data de criação",
-        }
+        },
     },
     "shopping_lists": {
         "model": ShoppingList,
@@ -416,7 +416,7 @@ ALLOWED_TABLES = {
             "notes": "Observações",
             "created_at": "Data de criação",
             "completed_at": "Data de conclusão",
-        }
+        },
     },
     "shopping_list_items": {
         "model": ShoppingListItem,
@@ -435,7 +435,7 @@ ALLOWED_TABLES = {
             "priority": "Prioridade",
             "notes": "Observações",
             "created_at": "Data de criação",
-        }
+        },
     },
     "chat_conversations": {
         "model": ChatConversation,
@@ -445,7 +445,7 @@ ALLOWED_TABLES = {
             "title": "Título da conversa",
             "created_at": "Data de criação",
             "updated_at": "Data de atualização",
-        }
+        },
     },
     "chat_messages": {
         "model": ChatMessage,
@@ -456,7 +456,7 @@ ALLOWED_TABLES = {
             "role": "user ou assistant",
             "content": "Conteúdo da mensagem",
             "created_at": "Data de criação",
-        }
+        },
     },
 }
 
@@ -481,14 +481,15 @@ class MCPService:
         tables = []
         for name, info in ALLOWED_TABLES.items():
             columns = [
-                ColumnInfo(name=col, description=desc)
-                for col, desc in info["columns"].items()
+                ColumnInfo(name=col, description=desc) for col, desc in info["columns"].items()
             ]
-            tables.append(TableInfo(
-                name=name,
-                description=info["description"],
-                columns=columns,
-            ))
+            tables.append(
+                TableInfo(
+                    name=name,
+                    description=info["description"],
+                    columns=columns,
+                )
+            )
         return tables
 
     async def query_table(
@@ -503,7 +504,7 @@ class MCPService:
         if request.table not in ALLOWED_TABLES:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Tabela '{request.table}' não permitida. Use /mcp/tables para ver tabelas disponíveis."
+                detail=f"Tabela '{request.table}' não permitida. Use /mcp/tables para ver tabelas disponíveis.",
             )
 
         table_info = ALLOWED_TABLES[request.table]
@@ -589,7 +590,7 @@ class MCPService:
         if table_name not in ALLOWED_TABLES:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Tabela '{table_name}' não permitida."
+                detail=f"Tabela '{table_name}' não permitida.",
             )
 
         table_info = ALLOWED_TABLES[table_name]
@@ -618,8 +619,9 @@ class MCPService:
 
         # Contas
         accounts_result = await self.db.execute(
-            select(func.count(), func.sum(Account.balance))
-            .where(Account.user_id == user.id, Account.is_active == True)
+            select(func.count(), func.sum(Account.balance)).where(
+                Account.user_id == user.id, Account.is_active == True
+            )
         )
         accounts_row = accounts_result.fetchone()
         summary["accounts"] = {
@@ -635,8 +637,7 @@ class MCPService:
                 func.count(),
                 func.sum(Transaction.amount).filter(Transaction.type == "expense"),
                 func.sum(Transaction.amount).filter(Transaction.type == "income"),
-            )
-            .where(
+            ).where(
                 Transaction.user_id == user.id,
                 Transaction.date >= first_of_month,
             )
@@ -650,8 +651,7 @@ class MCPService:
 
         # Cartões de crédito
         cards_result = await self.db.execute(
-            select(func.count())
-            .where(CreditCard.user_id == user.id, CreditCard.is_active == True)
+            select(func.count()).where(CreditCard.user_id == user.id, CreditCard.is_active == True)
         )
         summary["credit_cards"] = {
             "count": cards_result.scalar() or 0,
@@ -659,8 +659,7 @@ class MCPService:
 
         # Faturas abertas
         invoices_result = await self.db.execute(
-            select(func.count(), func.sum(CreditCardInvoice.total_amount))
-            .where(
+            select(func.count(), func.sum(CreditCardInvoice.total_amount)).where(
                 CreditCardInvoice.user_id == user.id,
                 CreditCardInvoice.status.in_(["open", "closed"]),
             )
@@ -673,8 +672,9 @@ class MCPService:
 
         # Metas ativas
         goals_result = await self.db.execute(
-            select(func.count(), func.sum(Goal.current_amount), func.sum(Goal.target_amount))
-            .where(Goal.user_id == user.id, Goal.status == "active")
+            select(func.count(), func.sum(Goal.current_amount), func.sum(Goal.target_amount)).where(
+                Goal.user_id == user.id, Goal.status == "active"
+            )
         )
         goals_row = goals_result.fetchone()
         summary["active_goals"] = {
@@ -685,8 +685,9 @@ class MCPService:
 
         # Dívidas ativas
         debts_result = await self.db.execute(
-            select(func.count(), func.sum(Debt.current_balance))
-            .where(Debt.user_id == user.id, Debt.status == "active")
+            select(func.count(), func.sum(Debt.current_balance)).where(
+                Debt.user_id == user.id, Debt.status == "active"
+            )
         )
         debts_row = debts_result.fetchone()
         summary["active_debts"] = {
@@ -698,11 +699,30 @@ class MCPService:
 
     # Mapeamento de meses em português
     MONTHS_PT = {
-        "janeiro": 1, "fevereiro": 2, "marco": 3, "abril": 4,
-        "maio": 5, "junho": 6, "julho": 7, "agosto": 8, "setembro": 9,
-        "outubro": 10, "novembro": 11, "dezembro": 12,
-        "jan": 1, "fev": 2, "mar": 3, "abr": 4, "mai": 5, "jun": 6,
-        "jul": 7, "ago": 8, "set": 9, "out": 10, "nov": 11, "dez": 12
+        "janeiro": 1,
+        "fevereiro": 2,
+        "marco": 3,
+        "abril": 4,
+        "maio": 5,
+        "junho": 6,
+        "julho": 7,
+        "agosto": 8,
+        "setembro": 9,
+        "outubro": 10,
+        "novembro": 11,
+        "dezembro": 12,
+        "jan": 1,
+        "fev": 2,
+        "mar": 3,
+        "abr": 4,
+        "mai": 5,
+        "jun": 6,
+        "jul": 7,
+        "ago": 8,
+        "set": 9,
+        "out": 10,
+        "nov": 11,
+        "dez": 12,
     }
 
     async def _get_household_user_ids(self, user: User) -> list[int]:
@@ -711,9 +731,7 @@ class MCPService:
             return []
 
         result = await self.db.execute(
-            select(HouseholdMember.user_id).where(
-                HouseholdMember.license_id == user.license_id
-            )
+            select(HouseholdMember.user_id).where(HouseholdMember.license_id == user.license_id)
         )
         return list(result.scalars().all())
 
@@ -763,14 +781,19 @@ class MCPService:
         categories_result = await self.db.execute(
             select(Category).where(Category.user_id == user.id)
         )
-        categories: dict[int | None, str] = {c.id: c.name for c in categories_result.scalars().all()}
+        categories: dict[int | None, str] = {
+            c.id: c.name for c in categories_result.scalars().all()
+        }
 
         # 2. Resumo de contas
         if household_user_ids:
             accounts_query = select(Account).where(
                 or_(
                     and_(Account.user_id == user.id, Account.ownership_type == "personal"),
-                    and_(Account.user_id.in_(household_user_ids), Account.ownership_type == "household")
+                    and_(
+                        Account.user_id.in_(household_user_ids),
+                        Account.ownership_type == "household",
+                    ),
                 )
             )
         else:
@@ -780,7 +803,8 @@ class MCPService:
         accounts_list = accounts.scalars().all()
         context["contas"] = [
             {"nome": a.name, "tipo": a.type, "saldo": float(a.balance)}
-            for a in accounts_list if a.is_active
+            for a in accounts_list
+            if a.is_active
         ]
         context["saldo_total"] = sum(float(a.balance) for a in accounts_list if a.is_active)
 
@@ -791,14 +815,17 @@ class MCPService:
                 Transaction.date <= period_end,
                 or_(
                     and_(Transaction.user_id == user.id, Transaction.ownership_type == "personal"),
-                    and_(Transaction.user_id.in_(household_user_ids), Transaction.ownership_type == "household")
-                )
+                    and_(
+                        Transaction.user_id.in_(household_user_ids),
+                        Transaction.ownership_type == "household",
+                    ),
+                ),
             )
         else:
             tx_query = select(Transaction).where(
                 Transaction.user_id == user.id,
                 Transaction.date >= period_start,
-                Transaction.date <= period_end
+                Transaction.date <= period_end,
             )
 
         transactions = await self.db.execute(tx_query)
@@ -830,7 +857,9 @@ class MCPService:
         }
 
         # 4. Gastos por categoria - SEMPRE retorna todos para o ChatGPT analisar
-        gastos_por_categoria: dict[str, dict[str, Any]] = defaultdict(lambda: {"total": 0, "count": 0, "transacoes": []})
+        gastos_por_categoria: dict[str, dict[str, Any]] = defaultdict(
+            lambda: {"total": 0, "count": 0, "transacoes": []}
+        )
         search_keyword = request.search.lower() if request.search else None
 
         # Função para verificar se transação corresponde à busca (para destacar resultados)
@@ -856,29 +885,35 @@ class MCPService:
                 gastos_por_categoria[cat_name]["count"] += 1
                 # Limitar transações detalhadas para não ficar muito grande
                 if len(gastos_por_categoria[cat_name]["transacoes"]) < 5:
-                    gastos_por_categoria[cat_name]["transacoes"].append({
-                        "valor": float(t.amount),
-                        "data": t.date.strftime("%d/%m"),
-                        "estabelecimento": merchant_name,
-                        "descricao": description,
-                    })
+                    gastos_por_categoria[cat_name]["transacoes"].append(
+                        {
+                            "valor": float(t.amount),
+                            "data": t.date.strftime("%d/%m"),
+                            "estabelecimento": merchant_name,
+                            "descricao": description,
+                        }
+                    )
 
                 # Se tem keyword e corresponde, acumula para destaque
                 if search_keyword and matches_search(description, merchant_name, cat_name):
                     total_encontrado += float(t.amount)
                     if len(transacoes_encontradas) < 20:
-                        transacoes_encontradas.append({
-                            "valor": float(t.amount),
-                            "data": t.date.strftime("%d/%m/%Y"),
-                            "estabelecimento": merchant_name,
-                            "descricao": description,
-                            "categoria": cat_name,
-                        })
+                        transacoes_encontradas.append(
+                            {
+                                "valor": float(t.amount),
+                                "data": t.date.strftime("%d/%m/%Y"),
+                                "estabelecimento": merchant_name,
+                                "descricao": description,
+                                "categoria": cat_name,
+                            }
+                        )
 
         # Ordenar por valor e arredondar
         context["gastos_por_categoria"] = {
             k: {"total": round(v["total"], 2), "count": v["count"], "transacoes": v["transacoes"]}
-            for k, v in sorted(gastos_por_categoria.items(), key=lambda x: x[1]["total"], reverse=True)
+            for k, v in sorted(
+                gastos_por_categoria.items(), key=lambda x: x[1]["total"], reverse=True
+            )
         }
 
         # Se teve busca, adiciona resultado destacado
@@ -887,12 +922,16 @@ class MCPService:
                 "termo": request.search,
                 "total": round(total_encontrado, 2),
                 "quantidade": len(transacoes_encontradas),
-                "transacoes": sorted(transacoes_encontradas, key=lambda x: x["valor"], reverse=True),
-                "dica": "Se não encontrou o que procurava, analise os dados de gastos_por_categoria e gastos_por_estabelecimento para encontrar transações relacionadas."
+                "transacoes": sorted(
+                    transacoes_encontradas, key=lambda x: x["valor"], reverse=True
+                ),
+                "dica": "Se não encontrou o que procurava, analise os dados de gastos_por_categoria e gastos_por_estabelecimento para encontrar transações relacionadas.",
             }
 
         # 5. Gastos por estabelecimento (top 15) - SEMPRE retorna todos
-        gastos_por_estabelecimento: dict[str, dict[str, Any]] = defaultdict(lambda: {"total": 0, "count": 0})
+        gastos_por_estabelecimento: dict[str, dict[str, Any]] = defaultdict(
+            lambda: {"total": 0, "count": 0}
+        )
         for t in txs:
             if t.type == TransactionType.EXPENSE.value:
                 merchant_name = merchants.get(t.merchant_id, t.description or "Outros")
@@ -901,11 +940,15 @@ class MCPService:
 
         context["gastos_por_estabelecimento"] = {
             k: {"total": round(v["total"], 2), "count": v["count"]}
-            for k, v in sorted(gastos_por_estabelecimento.items(), key=lambda x: x[1]["total"], reverse=True)[:10]
+            for k, v in sorted(
+                gastos_por_estabelecimento.items(), key=lambda x: x[1]["total"], reverse=True
+            )[:10]
         }
 
         # 6. Receitas por categoria
-        receitas_por_categoria: dict[str, dict[str, Any]] = defaultdict(lambda: {"total": 0, "count": 0})
+        receitas_por_categoria: dict[str, dict[str, Any]] = defaultdict(
+            lambda: {"total": 0, "count": 0}
+        )
         for t in txs:
             if t.type == TransactionType.INCOME.value:
                 cat_name = categories.get(t.category_id, "Sem categoria")
@@ -925,7 +968,9 @@ class MCPService:
             {
                 "valor": float(t.amount),
                 "data": t.date.strftime("%d/%m/%Y"),
-                "estabelecimento": merchants.get(t.merchant_id, t.description or "Não identificado"),
+                "estabelecimento": merchants.get(
+                    t.merchant_id, t.description or "Não identificado"
+                ),
                 "categoria": categories.get(t.category_id, "Sem categoria"),
             }
             for t in todas_despesas[:10]
@@ -933,10 +978,7 @@ class MCPService:
 
         # 9. Dívidas ativas
         debts = await self.db.execute(
-            select(Debt).where(
-                Debt.user_id == user.id,
-                Debt.status == DebtStatus.ACTIVE.value
-            )
+            select(Debt).where(Debt.user_id == user.id, Debt.status == DebtStatus.ACTIVE.value)
         )
         debts_list = debts.scalars().all()
         context["dividas"] = [
@@ -952,10 +994,7 @@ class MCPService:
 
         # 10. Metas financeiras
         goals = await self.db.execute(
-            select(Goal).where(
-                Goal.user_id == user.id,
-                Goal.status == "active"
-            )
+            select(Goal).where(Goal.user_id == user.id, Goal.status == "active")
         )
         goals_list = goals.scalars().all()
         context["metas"] = [
@@ -963,7 +1002,9 @@ class MCPService:
                 "nome": g.name,
                 "valor_alvo": float(g.target_amount),
                 "valor_atual": float(g.current_amount),
-                "progresso": round(float(g.current_amount / g.target_amount * 100), 1) if g.target_amount > 0 else 0,
+                "progresso": round(float(g.current_amount / g.target_amount * 100), 1)
+                if g.target_amount > 0
+                else 0,
                 "falta": round(float(g.target_amount - g.current_amount), 2),
             }
             for g in goals_list
@@ -971,27 +1012,26 @@ class MCPService:
 
         # 11. Cartões de crédito e faturas
         credit_cards_result = await self.db.execute(
-            select(CreditCard).where(
-                CreditCard.user_id == user.id,
-                CreditCard.is_active == True
-            )
+            select(CreditCard).where(CreditCard.user_id == user.id, CreditCard.is_active == True)
         )
         credit_cards_list = credit_cards_result.scalars().all()
 
         cartoes_info = []
         for card in credit_cards_list:
             invoices_result = await self.db.execute(
-                select(CreditCardInvoice).where(
+                select(CreditCardInvoice)
+                .where(
                     CreditCardInvoice.credit_card_id == card.id,
                     or_(
                         CreditCardInvoice.status == InvoiceStatus.OPEN.value,
                         CreditCardInvoice.status == InvoiceStatus.CLOSED.value,
                         CreditCardInvoice.status == InvoiceStatus.PARTIAL.value,
-                        CreditCardInvoice.status == InvoiceStatus.OVERDUE.value
-                    )
-                ).order_by(
+                        CreditCardInvoice.status == InvoiceStatus.OVERDUE.value,
+                    ),
+                )
+                .order_by(
                     CreditCardInvoice.reference_year.desc(),
-                    CreditCardInvoice.reference_month.desc()
+                    CreditCardInvoice.reference_month.desc(),
                 )
             )
             invoices_list = invoices_result.scalars().all()
@@ -1010,22 +1050,26 @@ class MCPService:
 
             faturas_info = []
             for inv in invoices_list[:2]:  # Mostrar até 2 faturas
-                faturas_info.append({
-                    "periodo": f"{inv.reference_month:02d}/{inv.reference_year}",
-                    "status": inv.status,
-                    "valor_total": float(inv.total_amount),
-                    "valor_restante": float(inv.remaining_amount),
-                    "vencimento": inv.due_date.strftime("%d/%m/%Y"),
-                })
+                faturas_info.append(
+                    {
+                        "periodo": f"{inv.reference_month:02d}/{inv.reference_year}",
+                        "status": inv.status,
+                        "valor_total": float(inv.total_amount),
+                        "valor_restante": float(inv.remaining_amount),
+                        "vencimento": inv.due_date.strftime("%d/%m/%Y"),
+                    }
+                )
 
-            cartoes_info.append({
-                "nome": account.name if account else card.nickname or "Cartão",
-                "bandeira": card.card_brand,
-                "limite_total": float(card.credit_limit),
-                "saldo_em_aberto": round(saldo_em_aberto, 2),
-                "limite_disponivel": round(float(card.credit_limit) - saldo_em_aberto, 2),
-                "faturas": faturas_info,
-            })
+            cartoes_info.append(
+                {
+                    "nome": account.name if account else card.nickname or "Cartão",
+                    "bandeira": card.card_brand,
+                    "limite_total": float(card.credit_limit),
+                    "saldo_em_aberto": round(saldo_em_aberto, 2),
+                    "limite_disponivel": round(float(card.credit_limit) - saldo_em_aberto, 2),
+                    "faturas": faturas_info,
+                }
+            )
 
         context["cartoes_credito"] = cartoes_info
 
@@ -1040,27 +1084,38 @@ class MCPService:
                 Transaction.date <= last_month_end,
                 or_(
                     and_(Transaction.user_id == user.id, Transaction.ownership_type == "personal"),
-                    and_(Transaction.user_id.in_(household_user_ids), Transaction.ownership_type == "household")
-                )
+                    and_(
+                        Transaction.user_id.in_(household_user_ids),
+                        Transaction.ownership_type == "household",
+                    ),
+                ),
             )
         else:
             last_month_query = select(Transaction).where(
                 Transaction.user_id == user.id,
                 Transaction.date >= last_month_start,
-                Transaction.date <= last_month_end
+                Transaction.date <= last_month_end,
             )
 
         last_txs = await self.db.execute(last_month_query)
         last_txs_list = last_txs.scalars().all()
 
-        last_despesas = sum(float(t.amount) for t in last_txs_list if t.type == TransactionType.EXPENSE.value)
-        last_receitas = sum(float(t.amount) for t in last_txs_list if t.type == TransactionType.INCOME.value)
+        last_despesas = sum(
+            float(t.amount) for t in last_txs_list if t.type == TransactionType.EXPENSE.value
+        )
+        last_receitas = sum(
+            float(t.amount) for t in last_txs_list if t.type == TransactionType.INCOME.value
+        )
 
         context["comparacao_periodo_anterior"] = {
             "periodo": f"{last_month_start.strftime('%d/%m')} - {last_month_end.strftime('%d/%m/%Y')}",
             "despesas": round(last_despesas, 2),
             "receitas": round(last_receitas, 2),
-            "variacao_despesas_pct": round(((despesas - last_despesas) / max(1, last_despesas)) * 100, 1) if last_despesas > 0 else 0,
+            "variacao_despesas_pct": round(
+                ((despesas - last_despesas) / max(1, last_despesas)) * 100, 1
+            )
+            if last_despesas > 0
+            else 0,
         }
 
         return context

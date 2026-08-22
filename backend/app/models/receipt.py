@@ -12,9 +12,10 @@ from ..core.database import Base
 
 class ReceiptStatus(str, Enum):
     """Status do cupom fiscal"""
-    PENDING = "pending"        # Aguardando confirmação
-    CONFIRMED = "confirmed"    # Itens confirmados
-    CANCELLED = "cancelled"    # Cancelado pelo usuário
+
+    PENDING = "pending"  # Aguardando confirmação
+    CONFIRMED = "confirmed"  # Itens confirmados
+    CANCELLED = "cancelled"  # Cancelado pelo usuário
 
 
 # Display names for status (Portuguese)
@@ -33,12 +34,11 @@ class Receipt(Base):
     - Vincular múltiplos pagamentos (ReceiptPayment) à compra, não aos itens
     - Cálculo de saldo correto por conta/cartão
     """
+
     __tablename__ = "receipts"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), index=True
-    )
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     document_id: Mapped[int | None] = mapped_column(
         ForeignKey("documents.id", ondelete="SET NULL"), index=True
     )
@@ -56,9 +56,7 @@ class Receipt(Base):
     purchase_date: Mapped[date] = mapped_column(Date, index=True)
 
     # Status
-    status: Mapped[str] = mapped_column(
-        String(20), default=ReceiptStatus.PENDING.value
-    )
+    status: Mapped[str] = mapped_column(String(20), default=ReceiptStatus.PENDING.value)
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
@@ -68,20 +66,16 @@ class Receipt(Base):
     user: Mapped["User"] = relationship(back_populates="receipts")
     document: Mapped["Document | None"] = relationship(back_populates="receipt")
     items: Mapped[list["Transaction"]] = relationship(
-        back_populates="receipt",
-        lazy="noload",
-        order_by="Transaction.id"
+        back_populates="receipt", lazy="noload", order_by="Transaction.id"
     )
     payments: Mapped[list["ReceiptPayment"]] = relationship(
         back_populates="receipt",
         cascade="all, delete-orphan",
         lazy="noload",
-        order_by="ReceiptPayment.sequence"
+        order_by="ReceiptPayment.sequence",
     )
     grocery_purchase: Mapped["GroceryPurchase | None"] = relationship(
-        back_populates="receipt",
-        uselist=False,
-        lazy="noload"
+        back_populates="receipt", uselist=False, lazy="noload"
     )
 
     @property
@@ -110,6 +104,7 @@ class ReceiptPayment(Base):
     Forma de pagamento de um receipt (split payment).
     Cada pagamento representa um débito em uma conta específica.
     """
+
     __tablename__ = "receipt_payments"
 
     id: Mapped[int] = mapped_column(primary_key=True)
