@@ -1,4 +1,5 @@
 from datetime import date as date_type
+
 from pydantic import BaseModel
 
 

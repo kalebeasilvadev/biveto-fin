@@ -5,7 +5,6 @@ from app.core.deps import CurrentUser, DbSession
 from app.modules.chat.schemas.chat import ChatRequest, ChatResponse
 from app.modules.chat.services.financial_agent_service import FinancialAgentService
 
-
 router = APIRouter()
 
 

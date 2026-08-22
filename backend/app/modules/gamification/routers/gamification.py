@@ -1,16 +1,18 @@
 """Gamification API Router"""
 
-from fastapi import APIRouter, Query, HTTPException
+from fastapi import APIRouter, HTTPException, Query
+
 from app.core.deps import CurrentUser, DbSession
-from ..services import GamificationService
+
 from ..schemas import (
-    GamificationSummary,
     BadgeResponse,
-    StreakWeekView,
     ChallengeListResponse,
     ChallengeStartResponse,
+    GamificationSummary,
     PointsHistoryResponse,
+    StreakWeekView,
 )
+from ..services import GamificationService
 
 router = APIRouter()
 

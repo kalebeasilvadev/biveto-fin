@@ -6,10 +6,11 @@ Este módulo NÃO bloqueia transações, apenas:
 3. Permite ajustes manuais
 """
 import logging
-from datetime import datetime, timezone
+
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.models.account import Account
+
 from app.core.utils import utc_now
+from app.models.account import Account
 
 logger = logging.getLogger(__name__)
 

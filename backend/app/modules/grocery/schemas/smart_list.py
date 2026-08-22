@@ -2,12 +2,14 @@
 Smart Shopping List Schemas - LLM-powered intelligent list generation
 """
 from datetime import date, datetime
+
 from pydantic import BaseModel, Field
+
 from app.models.grocery import (
     GroceryCategory,
     NecessityType,
-    ShoppingListStatus,
     ShoppingListSource,
+    ShoppingListStatus,
 )
 
 

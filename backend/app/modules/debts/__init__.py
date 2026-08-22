@@ -1,21 +1,21 @@
 """Debts module - Debt management"""
 from app.modules.debts.routers.debts import router
-from app.modules.debts.services.debt_service import DebtService
 from app.modules.debts.schemas.debt import (
+    AvalanchePlan,
     DebtCreate,
-    DebtUpdate,
-    DebtPaymentCreate,
-    DebtResponse,
     DebtDetailResponse,
+    DebtHighlight,
+    DebtPaymentCreate,
     DebtPaymentResponse,
     DebtPayoffProjection,
+    DebtResponse,
     DebtSummary,
-    DebtHighlight,
-    SnowballPlan,
-    AvalanchePlan,
-    SnowballDebtStep,
+    DebtUpdate,
     PayoffStrategyComparison,
+    SnowballDebtStep,
+    SnowballPlan,
 )
+from app.modules.debts.services.debt_service import DebtService
 
 __all__ = [
     "router",

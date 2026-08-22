@@ -3,21 +3,20 @@ REST API endpoints for income split rules.
 Allows users to configure rules for splitting income into expenses (e.g., tithe, savings).
 """
 from __future__ import annotations
+
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
+from sqlalchemy import select
 
 from app.core.deps import CurrentUser, DbSession
 from app.models.category import Category
-from sqlalchemy import select
-
 from app.modules.income_splits.schemas.income_split import (
-    IncomeSplitRuleCreate,
-    IncomeSplitRuleUpdate,
-    IncomeSplitRuleResponse,
     IncomeSplitPreview,
+    IncomeSplitRuleCreate,
+    IncomeSplitRuleResponse,
+    IncomeSplitRuleUpdate,
 )
 from app.modules.income_splits.services.income_split_service import IncomeSplitService
-
 
 router = APIRouter()
 

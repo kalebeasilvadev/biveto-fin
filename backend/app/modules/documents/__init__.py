@@ -24,12 +24,12 @@ Dependencias:
 """
 from app.modules.documents.routers.documents import router
 from app.modules.documents.schemas.document import (
-    FutureInstallmentResponse,
-    ExtractedItemResponse,
-    InstallmentAnalysisResponse,
-    DocumentExtractionResponse,
     CardInfoResponse,
+    DocumentExtractionResponse,
     DocumentResponse,
+    ExtractedItemResponse,
+    FutureInstallmentResponse,
+    InstallmentAnalysisResponse,
 )
 from app.modules.documents.services.document_service import DocumentService
 from app.modules.documents.services.llm_ocr_service import LLMOCRService

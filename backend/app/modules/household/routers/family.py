@@ -2,20 +2,19 @@
 Rotas para gerenciamento de familia/household.
 Permite ao owner convidar membros e gerenciar a familia.
 """
-from datetime import datetime
 from fastapi import APIRouter, HTTPException, status
-from sqlalchemy import select, func
+from sqlalchemy import select
 
-from app.core.deps import CurrentUser, DbSession
 from app.core.config import settings
-from app.models import User, License, Invitation, InvitationStatus
-from app.models.household import HouseholdMember, HouseholdRole
+from app.core.deps import CurrentUser, DbSession
 from app.core.services.email_service import email_service
+from app.models import Invitation, InvitationStatus, License, User
+from app.models.household import HouseholdMember, HouseholdRole
 from app.modules.household.schemas.household import (
     FamilyContext,
+    FamilyInvitationResponse,
     FamilyInviteRequest,
     FamilyInviteResponse,
-    FamilyInvitationResponse,
     HouseholdMemberResponse,
 )
 

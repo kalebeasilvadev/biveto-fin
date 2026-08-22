@@ -2,19 +2,19 @@
 Schemas for Financial Automations.
 """
 
-from datetime import datetime, date
+from datetime import datetime
 from decimal import Decimal
-from typing import Any, Literal
+from typing import Literal
+
 from pydantic import BaseModel, Field, field_validator
 
 from app.models.automation_rule import (
-    TriggerType,
     ActionType,
-    ScheduleFrequency,
     EventType,
+    ScheduleFrequency,
     ThresholdType,
+    TriggerType,
 )
-
 
 # ==================== Trigger Configs ====================
 

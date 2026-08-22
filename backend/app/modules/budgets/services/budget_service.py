@@ -5,34 +5,45 @@ Implementa funcionalidades baseadas em YNAB e Dave Ramsey
 Evolução: Incorpora funcionalidades de Envelopes (histórico, status dinâmico,
 transferências, subsídio diário) para uma experiência mais completa de orçamento.
 """
-from datetime import date, datetime, timezone
-from decimal import Decimal
 from calendar import monthrange
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, func, or_
-from sqlalchemy.orm import selectinload
-from fastapi import HTTPException, status
+from datetime import date
+from decimal import Decimal
 
+from fastapi import HTTPException, status
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from app.core.utils import utc_now
 from app.models.budget import (
-    Budget, BudgetItem, BudgetItemHistory,
-    BudgetItemStatus, BudgetHistoryChangeType
+    Budget,
+    BudgetHistoryChangeType,
+    BudgetItem,
+    BudgetItemHistory,
+    BudgetItemStatus,
 )
-from app.models.transaction import Transaction, TransactionType
 from app.models.category import Category
+from app.models.transaction import Transaction, TransactionType
 from app.models.user import User
 from app.modules.budgets.schemas.budget import (
-    BudgetCreate, BudgetUpdate, BudgetItemCreate, BudgetItemUpdate,
-    BudgetResponse, BudgetItemResponse, BudgetSummary, BudgetComparisonResponse,
-    BudgetTransferRequest, BudgetTransferResponse, BudgetItemHistoryResponse
+    BudgetComparisonResponse,
+    BudgetCreate,
+    BudgetItemCreate,
+    BudgetItemHistoryResponse,
+    BudgetItemResponse,
+    BudgetItemUpdate,
+    BudgetResponse,
+    BudgetSummary,
+    BudgetTransferRequest,
+    BudgetTransferResponse,
+    BudgetUpdate,
 )
-from app.core.utils import utc_now
 from app.modules.household.utils import (
-    get_household_user_ids,
-    get_household_member,
     build_ownership_filter,
+    get_household_member,
+    get_household_user_ids,
     validate_create_permission,
     validate_edit_permission,
-    validate_delete_permission,
 )
 
 
@@ -663,7 +674,7 @@ class BudgetService:
             balance_before=from_available,
             balance_after=from_available - data.amount,
             related_category_id=data.to_category_id,
-            notes=data.notes or f"Transferido para outra categoria"
+            notes=data.notes or "Transferido para outra categoria"
         )
         self.db.add(from_history)
 
@@ -679,7 +690,7 @@ class BudgetService:
             balance_before=to_available,
             balance_after=to_available + data.amount,
             related_category_id=data.from_category_id,
-            notes=data.notes or f"Recebido de outra categoria"
+            notes=data.notes or "Recebido de outra categoria"
         )
         self.db.add(to_history)
 

@@ -2,10 +2,10 @@
 Schemas de household: membros da familia, contexto e convites.
 """
 from datetime import datetime
-from pydantic import BaseModel, EmailStr, Field
+
+from pydantic import BaseModel, EmailStr
 
 from app.models.household import HouseholdRole, OwnershipType
-
 
 # ========== Household Member Schemas ==========
 

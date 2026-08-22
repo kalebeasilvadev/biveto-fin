@@ -6,35 +6,33 @@ Handles CRUD operations for automation rules and their execution.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, date, timedelta, timezone
+from datetime import date
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import select, func, and_, or_
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
+from app.core.utils import utc_now
 from app.models import (
-    User,
     Account,
-    Transaction,
-    Category,
-    AutomationRule,
-    AutomationExecution,
-    TriggerType,
     ActionType,
+    AutomationExecution,
+    AutomationRule,
+    Transaction,
+    TriggerType,
+    User,
 )
+from app.models.notification import NotificationPriority, NotificationType
 from app.modules.automations.schemas import (
-    AutomationRuleCreate,
-    AutomationRuleUpdate,
-    AutomationRuleResponse,
-    AutomationRuleListResponse,
     AutomationExecutionResponse,
+    AutomationRuleCreate,
+    AutomationRuleListResponse,
+    AutomationRuleResponse,
+    AutomationRuleUpdate,
     AutomationTestResult,
 )
-from app.models.notification import NotificationType, NotificationPriority
 from app.modules.notifications.services import NotificationService
-from app.core.utils import utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -109,12 +107,6 @@ class AutomationService:
         rules = list(result.scalars().all())
 
         # Count totals
-        count_query = select(
-            func.count(AutomationRule.id).label("total"),
-            func.sum(func.cast(AutomationRule.is_active, Integer)).label("active"),
-        ).where(AutomationRule.user_id == user.id)
-
-        # Use simpler count queries
         total_result = await self.session.execute(
             select(func.count(AutomationRule.id))
             .where(AutomationRule.user_id == user.id)
@@ -713,7 +705,6 @@ class AutomationService:
         if rule.action_type == ActionType.TRANSFER.value:
             config = rule.action_config
             from_id = config.get("from_account_id")
-            to_id = config.get("to_account_id")
 
             from_balance = await self._get_account_balance(user.id, from_id)
             amount_type = config.get("amount_type")
@@ -822,4 +813,3 @@ class AutomationService:
 
 
 # Fix missing import
-from sqlalchemy import Integer

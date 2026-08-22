@@ -21,8 +21,8 @@ from app.modules.accounts.routers.accounts import router
 from app.modules.accounts.schemas.account import (
     AccountBase,
     AccountCreate,
-    AccountUpdate,
     AccountResponse,
+    AccountUpdate,
 )
 
 __all__ = [

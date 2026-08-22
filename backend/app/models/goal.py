@@ -2,12 +2,15 @@
 Modelo de Metas Financeiras (Goals)
 Baseado nas metodologias YNAB, Cerbasi (PNIF) e Thiago Nigro
 """
-from datetime import datetime, date, timezone
-from app.core.utils import utc_now
+from datetime import date, datetime
 from decimal import Decimal
 from enum import Enum
-from sqlalchemy import String, ForeignKey, DateTime, Date, Numeric, Integer, Boolean, Text
+
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.core.utils import utc_now
+
 from ..core.database import Base
 
 
@@ -119,6 +122,6 @@ class GoalContribution(Base):
 
 
 # Imports para evitar circular import
-from .user import User
 from .account import Account
 from .transaction import Transaction
+from .user import User

@@ -1,13 +1,21 @@
 """Endpoints de Gestão de Dívidas (Debts)"""
 from decimal import Decimal
-from fastapi import APIRouter, Query, HTTPException, status
+
+from fastapi import APIRouter, HTTPException, Query, status
 
 from app.core.deps import CurrentUser, DbSession
 from app.models.debt import DebtStatus
 from app.modules.debts.schemas.debt import (
-    DebtCreate, DebtUpdate, DebtPaymentCreate,
-    DebtResponse, DebtDetailResponse, DebtPaymentResponse,
-    DebtSummary, SnowballPlan, AvalanchePlan, PayoffStrategyComparison
+    AvalanchePlan,
+    DebtCreate,
+    DebtDetailResponse,
+    DebtPaymentCreate,
+    DebtPaymentResponse,
+    DebtResponse,
+    DebtSummary,
+    DebtUpdate,
+    PayoffStrategyComparison,
+    SnowballPlan,
 )
 from app.modules.debts.services.debt_service import DebtService
 

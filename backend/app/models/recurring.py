@@ -1,8 +1,11 @@
-from datetime import datetime, date, timezone
-from app.core.utils import utc_now
+from datetime import date, datetime
 from enum import Enum
-from sqlalchemy import String, ForeignKey, DateTime, Date, Numeric, Integer
+
+from sqlalchemy import Date, DateTime, ForeignKey, Integer, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.core.utils import utc_now
+
 from ..core.database import Base
 
 
@@ -66,7 +69,7 @@ class RecurringTransaction(Base):
     )
 
 
-from .user import User
 from .account import Account
 from .category import Category
 from .transaction import Transaction
+from .user import User

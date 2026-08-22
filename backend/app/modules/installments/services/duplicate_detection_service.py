@@ -1,22 +1,21 @@
 """Serviço para detecção e resolução de duplicatas em séries de parcelas e transações"""
 
-from datetime import timedelta
-from rapidfuzz import fuzz
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, or_
 from fastapi import HTTPException, status
+from rapidfuzz import fuzz
+from sqlalchemy import and_, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.installment import InstallmentSeries, InstallmentSeriesStatus
 from app.models.transaction import Transaction
 from app.models.user import User
-from app.modules.installments.services.installment_service import InstallmentService
 from app.modules.installments.schemas.duplicate import (
-    DuplicateGroup,
     ConflictDetail,
+    DuplicateGroup,
     TransactionDuplicatePair,
     TransactionDuplicatesResponse,
 )
 from app.modules.installments.schemas.installment import InstallmentSeriesResponse
+from app.modules.installments.services.installment_service import InstallmentService
 
 
 class DuplicateDetectionService:
@@ -53,8 +52,8 @@ class DuplicateDetectionService:
         - Caracteres especiais extras
         - Espaços duplicados
         """
-        import unicodedata
         import re
+        import unicodedata
 
         if not description:
             return ""

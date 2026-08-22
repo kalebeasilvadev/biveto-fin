@@ -1,7 +1,10 @@
-from datetime import datetime, timezone
-from app.core.utils import utc_now
-from sqlalchemy import String, Boolean, DateTime, Date, ForeignKey
+from datetime import datetime
+
+from sqlalchemy import Boolean, DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.core.utils import utc_now
+
 from ..core.database import Base
 
 
@@ -142,24 +145,29 @@ class User(Base):
 
 
 from .account import Account
-from .transaction import Transaction
-from .document import Document
-from .rule import UserMerchantRule
-from .installment import InstallmentSeries
-from .budget import Budget
-from .goal import Goal
-from .debt import Debt
-from .license import License
-from .invitation import Invitation
-from .recurring import RecurringTransaction
-from .household import HouseholdMember
-from .credit_card import CreditCard
+from .api_key import APIKey
+from .automation_rule import AutomationRule
 from .benefit_card import BenefitCard
+from .budget import Budget
+from .credit_card import CreditCard
+from .credit_card_invoice import CreditCardInvoice
+from .debt import Debt
+from .document import Document
+from .gamification import UserBadge, UserChallenge, UserPoints, UserStreak
+from .goal import Goal
+from .household import HouseholdMember
 from .income_source import IncomeSource
 from .income_split_rule import IncomeSplitRule
-from .credit_card_invoice import CreditCardInvoice
-from .api_key import APIKey
-from .notification import Notification, NotificationPreference, NotificationSettings, PushSubscription
-from .automation_rule import AutomationRule
+from .installment import InstallmentSeries
+from .invitation import Invitation
+from .license import License
+from .notification import (
+    Notification,
+    NotificationPreference,
+    NotificationSettings,
+    PushSubscription,
+)
 from .receipt import Receipt
-from .gamification import UserBadge, UserStreak, UserChallenge, UserPoints
+from .recurring import RecurringTransaction
+from .rule import UserMerchantRule
+from .transaction import Transaction

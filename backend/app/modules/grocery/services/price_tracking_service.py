@@ -2,21 +2,21 @@
 Price Tracking Service - Track and analyze price history
 """
 from datetime import date, timedelta
+
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 
 from app.models.grocery import (
     GroceryPriceHistory,
     GroceryProduct,
 )
-from app.models.merchant import Merchant
 from app.models.user import User
 from app.modules.grocery.schemas.analytics import (
-    PriceHistoryResponse,
-    PricePoint,
     CheapestPriceResponse,
     MerchantPrice,
+    PriceHistoryResponse,
+    PricePoint,
 )
 
 

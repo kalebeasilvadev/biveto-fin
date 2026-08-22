@@ -3,9 +3,11 @@ Cryptography utilities for encrypting/decrypting sensitive data.
 
 Uses Fernet symmetric encryption with a key derived from the application's secret_key.
 """
-from cryptography.fernet import Fernet
 import base64
 import hashlib
+
+from cryptography.fernet import Fernet
+
 from .config import settings
 
 

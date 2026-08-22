@@ -1,33 +1,31 @@
-from datetime import datetime, time, timezone
 from typing import Any
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, update, delete, and_, or_
-from sqlalchemy.orm import selectinload
-from fastapi import HTTPException, status
 
-from app.models.user import User
+from sqlalchemy import func, select, update
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.utils import utc_now
 from app.models.notification import (
     Notification,
     NotificationPreference,
-    NotificationSettings,
-    PushSubscription,
-    NotificationType,
     NotificationPriority,
+    NotificationSettings,
+    NotificationType,
+    PushSubscription,
 )
-from app.core.utils import utc_now
+from app.models.user import User
 from app.modules.notifications.schemas.notification import (
+    NOTIFICATION_TYPE_INFO,
     NotificationCreate,
-    NotificationResponse,
-    NotificationSummary,
     NotificationPreferenceResponse,
     NotificationPreferenceUpdate,
     NotificationPreferenceWithDefaults,
+    NotificationResponse,
     NotificationSettingsResponse,
     NotificationSettingsUpdate,
+    NotificationSummary,
     PushSubscriptionCreate,
     PushSubscriptionResponse,
     UnreadCountResponse,
-    NOTIFICATION_TYPE_INFO,
 )
 
 

@@ -1,9 +1,9 @@
 from .income_split import (
-    IncomeSplitRuleCreate,
-    IncomeSplitRuleUpdate,
-    IncomeSplitRuleResponse,
-    IncomeSplitPreview,
     AppliedSplitResponse,
+    IncomeSplitPreview,
+    IncomeSplitRuleCreate,
+    IncomeSplitRuleResponse,
+    IncomeSplitRuleUpdate,
 )
 
 __all__ = [

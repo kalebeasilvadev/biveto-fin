@@ -2,9 +2,9 @@
 from app.modules.analytics.schemas.analytics import (
     AnalyticsSummary,
     CategorySummary,
-    MerchantSummary,
     InsightResponse,
     InsightType,
+    MerchantSummary,
 )
 
 __all__ = [

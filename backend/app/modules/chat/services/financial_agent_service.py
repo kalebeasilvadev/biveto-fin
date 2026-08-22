@@ -4,43 +4,49 @@ Suporta: Google Gemini (gratuito) e Mistral AI (melhor custo-beneficio)
 Com analise detalhada de gastos por categoria, estabelecimento, periodo, cartoes e receitas.
 """
 from __future__ import annotations
+
 import json
-import httpx
-import uuid
 import re
-from datetime import date, datetime, timedelta, timezone
-from typing import Any
-from dateutil.relativedelta import relativedelta
-from decimal import Decimal
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_, or_, delete
+import uuid
 from collections import defaultdict
+from datetime import date, datetime, timedelta
+from decimal import Decimal
+from typing import Any
+
+import httpx
+from dateutil.relativedelta import relativedelta
+from sqlalchemy import and_, delete, func, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.models.user import User
-from app.models.transaction import Transaction, TransactionType
-from app.models.category import Category
-from app.models.merchant import Merchant
-from app.models.debt import Debt, DebtStatus, DebtPayment
-from app.models.goal import Goal, GoalContribution
-from app.models.budget import Budget, BudgetItem
+from app.core.utils import utc_now
 from app.models.account import Account
-from app.models.household import HouseholdMember
+
+# Envelope module removed - functionality merged into Budgets module
+from app.models.automation_rule import AutomationExecution, AutomationRule
+from app.models.benefit_card import BenefitCard
+from app.models.budget import Budget, BudgetItem
+from app.models.category import Category
+from app.models.chat import ChatConversation, ChatMessage, MessageRole
 from app.models.credit_card import CreditCard
 from app.models.credit_card_invoice import CreditCardInvoice, InvoiceStatus
-from app.models.income_source import IncomeSource
-from app.models.chat import ChatConversation, ChatMessage, MessageRole
-from app.models.installment import InstallmentSeries, InstallmentSeriesStatus
-from app.models.recurring import RecurringTransaction, RecurringStatus
-from app.models.benefit_card import BenefitCard
+from app.models.debt import Debt, DebtPayment, DebtStatus
+from app.models.goal import Goal, GoalContribution
 from app.models.grocery import (
-    GroceryPurchase, GroceryProduct, ShoppingList, ShoppingListItem,
-    GroceryPriceHistory, ShoppingListStatus, GROCERY_CATEGORY_DISPLAY
+    GROCERY_CATEGORY_DISPLAY,
+    GroceryPurchase,
+    ShoppingList,
+    ShoppingListItem,
+    ShoppingListStatus,
 )
-# Envelope module removed - functionality merged into Budgets module
-from app.models.automation_rule import AutomationRule, AutomationExecution
+from app.models.household import HouseholdMember
+from app.models.income_source import IncomeSource
+from app.models.installment import InstallmentSeries, InstallmentSeriesStatus
+from app.models.merchant import Merchant
+from app.models.recurring import RecurringStatus, RecurringTransaction
+from app.models.transaction import Transaction, TransactionType
+from app.models.user import User
 from app.modules.chat.schemas.chat import ChatResponse
-from app.core.utils import utc_now
 
 # Limite de mensagens por conversa para evitar vazamento de memória
 MAX_MESSAGES_PER_CONVERSATION = 10
@@ -3101,7 +3107,6 @@ PONTOS IMPORTANTES:
 
         # Soma de parcelas ativas por mes
         parcelas = context.get("parcelas_ativas", [])
-        total_parcelas_mes = sum(p.get("valor_parcela", 0) for p in parcelas)
 
         # Soma de recorrentes mensais
         recorrentes = context.get("recorrentes", [])

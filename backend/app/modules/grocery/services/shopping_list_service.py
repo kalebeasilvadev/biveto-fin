@@ -1,41 +1,39 @@
 """
 Shopping List Service - CRUD and AI generation for shopping lists
 """
-from datetime import date, datetime, timedelta, timezone
-from decimal import Decimal
 from collections import defaultdict
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_, or_
-from sqlalchemy.orm import selectinload
-from fastapi import HTTPException, status
+from datetime import date, timedelta
 
+from fastapi import HTTPException, status
+from sqlalchemy import or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from app.core.utils import utc_now
 from app.models.grocery import (
-    ShoppingList,
-    ShoppingListItem,
-    GroceryPurchase,
-    GroceryProduct,
-    GroceryPriceHistory,
-    GroceryCategory,
-    NecessityType,
-    ShoppingListStatus,
-    ShoppingListSource,
     GROCERY_CATEGORY_DISPLAY,
     NECESSITY_TYPE_DISPLAY,
+    GroceryCategory,
+    GroceryPriceHistory,
+    GroceryPurchase,
+    NecessityType,
+    ShoppingList,
+    ShoppingListItem,
+    ShoppingListSource,
+    ShoppingListStatus,
 )
 from app.models.user import User
 from app.modules.grocery.schemas.shopping_list import (
     ShoppingListCreate,
-    ShoppingListUpdate,
-    ShoppingListResponse,
-    ShoppingListItemCreate,
-    ShoppingListItemUpdate,
-    ShoppingListItemResponse,
     ShoppingListGenerateRequest,
+    ShoppingListItemCreate,
+    ShoppingListItemResponse,
+    ShoppingListItemUpdate,
+    ShoppingListResponse,
+    ShoppingListUpdate,
 )
-from app.core.utils import utc_now
 from app.modules.household.utils import (
     get_household_user_ids,
-    get_household_member,
 )
 
 

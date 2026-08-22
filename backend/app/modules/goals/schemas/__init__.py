@@ -1,17 +1,17 @@
 """Goals schemas"""
 from app.modules.goals.schemas.goal import (
+    EmergencyFundCalculation,
+    GoalBase,
     GoalContributionBase,
     GoalContributionCreate,
     GoalContributionResponse,
-    GoalBase,
     GoalCreate,
-    GoalUpdate,
-    GoalResponse,
     GoalDetailResponse,
-    GoalProjection,
-    GoalSummary,
     GoalMilestone,
-    EmergencyFundCalculation,
+    GoalProjection,
+    GoalResponse,
+    GoalSummary,
+    GoalUpdate,
     PNIFCalculation,
 )
 

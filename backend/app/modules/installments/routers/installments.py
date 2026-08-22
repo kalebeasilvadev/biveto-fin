@@ -1,18 +1,18 @@
 """Router para gerenciamento de séries de parcelas"""
 
-from fastapi import APIRouter, Query, HTTPException, status
+from fastapi import APIRouter, HTTPException, Query, status
 
 from app.core.deps import CurrentUser, DbSession
-from app.modules.installments.services.installment_service import InstallmentService
-from app.modules.installments.services.duplicate_detection_service import DuplicateDetectionService
-from app.modules.installments.schemas.installment import InstallmentSeriesResponse
+from app.models.installment import InstallmentSeriesStatus
 from app.modules.installments.schemas.duplicate import (
     DuplicateGroupsResponse,
-    TransactionDuplicatesResponse,
     MergeSeriesRequest,
+    TransactionDuplicatesResponse,
     UpdateSeriesRequest,
 )
-from app.models.installment import InstallmentSeriesStatus
+from app.modules.installments.schemas.installment import InstallmentSeriesResponse
+from app.modules.installments.services.duplicate_detection_service import DuplicateDetectionService
+from app.modules.installments.services.installment_service import InstallmentService
 
 router = APIRouter()
 

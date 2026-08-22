@@ -1,7 +1,7 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, Query, BackgroundTasks, Form
+from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Query, UploadFile
 
 from app.core.deps import CurrentUser, DbSession
-from app.modules.documents.schemas.document import DocumentResponse, DocumentAsyncUploadResponse
+from app.modules.documents.schemas.document import DocumentAsyncUploadResponse, DocumentResponse
 from app.modules.documents.services.document_service import DocumentService, PasswordRequiredError
 
 router = APIRouter()
@@ -125,8 +125,11 @@ async def get_document(
     # Se tem extracted_data salvo (processamento async), converter para response
     if document.extracted_data and document.status == 'completed':
         from app.modules.documents.schemas.document import (
-            ExtractedItemResponse, CardInfoResponse, PaymentInfoResponse,
-            DetectedPaymentResponse, FutureInstallmentResponse
+            CardInfoResponse,
+            DetectedPaymentResponse,
+            ExtractedItemResponse,
+            FutureInstallmentResponse,
+            PaymentInfoResponse,
         )
         from app.modules.known_services.schemas.recurring_detection import RecurringDetection
         from app.modules.known_services.services.recurring_detector import RecurringDetectorService

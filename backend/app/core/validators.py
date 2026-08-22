@@ -1,5 +1,6 @@
 """Validadores reutilizaveis para o sistema"""
 from fastapi import HTTPException
+
 from app.models.account import Account
 
 

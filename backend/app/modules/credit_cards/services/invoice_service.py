@@ -1,21 +1,22 @@
 """Servico para gerenciamento de faturas de cartao de credito"""
 
-from datetime import date, datetime
+from datetime import date
 from decimal import Decimal
-from dateutil.relativedelta import relativedelta
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, func
-from fastapi import HTTPException, status
 
-from app.models.credit_card_invoice import CreditCardInvoice, InvoiceStatus
-from app.models.credit_card import CreditCard
-from app.models.transaction import Transaction, TransactionType, PaymentMethod
+from dateutil.relativedelta import relativedelta
+from fastapi import HTTPException, status
+from sqlalchemy import and_, func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.utils import utc_now
 from app.models.account import Account
 from app.models.category import Category
-from app.models.user import User
+from app.models.credit_card import CreditCard
+from app.models.credit_card_invoice import CreditCardInvoice, InvoiceStatus
 from app.models.document import Document
 from app.models.recurring import RecurringTransaction
-from app.core.utils import utc_now
+from app.models.transaction import PaymentMethod, Transaction, TransactionType
+from app.models.user import User
 
 
 class InvoiceService:
@@ -43,7 +44,6 @@ class InvoiceService:
         - due_date: Data de vencimento
         """
         closing_day = credit_card.closing_day
-        due_day = credit_card.due_day
 
         # Se a compra foi apos o fechamento, vai para a proxima fatura
         if reference_date.day > closing_day:

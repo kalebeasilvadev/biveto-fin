@@ -1,9 +1,10 @@
 """Schemas para Goal (Metas Financeiras)"""
-from datetime import datetime, date
+from datetime import date, datetime
 from decimal import Decimal
+
 from pydantic import BaseModel, Field
 
-from app.models.goal import GoalType, GoalStatus
+from app.models.goal import GoalStatus, GoalType
 from app.models.household import OwnershipType
 
 

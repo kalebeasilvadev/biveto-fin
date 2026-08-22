@@ -6,10 +6,9 @@ em threads separadas via asyncio.to_thread para nao bloquear o event loop.
 """
 import asyncio
 import csv
-import re
 import io
+import re
 from datetime import datetime
-from typing import Optional
 
 
 class SpreadsheetParserService:
@@ -204,7 +203,7 @@ class SpreadsheetParserService:
             if not items:
                 return {
                     'items': [],
-                    'error': f'Nenhuma transacao valida encontrada. Verifique se o arquivo contem dados de transacoes.'
+                    'error': 'Nenhuma transacao valida encontrada. Verifique se o arquivo contem dados de transacoes.'
                 }
 
             return {
@@ -277,7 +276,7 @@ class SpreadsheetParserService:
         # Retorna o mais comum
         return max(delimiters, key=delimiters.get) if max(delimiters.values()) > 0 else ','
 
-    def _detect_column_mapping(self, headers: list) -> Optional[dict]:
+    def _detect_column_mapping(self, headers: list) -> dict | None:
         """Detecta automaticamente o mapeamento de colunas baseado nos headers"""
         headers_lower = [h.lower().strip() if h else '' for h in headers]
 
@@ -324,7 +323,7 @@ class SpreadsheetParserService:
 
         return None
 
-    def _detect_bank_from_filename(self, filename: str, headers: list) -> Optional[dict]:
+    def _detect_bank_from_filename(self, filename: str, headers: list) -> dict | None:
         """Tenta detectar o banco pelo nome do arquivo"""
         filename_lower = filename.lower()
 
@@ -347,7 +346,7 @@ class SpreadsheetParserService:
         # Se nao identificou, tenta o mapeamento generico
         return self._detect_column_mapping(headers)
 
-    def _extract_transaction(self, row: dict, mapping: dict) -> Optional[dict]:
+    def _extract_transaction(self, row: dict, mapping: dict) -> dict | None:
         """Extrai transacao de uma linha usando o mapeamento detectado"""
         try:
             # Normalizar keys
@@ -397,7 +396,7 @@ class SpreadsheetParserService:
         except Exception:
             return None
 
-    def _parse_amount(self, value) -> Optional[float]:
+    def _parse_amount(self, value) -> float | None:
         """Converte valor para float com suporte a formatos brasileiros"""
         if value is None:
             return None
@@ -440,7 +439,7 @@ class SpreadsheetParserService:
 
         return None
 
-    def _parse_date(self, value) -> Optional[str]:
+    def _parse_date(self, value) -> str | None:
         """Converte data para formato YYYY-MM-DD"""
         if value is None:
             return None
@@ -477,7 +476,7 @@ class SpreadsheetParserService:
                     y = '20' + y if int(y) < 50 else '19' + y
                 try:
                     return f'{y}-{m.zfill(2)}-{d.zfill(2)}'
-                except:
+                except Exception:
                     pass
 
         return None

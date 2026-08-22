@@ -7,7 +7,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.account import Account, AccountType
 from app.models.category import Category, CategoryType
 
-
 # Contas padrão para novos usuários
 DEFAULT_ACCOUNTS = [
     {

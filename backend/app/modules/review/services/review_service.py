@@ -5,34 +5,31 @@ Provides data for guided weekly financial reviews.
 """
 
 import logging
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from decimal import Decimal
-from typing import Any
 
-from sqlalchemy import select, func, and_, or_
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models import (
-    User,
-    Transaction,
-    Category,
-    Account,
     Budget,
     BudgetItem,
+    Category,
+    CreditCardInvoice,
     Goal,
     RecurringTransaction,
-    CreditCardInvoice,
-    Debt,
+    Transaction,
+    User,
 )
 from app.modules.review.schemas import (
+    BudgetCategoryComparison,
+    BudgetComparison,
+    GoalProgress,
+    UncategorizedTransaction,
+    UpcomingItem,
     WeeklyReviewResponse,
     WeekSummary,
-    UncategorizedTransaction,
-    BudgetComparison,
-    BudgetCategoryComparison,
-    GoalProgress,
-    UpcomingItem,
 )
 
 logger = logging.getLogger(__name__)
@@ -54,7 +51,6 @@ class WeeklyReviewService:
         # Calculate week boundaries
         week_start = self._get_week_start(year, week)
         week_end = week_start + timedelta(days=6)
-        today = date.today()
 
         # Get data in parallel
         week_summary = await self._get_week_summary(user, year, week, week_start, week_end)
@@ -455,7 +451,7 @@ class WeeklyReviewService:
         for inv in result.scalars().all():
             items.append(UpcomingItem(
                 type="invoice",
-                description=f"Fatura cartão",
+                description="Fatura cartão",
                 amount=inv.total_amount,
                 due_date=inv.due_date,
                 days_until=(inv.due_date - today).days,

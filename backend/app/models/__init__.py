@@ -1,34 +1,8 @@
-from .license import License, LicenseType, LicenseStatus
-from .user import User
+from app.modules.known_services.models.known_service import KnownRecurringService
+
 from .account import Account
-from .household import HouseholdMember, HouseholdRole, OwnershipType
-from .category import Category
-from .merchant import Merchant
-from .document import Document, DocumentExtraction
-from .transaction import Transaction, TransactionAudit
-from .rule import UserMerchantRule
-from .installment import InstallmentSeries, InstallmentSeriesStatus
-from .budget import Budget, BudgetItem, BudgetPeriodType
-from .goal import Goal, GoalContribution, GoalType, GoalStatus
-from .debt import Debt, DebtPayment, DebtType, DebtStatus, PayoffStrategy
-from .invitation import Invitation, InvitationStatus
-from .recurring import RecurringTransaction, RecurrenceFrequency, RecurringStatus
-from .credit_card import CreditCard, PointsProgram
-from .benefit_card import BenefitCard, BenefitCardType, BenefitCardProvider
-from .transaction_payment import TransactionPayment
-from .income_source import IncomeSource, IncomeType, IncomeFrequency
-from .income_split_rule import IncomeSplitRule, SplitType
-from .credit_card_invoice import CreditCardInvoice, InvoiceStatus
 from .api_key import APIKey, APIKeyStatus
-from .notification import (
-    Notification,
-    NotificationPreference,
-    NotificationSettings,
-    PushSubscription,
-    NotificationType,
-    NotificationPriority,
-    NotificationFrequency,
-)
+
 # Envelope module removed - functionality merged into Budgets module
 # from .envelope import (
 #     SpendingEnvelope,
@@ -39,54 +13,82 @@ from .notification import (
 #     EnvelopeChangeType,
 # )
 from .automation_rule import (
-    AutomationRule,
-    AutomationExecution,
-    TriggerType,
     ActionType,
-    ScheduleFrequency,
+    AutomationExecution,
+    AutomationRule,
     EventType,
+    ScheduleFrequency,
     ThresholdType,
+    TriggerType,
 )
-from .grocery import (
-    GroceryProduct,
-    GroceryPurchase,
-    GroceryPriceHistory,
-    ShoppingList,
-    ShoppingListItem,
-    GroceryCategory,
-    NecessityType,
-    ShoppingListStatus,
-    ShoppingListSource,
-    GROCERY_CATEGORY_DISPLAY,
-    NECESSITY_TYPE_DISPLAY,
-)
-from .receipt import (
-    Receipt,
-    ReceiptPayment,
-    ReceiptStatus,
-    RECEIPT_STATUS_DISPLAY,
-)
+from .benefit_card import BenefitCard, BenefitCardProvider, BenefitCardType
+from .budget import Budget, BudgetItem, BudgetPeriodType
+from .category import Category
 from .chat import (
     ChatConversation,
     ChatMessage,
     MessageRole,
 )
-from app.modules.known_services.models.known_service import KnownRecurringService
+from .credit_card import CreditCard, PointsProgram
+from .credit_card_invoice import CreditCardInvoice, InvoiceStatus
+from .debt import Debt, DebtPayment, DebtStatus, DebtType, PayoffStrategy
+from .document import Document, DocumentExtraction
 from .gamification import (
-    BadgeDefinition,
-    UserBadge,
-    BadgeRarity,
     BadgeCategory,
-    UserStreak,
-    StreakHistory,
-    StreakType,
+    BadgeDefinition,
+    BadgeRarity,
     ChallengeDefinition,
-    UserChallenge,
     ChallengeDifficulty,
     ChallengeStatus,
-    UserPoints,
     PointsTransaction,
+    StreakHistory,
+    StreakType,
+    UserBadge,
+    UserChallenge,
+    UserPoints,
+    UserStreak,
 )
+from .goal import Goal, GoalContribution, GoalStatus, GoalType
+from .grocery import (
+    GROCERY_CATEGORY_DISPLAY,
+    NECESSITY_TYPE_DISPLAY,
+    GroceryCategory,
+    GroceryPriceHistory,
+    GroceryProduct,
+    GroceryPurchase,
+    NecessityType,
+    ShoppingList,
+    ShoppingListItem,
+    ShoppingListSource,
+    ShoppingListStatus,
+)
+from .household import HouseholdMember, HouseholdRole, OwnershipType
+from .income_source import IncomeFrequency, IncomeSource, IncomeType
+from .income_split_rule import IncomeSplitRule, SplitType
+from .installment import InstallmentSeries, InstallmentSeriesStatus
+from .invitation import Invitation, InvitationStatus
+from .license import License, LicenseStatus, LicenseType
+from .merchant import Merchant
+from .notification import (
+    Notification,
+    NotificationFrequency,
+    NotificationPreference,
+    NotificationPriority,
+    NotificationSettings,
+    NotificationType,
+    PushSubscription,
+)
+from .receipt import (
+    RECEIPT_STATUS_DISPLAY,
+    Receipt,
+    ReceiptPayment,
+    ReceiptStatus,
+)
+from .recurring import RecurrenceFrequency, RecurringStatus, RecurringTransaction
+from .rule import UserMerchantRule
+from .transaction import Transaction, TransactionAudit
+from .transaction_payment import TransactionPayment
+from .user import User
 
 __all__ = [
     "License",

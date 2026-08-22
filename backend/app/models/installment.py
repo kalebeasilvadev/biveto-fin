@@ -1,8 +1,11 @@
-from datetime import datetime, date, timezone
-from app.core.utils import utc_now
+from datetime import date, datetime
 from enum import Enum
-from sqlalchemy import String, ForeignKey, DateTime, Date, Numeric, Text
+
+from sqlalchemy import Date, DateTime, ForeignKey, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.core.utils import utc_now
+
 from ..core.database import Base
 
 
@@ -103,9 +106,9 @@ class InstallmentSeries(Base):
 
 
 # Imports circulares
-from .user import User
 from .account import Account
 from .category import Category
+from .credit_card import CreditCard
 from .merchant import Merchant
 from .transaction import Transaction
-from .credit_card import CreditCard
+from .user import User

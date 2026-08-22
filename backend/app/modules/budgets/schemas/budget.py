@@ -1,9 +1,11 @@
 """Schemas para Budget (Orcamento)"""
 from datetime import datetime
 from decimal import Decimal
+
 from pydantic import BaseModel, Field
+
+from app.models.budget import BudgetItemStatus
 from app.models.household import OwnershipType
-from app.models.budget import BudgetItemStatus, BudgetHistoryChangeType
 
 
 class BudgetItemBase(BaseModel):

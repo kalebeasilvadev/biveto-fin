@@ -1,34 +1,35 @@
 from __future__ import annotations
+
 from datetime import date
 from decimal import Decimal
-from fastapi import APIRouter, HTTPException, status, Query
+
+from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel
-from sqlalchemy import select, func, and_, or_
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import aliased
 
 from app.core.deps import CurrentUser, DbSession
-from app.models.credit_card_invoice import CreditCardInvoice, InvoiceStatus
-from app.models.credit_card import CreditCard
 from app.models.account import Account, AccountType
-from app.models.transaction import Transaction
+from app.models.credit_card import CreditCard
+from app.models.credit_card_invoice import CreditCardInvoice, InvoiceStatus
 from app.models.document import Document
-from app.modules.credit_cards.services.invoice_service import InvoiceService
-from app.modules.credit_cards.services.expected_invoice_service import (
-    ExpectedInvoiceService,
-    ExpectedInvoiceState,
-)
+from app.models.transaction import Transaction
 from app.modules.credit_cards.schemas.invoice import (
-    InvoiceCreate,
-    InvoiceFromDocument,
-    InvoiceUpdate,
-    InvoicePayment,
-    InvoiceResponse,
-    InvoiceDetailResponse,
-    InvoiceTransactionResponse,
-    InvoiceSummary,
     CardDetectionResult,
     DetectedCardInfo,
+    InvoiceCreate,
+    InvoiceDetailResponse,
+    InvoiceFromDocument,
+    InvoicePayment,
+    InvoiceResponse,
+    InvoiceSummary,
+    InvoiceTransactionResponse,
+    InvoiceUpdate,
 )
+from app.modules.credit_cards.services.expected_invoice_service import (
+    ExpectedInvoiceService,
+)
+from app.modules.credit_cards.services.invoice_service import InvoiceService
 
 router = APIRouter()
 
@@ -81,8 +82,8 @@ async def list_invoices(
 ):
     """Lista faturas do usuario"""
     from app.modules.household.utils.household_helpers import (
-        get_household_user_ids,
         get_household_member,
+        get_household_user_ids,
     )
 
     service = InvoiceService(db)
@@ -255,11 +256,11 @@ async def get_invoice(
     db: DbSession,
 ):
     """Retorna detalhes de uma fatura com suas transacoes"""
-    from app.models.merchant import Merchant
     from app.models.category import Category
+    from app.models.merchant import Merchant
     from app.modules.household.utils.household_helpers import (
-        get_household_user_ids,
         get_household_member,
+        get_household_user_ids,
     )
 
     # Get household user IDs for filtering
@@ -625,7 +626,7 @@ async def pay_invoice(
             detail="Fatura ja esta paga",
         )
 
-    payment_transaction = await service.pay_invoice(
+    await service.pay_invoice(
         user=current_user,
         invoice=invoice,
         amount=Decimal(str(data.amount)),
@@ -1020,8 +1021,8 @@ async def project_future_transactions(
     # Parcelas futuras ja sao criadas automaticamente quando uma compra parcelada e registrada
     # com create_future_installments=True, mas podemos forcar a atualizacao aqui
     if data.include_installments:
-        from app.modules.installments.services.installment_service import InstallmentService
         from app.models.installment import InstallmentSeries, InstallmentSeriesStatus
+        from app.modules.installments.services.installment_service import InstallmentService
 
         installment_service = InstallmentService(db)
 
@@ -1147,8 +1148,9 @@ async def get_invoice_duplicate_warnings(
     - affected_series_pairs: list de pares de séries duplicadas
     - duplicate_count: número de parcelas duplicadas
     """
-    from app.modules.installments.services.duplicate_detection_service import DuplicateDetectionService
-    from app.models.installment import InstallmentSeries
+    from app.modules.installments.services.duplicate_detection_service import (
+        DuplicateDetectionService,
+    )
 
     # Verificar se fatura existe e pertence ao usuário
     invoice_result = await db.execute(

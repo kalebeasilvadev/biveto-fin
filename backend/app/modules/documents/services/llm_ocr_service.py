@@ -8,15 +8,16 @@ Este modulo foi refatorado para seguir Clean Code:
 - Classificador de documentos em document_classifier.py
 """
 from pathlib import Path
+
 from app.core.config import settings
 
-from .schemas import FaturaExtracao
-from .prompts import EXTRACTION_PROMPT
-from .pdf_converter import convert_pdf_to_images
-from .response_parser import ResponseParser
+from .document_classifier import DocumentClassifier
 from .extraction_validator import ExtractionValidator
-from .document_classifier import DocumentClassifier, DocumentType
-from .providers import GoogleProvider, MistralProvider, OpenAIProvider, AnthropicProvider
+from .pdf_converter import convert_pdf_to_images
+from .prompts import EXTRACTION_PROMPT
+from .providers import AnthropicProvider, GoogleProvider, MistralProvider, OpenAIProvider
+from .response_parser import ResponseParser
+from .schemas import FaturaExtracao
 
 
 class LLMOCRService:
@@ -126,14 +127,14 @@ class LLMOCRService:
                     print(f"[LLM_OCR] Primary provider ({self.provider_name}) failed: {type(primary_err).__name__}: {primary_err}")
                     fallback_provider = self._get_fallback_provider()
                     if fallback_provider:
-                        print(f"[LLM_OCR] Trying fallback provider...")
+                        print("[LLM_OCR] Trying fallback provider...")
                         result = await fallback_provider.extract_from_pdf(image_content, filename, password)
                     else:
                         raise
 
                 # Se provider retornou None, precisa converter para imagens
                 if result is None:
-                    print(f"[LLM_OCR] Provider nao suporta PDF direto, convertendo para imagens...")
+                    print("[LLM_OCR] Provider nao suporta PDF direto, convertendo para imagens...")
                     result = await self._process_pdf_as_images(image_content, password)
             else:
                 result = await provider.extract_from_image(image_content, mime_type)
@@ -156,7 +157,7 @@ class LLMOCRService:
                                 print(f"[LLM_OCR] Fallback succeeded: {len(retry_result['items'])} items extracted")
                                 result = retry_result
                             else:
-                                print(f"[LLM_OCR] Fallback also returned 0 items or error")
+                                print("[LLM_OCR] Fallback also returned 0 items or error")
                         except Exception as retry_err:
                             print(f"[LLM_OCR] Fallback retry failed: {type(retry_err).__name__}: {retry_err}")
 
@@ -386,7 +387,7 @@ class LLMOCRService:
                     )
 
                     if is_likely_example:
-                        skipped_pages.append((page_num, f"example data detected"))
+                        skipped_pages.append((page_num, "example data detected"))
                         print(f"[LLM_OCR] Page {page_num} looks like example data (round:{round_values}, no_inst:{no_installments}, generic:{generic_names})")
                         continue
 

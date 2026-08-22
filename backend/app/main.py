@@ -1,15 +1,15 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
+
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from starlette.middleware.base import BaseHTTPMiddleware
-from slowapi import _rate_limit_exceeded_handler
+from fastapi.staticfiles import StaticFiles
 from slowapi.errors import RateLimitExceeded
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from .core.config import settings
-from .core.database import engine, Base
+from .core.database import engine
 from .core.rate_limit import limiter, rate_limit_exceeded_handler
 from .routers import api_router
 
@@ -35,9 +35,10 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 async def migrate_credit_card_transactions():
     """Migra transações de cartão para faturas no startup."""
-    from sqlalchemy import text
     from datetime import date
+
     from dateutil.relativedelta import relativedelta
+    from sqlalchemy import text
 
     def calculate_invoice_period(closing_day: int, due_day: int, reference_date: date) -> dict:
         if reference_date.day > closing_day:
@@ -165,11 +166,11 @@ async def migrate_credit_card_transactions():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    from .core.scheduler import start_scheduler, shutdown_scheduler
+    from .core.scheduler import shutdown_scheduler, start_scheduler
 
     # Startup
     try:
-        async with engine.begin() as conn:
+        async with engine.begin():
             pass
     except Exception as e:
         print(f"Aviso: Conexão inicial com banco falhou: {e}")

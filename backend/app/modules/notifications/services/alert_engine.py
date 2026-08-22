@@ -12,22 +12,24 @@ This service analyzes user data to detect important financial events:
 
 from datetime import date, datetime, timedelta
 from decimal import Decimal
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_
 
-from app.models.user import User
-from app.models.notification import (
-    Notification,
-    NotificationType,
-    NotificationPriority,
-)
-from app.models.credit_card_invoice import CreditCardInvoice, InvoiceStatus
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.utils import utc_now
+from app.models.account import Account
 from app.models.budget import Budget, BudgetItem
 from app.models.credit_card import CreditCard
+from app.models.credit_card_invoice import CreditCardInvoice, InvoiceStatus
 from app.models.goal import Goal, GoalStatus
-from app.models.account import Account
-from app.models.recurring import RecurringTransaction, RecurringStatus
+from app.models.notification import (
+    Notification,
+    NotificationPriority,
+    NotificationType,
+)
+from app.models.recurring import RecurringStatus, RecurringTransaction
 from app.models.transaction import Transaction
+from app.models.user import User
 
 from .notification_service import NotificationService
 
@@ -233,7 +235,6 @@ class AlertEngine:
                 continue
 
             # Get current invoice total
-            today = date.today()
             invoice_query = select(CreditCardInvoice).where(
                 CreditCardInvoice.credit_card_id == card.id,
                 CreditCardInvoice.status == InvoiceStatus.OPEN.value,
@@ -588,7 +589,6 @@ class AlertEngine:
 
         Considera apenas notificacoes ativas (nao dispensadas).
         """
-        from sqlalchemy import cast, String
         query = select(Notification).where(
             Notification.user_id == user_id,
             Notification.type == notification_type.value,

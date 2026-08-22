@@ -1,50 +1,51 @@
 """
 Grocery Service - CRUD operations for products and purchases
 """
-from datetime import date, datetime
 import unicodedata
+from datetime import date
 from decimal import Decimal
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_, or_
-from sqlalchemy.orm import selectinload
-from fastapi import HTTPException, status
 
+from fastapi import HTTPException, status
+from sqlalchemy import and_, func, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from app.models.category import Category
 from app.models.grocery import (
-    GroceryProduct,
-    GroceryPurchase,
-    GroceryPriceHistory,
-    GroceryCategory,
-    NecessityType,
     GROCERY_CATEGORY_DISPLAY,
     NECESSITY_TYPE_DISPLAY,
+    GroceryCategory,
+    GroceryPriceHistory,
+    GroceryProduct,
+    GroceryPurchase,
+    NecessityType,
 )
 from app.models.merchant import Merchant
-from app.models.user import User
 from app.models.transaction import Transaction
-from app.models.category import Category
+from app.models.user import User
 from app.modules.grocery.schemas.product import (
     GroceryProductCreate,
-    GroceryProductUpdate,
     GroceryProductResponse,
+    GroceryProductUpdate,
 )
 from app.modules.grocery.schemas.purchase import (
-    GroceryPurchaseCreate,
-    GroceryPurchaseBulkCreate,
-    GroceryPurchaseUpdate,
-    GroceryPurchaseResponse,
-    GroceryPurchaseSummary,
-    GroceryPurchaseComparison,
-    CategorySummary,
-    NecessitySummary,
-    MonthData,
     BackfillRequest,
     BackfillResponse,
     BackfillTransactionDetail,
+    CategorySummary,
+    GroceryPurchaseBulkCreate,
+    GroceryPurchaseComparison,
+    GroceryPurchaseCreate,
+    GroceryPurchaseResponse,
+    GroceryPurchaseSummary,
+    GroceryPurchaseUpdate,
+    MonthData,
+    NecessitySummary,
 )
 from app.modules.household.utils import (
-    get_household_user_ids,
-    get_household_member,
     build_ownership_filter,
+    get_household_member,
+    get_household_user_ids,
 )
 
 

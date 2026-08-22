@@ -1,11 +1,14 @@
 """Streak Service for gamification"""
 
-from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import date, timedelta
+
 from sqlalchemy import select
-from datetime import datetime, date, timedelta
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.gamification import StreakHistory, StreakType, UserStreak
 from app.models.user import User
-from app.models.gamification import UserStreak, StreakHistory, StreakType
-from ..schemas import StreakResponse, StreakWeekView, StreakDayInfo
+
+from ..schemas import StreakDayInfo, StreakResponse, StreakWeekView
 
 
 class StreakService:

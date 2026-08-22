@@ -1,8 +1,10 @@
+import secrets
 from datetime import datetime, timedelta
 from enum import Enum
-import secrets
-from sqlalchemy import String, DateTime, Integer, ForeignKey
+
+from sqlalchemy import DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
 from ..core.database import Base
 from ..core.utils import utc_now
 

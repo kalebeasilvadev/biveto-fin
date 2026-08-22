@@ -1,15 +1,16 @@
-from datetime import datetime, timezone
-from app.core.utils import utc_now
 from typing import Annotated
-from fastapi import Depends, HTTPException, status, Header, Request
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 
+from fastapi import Depends, Header, HTTPException, Request, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.utils import utc_now
+
+from ..models.api_key import APIKey
+from ..models.user import User
 from .database import get_db
 from .security import decode_token, hash_api_key, verify_api_key_format
-from ..models.user import User
-from ..models.api_key import APIKey
 
 security = HTTPBearer()
 security_optional = HTTPBearer(auto_error=False)

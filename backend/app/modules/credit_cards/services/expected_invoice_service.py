@@ -17,14 +17,15 @@ E consumido por:
 """
 
 from __future__ import annotations
+
+from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from decimal import Decimal
 from enum import Enum
-from typing import Iterable
 
 from dateutil.relativedelta import relativedelta
-from sqlalchemy import select, and_
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.credit_card import CreditCard
@@ -241,8 +242,6 @@ class ExpectedInvoiceService:
             CYCLE_CHANGE_SUPPRESS_DAYS E mes de referencia = mes atual -> suprime
             (evita falso positivo quando o usuario acabou de mudar o ciclo)
         """
-        month_start = date(year, month, 1)
-
         # 1. Criado depois do mes de referencia
         if card.created_at and card.created_at.date() > self._end_of_month(year, month):
             return False

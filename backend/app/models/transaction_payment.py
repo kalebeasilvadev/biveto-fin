@@ -1,7 +1,10 @@
-from datetime import datetime, timezone
-from app.core.utils import utc_now
-from sqlalchemy import String, ForeignKey, DateTime, Numeric, Integer
+from datetime import datetime
+
+from sqlalchemy import DateTime, ForeignKey, Integer, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.core.utils import utc_now
+
 from ..core.database import Base
 
 
@@ -47,7 +50,7 @@ class TransactionPayment(Base):
     credit_card: Mapped["CreditCard | None"] = relationship(lazy="noload")
 
 
-from .transaction import Transaction
 from .account import Account
 from .benefit_card import BenefitCard
 from .credit_card import CreditCard
+from .transaction import Transaction

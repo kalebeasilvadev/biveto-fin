@@ -1,29 +1,47 @@
+from collections import defaultdict
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Any
-from collections import defaultdict
+
 from dateutil.relativedelta import relativedelta
-from sqlalchemy import select, func, text, inspect, String, or_, and_
-from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
+from sqlalchemy import and_, func, inspect, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ....models import (
-    User, Account, Transaction, Category, CreditCard,
-    CreditCardInvoice, InstallmentSeries, Budget, BudgetItem,
-    Goal, GoalContribution, Debt, DebtPayment, RecurringTransaction,
-    IncomeSource, Document, Merchant,
-    Receipt, ReceiptPayment,
+    Account,
     BenefitCard,
-    GroceryProduct, GroceryPurchase, GroceryPriceHistory,
-    ShoppingList, ShoppingListItem,
-    ChatConversation, ChatMessage,
+    Budget,
+    BudgetItem,
+    Category,
+    ChatConversation,
+    ChatMessage,
+    CreditCard,
+    CreditCardInvoice,
+    Debt,
+    DebtPayment,
+    Document,
+    Goal,
+    GoalContribution,
+    GroceryPriceHistory,
+    GroceryProduct,
+    GroceryPurchase,
+    IncomeSource,
+    InstallmentSeries,
+    Merchant,
+    Receipt,
+    ReceiptPayment,
+    RecurringTransaction,
+    ShoppingList,
+    ShoppingListItem,
+    Transaction,
+    User,
 )
-from ....models.transaction import TransactionType
 from ....models.credit_card_invoice import InvoiceStatus
 from ....models.debt import DebtStatus
 from ....models.household import HouseholdMember
-from ..schemas import TableInfo, ColumnInfo, QueryRequest, ContextRequest
-
+from ....models.transaction import TransactionType
+from ..schemas import ColumnInfo, ContextRequest, QueryRequest, TableInfo
 
 # Mapeamento de tabelas permitidas e suas descrições
 ALLOWED_TABLES = {
@@ -735,7 +753,6 @@ class MCPService:
         Similar ao que o chatbot interno usa, mas otimizado para o MCP.
         """
         context: dict[str, Any] = {}
-        today = date.today()
         period = self._parse_period(request)
         period_start = period["start"]
         period_end = period["end"]

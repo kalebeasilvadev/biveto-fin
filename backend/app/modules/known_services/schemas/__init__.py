@@ -1,8 +1,8 @@
 from .recurring_detection import (
-    RecurringDetection,
     DuplicateAnalysis,
-    RecurringSuggestion,
     KnownServiceResponse,
+    RecurringDetection,
+    RecurringSuggestion,
 )
 
 __all__ = [

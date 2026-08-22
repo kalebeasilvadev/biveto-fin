@@ -1,16 +1,17 @@
 """Serviço para gerenciamento de parcelas e detecção de duplicatas"""
 
 from datetime import date, timedelta
-from dateutil.relativedelta import relativedelta
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, or_, func
-from fastapi import HTTPException, status
 
-from app.models.installment import InstallmentSeries, InstallmentSeriesStatus
-from app.models.transaction import Transaction, TransactionType
-from app.models.merchant import Merchant
-from app.models.user import User
+from dateutil.relativedelta import relativedelta
+from fastapi import HTTPException, status
+from sqlalchemy import and_, func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.models.credit_card import CreditCard
+from app.models.installment import InstallmentSeries, InstallmentSeriesStatus
+from app.models.merchant import Merchant
+from app.models.transaction import Transaction, TransactionType
+from app.models.user import User
 
 
 class InstallmentService:

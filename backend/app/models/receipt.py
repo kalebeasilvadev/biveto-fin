@@ -1,9 +1,12 @@
-from datetime import datetime, date, timezone
-from app.core.utils import utc_now
+from datetime import date, datetime
 from decimal import Decimal
 from enum import Enum
-from sqlalchemy import String, ForeignKey, DateTime, Date, Text, Numeric
+
+from sqlalchemy import Date, DateTime, ForeignKey, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.core.utils import utc_now
+
 from ..core.database import Base
 
 
@@ -161,11 +164,11 @@ class ReceiptPayment(Base):
 
 
 # Imports for relationships (at the end to avoid circular imports)
-from .user import User
-from .document import Document
-from .transaction import Transaction
 from .account import Account
 from .benefit_card import BenefitCard
-from .grocery import GroceryPurchase
 from .credit_card import CreditCard
+from .document import Document
+from .grocery import GroceryPurchase
 from .installment import InstallmentSeries
+from .transaction import Transaction
+from .user import User

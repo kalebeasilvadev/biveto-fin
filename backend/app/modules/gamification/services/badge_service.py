@@ -1,18 +1,22 @@
 """Badge Service for gamification"""
 
+
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_
-from datetime import datetime, timezone
-from app.models.user import User
-from app.models.gamification import (
-    BadgeDefinition, UserBadge, UserStreak,
-    BadgeRarity, BadgeCategory
-)
-from app.models.transaction import Transaction
-from app.models.goal import Goal, GoalStatus
-from app.models.debt import Debt, DebtStatus
+
 from app.core.utils import utc_now
-from ..schemas import BadgeResponse, BadgeCategory as BadgeCategorySchema
+from app.models.debt import Debt, DebtStatus
+from app.models.gamification import (
+    BadgeDefinition,
+    UserBadge,
+    UserStreak,
+)
+from app.models.goal import Goal, GoalStatus
+from app.models.transaction import Transaction
+from app.models.user import User
+
+from ..schemas import BadgeCategory as BadgeCategorySchema
+from ..schemas import BadgeResponse
 from .points_service import PointsService
 
 
@@ -360,7 +364,6 @@ class BadgeService:
 
     async def mark_all_seen(self, user: User) -> int:
         """Marca todos os badges como vistos"""
-        from sqlalchemy import update
 
         result = await self.db.execute(
             select(UserBadge)

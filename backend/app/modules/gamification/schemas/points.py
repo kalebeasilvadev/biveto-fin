@@ -1,7 +1,8 @@
 """Points schemas for gamification"""
 
-from pydantic import BaseModel
 from datetime import datetime
+
+from pydantic import BaseModel
 
 
 class PointsResponse(BaseModel):

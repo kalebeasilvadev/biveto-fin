@@ -5,17 +5,16 @@ Router for Weekly Review.
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.models import User
 from app.modules.review.schemas import (
-    WeeklyReviewResponse,
     WeeklyReviewComplete,
+    WeeklyReviewResponse,
 )
 from app.modules.review.services import WeeklyReviewService
-
-from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/review", tags=["review"])
 

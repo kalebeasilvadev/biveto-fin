@@ -114,7 +114,7 @@ class ResponseParser:
 
             # Se o LLM retornou um array ao invés de objeto, converter
             if isinstance(data, list):
-                print(f"[Parser] LLM retornou array ao invés de objeto, convertendo...")
+                print("[Parser] LLM retornou array ao invés de objeto, convertendo...")
                 # Assumir que é uma lista de transações
                 data = {
                     'document_type': 'fatura_cartao',
@@ -137,7 +137,7 @@ class ResponseParser:
 
             # DEBUG: Log para verificar o que veio do LLM
             import json as json_debug
-            print(f"[Parser] DEBUG: FULL JSON from LLM:")
+            print("[Parser] DEBUG: FULL JSON from LLM:")
             print(json_debug.dumps(data, indent=2, ensure_ascii=False, default=str)[:2000])
 
             # Extrair total_amount de varios lugares possiveis
@@ -432,13 +432,13 @@ class ResponseParser:
 
         # Normalizar datas de fechamento e vencimento
         closing_date = card_info.get('closing_date')
-        if closing_date and not ('YYYY' in str(closing_date)):
+        if closing_date and 'YYYY' not in str(closing_date):
             closing_date = self._parse_date(closing_date)
         elif closing_date and 'YYYY' in str(closing_date):
             closing_date = None
 
         due_date = card_info.get('due_date')
-        if due_date and not ('YYYY' in str(due_date)):
+        if due_date and 'YYYY' not in str(due_date):
             due_date = self._parse_date(due_date)
         elif due_date and 'YYYY' in str(due_date):
             due_date = None

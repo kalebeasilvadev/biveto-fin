@@ -9,13 +9,15 @@ Sistema de gamificação com:
 - Points (pontos)
 """
 
-from sqlalchemy import String, ForeignKey, DateTime, Date, Integer, Boolean, JSON, Text, UniqueConstraint
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-from datetime import datetime, date, timezone
-from app.core.utils import utc_now
+from datetime import date, datetime
 from enum import Enum
-from ..core.database import Base
 
+from sqlalchemy import JSON, Boolean, Date, DateTime, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.core.utils import utc_now
+
+from ..core.database import Base
 
 # =============================================================================
 # ENUMS

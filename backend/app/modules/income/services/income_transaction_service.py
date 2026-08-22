@@ -3,13 +3,13 @@ Serviço para geração automática de transações a partir de fontes de receit
 Cria transações no histórico para receitas recorrentes (salário, benefícios, etc).
 """
 from datetime import date
-from typing import List, Optional
-from sqlalchemy import select, and_
+
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.income_source import IncomeSource, IncomeFrequency
-from app.models.transaction import Transaction, TransactionType
 from app.core.services.business_day_service import get_payment_date_for_income
+from app.models.income_source import IncomeFrequency, IncomeSource
+from app.models.transaction import Transaction, TransactionType
 
 
 class IncomeTransactionService:
@@ -22,9 +22,9 @@ class IncomeTransactionService:
         year: int,
         month: int,
         overwrite: bool = False,
-        source_ids: Optional[List[int]] = None,
-        amount_overrides: Optional[dict[int, float]] = None
-    ) -> List[Transaction]:
+        source_ids: list[int] | None = None,
+        amount_overrides: dict[int, float] | None = None
+    ) -> list[Transaction]:
         """
         Gera transações para as fontes de receita ativas de um usuário
         para um determinado mês.
@@ -82,8 +82,8 @@ class IncomeTransactionService:
         year: int,
         month: int,
         overwrite: bool,
-        custom_amount: Optional[float] = None
-    ) -> List[Transaction]:
+        custom_amount: float | None = None
+    ) -> list[Transaction]:
         """
         Gera transações para uma fonte de receita específica.
 
@@ -161,8 +161,8 @@ class IncomeTransactionService:
         source: IncomeSource,
         payment_date: date,
         overwrite: bool,
-        custom_amount: Optional[float] = None
-    ) -> Optional[Transaction]:
+        custom_amount: float | None = None
+    ) -> Transaction | None:
         """
         Cria uma transação se não existir uma para a mesma fonte e data.
 
@@ -224,7 +224,7 @@ class IncomeTransactionService:
         year: int,
         month: int,
         overwrite: bool = False
-    ) -> List[Transaction]:
+    ) -> list[Transaction]:
         """
         Gera transações para uma fonte de receita específica.
         """
@@ -251,7 +251,7 @@ class IncomeTransactionService:
         user_id: int,
         year: int,
         month: int
-    ) -> List[dict]:
+    ) -> list[dict]:
         """
         Retorna uma prévia das transações que seriam criadas,
         sem realmente criar no banco.

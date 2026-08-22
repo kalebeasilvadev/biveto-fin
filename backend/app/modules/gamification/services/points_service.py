@@ -1,9 +1,10 @@
 """Points Service for gamification"""
 
+from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, desc
+
+from app.models.gamification import PointsTransaction, UserPoints
 from app.models.user import User
-from app.models.gamification import UserPoints, PointsTransaction
 
 
 class PointsService:

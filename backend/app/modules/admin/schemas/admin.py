@@ -1,7 +1,8 @@
 from datetime import date, datetime
-from pydantic import BaseModel, Field, EmailStr
-from app.models.license import LicenseType, LicenseStatus
 
+from pydantic import BaseModel, EmailStr, Field
+
+from app.models.license import LicenseStatus, LicenseType
 
 # ========== License Schemas ==========
 

@@ -1,7 +1,9 @@
 """Modelo para serviços recorrentes conhecidos (Netflix, Spotify, etc)"""
-from datetime import datetime, timezone
-from sqlalchemy import String, DateTime, Boolean, Numeric, JSON
+from datetime import datetime
+
+from sqlalchemy import JSON, Boolean, DateTime, String
 from sqlalchemy.orm import Mapped, mapped_column
+
 from app.core.database import Base
 from app.core.utils import utc_now
 

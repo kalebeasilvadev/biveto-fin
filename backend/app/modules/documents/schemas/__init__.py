@@ -1,10 +1,10 @@
 from .document import (
-    FutureInstallmentResponse,
-    ExtractedItemResponse,
-    InstallmentAnalysisResponse,
-    DocumentExtractionResponse,
     CardInfoResponse,
+    DocumentExtractionResponse,
     DocumentResponse,
+    ExtractedItemResponse,
+    FutureInstallmentResponse,
+    InstallmentAnalysisResponse,
 )
 
 __all__ = [

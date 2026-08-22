@@ -1,19 +1,25 @@
 """Gamification Service - Main Orchestrator"""
 
-from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import date
-from app.models.user import User
-from app.models.transaction import Transaction
+
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.models.gamification import StreakType
+from app.models.transaction import Transaction
+from app.models.user import User
+
+from ..schemas import (
+    BadgeResponse,
+    ChallengeListResponse,
+    ChallengeResponse,
+    GamificationEvent,
+    GamificationSummary,
+    StreakWeekView,
+)
 from .badge_service import BadgeService
-from .streak_service import StreakService
 from .challenge_service import ChallengeService
 from .points_service import PointsService
-from ..schemas import (
-    GamificationSummary, GamificationEvent,
-    BadgeResponse, StreakResponse, ChallengeResponse,
-    StreakWeekView, ChallengeListResponse
-)
+from .streak_service import StreakService
 
 
 class GamificationService:

@@ -29,29 +29,29 @@ Uso:
     from app.modules.auth.routers import auth_router, users_router
 """
 
+from app.modules.auth.routers import auth_router, users_router
 from app.modules.auth.schemas import (
+    ChangePassword,
+    InvitationCreate,
+    InvitationListResponse,
+    InvitationResponse,
+    InviteRegister,
+    InviteValidation,
     LoginRequest,
     Token,
     TokenPayload,
     UserBase,
     UserCreate,
-    UserUpdate,
     UserResponse,
-    ChangePassword,
-    InvitationCreate,
-    InvitationResponse,
-    InvitationListResponse,
-    InviteValidation,
-    InviteRegister,
+    UserUpdate,
 )
 from app.modules.auth.services import (
     AuthService,
     UserService,
-    setup_new_user,
     create_default_accounts,
     create_default_categories,
+    setup_new_user,
 )
-from app.modules.auth.routers import auth_router, users_router
 
 __all__ = [
     # Schemas

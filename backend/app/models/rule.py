@@ -1,7 +1,10 @@
-from datetime import datetime, timezone
-from app.core.utils import utc_now
-from sqlalchemy import String, ForeignKey, DateTime, Float
+from datetime import datetime
+
+from sqlalchemy import DateTime, Float, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.core.utils import utc_now
+
 from ..core.database import Base
 
 

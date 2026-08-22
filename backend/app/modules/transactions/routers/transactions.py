@@ -1,29 +1,28 @@
 from __future__ import annotations
 
-from datetime import date
 import csv
 import io
-from typing import Optional
+from datetime import date
 
-from fastapi import APIRouter, Query, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+from sqlalchemy import delete, func, select
 
 from app.core.deps import CurrentUser, DbSession
+from app.models.credit_card import CreditCard
+from app.models.installment import InstallmentSeries
+from app.models.transaction import Transaction
 from app.modules.transactions.schemas.transaction import (
+    BatchConfirmItemResult,
+    BatchConfirmRequest,
+    BatchConfirmResponse,
+    TransactionConfirm,
     TransactionCreate,
     TransactionResponse,
     TransactionUpdate,
-    TransactionConfirm,
-    BatchConfirmRequest,
-    BatchConfirmResponse,
-    BatchConfirmItemResult,
 )
 from app.modules.transactions.services.transaction_service import TransactionService
-from app.models.credit_card import CreditCard
-from app.models.transaction import Transaction
-from app.models.installment import InstallmentSeries
-from sqlalchemy import select, delete, func, and_
 
 router = APIRouter()
 
@@ -39,7 +38,7 @@ class PaginatedTransactions(BaseModel):
 async def enrich_transactions_with_linked_account(db, transactions: list) -> list:
     """Enrich transfer transactions with linked account names"""
     from app.models.account import Account
-    from app.models.transaction import Transaction as TransactionModel, TransactionType
+    from app.models.transaction import Transaction as TransactionModel
 
     # Get all linked transaction IDs
     linked_ids = [t.linked_transaction_id for t in transactions if t.linked_transaction_id]
@@ -438,8 +437,8 @@ async def batch_confirm_transactions(
                 await db.flush()
 
                 # Recalcular total da fatura
-                from app.modules.credit_cards.services.invoice_service import InvoiceService
                 from app.models.credit_card_invoice import CreditCardInvoice
+                from app.modules.credit_cards.services.invoice_service import InvoiceService
                 invoice_result = await db.execute(
                     select(CreditCardInvoice).where(CreditCardInvoice.id == invoice_id)
                 )
@@ -557,20 +556,20 @@ class ProjectedMatchResult(BaseModel):
     """Resultado da verificacao de match com projecao"""
     index: int
     has_projected: bool
-    projected_transaction_id: Optional[int] = None
-    projected_date: Optional[date] = None
-    series_id: Optional[int] = None
-    series_description: Optional[str] = None
-    message: Optional[str] = None
-    potential_duplicate_series: Optional[PotentialDuplicateSeries] = None
+    projected_transaction_id: int | None = None
+    projected_date: date | None = None
+    series_id: int | None = None
+    series_description: str | None = None
+    message: str | None = None
+    potential_duplicate_series: PotentialDuplicateSeries | None = None
 
 
 class CheckProjectedRequest(BaseModel):
     """Request para verificar projecoes"""
     items: list[ExtractedItemCheck]
-    credit_card_id: Optional[int] = None
-    invoice_month: Optional[int] = None
-    invoice_year: Optional[int] = None
+    credit_card_id: int | None = None
+    invoice_month: int | None = None
+    invoice_year: int | None = None
 
 
 class CheckProjectedResponse(BaseModel):

@@ -131,7 +131,7 @@ class DocumentClassifier:
 
         # Nivel 2: LLM fallback (quando regras nao decidem)
         if self.use_llm_fallback:
-            print(f"[Classifier] Regras inconclusivas, usando LLM...")
+            print("[Classifier] Regras inconclusivas, usando LLM...")
             llm_result = await self._classify_by_llm(text_sample)
             if llm_result != DocumentType.UNKNOWN:
                 self._stats['by_llm'] += 1
@@ -142,7 +142,7 @@ class DocumentClassifier:
             return llm_result
 
         self._stats['unknown'] += 1
-        print(f"[Classifier] Nao foi possivel classificar (UNKNOWN)")
+        print("[Classifier] Nao foi possivel classificar (UNKNOWN)")
         print(f"[Classifier] Stats: {self._stats}")
         return DocumentType.UNKNOWN
 
@@ -169,7 +169,7 @@ class DocumentClassifier:
             "cupom fiscal eletronico",
             "nota fiscal consumidor eletron",
         ]):
-            print(f"[Classifier] Decisor forte: NFC-e detectado")
+            print("[Classifier] Decisor forte: NFC-e detectado")
             return DocumentType.CUPOM_FISCAL
 
         # Chave de acesso (44 digitos) = 99% cupom
@@ -178,7 +178,7 @@ class DocumentClassifier:
             import re
             digit_sequences = re.findall(r'\d+', text)
             if any(len(seq) >= 40 for seq in digit_sequences):
-                print(f"[Classifier] Decisor forte: Chave de acesso detectada")
+                print("[Classifier] Decisor forte: Chave de acesso detectada")
                 return DocumentType.CUPOM_FISCAL
 
         # Fatura - indicadores exclusivos
@@ -188,7 +188,7 @@ class DocumentClassifier:
             "limite disponivel",
             "cartao final",
         ]):
-            print(f"[Classifier] Decisor forte: Limite de credito detectado")
+            print("[Classifier] Decisor forte: Limite de credito detectado")
             return DocumentType.FATURA_CARTAO
 
         # ===== SISTEMA DE SCORE PONDERADO =====
@@ -272,7 +272,7 @@ class DocumentClassifier:
         max_score = max(cupom_score, fatura_score, extrato_score)
 
         if max_score == 0:
-            print(f"[Classifier] Nenhum indicador encontrado")
+            print("[Classifier] Nenhum indicador encontrado")
             return DocumentType.UNKNOWN
 
         # Verificar se tem margem suficiente
@@ -298,7 +298,7 @@ class DocumentClassifier:
         ])
 
         if has_product_list:
-            print(f"[Classifier] Heuristica: Lista de produtos detectada -> CUPOM")
+            print("[Classifier] Heuristica: Lista de produtos detectada -> CUPOM")
             return DocumentType.CUPOM_FISCAL
 
         # Heuristica 2: Se tem parcelamento, e fatura
@@ -309,22 +309,22 @@ class DocumentClassifier:
         ])
 
         if has_installments and fatura_score > 0:
-            print(f"[Classifier] Heuristica: Parcelamento detectado -> FATURA")
+            print("[Classifier] Heuristica: Parcelamento detectado -> FATURA")
             return DocumentType.FATURA_CARTAO
 
         # Heuristica 3: Se empate, escolher o maior score
         if max_score > 0:
             if cupom_score == max_score:
-                print(f"[Classifier] Heuristica: Maior score -> CUPOM")
+                print("[Classifier] Heuristica: Maior score -> CUPOM")
                 return DocumentType.CUPOM_FISCAL
             elif fatura_score == max_score:
-                print(f"[Classifier] Heuristica: Maior score -> FATURA")
+                print("[Classifier] Heuristica: Maior score -> FATURA")
                 return DocumentType.FATURA_CARTAO
             else:
-                print(f"[Classifier] Heuristica: Maior score -> EXTRATO")
+                print("[Classifier] Heuristica: Maior score -> EXTRATO")
                 return DocumentType.EXTRATO_BANCARIO
 
-        print(f"[Classifier] Heuristicas inconclusivas")
+        print("[Classifier] Heuristicas inconclusivas")
         return DocumentType.UNKNOWN
 
     async def _classify_by_llm(self, text_sample: str) -> DocumentType:
@@ -338,10 +338,11 @@ class DocumentClassifier:
         try:
             # Importar apenas quando necessario (otimizacao)
             from google import genai
+
             from app.core.config import settings
 
             if not settings.google_api_key:
-                print(f"[Classifier] GOOGLE_API_KEY nao configurada, pulando LLM")
+                print("[Classifier] GOOGLE_API_KEY nao configurada, pulando LLM")
                 return DocumentType.UNKNOWN
 
             client = genai.Client(api_key=settings.google_api_key)
@@ -376,7 +377,7 @@ class DocumentClassifier:
             return DocumentType.UNKNOWN
 
         except ImportError:
-            print(f"[Classifier] google-genai nao instalado, pulando LLM")
+            print("[Classifier] google-genai nao instalado, pulando LLM")
             return DocumentType.UNKNOWN
         except Exception as e:
             print(f"[Classifier] Erro no LLM: {type(e).__name__}: {e}")

@@ -1,7 +1,7 @@
-from datetime import datetime, date
+from datetime import date, datetime
 from decimal import Decimal
+
 from pydantic import BaseModel, Field, model_validator
-from app.models.receipt import ReceiptStatus
 
 
 class ReceiptPaymentCreate(BaseModel):

@@ -9,21 +9,21 @@ Sistema de gamificação para o Biveto com:
 """
 
 from .routers.gamification import router
-from .services import (
-    GamificationService,
-    BadgeService,
-    StreakService,
-    ChallengeService,
-    PointsService,
-)
 from .schemas import (
-    GamificationSummary,
-    GamificationEvent,
     BadgeResponse,
+    ChallengeListResponse,
+    ChallengeResponse,
+    GamificationEvent,
+    GamificationSummary,
     StreakResponse,
     StreakWeekView,
-    ChallengeResponse,
-    ChallengeListResponse,
+)
+from .services import (
+    BadgeService,
+    ChallengeService,
+    GamificationService,
+    PointsService,
+    StreakService,
 )
 
 __all__ = [

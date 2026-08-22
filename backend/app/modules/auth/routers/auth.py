@@ -1,25 +1,22 @@
 """
 Rotas de autenticacao: login, refresh, convites e reset de senha.
 """
-from datetime import datetime, timedelta
-from fastapi import APIRouter, Depends, Body, HTTPException, status, Request
+from fastapi import APIRouter, Body, HTTPException, Request
 from pydantic import BaseModel, Field
-from sqlalchemy import select, func
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import func, select
 
-from app.core.deps import DbSession, CurrentUser
-from app.core.security import get_password_hash, verify_password, validate_password_or_raise
+from app.core.deps import CurrentUser, DbSession
 from app.core.rate_limit import limiter
-from app.core.utils import utc_now
-from app.models import User, Invitation, InvitationStatus, License
-from app.models.household import HouseholdMember, HouseholdRole
-from app.modules.auth.schemas.user import UserCreate, UserResponse
-from app.modules.auth.schemas.auth import Token, LoginRequest
-from app.modules.auth.schemas.invitation import InviteValidation, InviteRegister
-from app.modules.auth.services.auth_service import AuthService
-from app.modules.auth.services.user_service import UserService
-from app.modules.auth.services.user_setup import setup_new_user
+from app.core.security import get_password_hash, validate_password_or_raise
 from app.core.services.email_service import email_service
+from app.core.utils import utc_now
+from app.models import Invitation, InvitationStatus, License, User
+from app.models.household import HouseholdMember, HouseholdRole
+from app.modules.auth.schemas.auth import LoginRequest, Token
+from app.modules.auth.schemas.invitation import InviteRegister, InviteValidation
+from app.modules.auth.schemas.user import UserResponse
+from app.modules.auth.services.auth_service import AuthService
+from app.modules.auth.services.user_setup import setup_new_user
 
 router = APIRouter()
 

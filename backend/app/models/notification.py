@@ -1,19 +1,22 @@
-from datetime import datetime, time, timezone
-from app.core.utils import utc_now
+from datetime import datetime, time
 from enum import Enum
+
 from sqlalchemy import (
-    String,
+    JSON,
     Boolean,
     DateTime,
-    Time,
     ForeignKey,
-    Text,
-    Integer,
     Index,
+    Integer,
+    String,
+    Text,
+    Time,
     UniqueConstraint,
-    JSON,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.core.utils import utc_now
+
 from ..core.database import Base
 
 

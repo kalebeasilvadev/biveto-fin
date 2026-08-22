@@ -1,28 +1,29 @@
 import secrets
-from datetime import date, datetime, timedelta
-from fastapi import APIRouter, HTTPException, status
-from sqlalchemy import select, func, delete
+from datetime import timedelta
 
-from app.core.deps import CurrentUser, DbSession
+from fastapi import APIRouter, HTTPException, status
+from sqlalchemy import delete, func, select
+
 from app.core.config import settings
+from app.core.deps import CurrentUser, DbSession
 from app.core.security import get_password_hash
-from app.core.utils import utc_now
-from app.models import User, License, LicenseStatus, Invitation, InvitationStatus
-from app.modules.auth.services.user_setup import setup_new_user
 from app.core.services.email_service import email_service
+from app.core.utils import utc_now
+from app.models import Invitation, InvitationStatus, License, LicenseStatus, User
+from app.models.household import HouseholdMember, HouseholdRole
 from app.modules.admin.schemas.admin import (
-    LicenseCreate,
-    LicenseUpdate,
-    LicenseResponse,
-    HouseholdMemberSummary,
-    UserAdminCreate,
-    UserAdminUpdate,
-    UserAdminResponse,
-    UserListResponse,
     AdminDashboard,
+    HouseholdMemberSummary,
+    LicenseCreate,
+    LicenseResponse,
+    LicenseUpdate,
+    UserAdminCreate,
+    UserAdminResponse,
+    UserAdminUpdate,
+    UserListResponse,
 )
 from app.modules.auth.schemas.invitation import InvitationCreate, InvitationListResponse
-from app.models.household import HouseholdMember, HouseholdRole
+from app.modules.auth.services.user_setup import setup_new_user
 
 router = APIRouter()
 

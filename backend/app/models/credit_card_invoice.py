@@ -1,8 +1,20 @@
-from datetime import datetime, date
+from datetime import date, datetime
 from decimal import Decimal
 from enum import Enum
-from sqlalchemy import String, ForeignKey, DateTime, Date, Text, Numeric, Integer, UniqueConstraint, JSON
+
+from sqlalchemy import (
+    JSON,
+    Date,
+    DateTime,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
 from ..core.database import Base
 from ..core.utils import utc_now
 
@@ -112,8 +124,8 @@ class CreditCardInvoice(Base):
         return f"{months[self.reference_month - 1]}/{self.reference_year}"
 
 
-from .user import User
+from .account import Account
 from .credit_card import CreditCard
 from .document import Document
 from .transaction import Transaction
-from .account import Account
+from .user import User

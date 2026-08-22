@@ -4,26 +4,36 @@ Implementa metodologias Dave Ramsey (Snowball/Avalanche) e Gustavo Cerbasi
 """
 from datetime import date
 from decimal import Decimal
-from dateutil.relativedelta import relativedelta
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
-from fastapi import HTTPException, status
 
-from app.models.debt import Debt, DebtPayment, DebtStatus, DebtType, PayoffStrategy
+from dateutil.relativedelta import relativedelta
+from fastapi import HTTPException, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.debt import Debt, DebtPayment, DebtStatus, DebtType
 from app.models.user import User
 from app.modules.debts.schemas.debt import (
-    DebtCreate, DebtUpdate, DebtPaymentCreate,
-    DebtResponse, DebtDetailResponse, DebtPaymentResponse,
-    DebtPayoffProjection, DebtSummary, DebtHighlight,
-    SnowballPlan, AvalanchePlan, SnowballDebtStep, PayoffStrategyComparison
+    AvalanchePlan,
+    DebtCreate,
+    DebtDetailResponse,
+    DebtHighlight,
+    DebtPaymentCreate,
+    DebtPaymentResponse,
+    DebtPayoffProjection,
+    DebtResponse,
+    DebtSummary,
+    DebtUpdate,
+    PayoffStrategyComparison,
+    SnowballDebtStep,
+    SnowballPlan,
 )
 from app.modules.household.utils import (
-    get_household_user_ids,
-    get_household_member,
     build_ownership_filter,
+    get_household_member,
+    get_household_user_ids,
     validate_create_permission,
-    validate_edit_permission,
     validate_delete_permission,
+    validate_edit_permission,
 )
 
 

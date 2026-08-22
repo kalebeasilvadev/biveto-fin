@@ -1,9 +1,12 @@
-from datetime import datetime, date, timezone
-from app.core.utils import utc_now
-from enum import Enum
 import secrets
-from sqlalchemy import String, Boolean, DateTime, Date, Integer, Text, ForeignKey
+from datetime import date, datetime
+from enum import Enum
+
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.core.utils import utc_now
+
 from ..core.database import Base
 
 
@@ -111,5 +114,5 @@ class License(Base):
         return self.member_count < self.max_users
 
 
-from .user import User
 from .household import HouseholdMember
+from .user import User

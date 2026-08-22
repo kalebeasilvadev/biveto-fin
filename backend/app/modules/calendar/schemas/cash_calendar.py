@@ -2,9 +2,9 @@
 Schemas for Cash Calendar API.
 """
 
-from datetime import date, datetime
-from decimal import Decimal
+from datetime import date
 from enum import Enum
+
 from pydantic import BaseModel
 
 

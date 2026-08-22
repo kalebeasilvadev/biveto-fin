@@ -1,8 +1,11 @@
-from datetime import datetime, timezone
-from app.core.utils import utc_now
+from datetime import datetime
 from enum import Enum
-from sqlalchemy import String, ForeignKey, DateTime, Numeric, Boolean, Integer, Text
+
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.core.utils import utc_now
+
 from ..core.database import Base
 
 
@@ -97,7 +100,7 @@ class IncomeSource(Base):
     transactions: Mapped[list["Transaction"]] = relationship(back_populates="income_source")
 
 
-from .user import User
 from .account import Account
 from .category import Category
 from .transaction import Transaction
+from .user import User

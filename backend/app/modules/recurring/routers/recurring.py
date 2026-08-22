@@ -2,15 +2,15 @@ from fastapi import APIRouter, HTTPException, Query
 
 from app.core.deps import CurrentUser, DbSession
 from app.modules.recurring.schemas.recurring import (
-    RecurringCreate,
-    RecurringUpdate,
-    RecurringResponse,
-    RecurringSummary,
-    RecurringFromSuggestionCreate,
     BatchRecurringFromSuggestionRequest,
     BatchRecurringItemResult,
     BatchRecurringResponse,
     RecurringCancelRequest,
+    RecurringCreate,
+    RecurringFromSuggestionCreate,
+    RecurringResponse,
+    RecurringSummary,
+    RecurringUpdate,
 )
 from app.modules.recurring.services.recurring_service import RecurringTransactionService
 
@@ -289,7 +289,9 @@ async def create_from_suggestion(
     decide cadastrá-lo como recorrência.
     """
     from datetime import date as date_type
+
     from sqlalchemy import select
+
     from app.models.category import Category
     from app.models.recurring import RecurringTransaction
 
@@ -382,7 +384,9 @@ async def batch_create_from_suggestion(
     incluindo quais foram sucesso, quais são duplicados e quais tiveram erro.
     """
     from datetime import date as date_type
+
     from sqlalchemy import select
+
     from app.models.category import Category
     from app.models.recurring import RecurringTransaction
 

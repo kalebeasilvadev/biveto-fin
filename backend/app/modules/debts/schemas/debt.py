@@ -1,9 +1,10 @@
 """Schemas para Debt (Gestao de Dividas)"""
-from datetime import datetime, date
+from datetime import date, datetime
 from decimal import Decimal
+
 from pydantic import BaseModel, Field
 
-from app.models.debt import DebtType, DebtStatus, PayoffStrategy
+from app.models.debt import DebtStatus, DebtType
 from app.models.household import OwnershipType
 
 

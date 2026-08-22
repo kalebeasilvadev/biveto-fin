@@ -1,19 +1,19 @@
 """Gamification models - Re-exported from central models"""
 
 from app.models.gamification import (
-    BadgeDefinition,
-    UserBadge,
-    BadgeRarity,
     BadgeCategory,
-    UserStreak,
-    StreakHistory,
-    StreakType,
+    BadgeDefinition,
+    BadgeRarity,
     ChallengeDefinition,
-    UserChallenge,
     ChallengeDifficulty,
     ChallengeStatus,
-    UserPoints,
     PointsTransaction,
+    StreakHistory,
+    StreakType,
+    UserBadge,
+    UserChallenge,
+    UserPoints,
+    UserStreak,
 )
 
 __all__ = [

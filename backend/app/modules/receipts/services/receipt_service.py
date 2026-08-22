@@ -1,29 +1,29 @@
-from datetime import datetime, timezone
 from decimal import Decimal
-from sqlalchemy import select, func
+
+from fastapi import HTTPException
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
-from fastapi import HTTPException
 
-from app.models.receipt import Receipt, ReceiptPayment, ReceiptStatus
-from app.models.transaction import Transaction, TransactionType
-from app.models.document import Document
-from app.models.account import Account
-from app.models.benefit_card import BenefitCard
-from app.models.user import User
-from app.models.grocery import GroceryPurchase, GroceryCategory, NecessityType
-from app.models.credit_card import CreditCard
-from app.modules.receipts.schemas.receipt import (
-    ReceiptConfirmRequest,
-    ReceiptPaymentResponse,
-    ReceiptResponse,
-    ReceiptListResponse,
-    ReceiptUpdate,
-)
-from app.modules.installments.services.installment_service import InstallmentService
-from app.modules.credit_cards.services.invoice_service import InvoiceService
 from app.core.balance_monitor import BalanceMonitor
 from app.core.utils import utc_now
+from app.models.account import Account
+from app.models.benefit_card import BenefitCard
+from app.models.credit_card import CreditCard
+from app.models.document import Document
+from app.models.grocery import GroceryCategory, GroceryPurchase, NecessityType
+from app.models.receipt import Receipt, ReceiptPayment, ReceiptStatus
+from app.models.transaction import Transaction, TransactionType
+from app.models.user import User
+from app.modules.credit_cards.services.invoice_service import InvoiceService
+from app.modules.installments.services.installment_service import InstallmentService
+from app.modules.receipts.schemas.receipt import (
+    ReceiptConfirmRequest,
+    ReceiptListResponse,
+    ReceiptPaymentResponse,
+    ReceiptResponse,
+    ReceiptUpdate,
+)
 
 
 class ReceiptService:

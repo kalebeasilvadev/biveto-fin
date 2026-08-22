@@ -1,5 +1,5 @@
 """Utility functions for the application."""
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 
 def utc_now() -> datetime:
@@ -10,4 +10,4 @@ def utc_now() -> datetime:
     Returns naive datetime (no tzinfo) for compatibility with PostgreSQL
     TIMESTAMP WITHOUT TIME ZONE columns.
     """
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    return datetime.now(UTC).replace(tzinfo=None)

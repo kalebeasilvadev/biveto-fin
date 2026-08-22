@@ -3,8 +3,8 @@ import asyncio
 import base64
 
 from app.core.config import settings
-from .base import BaseProvider
 
+from .base import BaseProvider
 
 DEFAULT_MAX_RETRIES = 3
 DEFAULT_RETRY_DELAY = 2.0

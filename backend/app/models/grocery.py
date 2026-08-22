@@ -1,9 +1,11 @@
-from datetime import datetime, date, timezone
-from app.core.utils import utc_now
-from decimal import Decimal
+from datetime import date, datetime
 from enum import Enum
-from sqlalchemy import String, ForeignKey, DateTime, Date, Text, Numeric, Integer, Boolean
+
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.core.utils import utc_now
+
 from ..core.database import Base
 
 
@@ -313,9 +315,9 @@ class ShoppingListItem(Base):
 
 
 # Import for relationships
-from .user import User
-from .transaction import Transaction
 from .document import Document
-from .merchant import Merchant
 from .license import License
+from .merchant import Merchant
 from .receipt import Receipt
+from .transaction import Transaction
+from .user import User

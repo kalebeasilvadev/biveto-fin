@@ -130,6 +130,7 @@ def _advance_next_due_date(rec):
 async def task_generate_recurring_transactions():
     """Generate transactions from recurring definitions that are due."""
     from sqlalchemy import and_
+
     from app.models.recurring import RecurringTransaction
     from app.models.transaction import Transaction
 
@@ -204,10 +205,10 @@ async def task_generate_recurring_transactions():
 
 async def task_process_scheduled_automations():
     """Process scheduled automation rules."""
-    from datetime import datetime, time as dtime
-    from app.models import AutomationRule, TriggerType, ScheduleFrequency
-    from app.modules.automations.services import AutomationService
-    from app.modules.automations.tasks.automation_tasks import _should_run_scheduled
+    from datetime import datetime
+
+    from app.models import AutomationRule, TriggerType
+    from app.modules.automations.services import AutomationService, should_run_scheduled
 
     try:
         async with async_session_maker() as session:
@@ -227,7 +228,7 @@ async def task_process_scheduled_automations():
 
             for rule in rules:
                 try:
-                    if not _should_run_scheduled(rule, current_date, current_time):
+                    if not should_run_scheduled(rule, current_date, current_time):
                         continue
 
                     if rule.last_executed_at:

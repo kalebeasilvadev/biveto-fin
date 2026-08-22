@@ -1,7 +1,9 @@
 """Schemas para detecção e resolução de duplicatas"""
 
 from datetime import date
+
 from pydantic import BaseModel, Field
+
 from app.modules.installments.schemas.installment import InstallmentSeriesResponse
 
 

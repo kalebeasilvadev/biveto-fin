@@ -1,12 +1,12 @@
 """Notification schemas."""
 from .notification import (
     NotificationCreate,
-    NotificationResponse,
-    NotificationSummary,
     NotificationPreferenceResponse,
     NotificationPreferenceUpdate,
+    NotificationResponse,
     NotificationSettingsResponse,
     NotificationSettingsUpdate,
+    NotificationSummary,
     PushSubscriptionCreate,
     PushSubscriptionResponse,
     UnreadCountResponse,

@@ -1,7 +1,6 @@
 """Validacao e limpeza de dados extraidos de faturas"""
 import re
 
-
 # Padroes de descricao que indicam totais/resumos (nao sao transacoes reais)
 INVALID_DESCRIPTIONS = [
     'despesas do mes',
@@ -387,7 +386,6 @@ class ExtractionValidator:
         removed_any = False
 
         for pag in pagamentos_fatura:
-            payment_amount = abs(pag.get('amount', 0))
             # Se remover este pagamento, a soma fica proxima do total?
             soma_sem_este = soma_compras
             if abs(soma_sem_este - total_amount) < 50:
@@ -492,7 +490,7 @@ class ExtractionValidator:
         if not is_bradesco:
             return items
 
-        print(f"[Validator] Detectado Bradesco, verificando parcelamentos concatenados...")
+        print("[Validator] Detectado Bradesco, verificando parcelamentos concatenados...")
 
         pattern = re.compile(r'(\d{1,2})/(\d{1,2})$')
 

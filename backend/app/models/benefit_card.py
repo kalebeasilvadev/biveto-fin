@@ -1,8 +1,11 @@
-from datetime import datetime, timezone
-from app.core.utils import utc_now
+from datetime import datetime
 from enum import Enum
-from sqlalchemy import String, ForeignKey, DateTime, Numeric, Integer, Boolean
+
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.core.utils import utc_now
+
 from ..core.database import Base
 
 
@@ -105,5 +108,5 @@ class BenefitCard(Base):
 
 
 from .account import Account
-from .user import User
 from .income_source import IncomeSource
+from .user import User

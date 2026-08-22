@@ -1,6 +1,7 @@
 """Grocery (Mercado) API Endpoints"""
 from datetime import date
-from fastapi import APIRouter, Query, HTTPException, status
+
+from fastapi import APIRouter, HTTPException, Query, status
 
 from app.core.deps import CurrentUser, DbSession
 from app.models.grocery import (
@@ -8,48 +9,48 @@ from app.models.grocery import (
     NecessityType,
     ShoppingListStatus,
 )
+from app.modules.grocery.schemas.analytics import (
+    CheapestPriceResponse,
+    GroceryAnalyticsByCategory,
+    GroceryAnalyticsByNecessity,
+    GroceryAnalyticsSpending,
+    GroceryBudgetStatus,
+    GroceryInsights,
+    PriceHistoryResponse,
+)
 from app.modules.grocery.schemas.product import (
     GroceryProductCreate,
-    GroceryProductUpdate,
     GroceryProductResponse,
+    GroceryProductUpdate,
 )
 from app.modules.grocery.schemas.purchase import (
-    GroceryPurchaseCreate,
-    GroceryPurchaseBulkCreate,
-    GroceryPurchaseUpdate,
-    GroceryPurchaseResponse,
-    GroceryPurchaseSummary,
-    GroceryPurchaseComparison,
     BackfillRequest,
     BackfillResponse,
+    GroceryPurchaseBulkCreate,
+    GroceryPurchaseComparison,
+    GroceryPurchaseCreate,
+    GroceryPurchaseResponse,
+    GroceryPurchaseSummary,
+    GroceryPurchaseUpdate,
 )
 from app.modules.grocery.schemas.shopping_list import (
     ShoppingListCreate,
-    ShoppingListUpdate,
-    ShoppingListResponse,
-    ShoppingListItemCreate,
-    ShoppingListItemUpdate,
-    ShoppingListItemResponse,
     ShoppingListGenerateRequest,
+    ShoppingListItemCreate,
+    ShoppingListItemResponse,
+    ShoppingListItemUpdate,
+    ShoppingListResponse,
+    ShoppingListUpdate,
 )
 from app.modules.grocery.schemas.smart_list import (
-    SmartListGenerateRequest,
     SmartListFullResponse,
-)
-from app.modules.grocery.schemas.analytics import (
-    GroceryAnalyticsSpending,
-    GroceryAnalyticsByCategory,
-    GroceryAnalyticsByNecessity,
-    GroceryInsights,
-    GroceryBudgetStatus,
-    PriceHistoryResponse,
-    CheapestPriceResponse,
+    SmartListGenerateRequest,
 )
 from app.modules.grocery.services import (
-    GroceryService,
-    ShoppingListService,
     GroceryAnalyticsService,
+    GroceryService,
     PriceTrackingService,
+    ShoppingListService,
     SmartListService,
 )
 

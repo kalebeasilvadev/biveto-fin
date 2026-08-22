@@ -1,13 +1,13 @@
 """
 Servico de usuario: operacoes CRUD e configuracao inicial.
 """
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 from fastapi import HTTPException, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.user import User
 from app.models.account import Account, AccountType
 from app.models.category import Category, CategoryType
+from app.models.user import User
 from app.modules.auth.schemas.user import UserUpdate
 
 

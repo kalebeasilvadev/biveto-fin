@@ -3,20 +3,21 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import os
-from datetime import datetime, date
+from datetime import date
 from decimal import Decimal
 from pathlib import Path
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, func
-from fastapi import HTTPException, status, UploadFile, BackgroundTasks
 
-from app.models.document import Document, DocumentExtraction, DocumentStatus
+from fastapi import BackgroundTasks, HTTPException, UploadFile, status
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.config import settings
+from app.core.database import async_session_maker
+from app.core.utils import utc_now
+from app.models.credit_card import CreditCard
+from app.models.document import Document, DocumentStatus
 from app.models.transaction import Transaction
 from app.models.user import User
-from app.models.credit_card import CreditCard
-from app.core.config import settings
-from app.core.utils import utc_now
-from app.core.database import async_session_maker
 
 
 class PasswordRequiredError(Exception):
@@ -102,9 +103,6 @@ async def process_document_background(document_id: int, user_id: int, file_path:
             document.status = DocumentStatus.PROCESSING
             await db.commit()
 
-            # Determinar se e PDF ou imagem
-            is_pdf = mime_type == 'application/pdf' or filename.lower().endswith('.pdf')
-
             from app.modules.documents.services.llm_ocr_service import LLMOCRService
             if settings.mistral_api_key:
                 llm_service = LLMOCRService(provider='mistral', model=settings.mistral_llm_model)
@@ -133,7 +131,7 @@ async def process_document_background(document_id: int, user_id: int, file_path:
                         # Se diferença > R$ 50, há itens faltando ou sobrando
                         if difference > 50:
                             print(f"[DOC_BG] ⚠️ ALERTA: Diferença de R$ {difference:.2f} detectada!")
-                            print(f"[DOC_BG] Possível causa: LLM ignorou alguma coluna/seção de transações")
+                            print("[DOC_BG] Possível causa: LLM ignorou alguma coluna/seção de transações")
                             # Adicionar flag nos extracted_data para o frontend alertar o usuário
                             extraction_data['validation_warning'] = {
                                 'type': 'sum_mismatch',
@@ -397,7 +395,11 @@ class DocumentService:
         extraction_data = await self._process_document(document, content, password)
 
         # Retornar resposta com flag de duplicata e itens extraidos (nao salvos)
-        from app.modules.documents.schemas.document import DocumentResponse, ExtractedItemResponse, CardInfoResponse
+        from app.modules.documents.schemas.document import (
+            CardInfoResponse,
+            DocumentResponse,
+            ExtractedItemResponse,
+        )
 
         response = DocumentResponse.model_validate(document)
         response.is_duplicate = is_duplicate
@@ -405,7 +407,9 @@ class DocumentService:
         # Converter itens extraidos para o formato de resposta e verificar duplicados
         if extraction_data and extraction_data.get('items'):
             # Detectar recorrencias (Netflix, Spotify, etc.)
-            from app.modules.known_services.services.recurring_detector import RecurringDetectorService
+            from app.modules.known_services.services.recurring_detector import (
+                RecurringDetectorService,
+            )
             recurring_detector = RecurringDetectorService(self.db)
 
             card_info = extraction_data.get('card_info', {})
@@ -450,7 +454,9 @@ class DocumentService:
                 # Converter recurring_detection se existir
                 recurring_detection = None
                 if item.get('recurring_detection'):
-                    from app.modules.known_services.schemas.recurring_detection import RecurringDetection
+                    from app.modules.known_services.schemas.recurring_detection import (
+                        RecurringDetection,
+                    )
                     recurring_detection = RecurringDetection(**item['recurring_detection'])
 
                 extracted_items.append(ExtractedItemResponse(
@@ -501,7 +507,10 @@ class DocumentService:
 
         # Incluir informacoes de pagamento (para cupom fiscal)
         if extraction_data and extraction_data.get('payment_info'):
-            from app.modules.documents.schemas.document import PaymentInfoResponse, DetectedPaymentResponse
+            from app.modules.documents.schemas.document import (
+                DetectedPaymentResponse,
+                PaymentInfoResponse,
+            )
             payment_info = extraction_data['payment_info']
             payments = []
             for p in payment_info.get('payments', []):
@@ -522,7 +531,11 @@ class DocumentService:
 
     async def upload_batch(self, user: User, files: list) -> Document:
         """Upload de multiplas imagens como 1 documento (para cupons grandes)"""
-        from app.modules.documents.schemas.document import DocumentResponse, ExtractedItemResponse, CardInfoResponse
+        from app.modules.documents.schemas.document import (
+            CardInfoResponse,
+            DocumentResponse,
+            ExtractedItemResponse,
+        )
 
         # Validar quantidade de arquivos
         if len(files) < 1:
@@ -579,7 +592,7 @@ class DocumentService:
         if total_size > max_total_size:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Tamanho total muito grande. Maximo: 50MB",
+                detail="Tamanho total muito grande. Maximo: 50MB",
             )
 
         # Calcular hash combinado para dedupe
@@ -630,7 +643,9 @@ class DocumentService:
 
         # Converter itens extraidos para o formato de resposta
         if extraction_data and extraction_data.get('items'):
-            from app.modules.known_services.services.recurring_detector import RecurringDetectorService
+            from app.modules.known_services.services.recurring_detector import (
+                RecurringDetectorService,
+            )
             recurring_detector = RecurringDetectorService(self.db)
 
             card_info = extraction_data.get('card_info', {})
@@ -673,7 +688,9 @@ class DocumentService:
 
                 recurring_detection = None
                 if item.get('recurring_detection'):
-                    from app.modules.known_services.schemas.recurring_detection import RecurringDetection
+                    from app.modules.known_services.schemas.recurring_detection import (
+                        RecurringDetection,
+                    )
                     recurring_detection = RecurringDetection(**item['recurring_detection'])
 
                 extracted_items.append(ExtractedItemResponse(
@@ -722,7 +739,10 @@ class DocumentService:
 
         # Incluir informacoes de pagamento (para cupom fiscal)
         if extraction_data and extraction_data.get('payment_info'):
-            from app.modules.documents.schemas.document import PaymentInfoResponse, DetectedPaymentResponse
+            from app.modules.documents.schemas.document import (
+                DetectedPaymentResponse,
+                PaymentInfoResponse,
+            )
             payment_info = extraction_data['payment_info']
             payments = []
             for p in payment_info.get('payments', []):
@@ -790,10 +810,10 @@ class DocumentService:
             from app.modules.documents.services.llm_ocr_service import LLMOCRService
             if settings.mistral_api_key:
                 llm_service = LLMOCRService(provider='mistral', model=settings.mistral_llm_model)
-                print(f"[DOC_SVC] Using Mistral for batch image extraction")
+                print("[DOC_SVC] Using Mistral for batch image extraction")
             else:
                 llm_service = LLMOCRService(provider='google', model=settings.vision_model or 'gemini-2.0-flash')
-                print(f"[DOC_SVC] Using Google for batch image extraction (Mistral not configured)")
+                print("[DOC_SVC] Using Google for batch image extraction (Mistral not configured)")
             result = await llm_service.extract_from_multiple_images(images)
 
             items_count = len(result.get('items', [])) if result else 0
@@ -896,7 +916,7 @@ class DocumentService:
             await self.db.flush()
 
             # Extrair dados com LLM
-            print(f"[DOC_SVC] Calling _extract_data...")
+            print("[DOC_SVC] Calling _extract_data...")
             extraction_data = await self._extract_data(document, content, password)
             items_count = len(extraction_data.get('items', [])) if extraction_data else 0
             print(f"[DOC_SVC] _extract_data returned: items={items_count}, error={document.error_message}")
@@ -952,7 +972,9 @@ class DocumentService:
 
         if is_spreadsheet:
             # Usar parser de planilha
-            from app.modules.documents.services.spreadsheet_parser_service import SpreadsheetParserService
+            from app.modules.documents.services.spreadsheet_parser_service import (
+                SpreadsheetParserService,
+            )
             parser = SpreadsheetParserService()
             result = await parser.parse_file(content, filename, mime_type)
         else:

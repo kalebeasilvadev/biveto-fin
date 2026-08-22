@@ -1,27 +1,28 @@
 from __future__ import annotations
-from datetime import date, timedelta
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_, or_
-from calendar import monthrange
 
-from app.models.transaction import Transaction, TransactionType
-from app.models.category import Category
-from app.models.merchant import Merchant
-from app.models.user import User
-from app.models.household import HouseholdMember
-from app.models.credit_card_invoice import CreditCardInvoice, InvoiceStatus
-from app.models.credit_card import CreditCard
+from calendar import monthrange
+from datetime import date, timedelta
+
+from sqlalchemy import and_, func, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.models.account import Account
+from app.models.budget import BudgetItemStatus
+from app.models.category import Category
+from app.models.credit_card import CreditCard
+from app.models.credit_card_invoice import CreditCardInvoice, InvoiceStatus
+from app.models.household import HouseholdMember
+from app.models.merchant import Merchant
+from app.models.transaction import PaymentMethod, Transaction, TransactionType
+from app.models.user import User
 from app.modules.analytics.schemas.analytics import (
     AnalyticsSummary,
     CategorySummary,
-    MerchantSummary,
     InsightResponse,
-    PaymentMethodSummary,
+    MerchantSummary,
     PaymentMethodReport,
+    PaymentMethodSummary,
 )
-from app.models.transaction import PaymentMethod
-from app.models.budget import BudgetItemStatus
 
 
 class AnalyticsService:
@@ -919,7 +920,7 @@ class AnalyticsService:
                             description=f"Voce tem R$ {total_outstanding:,.2f} em saldo devedor em {len(cards_with_balance)} cartao(oes)",
                             impact_value=float(monthly_interest),
                             calculation=f"Juros estimados: R$ {monthly_interest:,.2f}/mes (taxa media: {avg_interest_rate*100}% a.m.)",
-                            action=f"Priorize quitar os cartoes com maiores saldos. Se tiver R$ 10.000 disponiveis, use para abater e economizar juros"
+                            action="Priorize quitar os cartoes com maiores saldos. Se tiver R$ 10.000 disponiveis, use para abater e economizar juros"
                         )
                     )
 
@@ -937,7 +938,7 @@ class AnalyticsService:
                         description=f"Seus 2 maiores saldos: {top_2[0]['name']} (R$ {top_2[0]['balance']:,.2f}) e {top_2[1]['name']} (R$ {top_2[1]['balance']:,.2f})",
                         impact_value=float(top_2_total),
                         calculation=f"Total consolidavel: R$ {top_2_total:,.2f}",
-                        action=f"Priorize pagar estes cartoes primeiro para reduzir juros e simplificar suas financas"
+                        action="Priorize pagar estes cartoes primeiro para reduzir juros e simplificar suas financas"
                     )
                 )
 

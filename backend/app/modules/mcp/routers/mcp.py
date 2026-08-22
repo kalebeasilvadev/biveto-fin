@@ -4,11 +4,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ....core.deps import ApiKeyUser, get_db
 from ..schemas import (
-    TableListResponse,
+    ContextRequest,
     QueryRequest,
     QueryResponse,
+    TableListResponse,
     TableStatsResponse,
-    ContextRequest,
 )
 from ..services import MCPService
 

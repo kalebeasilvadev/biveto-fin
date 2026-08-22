@@ -1,7 +1,9 @@
 from datetime import datetime
+
 from pydantic import BaseModel, Field
-from app.models.income_source import IncomeType, IncomeFrequency
+
 from app.models.household import OwnershipType
+from app.models.income_source import IncomeFrequency, IncomeType
 
 
 class IncomeSourceBase(BaseModel):

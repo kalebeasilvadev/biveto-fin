@@ -1,7 +1,8 @@
-from datetime import datetime, date as date_type
-from decimal import Decimal
+from datetime import date as date_type
+from datetime import datetime
+
 from pydantic import BaseModel, Field
-from app.models.credit_card_invoice import InvoiceStatus
+
 from app.models.transaction import PaymentMethod
 
 

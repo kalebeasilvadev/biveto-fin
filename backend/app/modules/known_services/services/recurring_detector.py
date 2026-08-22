@@ -1,19 +1,20 @@
 """Serviço para detectar transações recorrentes em itens extraídos de faturas"""
 from __future__ import annotations
+
 import re
-import fnmatch
-from datetime import date, datetime
 from collections import defaultdict
+from datetime import date, datetime
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.recurring import RecurringStatus, RecurringTransaction
 from app.models.user import User
-from app.models.recurring import RecurringTransaction, RecurringStatus
 from app.modules.known_services.models.known_service import KnownRecurringService
 from app.modules.known_services.schemas.recurring_detection import (
-    RecurringDetection,
     DuplicateAnalysis,
     DuplicateType,
+    RecurringDetection,
     RecurringSuggestion,
 )
 

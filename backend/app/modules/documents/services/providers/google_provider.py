@@ -5,8 +5,8 @@ import os
 import tempfile
 
 from app.core.config import settings
-from .base import BaseProvider
 
+from .base import BaseProvider
 
 # Configuracao de retry
 DEFAULT_MAX_RETRIES = 3
@@ -174,7 +174,7 @@ class GoogleProvider(BaseProvider):
                 native_banks = ['banco itau', 'itaú', 'itau unibanco', 'financeira itau cbd']
                 if any(ind in quick_lower for ind in native_banks):
                     use_native = True
-                    print(f"[GoogleProvider] Auto-detected Itaú layout — switching to native PDF mode")
+                    print("[GoogleProvider] Auto-detected Itaú layout — switching to native PDF mode")
             except Exception:
                 pass
 
@@ -197,7 +197,7 @@ class GoogleProvider(BaseProvider):
 
             # Try native mode: send PDF bytes directly to Gemini
             if use_native and not password:
-                print(f"[GoogleProvider] Native mode: sending PDF bytes directly to Gemini...")
+                print("[GoogleProvider] Native mode: sending PDF bytes directly to Gemini...")
 
                 # Extract text only for bank detection (lightweight)
                 from ..pdf_text_extractor import PDFTextExtractor
@@ -233,10 +233,10 @@ Extraia TODAS as transações do documento PDF anexado."""
                 )
             else:
                 if use_native and password:
-                    print(f"[GoogleProvider] Password-protected PDF, falling back to text mode...")
+                    print("[GoogleProvider] Password-protected PDF, falling back to text mode...")
 
                 # PASSO 1: Usar PyMuPDF para extrair texto preservando layout de colunas
-                print(f"[GoogleProvider] Step 1: Extract text with PyMuPDF (preserves columns)...")
+                print("[GoogleProvider] Step 1: Extract text with PyMuPDF (preserves columns)...")
                 from ..pdf_text_extractor import PDFTextExtractor
 
                 pdf_bytes = await asyncio.to_thread(_read_file_sync, temp_file)
@@ -252,7 +252,7 @@ Extraia TODAS as transações do documento PDF anexado."""
                 composed_prompt = self._compose_prompt_with_bank(bank_name)
 
                 # PASSO 3: Fazer extração estruturada usando TEXTO (não imagem)
-                print(f"[GoogleProvider] Step 2: Structured extraction from TEXT (not image)...")
+                print("[GoogleProvider] Step 2: Structured extraction from TEXT (not image)...")
 
                 # Criar prompt final com o texto do documento
                 final_prompt = f"""{composed_prompt}

@@ -1,20 +1,20 @@
 """
 Servico de autenticacao: registro, login e refresh de tokens.
 """
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 from fastapi import HTTPException, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.user import User
-from app.modules.auth.schemas.user import UserCreate
-from app.modules.auth.schemas.auth import Token
 from app.core.security import (
-    get_password_hash,
-    verify_password,
     create_access_token,
     create_refresh_token,
     decode_token,
+    get_password_hash,
+    verify_password,
 )
+from app.models.user import User
+from app.modules.auth.schemas.auth import Token
+from app.modules.auth.schemas.user import UserCreate
 
 
 class AuthService:

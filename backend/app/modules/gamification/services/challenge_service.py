@@ -1,20 +1,22 @@
 """Challenge Service for gamification"""
 
+from datetime import date, timedelta
+
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_
-from datetime import datetime, date, timedelta, timezone
-from app.models.user import User
+
+from app.core.utils import utc_now
 from app.models.gamification import (
-    ChallengeDefinition, UserChallenge,
-    ChallengeStatus, ChallengeDifficulty
+    ChallengeDefinition,
+    ChallengeStatus,
+    UserChallenge,
 )
 from app.models.transaction import Transaction
-from app.core.utils import utc_now
-from ..schemas import (
-    ChallengeResponse, ChallengeListResponse,
-    ChallengeDifficulty as ChallengeDifficultySchema,
-    ChallengeStatus as ChallengeStatusSchema
-)
+from app.models.user import User
+
+from ..schemas import ChallengeDifficulty as ChallengeDifficultySchema
+from ..schemas import ChallengeListResponse, ChallengeResponse
+from ..schemas import ChallengeStatus as ChallengeStatusSchema
 from .points_service import PointsService
 
 
@@ -322,8 +324,6 @@ class ChallengeService:
 
         # Verificar se a transação é da categoria proibida
         # (simplificado - em produção verificaria por category_id)
-        criteria = definition.criteria or {}
-        category_name = criteria.get("category_name", "").lower()
 
         # Se gastou na categoria proibida, falha o desafio
         # Aqui seria necessário verificar a categoria real da transação

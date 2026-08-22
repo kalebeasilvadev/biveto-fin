@@ -5,9 +5,9 @@ from fastapi import APIRouter, HTTPException, status
 
 from app.core.deps import CurrentUser, DbSession
 from app.core.security import get_password_hash, verify_password
-from app.modules.auth.schemas.user import UserResponse, UserUpdate, ChangePassword
-from app.modules.auth.services.user_service import UserService
 from app.core.services.email_service import email_service
+from app.modules.auth.schemas.user import ChangePassword, UserResponse, UserUpdate
+from app.modules.auth.services.user_service import UserService
 
 router = APIRouter()
 

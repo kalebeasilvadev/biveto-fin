@@ -3,10 +3,9 @@ Serviço para cálculo de dias úteis no Brasil.
 Considera feriados nacionais fixos e móveis.
 """
 from datetime import date, timedelta
-from typing import List
 
 
-def get_brazilian_holidays(year: int) -> List[date]:
+def get_brazilian_holidays(year: int) -> list[date]:
     """
     Retorna lista de feriados nacionais brasileiros para um ano.
     Inclui feriados fixos e móveis (Páscoa, Carnaval, Corpus Christi).
@@ -65,14 +64,14 @@ def calculate_easter(year: int) -> date:
     h = (19 * a + b - d - g + 15) % 30
     i = c // 4
     k = c % 4
-    l = (32 + 2 * e + 2 * i - h - k) % 7
-    m = (a + 11 * h + 22 * l) // 451
-    month = (h + l - 7 * m + 114) // 31
-    day = ((h + l - 7 * m + 114) % 31) + 1
+    ell = (32 + 2 * e + 2 * i - h - k) % 7
+    m = (a + 11 * h + 22 * ell) // 451
+    month = (h + ell - 7 * m + 114) // 31
+    day = ((h + ell - 7 * m + 114) % 31) + 1
     return date(year, month, day)
 
 
-def is_business_day(check_date: date, holidays: List[date] | None = None) -> bool:
+def is_business_day(check_date: date, holidays: list[date] | None = None) -> bool:
     """
     Verifica se uma data é dia útil (não é fim de semana nem feriado).
     """

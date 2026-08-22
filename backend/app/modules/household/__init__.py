@@ -25,18 +25,18 @@ Dependencias:
 - app.services.email_service: Para envio de convites por email
 """
 
+from app.modules.household.routers import family_router
 from app.modules.household.schemas import (
+    FamilyContext,
+    FamilyInvitationResponse,
+    FamilyInviteRequest,
+    FamilyInviteResponse,
     HouseholdMemberBase,
     HouseholdMemberCreate,
     HouseholdMemberResponse,
     HouseholdMemberUpdate,
-    FamilyContext,
-    FamilyInviteRequest,
-    FamilyInviteResponse,
-    FamilyInvitationResponse,
     OwnershipUpdate,
 )
-from app.modules.household.routers import family_router
 
 __all__ = [
     # Schemas

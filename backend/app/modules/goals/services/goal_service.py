@@ -2,30 +2,38 @@
 Serviço de Metas Financeiras (Goals)
 Implementa funcionalidades baseadas em YNAB, Cerbasi (PNIF) e Ramsey (Emergency Fund)
 """
-from datetime import date, timedelta
+from datetime import date
 from decimal import Decimal
-from dateutil.relativedelta import relativedelta
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
-from fastapi import HTTPException, status
 
+from dateutil.relativedelta import relativedelta
+from fastapi import HTTPException, status
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.account import Account
 from app.models.goal import Goal, GoalContribution, GoalStatus, GoalType
 from app.models.transaction import Transaction, TransactionType
-from app.models.account import Account
 from app.models.user import User
 from app.modules.goals.schemas.goal import (
-    GoalCreate, GoalUpdate, GoalContributionCreate,
-    GoalResponse, GoalDetailResponse, GoalContributionResponse,
-    GoalProjection, GoalSummary, GoalMilestone,
-    EmergencyFundCalculation, PNIFCalculation
+    EmergencyFundCalculation,
+    GoalContributionCreate,
+    GoalContributionResponse,
+    GoalCreate,
+    GoalDetailResponse,
+    GoalMilestone,
+    GoalProjection,
+    GoalResponse,
+    GoalSummary,
+    GoalUpdate,
+    PNIFCalculation,
 )
 from app.modules.household.utils import (
-    get_household_user_ids,
-    get_household_member,
     build_ownership_filter,
+    get_household_member,
+    get_household_user_ids,
     validate_create_permission,
-    validate_edit_permission,
     validate_delete_permission,
+    validate_edit_permission,
 )
 
 

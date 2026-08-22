@@ -1,5 +1,7 @@
 from datetime import datetime
+
 from pydantic import BaseModel
+
 from app.models.document import DocumentStatus, DocumentType
 from app.modules.known_services.schemas.recurring_detection import RecurringDetection
 

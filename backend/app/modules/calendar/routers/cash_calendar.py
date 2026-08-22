@@ -3,14 +3,15 @@ Cash Calendar API Routes.
 """
 
 from datetime import date, timedelta
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.models import User
-from app.modules.calendar.services import CashCalendarService
 from app.modules.calendar.schemas import CashCalendarResponse, WeeklySummary
+from app.modules.calendar.services import CashCalendarService
 
 router = APIRouter(prefix="/calendar", tags=["Cash Calendar"])
 

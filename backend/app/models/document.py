@@ -1,8 +1,11 @@
-from datetime import datetime, timezone
-from app.core.utils import utc_now
+from datetime import datetime
 from enum import Enum
-from sqlalchemy import String, ForeignKey, DateTime, Text, JSON, Float
+
+from sqlalchemy import JSON, DateTime, Float, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.core.utils import utc_now
+
 from ..core.database import Base
 
 
@@ -89,7 +92,7 @@ class DocumentExtraction(Base):
     document: Mapped["Document"] = relationship(back_populates="extractions")
 
 
-from .user import User
-from .transaction import Transaction
 from .credit_card_invoice import CreditCardInvoice
 from .receipt import Receipt
+from .transaction import Transaction
+from .user import User

@@ -5,14 +5,16 @@ Baseado nas metodologias YNAB e Dave Ramsey
 Evolução: Incorpora funcionalidades de Envelopes (histórico, status dinâmico,
 transferências, subsídio diário) para uma experiência mais completa de orçamento.
 """
-from datetime import datetime, date, timezone
-from app.core.utils import utc_now
+from datetime import datetime
 from decimal import Decimal
 from enum import Enum
-from sqlalchemy import String, ForeignKey, DateTime, Date, Numeric, Integer, Boolean, Text, Index
+
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.core.utils import utc_now
+
 from ..core.database import Base
-from ..core.utils import utc_now
 
 
 class BudgetPeriodType(str, Enum):
@@ -149,6 +151,6 @@ class BudgetItemHistory(Base):
 
 
 # Import para evitar circular import
-from .user import User
 from .category import Category
 from .transaction import Transaction
+from .user import User

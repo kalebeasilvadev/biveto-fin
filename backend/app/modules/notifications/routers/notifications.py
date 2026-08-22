@@ -1,15 +1,15 @@
-from fastapi import APIRouter, Query, HTTPException, status
+from fastapi import APIRouter, HTTPException, Query, status
+
 from app.core.deps import CurrentUser, DbSession
 from app.models.notification import NotificationType
 from app.modules.notifications.schemas.notification import (
-    NotificationCreate,
-    NotificationResponse,
-    NotificationSummary,
     NotificationPreferenceResponse,
     NotificationPreferenceUpdate,
     NotificationPreferenceWithDefaults,
+    NotificationResponse,
     NotificationSettingsResponse,
     NotificationSettingsUpdate,
+    NotificationSummary,
     PushSubscriptionCreate,
     PushSubscriptionResponse,
     UnreadCountResponse,

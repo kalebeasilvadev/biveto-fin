@@ -1,12 +1,18 @@
 """Endpoints de Metas Financeiras (Goals)"""
-from fastapi import APIRouter, Query, HTTPException, status
+from fastapi import APIRouter, HTTPException, Query, status
 
 from app.core.deps import CurrentUser, DbSession
 from app.models.goal import GoalStatus
 from app.modules.goals.schemas.goal import (
-    GoalCreate, GoalUpdate, GoalContributionCreate,
-    GoalResponse, GoalDetailResponse, GoalContributionResponse,
-    GoalSummary, EmergencyFundCalculation, PNIFCalculation
+    EmergencyFundCalculation,
+    GoalContributionCreate,
+    GoalContributionResponse,
+    GoalCreate,
+    GoalDetailResponse,
+    GoalResponse,
+    GoalSummary,
+    GoalUpdate,
+    PNIFCalculation,
 )
 from app.modules.goals.services.goal_service import GoalService
 

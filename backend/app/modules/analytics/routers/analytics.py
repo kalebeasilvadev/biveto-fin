@@ -1,8 +1,13 @@
 from datetime import date
+
 from fastapi import APIRouter, Query
 
 from app.core.deps import CurrentUser, DbSession
-from app.modules.analytics.schemas.analytics import AnalyticsSummary, InsightResponse, PaymentMethodReport
+from app.modules.analytics.schemas.analytics import (
+    AnalyticsSummary,
+    InsightResponse,
+    PaymentMethodReport,
+)
 from app.modules.analytics.services.analytics_service import AnalyticsService
 
 router = APIRouter()

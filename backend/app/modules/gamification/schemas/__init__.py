@@ -1,32 +1,33 @@
 """Gamification schemas"""
 
-from pydantic import BaseModel
 from datetime import datetime
 
+from pydantic import BaseModel
+
 from .badge import (
-    BadgeRarity,
     BadgeCategory,
-    BadgeResponse,
     BadgeEarnedEvent,
     BadgeListResponse,
-)
-from .streak import (
-    StreakType,
-    StreakResponse,
-    StreakDayInfo,
-    StreakWeekView,
+    BadgeRarity,
+    BadgeResponse,
 )
 from .challenge import (
     ChallengeDifficulty,
-    ChallengeStatus,
-    ChallengeResponse,
     ChallengeListResponse,
+    ChallengeResponse,
     ChallengeStartResponse,
+    ChallengeStatus,
 )
 from .points import (
+    PointsHistoryResponse,
     PointsResponse,
     PointsTransactionResponse,
-    PointsHistoryResponse,
+)
+from .streak import (
+    StreakDayInfo,
+    StreakResponse,
+    StreakType,
+    StreakWeekView,
 )
 
 

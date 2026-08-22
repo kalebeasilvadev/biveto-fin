@@ -1,13 +1,12 @@
 """Mistral provider para extracao de documentos via OCR especializado"""
 import asyncio
 import io
-import json
 from pathlib import Path
 
 from app.core.config import settings
-from .base import BaseProvider
-from ..document_classifier import DocumentClassifier, DocumentType
 
+from ..document_classifier import DocumentClassifier, DocumentType
+from .base import BaseProvider
 
 DEFAULT_MAX_RETRIES = 3
 DEFAULT_RETRY_DELAY = 2.0
@@ -181,20 +180,20 @@ class MistralProvider(BaseProvider):
 
         # Usar novo classificador se disponivel
         if self.classifier:
-            print(f"[MistralProvider] Usando DocumentClassifier...")
+            print("[MistralProvider] Usando DocumentClassifier...")
             doc_type_enum = await self.classifier.classify(ocr_text, max_chars=3000)
 
             if doc_type_enum == DocumentType.CUPOM_FISCAL:
                 doc_type = "cupom_fiscal"
                 prompt_path = prompts_dir / "cupom_fiscal_focused.md"
-                print(f"[MistralProvider] Tipo detectado: CUPOM_FISCAL -> usando prompt focado")
+                print("[MistralProvider] Tipo detectado: CUPOM_FISCAL -> usando prompt focado")
             elif doc_type_enum == DocumentType.FATURA_CARTAO:
                 doc_type = "fatura_cartao"
                 prompt_path = prompts_dir / "fatura_cartao_focused.md"
-                print(f"[MistralProvider] Tipo detectado: FATURA_CARTAO -> usando prompt focado")
+                print("[MistralProvider] Tipo detectado: FATURA_CARTAO -> usando prompt focado")
             else:
                 # Fallback: usar metodo antigo
-                print(f"[MistralProvider] Tipo UNKNOWN, usando deteccao antiga...")
+                print("[MistralProvider] Tipo UNKNOWN, usando deteccao antiga...")
                 doc_type = self._detect_document_type(ocr_text)
                 if doc_type == "cupom_fiscal":
                     prompt_path = prompts_dir / "cupom_fiscal_focused.md"
@@ -342,6 +341,7 @@ class MistralProvider(BaseProvider):
         Otimizado para memoria: fecha imagens explicitamente e roda gc.collect() periodicamente.
         """
         import gc
+
         from PIL import Image
 
         def _split_long_image(img: Image.Image, max_ratio: float = 3.0) -> tuple[list[Image.Image], bool]:
@@ -442,6 +442,7 @@ class MistralProvider(BaseProvider):
         """
         import gc
         import io
+
         from PIL import Image
 
         try:
@@ -614,7 +615,7 @@ class MistralProvider(BaseProvider):
 
         annotation_prompt = self._build_annotation_prompt(bank_prompt)
 
-        print(f"[MistralProvider] Trying document_annotation (single-call extraction)...")
+        print("[MistralProvider] Trying document_annotation (single-call extraction)...")
 
         try:
             ocr_response = await asyncio.to_thread(
@@ -636,7 +637,7 @@ class MistralProvider(BaseProvider):
         annotation_json = getattr(ocr_response, 'document_annotation', None)
         # Handle UNSET sentinel from Mistral SDK
         if annotation_json is None or (hasattr(annotation_json, '__class__') and 'UNSET' in str(type(annotation_json))):
-            print(f"[MistralProvider] document_annotation returned no structured data")
+            print("[MistralProvider] document_annotation returned no structured data")
             return None, ocr_text
 
         if not isinstance(annotation_json, str) or not annotation_json.strip():
@@ -650,7 +651,7 @@ class MistralProvider(BaseProvider):
         result = self._parse_response(annotation_json)
 
         if not result.get('items'):
-            print(f"[MistralProvider] document_annotation parsed but no items found")
+            print("[MistralProvider] document_annotation parsed but no items found")
             return None, ocr_text
 
         # Validate sum
@@ -723,7 +724,7 @@ class MistralProvider(BaseProvider):
 
             # If annotation returned no OCR text, do a separate OCR call (reuse file_id)
             if not ocr_text.strip():
-                print(f"[MistralProvider] Annotation didn't return OCR text, doing separate OCR (reusing file_id)...")
+                print("[MistralProvider] Annotation didn't return OCR text, doing separate OCR (reusing file_id)...")
                 ocr_response = await asyncio.to_thread(
                     self._ocr_sync, client, uploaded_file.id
                 )
@@ -740,7 +741,7 @@ class MistralProvider(BaseProvider):
 
             # If annotation succeeded with good sum match, return it directly
             if annotation_result and not annotation_result.get('_annotation_candidate'):
-                print(f"[MistralProvider] Using document_annotation result (perfect match)")
+                print("[MistralProvider] Using document_annotation result (perfect match)")
                 return annotation_result
 
             # Step 3: Fallback to OCR text + LLM chat
@@ -914,7 +915,7 @@ class MistralProvider(BaseProvider):
             return result
 
         print(f"[MistralProvider] Sum mismatch: items_sum={items_sum:.2f}, total={total_amount:.2f}, faltam={diff:.2f}")
-        print(f"[MistralProvider] Retrying with feedback...")
+        print("[MistralProvider] Retrying with feedback...")
 
         # Identify specific missing amounts from OCR text
         missing_amounts_info = self._find_missing_amounts_in_ocr(ocr_text, result['items'])

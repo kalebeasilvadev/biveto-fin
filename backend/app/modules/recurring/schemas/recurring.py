@@ -1,7 +1,8 @@
 from datetime import date, datetime
-from pydantic import BaseModel, Field, model_validator
-from typing import Optional
 from enum import Enum
+
+from pydantic import BaseModel, Field, model_validator
+
 from app.models.household import OwnershipType
 from app.models.transaction import PaymentMethod
 
@@ -27,57 +28,57 @@ class TransactionType(str, Enum):
 class RecurringCreate(BaseModel):
     """Schema para criar uma transacao recorrente"""
     name: str = Field(..., min_length=1, max_length=100)
-    description: Optional[str] = Field(None, max_length=500)
+    description: str | None = Field(None, max_length=500)
     amount: float = Field(..., gt=0)
     type: TransactionType = TransactionType.EXPENSE
-    payment_method: Optional[PaymentMethod] = None  # credit_card, pix, boleto, etc.
+    payment_method: PaymentMethod | None = None  # credit_card, pix, boleto, etc.
     account_id: int
-    category_id: Optional[int] = None
+    category_id: int | None = None
     frequency: RecurrenceFrequency
-    day_of_month: Optional[int] = Field(None, ge=1, le=31)
-    day_of_week: Optional[int] = Field(None, ge=0, le=6)
+    day_of_month: int | None = Field(None, ge=1, le=31)
+    day_of_week: int | None = Field(None, ge=0, le=6)
     start_date: date
-    end_date: Optional[date] = None
+    end_date: date | None = None
     ownership_type: OwnershipType = OwnershipType.PERSONAL
 
 
 class RecurringUpdate(BaseModel):
     """Schema para atualizar uma transação recorrente"""
-    name: Optional[str] = Field(None, min_length=1, max_length=100)
-    description: Optional[str] = Field(None, max_length=500)
-    amount: Optional[float] = Field(None, gt=0)
-    type: Optional[TransactionType] = None
-    payment_method: Optional[PaymentMethod] = None
-    account_id: Optional[int] = None
-    category_id: Optional[int] = None
-    frequency: Optional[RecurrenceFrequency] = None
-    day_of_month: Optional[int] = Field(None, ge=1, le=31)
-    day_of_week: Optional[int] = Field(None, ge=0, le=6)
-    end_date: Optional[date] = None
-    status: Optional[RecurringStatus] = None
+    name: str | None = Field(None, min_length=1, max_length=100)
+    description: str | None = Field(None, max_length=500)
+    amount: float | None = Field(None, gt=0)
+    type: TransactionType | None = None
+    payment_method: PaymentMethod | None = None
+    account_id: int | None = None
+    category_id: int | None = None
+    frequency: RecurrenceFrequency | None = None
+    day_of_month: int | None = Field(None, ge=1, le=31)
+    day_of_week: int | None = Field(None, ge=0, le=6)
+    end_date: date | None = None
+    status: RecurringStatus | None = None
 
 
 class RecurringResponse(BaseModel):
     """Schema de resposta de uma transacao recorrente"""
     id: int
     name: str
-    description: Optional[str]
+    description: str | None
     amount: float
     type: str
-    payment_method: Optional[str] = None
+    payment_method: str | None = None
     account_id: int
-    account_name: Optional[str] = None
-    category_id: Optional[int]
-    category_name: Optional[str] = None
+    account_name: str | None = None
+    category_id: int | None
+    category_name: str | None = None
     frequency: str
-    day_of_month: Optional[int]
-    day_of_week: Optional[int]
+    day_of_month: int | None
+    day_of_week: int | None
     start_date: date
-    end_date: Optional[date]
+    end_date: date | None
     status: str
     ownership_type: str = "personal"
-    last_generated_date: Optional[date]
-    next_due_date: Optional[date]
+    last_generated_date: date | None
+    next_due_date: date | None
     created_at: datetime
     updated_at: datetime
 
@@ -101,17 +102,17 @@ class RecurringFromSuggestionCreate(BaseModel):
 
     # Campos da sugestão (opcionais com defaults)
     frequency: RecurrenceFrequency = RecurrenceFrequency.MONTHLY
-    day_of_month: Optional[int] = Field(None, ge=1, le=31)
-    category_id: Optional[int] = None
-    category_name: Optional[str] = None  # Alternativa ao category_id - busca por nome
+    day_of_month: int | None = Field(None, ge=1, le=31)
+    category_id: int | None = None
+    category_name: str | None = None  # Alternativa ao category_id - busca por nome
 
     # Campos extras
-    description: Optional[str] = Field(None, max_length=500)
-    start_date: Optional[date] = None  # Se não informado, usa hoje
-    payment_method: Optional[PaymentMethod] = PaymentMethod.CREDIT_CARD
+    description: str | None = Field(None, max_length=500)
+    start_date: date | None = None  # Se não informado, usa hoje
+    payment_method: PaymentMethod | None = PaymentMethod.CREDIT_CARD
     type: TransactionType = TransactionType.EXPENSE
-    known_service_id: Optional[int] = None  # ID do serviço conhecido (opcional, para tracking)
-    credit_card_id: Optional[int] = None  # ID do cartão de crédito (para faturas)
+    known_service_id: int | None = None  # ID do serviço conhecido (opcional, para tracking)
+    credit_card_id: int | None = None  # ID do cartão de crédito (para faturas)
     ownership_type: OwnershipType = OwnershipType.PERSONAL
 
 
@@ -128,9 +129,9 @@ class BatchRecurringItemResult(BaseModel):
     """Resultado de um item do batch"""
     index: int
     success: bool
-    recurring_id: Optional[int] = None
-    recurring_name: Optional[str] = None
-    error: Optional[str] = None
+    recurring_id: int | None = None
+    recurring_name: str | None = None
+    error: str | None = None
     is_duplicate: bool = False
 
 

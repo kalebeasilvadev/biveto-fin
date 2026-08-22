@@ -1,22 +1,22 @@
 from __future__ import annotations
-from fastapi import APIRouter, HTTPException, status, Query
-from sqlalchemy import select, or_, and_, func
-from decimal import Decimal
+
+from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel
+from sqlalchemy import and_, func, or_, select
 
 from app.core.deps import CurrentUser, DbSession
-from app.models.credit_card import CreditCard
 from app.models.account import Account, AccountType
+from app.models.credit_card import CreditCard
 from app.models.credit_card_invoice import CreditCardInvoice, InvoiceStatus
 from app.models.household import HouseholdMember
-from app.modules.credit_cards.services.invoice_service import InvoiceService
 from app.modules.credit_cards.schemas.credit_card import (
     CreditCardCreate,
-    CreditCardUpdate,
-    CreditCardResponse,
     CreditCardListResponse,
+    CreditCardResponse,
+    CreditCardUpdate,
     InvoicePasswordRequest,
 )
+from app.modules.credit_cards.services.invoice_service import InvoiceService
 from app.modules.household.utils.household_helpers import validate_create_permission
 
 router = APIRouter()
@@ -405,7 +405,7 @@ async def project_recurring_transactions(
     )
 
     return ProjectRecurringResponse(
-        message=f"Projecao concluida com sucesso",
+        message="Projecao concluida com sucesso",
         transactions_created=len(created_transactions),
         months_projected=months_ahead,
     )

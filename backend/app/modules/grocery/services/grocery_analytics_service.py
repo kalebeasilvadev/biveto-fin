@@ -1,35 +1,34 @@
 """
 Grocery Analytics Service - Analytics and insights
 """
-from datetime import date, timedelta
 from collections import defaultdict
+from datetime import date, timedelta
+
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
 
 from app.models.grocery import (
-    GroceryPurchase,
-    GroceryCategory,
-    NecessityType,
     GROCERY_CATEGORY_DISPLAY,
     NECESSITY_TYPE_DISPLAY,
+    GroceryPurchase,
+    NecessityType,
 )
-from app.models.budget import Budget, BudgetItem
 from app.models.user import User
 from app.modules.grocery.schemas.analytics import (
-    GroceryAnalyticsSpending,
+    CategoryBreakdown,
     GroceryAnalyticsByCategory,
     GroceryAnalyticsByNecessity,
-    GroceryInsights,
+    GroceryAnalyticsSpending,
     GroceryBudgetStatus,
-    SpendingPoint,
-    CategoryBreakdown,
-    NecessityBreakdown,
+    GroceryInsights,
     Insight,
+    NecessityBreakdown,
+    SpendingPoint,
 )
 from app.modules.household.utils import (
-    get_household_user_ids,
-    get_household_member,
     build_ownership_filter,
+    get_household_member,
+    get_household_user_ids,
 )
 
 

@@ -1,7 +1,7 @@
 """Schemas para detecção de transações recorrentes"""
-from pydantic import BaseModel, Field
-from typing import Optional
 from enum import Enum
+
+from pydantic import BaseModel
 
 
 class DuplicateType(str, Enum):

@@ -2,13 +2,13 @@
 Automation Rule model for financial automations.
 """
 
-from datetime import datetime, timezone
-from app.core.utils import utc_now
-from decimal import Decimal
+from datetime import datetime
 from enum import Enum
 
-from sqlalchemy import ForeignKey, Index, JSON, String, Text, UniqueConstraint
+from sqlalchemy import JSON, ForeignKey, Index, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.core.utils import utc_now
 
 from ..core.database import Base
 

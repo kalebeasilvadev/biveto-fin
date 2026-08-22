@@ -1,8 +1,11 @@
-from datetime import datetime, date, timezone
-from app.core.utils import utc_now
+from datetime import date, datetime
 from enum import Enum
-from sqlalchemy import String, ForeignKey, DateTime, Date, Text, Numeric, JSON
+
+from sqlalchemy import JSON, Date, DateTime, ForeignKey, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.core.utils import utc_now
+
 from ..core.database import Base
 
 
@@ -279,13 +282,13 @@ class TransactionAudit(Base):
     transaction: Mapped["Transaction"] = relationship(back_populates="audit_logs")
 
 
-from .user import User
 from .account import Account
 from .category import Category
-from .merchant import Merchant
+from .credit_card_invoice import CreditCardInvoice
 from .document import Document
 from .installment import InstallmentSeries
-from .recurring import RecurringTransaction
-from .credit_card_invoice import CreditCardInvoice
-from .transaction_payment import TransactionPayment
+from .merchant import Merchant
 from .receipt import Receipt
+from .recurring import RecurringTransaction
+from .transaction_payment import TransactionPayment
+from .user import User

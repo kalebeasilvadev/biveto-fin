@@ -7,23 +7,35 @@ with future projections from recurring transactions, invoices, debts, etc.
 
 from datetime import date, timedelta
 from decimal import Decimal
+
 from dateutil.relativedelta import relativedelta
-from sqlalchemy import select, func, and_
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models import (
-    User, Transaction, Account, Category,
-    RecurringTransaction, RecurrenceFrequency, RecurringStatus,
-    CreditCardInvoice, InvoiceStatus,
-    Debt, DebtStatus,
-    InstallmentSeries
+    Account,
+    CreditCardInvoice,
+    Debt,
+    DebtStatus,
+    InvoiceStatus,
+    RecurrenceFrequency,
+    RecurringStatus,
+    RecurringTransaction,
+    Transaction,
+    User,
 )
 from app.modules.calendar.schemas import (
-    DailyEntry, TransactionSummary, ProjectionItem, ProjectionType,
-    RunningBalanceEntry, WeeklySummary, MajorExpense, CashCalendarResponse
+    CashCalendarResponse,
+    DailyEntry,
+    MajorExpense,
+    ProjectionItem,
+    ProjectionType,
+    RunningBalanceEntry,
+    TransactionSummary,
+    WeeklySummary,
 )
-from app.modules.household.utils import get_household_user_ids, build_ownership_filter
+from app.modules.household.utils import get_household_user_ids
 
 
 class CashCalendarService:
@@ -348,12 +360,9 @@ class CashCalendarService:
                 projections[d] = []
             projections[d].extend(items)
 
-        # Get installment projections
-        installment_projs = await self._project_installments(user, proj_start, end_date)
-        for d, items in installment_projs.items():
-            if d not in projections:
-                projections[d] = []
-            projections[d].extend(items)
+        # Parcelas futuras NAO sao projetadas aqui: elas ja existem como Transactions
+        # futuras (is_paid=false) geradas pela InstallmentSeries e entram pela query
+        # de transacoes do periodo — projeta-las de novo duplicaria os valores.
 
         return projections
 
@@ -486,42 +495,6 @@ class CashCalendarService:
                 projections[current].append(item)
 
                 current = (current + relativedelta(months=1)).replace(day=min(debt.due_day, 28))
-
-        return projections
-
-    async def _project_installments(
-        self, user: User, start_date: date, end_date: date
-    ) -> dict[date, list[ProjectionItem]]:
-        """Project future installment payments."""
-        household_ids = await get_household_user_ids(self.db, user)
-
-        query = (
-            select(Installment)
-            .options(selectinload(Installment.series))
-            .where(
-                Installment.series.has(InstallmentSeries.user_id.in_(household_ids)),
-                Installment.status == "pending",
-                Installment.due_date >= start_date,
-                Installment.due_date <= end_date,
-            )
-        )
-        result = await self.db.execute(query)
-        installments = result.scalars().all()
-
-        projections = {}
-        for inst in installments:
-            item = ProjectionItem(
-                projection_type=ProjectionType.INSTALLMENT,
-                description=f"{inst.series.description if inst.series else 'Parcela'} ({inst.installment_number}/{inst.series.total_installments if inst.series else '?'})",
-                amount=float(inst.amount),
-                is_income=False,
-                entity_type="installment",
-                entity_id=inst.id,
-                confidence=1.0,
-            )
-            if inst.due_date not in projections:
-                projections[inst.due_date] = []
-            projections[inst.due_date].append(item)
 
         return projections
 

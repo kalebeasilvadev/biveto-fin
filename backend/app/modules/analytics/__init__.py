@@ -3,9 +3,9 @@ from app.modules.analytics.routers.analytics import router
 from app.modules.analytics.schemas.analytics import (
     AnalyticsSummary,
     CategorySummary,
-    MerchantSummary,
     InsightResponse,
     InsightType,
+    MerchantSummary,
 )
 from app.modules.analytics.services.analytics_service import AnalyticsService
 

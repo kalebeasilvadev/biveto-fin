@@ -2,20 +2,18 @@
 Service for managing income split rules and applying splits to income transactions.
 Creates pending expense transactions linked to the original income.
 """
-from datetime import date
-from typing import Optional
-from sqlalchemy import select, and_
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.income_split_rule import IncomeSplitRule, SplitType
-from app.models.transaction import Transaction, TransactionType
 from app.models.category import Category
+from app.models.income_split_rule import IncomeSplitRule
+from app.models.transaction import Transaction, TransactionType
 from app.models.user import User
 from app.modules.income_splits.schemas.income_split import (
-    IncomeSplitRuleCreate,
-    IncomeSplitRuleUpdate,
-    IncomeSplitRuleResponse,
     IncomeSplitPreview,
+    IncomeSplitRuleCreate,
+    IncomeSplitRuleResponse,
+    IncomeSplitRuleUpdate,
 )
 
 
@@ -47,7 +45,7 @@ class IncomeSplitService:
         )
         return list(result.scalars().all())
 
-    async def get_by_id(self, user: User, rule_id: int) -> Optional[IncomeSplitRule]:
+    async def get_by_id(self, user: User, rule_id: int) -> IncomeSplitRule | None:
         """Get a specific income split rule by ID"""
         result = await self.db.execute(
             select(IncomeSplitRule).where(
@@ -85,7 +83,7 @@ class IncomeSplitService:
 
     async def update(
         self, user: User, rule_id: int, data: IncomeSplitRuleUpdate
-    ) -> Optional[IncomeSplitRule]:
+    ) -> IncomeSplitRule | None:
         """
         Update an existing income split rule.
 

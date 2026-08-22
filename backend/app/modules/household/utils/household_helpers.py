@@ -1,9 +1,9 @@
 """
 Helpers para lógica de household reutilizáveis em todos os módulos
 """
-from sqlalchemy import select, or_, and_
-from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
+from sqlalchemy import and_, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.household import HouseholdMember
 from app.models.user import User

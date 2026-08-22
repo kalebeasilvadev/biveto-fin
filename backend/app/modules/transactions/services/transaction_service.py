@@ -1,22 +1,28 @@
 from __future__ import annotations
-from datetime import date, timedelta
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, or_, func
-from sqlalchemy.orm import selectinload
-from fastapi import HTTPException, status
 
-from app.models.transaction import Transaction, TransactionAudit, TransactionType, PaymentMethod
-from app.models.merchant import Merchant
+from datetime import date, timedelta
+
+from fastapi import HTTPException, status
+from sqlalchemy import and_, func, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
 from app.models.account import Account
-from app.models.user import User
-from app.models.household import HouseholdMember
-from app.models.recurring import RecurringTransaction
 from app.models.credit_card import CreditCard
-from app.modules.transactions.schemas.transaction import TransactionCreate, TransactionUpdate, TransactionConfirm
-from app.modules.installments.services.installment_service import InstallmentService
+from app.models.household import HouseholdMember
+from app.models.merchant import Merchant
+from app.models.recurring import RecurringTransaction
+from app.models.transaction import PaymentMethod, Transaction, TransactionAudit, TransactionType
+from app.models.user import User
+from app.modules.budgets.services.budget_service import BudgetService
 from app.modules.credit_cards.services.invoice_service import InvoiceService
 from app.modules.income_splits.services.income_split_service import IncomeSplitService
-from app.modules.budgets.services.budget_service import BudgetService
+from app.modules.installments.services.installment_service import InstallmentService
+from app.modules.transactions.schemas.transaction import (
+    TransactionConfirm,
+    TransactionCreate,
+    TransactionUpdate,
+)
 
 
 class TransactionService:
@@ -91,7 +97,6 @@ class TransactionService:
         is_installment = getattr(data, 'is_installment', False)
         installment_current = getattr(data, 'installment_current', None)
         installment_total = getattr(data, 'installment_total', None)
-        create_future_installments = getattr(data, 'create_future_installments', False)
 
         if is_installment and installment_current and installment_total:
             # Processar transacao parcelada
@@ -927,7 +932,7 @@ class TransactionService:
 
                 else:
                     # Não encontrou série existente - criar nova (fluxo original)
-                    print(f"[TX_SVC] Nenhuma serie encontrada via fuzzy match, criando nova")
+                    print("[TX_SVC] Nenhuma serie encontrada via fuzzy match, criando nova")
 
                     # Determinar payment_method
                     payment_method = self._infer_payment_method(data, credit_card_id)
@@ -959,7 +964,7 @@ class TransactionService:
                     # PASSO 2: Criar série vinculada a ESTA transação
                     first_installment_date = data.date - relativedelta(months=data.installment_current - 1)
 
-                    print(f"[TX_SVC] Criando serie de parcelas (NOVO FLUXO):")
+                    print("[TX_SVC] Criando serie de parcelas (NOVO FLUXO):")
                     print(f"[TX_SVC]   data.date={data.date}, installment={data.installment_current}/{data.installment_total}")
                     print(f"[TX_SVC]   first_installment_date calculado={first_installment_date}")
                     print(f"[TX_SVC]   first_transaction_id={transaction.id}")

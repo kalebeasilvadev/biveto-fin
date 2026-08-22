@@ -3,21 +3,20 @@ Router for Financial Automations.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.deps import get_current_user
-from app.models import User, TriggerType, ActionType
+from app.models import ActionType, TriggerType, User
 from app.modules.automations.schemas import (
-    AutomationRuleCreate,
-    AutomationRuleUpdate,
-    AutomationRuleResponse,
-    AutomationRuleListResponse,
     AutomationExecutionResponse,
+    AutomationRuleCreate,
+    AutomationRuleListResponse,
+    AutomationRuleResponse,
+    AutomationRuleUpdate,
     AutomationTestResult,
 )
 from app.modules.automations.services import AutomationService
-
-from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/automations", tags=["automations"])
 

@@ -1,10 +1,10 @@
 """Gamification services"""
 
-from .gamification_service import GamificationService
 from .badge_service import BadgeService
-from .streak_service import StreakService
 from .challenge_service import ChallengeService
+from .gamification_service import GamificationService
 from .points_service import PointsService
+from .streak_service import StreakService
 
 __all__ = [
     "GamificationService",

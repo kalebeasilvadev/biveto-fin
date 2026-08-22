@@ -1,13 +1,11 @@
 """Serviço de envio de emails via SMTP"""
 import smtplib
 import ssl
-import uuid
-from datetime import datetime
-from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from email.utils import formatdate, make_msgid
-from ..config import settings
 
+from ..config import settings
 
 # Template base para emails
 EMAIL_BASE_STYLE = """

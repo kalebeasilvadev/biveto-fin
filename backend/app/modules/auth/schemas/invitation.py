@@ -2,6 +2,7 @@
 Schemas de convite: criacao, validacao e registro via convite.
 """
 from datetime import datetime
+
 from pydantic import BaseModel, EmailStr, Field
 
 from app.models.invitation import InvitationStatus

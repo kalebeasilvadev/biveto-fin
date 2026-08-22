@@ -1,8 +1,11 @@
-from datetime import datetime, timezone
-from app.core.utils import utc_now
+from datetime import datetime
 from enum import Enum
-from sqlalchemy import String, ForeignKey, DateTime, Numeric, Boolean, Integer, Text
+
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.core.utils import utc_now
+
 from ..core.database import Base
 
 
@@ -87,5 +90,5 @@ class CreditCard(Base):
 
 
 from .account import Account
-from .user import User
 from .credit_card_invoice import CreditCardInvoice
+from .user import User
