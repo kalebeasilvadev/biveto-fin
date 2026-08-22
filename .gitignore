@@ -71,8 +71,27 @@ prints/
 # MCP config (may contain sensitive info)
 mcp-config.json
 
-# HTTPS certificates for local development
+# HTTPS certificates and private keys (never commit)
 frontend/certs/
+frontend/certs.bak/
+frontend/public/certs/
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Database dumps and backups (never commit)
+*.dump
+*.bundle
+
+# Real financial data / test fixtures with PII (never commit)
+*.csv
+extracao.json
+payload_batch_confirm.json
+response_batch_confirm.json
+
+# AI agent local dirs
+.codex/
 Nubank_2026-01-12 2.csv
 credencial_test.txt
 
