@@ -37,6 +37,15 @@ flowchart LR
 
 ## Indice de Documentos
 
+### Onboarding (comece por aqui) — atualizado em ago/2026
+
+| Documento | Descricao |
+|-----------|-----------|
+| [Guia de Onboarding](./onboarding/README.md) | Trilha completa para novos integrantes: o que e o app, setup (Windows e Linux), mapa do codigo, decisoes de arquitetura e runbook de sustentacao |
+| [CONTRIBUTING](../CONTRIBUTING.md) | Fluxo de trabalho do time: branches, commits, PRs, revisao e definition of done |
+
+> Os documentos abaixo foram escritos entre jan-mar/2026; o conteudo conceitual segue valido, mas caminhos de arquivo e contagens podem estar defasados (a estrutura do backend migrou para `app/modules/<feature>/`). Em caso de conflito, confie no onboarding e no codigo.
+
 ### Arquitetura
 
 | Documento | Descricao |
@@ -79,6 +88,15 @@ flowchart LR
 | Documento | Descricao |
 |-----------|-----------|
 | [Mistral Integration](./integrations/MISTRAL_INTEGRATION.md) | Integracao com Mistral OCR |
+| [MCP Tools](./integrations/MCP_TOOLS.md) | Servidor MCP para Claude Code / assistentes |
+
+### Analises e Seguranca
+
+| Documento | Descricao |
+|-----------|-----------|
+| [Team Analysis](./team-analysis/README.md) | Relatorios de auditoria por especialidade (mar/2026) + plano de acao |
+| [Security Audit](./business/SECURITY_AUDIT_2026-02.md) | Auditoria de seguranca (fev/2026) |
+| [Security Remediation](./SECURITY_REMEDIATION_CHECKLIST.md) | Checklist de remediacao de segredos no repositorio |
 
 ---
 

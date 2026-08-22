@@ -2,6 +2,8 @@
 
 Sistema completo de gestao financeira pessoal com suporte a familias, extracao inteligente de documentos via IA e assistente financeiro.
 
+> **Novo no time?** Comece pelo **[guia de onboarding](docs/onboarding/README.md)** (o que e o app, setup Windows/Linux, mapa do codigo, decisoes de arquitetura) e pelo **[CONTRIBUTING.md](CONTRIBUTING.md)** (fluxo de branches, PRs e definition of done). Esses guias, escritos em ago/2026, sao a referencia mais atual — alguns numeros abaixo (contagem de modulos/paginas) estao defasados.
+
 ## Visao Geral
 
 O Biveto e uma aplicacao web de gestao financeira que permite:
